@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Master Educação - Painel Administrativo</title>
+  
+  <!-- Tailwind CSS (versão estável) -->
+  <script src="https://cdn.tailwindcss.com/3.3.0"></script>
+  
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;700&family=Lexend:wght@400;700&display=swap" rel="stylesheet">
+  
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+  
+  <!-- Ícones -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- CSS Personalizado -->
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- Configuração do Tailwind -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            orange: {
+              500: '#f28705',
+              600: '#d97804',
+              400: '#ffb347',
+              300: '#ffcc7f',
+              100: '#fff7eb'
+            }
+          },
+          fontFamily: {
+            'comfortaa': ['Comfortaa', 'cursive'],
+            'lexend': ['Lexend', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-gray-50 font-sans">
+  <!-- Loading Inicial -->
+  <div id="loading-screen" class="fixed inset-0 bg-white z-50 flex flex-col items-center justify-center">
+    <div class="loading-spinner-large"></div>
+    <p class="mt-4 text-orange-500 font-comfortaa font-bold">Carregando dados...</p>
+  </div>
+
+  <div class="flex h-screen overflow-hidden">
+    <!-- Menu Lateral -->
+    <aside id="menu-lateral" class="bg-orange-500 text-white w-64 flex-shrink-0 shadow-xl">
+      <!-- Logo -->
+      <div class="p-4 border-b border-orange-400">
+        <div class="flex items-center justify-center">
+          <div class="w-16 h-16 bg-white rounded-full flex items-center justify-center">
+            <i class="fas fa-graduation-cap text-orange-500 text-2xl"></i>
+          </div>
+          <div class="ml-3">
+            <h1 class="font-lexend font-bold text-lg">Master Educação</h1>
+            <p class="font-comfortaa text-xs">Painel Admin</p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Menu Items -->
+      <nav id="div-menuLateral" class="p-3 space-y-1 mt-4">
+        <button class="menu-item active" data-section="banco-aulas">
+          <i class="fas fa-book mr-3"></i>
+          <span>Banco de Aulas</span>
+        </button>
+        
+        <button class="menu-item" data-section="aulas-dia">
+          <i class="fas fa-calendar-day mr-3"></i>
+          <span>Aulas do Dia</span>
+        </button>
+        
+        <button class="menu-item" data-section="mensagens">
+          <i class="fas fa-comments mr-3"></i>
+          <span>Mensagens Automáticas</span>
+        </button>
+        
+        <button class="menu-item" data-section="simulacoes">
+          <i class="fas fa-chart-line mr-3"></i>
+          <span>Simulações</span>
+        </button>
+        
+        <button class="menu-item" data-section="fluxo-processos">
+          <i class="fas fa-project-diagram mr-3"></i>
+          <span>Fluxo de Processos</span>
+        </button>
+        
+        <button class="menu-item" data-section="dashboard">
+          <i class="fas fa-tachometer-alt mr-3"></i>
+          <span>Dashboard</span>
+        </button>
+        
+        <button class="menu-item" data-section="exportar-dados">
+          <i class="fas fa-file-export mr-3"></i>
+          <span>Exportar Dados</span>
+        </button>
+      </nav>
+      
+      <!-- Footer do Menu -->
+      <div class="absolute bottom-0 left-0 right-0 p-3 border-t border-orange-400">
+        <div class="text-center text-xs opacity-80">
+          <p class="font-lexend">Master Educação</p>
+          <p class="font-comfortaa mt-1">Painel Administrativo</p>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Conteúdo Principal -->
+    <main class="flex-1 overflow-auto">
+      <!-- Header -->
+      <header class="bg-white shadow-sm border-b px-4 py-3">
+        <div class="flex justify-between items-center">
+          <h1 id="section-title" class="text-xl font-lexend font-bold text-gray-800">Banco de Aulas</h1>
+          <div class="flex items-center space-x-3">
+            <div class="relative">
+              <input type="text" placeholder="Pesquisar..." class="pl-9 pr-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-300 w-48">
+              <i class="fas fa-search absolute left-3 top-2.5 text-gray-400 text-sm"></i>
+            </div>
+            <div class="flex items-center space-x-2">
+              <div class="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                <i class="fas fa-user text-orange-500 text-sm"></i>
+              </div>
+              <span class="text-sm font-comfortaa text-gray-600">Admin</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Área de Conteúdo -->
+      <div id="content-area" class="p-4">
+        <!-- Sections serão carregadas aqui -->
+        <section id="banco-aulas" class="section-content active">
+          <!-- Conteúdo será carregado por functions-banco-de-aulas.js -->
+        </section>
+        
+        <section id="aulas-dia" class="section-content">
+          <div class="text-center py-8">
+            <i class="fas fa-calendar-day text-3xl text-gray-300 mb-3"></i>
+            <h3 class="font-lexend text-lg mb-2">Aulas do Dia</h3>
+            <p class="text-gray-600 text-sm">Esta seção está em desenvolvimento.</p>
+          </div>
+        </section>
+        
+        <section id="mensagens" class="section-content">
+          <div class="text-center py-8">
+            <i class="fas fa-comments text-3xl text-gray-300 mb-3"></i>
+            <h3 class="font-lexend text-lg mb-2">Mensagens Automáticas</h3>
+            <p class="text-gray-600 text-sm">Esta seção está em desenvolvimento.</p>
+          </div>
+        </section>
+        
+        <section id="simulacoes" class="section-content">
+          <div class="text-center py-8">
+            <i class="fas fa-chart-line text-3xl text-gray-300 mb-3"></i>
+            <h3 class="font-lexend text-lg mb-2">Simulações</h3>
+            <p class="text-gray-600 text-sm">Esta seção está em desenvolvimento.</p>
+          </div>
+        </section>
+        
+        <section id="fluxo-processos" class="section-content">
+          <div class="text-center py-8">
+            <i class="fas fa-project-diagram text-3xl text-gray-300 mb-3"></i>
+            <h3 class="font-lexend text-lg mb-2">Fluxo de Processos</h3>
+            <p class="text-gray-600 text-sm">Esta seção está em desenvolvimento.</p>
+          </div>
+        </section>
+        
+        <section id="dashboard" class="section-content">
+          <div class="text-center py-8">
+            <i class="fas fa-tachometer-alt text-3xl text-gray-300 mb-3"></i>
+            <h3 class="font-lexend text-lg mb-2">Dashboard</h3>
+            <p class="text-gray-600 text-sm">Esta seção está em desenvolvimento.</p>
+          </div>
+        </section>
+        
+        <section id="exportar-dados" class="section-content">
+          <div class="text-center py-8">
+            <i class="fas fa-file-export text-3xl text-gray-300 mb-3"></i>
+            <h3 class="font-lexend text-lg mb-2">Exportar Dados</h3>
+            <p class="text-gray-600 text-sm">Esta seção está em desenvolvimento.</p>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
+
+  <!-- Scripts -->
+  <script src="banco.js"></script>
+  <script src="script.js"></script>
+  <script src="functions-banco-de-aulas.js"></script>
+  <script src="functions-aulas-do-dia.js"></script>
+  <script src="functions-mensagens-automaticas.js"></script>
+  <script src="functions-simulacoes.js"></script>
+  <script src="functions-fluxo-processos.js"></script>
+  <script src="functions-dashboard.js"></script>
+  <script src="functions-exportar-dados.js"></script>
+</body>
+</html>

@@ -1,0 +1,653 @@
+/* -------------------- VARIÁVEIS -------------------- */
+:root {
+  --orange: #f28705;
+  --orange-light: #ffb347;
+  --orange-dark: #d97804;
+  --black: #111827;
+  --gray-dark: #374151;
+  --gray-light: #f9fafb;
+  --radius: 16px;
+  --radius-sm: 8px;
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+  --shadow-sm: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
+/* -------------------- FONTES -------------------- */
+.font-comfortaa {
+  font-family: 'Comfortaa', cursive;
+}
+
+.font-lexend {
+  font-family: 'Lexend', sans-serif;
+}
+
+/* -------------------- LOADING -------------------- */
+.loading-spinner-large {
+  border: 6px solid #f3f3f3;
+  border-top: 6px solid var(--orange);
+  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* -------------------- MENU LATERAL -------------------- */
+.menu-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  font-family: 'Comfortaa', cursive;
+  font-weight: 700;
+  color: white;
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-bottom: 4px;
+}
+
+.menu-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateX(5px);
+}
+
+.menu-item.active {
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.menu-item i {
+  font-size: 1.1rem;
+  width: 24px;
+}
+
+/* -------------------- SECTIONS -------------------- */
+.section-content {
+  display: none;
+  animation: fadeIn 0.5s ease forwards;
+}
+
+.section-content.active {
+  display: block;
+}
+
+.section-content.fade-out {
+  animation: fadeOut 0.3s ease forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+    display: none;
+  }
+}
+
+/* -------------------- CARDS -------------------- */
+.card {
+  background: white;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 20px;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+}
+
+.card:hover {
+  transform: scale(1.05);
+  box-shadow: var(--shadow);
+  border-color: var(--orange);
+}
+
+.card-header {
+  font-family: 'Lexend', sans-serif;
+  font-weight: 700;
+  color: var(--orange);
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #f3f4f6;
+}
+
+/* -------------------- BOTÕES -------------------- */
+.btn-primary {
+  background: var(--orange);
+  color: white;
+  font-family: 'Comfortaa', cursive;
+  font-weight: 700;
+  padding: 10px 24px;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-primary:hover {
+  background: var(--orange-dark);
+  transform: scale(1.03);
+  box-shadow: 0 4px 12px rgba(242, 135, 5, 0.3);
+}
+
+.btn-secondary {
+  background: white;
+  color: var(--orange);
+  border: 2px solid var(--orange);
+  font-family: 'Comfortaa', cursive;
+  font-weight: 700;
+  padding: 10px 24px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+  background: var(--orange);
+  color: white;
+  transform: scale(1.03);
+}
+
+/* -------------------- FILTROS -------------------- */
+.filter-container {
+  background: white;
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 24px;
+}
+
+.filter-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.filter-label {
+  font-family: 'Comfortaa', cursive;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: var(--gray-dark);
+}
+
+.filter-select, .filter-input {
+  padding: 10px 12px;
+  border: 2px solid #e5e7eb;
+  border-radius: var(--radius-sm);
+  font-family: 'Comfortaa', cursive;
+  transition: all 0.2s ease;
+}
+
+.filter-select:focus, .filter-input:focus {
+  outline: none;
+  border-color: var(--orange);
+  box-shadow: 0 0 0 3px rgba(242, 135, 5, 0.1);
+}
+
+/* -------------------- CARDS GRID -------------------- */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.aula-card {
+  background: white;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 20px;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+}
+
+.aula-card:hover {
+  transform: scale(1.02);
+  box-shadow: var(--shadow);
+  border-color: var(--orange);
+}
+
+.aula-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.aula-card-title {
+  font-family: 'Lexend', sans-serif;
+  font-weight: 700;
+  color: var(--orange);
+  font-size: 1.1rem;
+}
+
+.aula-card-codigo {
+  font-family: 'Comfortaa', cursive;
+  font-size: 0.9rem;
+  color: var(--gray-dark);
+  background: #f9fafb;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.aula-card-content {
+  font-family: 'Comfortaa', cursive;
+  color: #4b5563;
+  line-height: 1.5;
+}
+
+/* -------------------- TOAST -------------------- */
+.toast {
+  background: white;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  min-width: 300px;
+  max-width: 400px;
+  animation: slideInRight 0.3s ease forwards;
+  border-left: 4px solid var(--orange);
+}
+
+.toast.success {
+  border-left-color: #10b981;
+}
+
+.toast.error {
+  border-left-color: #ef4444;
+}
+
+.toast.warning {
+  border-left-color: #f59e0b;
+}
+
+.toast-icon {
+  margin-right: 12px;
+  font-size: 1.2rem;
+}
+
+.toast-content {
+  flex: 1;
+}
+
+.toast-title {
+  font-family: 'Lexend', sans-serif;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.toast-message {
+  font-family: 'Comfortaa', cursive;
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+.toast-close {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  font-size: 1.2rem;
+  margin-left: 12px;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.toast.fade-out {
+  animation: slideOutRight 0.3s ease forwards;
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+/* -------------------- UTILITÁRIOS -------------------- */
+.hidden {
+  display: none !important;
+}
+
+/* -------------------- RESPONSIVIDADE -------------------- */
+@media (max-width: 768px) {
+  .cards-grid {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  }
+  
+  .filter-row {
+    grid-template-columns: 1fr;
+  }
+  
+  #menu-lateral {
+    width: 100%;
+    position: fixed;
+    height: auto;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    transform: translateY(-100%);
+    transition: transform 0.3s ease;
+  }
+  
+  #menu-lateral.menu-open {
+    transform: translateY(0);
+  }
+  
+  main {
+    margin-top: 80px;
+  }
+  
+  .menu-toggle {
+    display: block;
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 1001;
+    background: var(--orange);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    font-size: 1.5rem;
+  }
+}
+
+/* ADICIONAR AO FINAL DO ARQUIVO STYLE.CSS */
+
+/* -------------------- BOTÕES ELEMENTOS PEQUENOS -------------------- */
+.btn-compact {
+  padding: 6px 12px !important;
+  font-size: 0.8rem !important;
+}
+
+.filter-compact {
+  padding: 6px 10px !important;
+  font-size: 0.85rem !important;
+}
+
+.filter-label-compact {
+  font-size: 0.8rem !important;
+  margin-bottom: 4px !important;
+}
+
+/* Botões especiais mais compactos */
+.botoes-especiais .btn-primary,
+.botoes-especiais .btn-secondary {
+  padding: 8px 14px;
+  font-size: 0.85rem;
+}
+
+/* Filtros alinhados em linha */
+.filter-row-compact {
+  display: grid !important;
+  grid-template-columns: repeat(5, 1fr) !important;
+  gap: 12px !important;
+  align-items: end !important;
+}
+
+/* Ajuste específico para o botão aplicar filtros */
+#btn-aplicar-filtros {
+  height: 38px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  white-space: nowrap !important;
+}
+
+/* Cards com fonte menor */
+.aula-card-compact .aula-card-title {
+  font-size: 0.95rem !important;
+}
+
+.aula-card-compact .aula-card-content {
+  font-size: 0.85rem !important;
+}
+
+/* Grid de cards ajustado */
+.cards-grid-compact {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)) !important;
+  gap: 16px !important;
+}
+
+/* Ajuste responsivo para mobile */
+@media (max-width: 1024px) {
+  .filter-row-compact {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .filter-row-compact {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .botoes-especiais .flex-wrap {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .botoes-especiais .btn-primary,
+  .botoes-especiais .btn-secondary {
+    width: 100%;
+  }
+}
+
+/* ADICIONAR/ATUALIZAR NO ARQUIVO STYLE.CSS */
+
+/* -------------------- GRID DE 4 COLUNAS PARA CARDS -------------------- */
+.cards-grid-compact {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr); /* 4 colunas por padrão */
+  gap: 16px;
+}
+
+/* Cards de aula compactos */
+.aula-card-compact {
+  background: white;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 16px;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.aula-card-compact:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+  border-color: var(--orange);
+}
+
+/* Ajustes para telas menores - Responsividade */
+@media (max-width: 1536px) { /* 2xl */
+  .cards-grid-compact {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (max-width: 1280px) { /* xl */
+  .cards-grid-compact {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 1024px) { /* lg */
+  .cards-grid-compact {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) { /* md */
+  .cards-grid-compact {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+}
+
+@media (max-width: 640px) { /* sm */
+  .cards-grid-compact {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+/* Ajuste de cabeçalho e conteúdo dos cards */
+.aula-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.aula-card-title {
+  font-family: 'Lexend', sans-serif;
+  font-weight: 700;
+  color: var(--orange);
+  font-size: 0.95rem;
+  flex: 1;
+  line-height: 1.3;
+}
+
+.aula-card-codigo {
+  font-family: 'Comfortaa', cursive;
+  font-size: 0.75rem;
+  color: var(--gray-dark);
+  background: #f9fafb;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
+.aula-card-content {
+  font-family: 'Comfortaa', cursive;
+  color: #4b5563;
+  line-height: 1.5;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Ajuste dos elementos dentro do card */
+.aula-card-content > div:first-child {
+  flex: 1;
+}
+
+.aula-card-content > div:last-child {
+  margin-top: auto;
+  padding-top: 12px;
+}
+
+/* Botões dentro do card mais compactos */
+.aula-card-compact .btn-view-aula,
+.aula-card-compact .btn-edit-aula {
+  font-size: 0.75rem !important;
+  padding: 4px 8px !important;
+}
+
+/* Informações em linha para economizar espaço */
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.info-row:last-child {
+  margin-bottom: 0;
+}
+
+.info-label {
+  font-size: 0.75rem;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+}
+
+.info-value {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+/* Ajuste dos ícones nos labels */
+.info-label i {
+  margin-right: 4px;
+  font-size: 0.7rem;
+}
+
+/* Ajuste do filtro de clientes com busca */
+.cliente-search-container {
+  position: relative;
+}
+
+.cliente-search-input {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  padding: 8px;
+}
+
+.cliente-search-input.active {
+  display: block;
+}
+
+/* Ajuste do contador */
+#aulas-count {
+  font-size: 1.1rem;
+  color: var(--orange);
+}
