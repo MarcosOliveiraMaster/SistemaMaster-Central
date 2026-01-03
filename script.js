@@ -117,8 +117,14 @@ function showSection(sectionId) {
   
   // Adicionar classe de loading
   section.innerHTML = `
-    <div class="flex items-center justify-center py-12">
-      <div class="loading-spinner-large"></div>
+    <div class="flex flex-col items-center justify-center py-12">
+      <div class="loading-spinner-large mb-4"></div>
+      <p class="text-orange-500 font-comfortaa font-bold text-center">
+        Carregando ${sectionId.replace('-', ' ')}<br>
+        <span class="text-sm font-normal text-gray-500 mt-1 block">
+          Buscando dados do Firebase...
+        </span>
+      </p>
     </div>
   `;
   
@@ -133,7 +139,6 @@ function showSection(sectionId) {
 
 // Carregar conteúdo específico da seção
 function loadSectionContent(sectionId) {
-  // Esta função será complementada por cada arquivo de functions específico
   console.log(`Carregando conteúdo da seção: ${sectionId}`);
   
   // Chamar a função específica de cada seção
@@ -199,7 +204,6 @@ function setupGlobalListeners() {
 
 // Handler de redimensionamento
 function handleResize() {
-  // Adicionar toggle de menu para mobile se necessário
   if (window.innerWidth <= 768) {
     addMobileMenuToggle();
   } else {
@@ -240,9 +244,6 @@ function performSearch(query) {
   }
   
   showToast(`Buscando por: "${query}"`, 'info');
-  
-  // Implementar lógica de pesquisa específica para cada seção
-  // Será complementada por cada functions-*.js
 }
 
 // Sistema de Toast
@@ -276,7 +277,6 @@ function showToast(message, type = 'info', duration = 5000) {
   
   toastContainer.appendChild(toast);
   
-  // Remover toast automaticamente após a duração
   if (duration > 0) {
     setTimeout(() => {
       removeToast(toastId);
@@ -329,13 +329,17 @@ function formatDate(dateString) {
   if (!dateString) return '--/--/----';
   
   try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) {
-      // Tentar parse de formato dd/mm/yyyy
+    // Verificar se já está no formato dd/mm/yyyy
+    if (typeof dateString === 'string' && dateString.includes('/')) {
       const parts = dateString.split('/');
-      if (parts.length === 3) {
+      if (parts.length === 3 && parts[0].length === 2 && parts[1].length === 2 && parts[2].length === 4) {
         return dateString;
       }
+    }
+    
+    // Tentar converter de timestamp ou string ISO
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
       return '--/--/----';
     }
     
@@ -363,23 +367,83 @@ function formatTime(timeString) {
   return '--:--';
 }
 
-// Função para obter data formatada para filtros
-function getFilterDate(type) {
+// Função para obter data de hoje formatada
+function getTodayFormatted() {
   const hoje = new Date();
-  let data = new Date(hoje);
+  const dia = hoje.getDate().toString().padStart(2, '0');
+  const mes = (hoje.getMonth() + 1).toString().padStart(2, '0');
+  const ano = hoje.getFullYear();
+  return `${dia}/${mes}/${ano}`;
+}
+
+// Função para verificar se uma data é hoje
+function isToday(dateString) {
+  if (!dateString) return false;
   
-  switch(type) {
-    case 'hoje':
-      return hoje.toLocaleDateString('pt-BR');
-    case 'amanha':
-      data.setDate(hoje.getDate() + 1);
-      return data.toLocaleDateString('pt-BR');
-    case 'ontem':
-      data.setDate(hoje.getDate() - 1);
-      return data.toLocaleDateString('pt-BR');
-    default:
-      return '';
-  }
+  const hoje = getTodayFormatted();
+  return dateString === hoje;
+}
+
+// Função para criar modal genérico
+function createModal(title, content, buttons = []) {
+  const modalId = 'modal-' + Date.now();
+  
+  const modalHTML = `
+    <div id="${modalId}" class="modal-overlay">
+      <div class="modal-container max-w-2xl">
+        <div class="modal-header">
+          <h3 class="font-lexend font-bold text-lg text-gray-800">${title}</h3>
+          <button class="modal-close text-gray-400 hover:text-gray-600">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          ${content}
+        </div>
+        <div class="modal-footer">
+          ${buttons.map(btn => `
+            <button class="${btn.classes}" ${btn.attributes || ''}>
+              ${btn.text}
+            </button>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+  
+  const modalContainer = document.createElement('div');
+  modalContainer.innerHTML = modalHTML;
+  document.body.appendChild(modalContainer);
+  
+  const modal = document.getElementById(modalId);
+  const closeBtn = modal.querySelector('.modal-close');
+  
+  const closeModal = () => {
+    modal.remove();
+  };
+  
+  closeBtn.addEventListener('click', closeModal);
+  
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      closeModal();
+    }
+  });
+  
+  // Fechar com ESC
+  const escHandler = (e) => {
+    if (e.key === 'Escape') closeModal();
+  };
+  document.addEventListener('keydown', escHandler);
+  
+  modal.addEventListener('remove', () => {
+    document.removeEventListener('keydown', escHandler);
+  });
+  
+  return {
+    modal,
+    closeModal
+  };
 }
 
 // Exportar funções para uso global
@@ -387,3 +451,6 @@ window.showToast = showToast;
 window.removeToast = removeToast;
 window.formatDate = formatDate;
 window.formatTime = formatTime;
+window.getTodayFormatted = getTodayFormatted;
+window.isToday = isToday;
+window.createModal = createModal;
