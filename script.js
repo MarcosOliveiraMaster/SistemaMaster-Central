@@ -454,3 +454,23 @@ window.formatTime = formatTime;
 window.getTodayFormatted = getTodayFormatted;
 window.isToday = isToday;
 window.createModal = createModal;
+
+// Função para validar formato de data dd/mm/aaaa
+function isValidDate(dateString) {
+  if (!dateString) return false;
+  
+  const regex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+  const match = dateString.match(regex);
+  
+  if (!match) return false;
+  
+  const [, day, month, year] = match;
+  const date = new Date(year, month - 1, day);
+  
+  return date.getDate() === parseInt(day) && 
+         date.getMonth() === parseInt(month) - 1 && 
+         date.getFullYear() === parseInt(year);
+}
+
+// Adicionar ao objeto global
+window.isValidDate = isValidDate;
