@@ -307,7 +307,7 @@ const BancoDeAulasCards = (function() {
           <div class="modal-header">
             <h3 class="font-lexend font-bold text-lg text-gray-800">
               <i class="fas fa-file-contract text-orange-500 mr-2"></i>
-              Detalhes da Contratação - ${aula.codigoContratacao || 'Sem código'}
+              Detalhes da Contratação - ${aula.codigoContratacao || 'Sem código'}${(typeof formatDateLong === 'function' && formatDateLong(aula.dataContratacao)) ? ' — ' + formatDateLong(aula.dataContratacao) : ''}
             </h3>
             <button class="modal-close text-gray-400 hover:text-gray-600">
               <i class="fas fa-times"></i>
@@ -339,8 +339,8 @@ const BancoDeAulasCards = (function() {
                       <div class="info-value-small">${aula.nomeAluno || '--'}</div>
                     </div>
                     <div class="info-item">
-                      <div class="info-label-small">Data da Contratação</div>
-                      <div class="info-value-small">${formatDate(aula.dataContratacao) || '--'}</div>
+                      <div class="info-label-small">Aula Emergencial</div>
+                      <div class="info-value-small">${(aula.AulaEmergencial !== undefined && aula.AulaEmergencial !== null) ? aula.AulaEmergencial : '--'}</div>
                     </div>
                   </div>
                   
@@ -430,7 +430,7 @@ const BancoDeAulasCards = (function() {
               
               <div class="table-container-double-scroll">
                 <div class="table-wrapper vertical-scroll-hidden">
-                  ${renderAulasDetalhadas(aula.aulas || [])}
+                  ${renderAulasDetalhadas(aula.aulas || [], aula.id)}
                 </div>
               </div>
             </div>
@@ -498,16 +498,194 @@ const BancoDeAulasCards = (function() {
       // TODO: Implementar funcionalidade de gerar solicitação
     });
     
-    // Configurar botão de ver observações
+    // Configurar botão de ver observações (contratação)
     const btnVerObservacoes = modal.querySelector('#btn-ver-observacoes');
     btnVerObservacoes.addEventListener('click', () => {
       showObservacoesModal(aula);
+    });
+
+    // Configurar ícones de observação das aulas (cada linha da tabela)
+    const btnsObservacoesAula = modal.querySelectorAll('.btn-observacao-aula');
+    btnsObservacoesAula.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const raw = btn.dataset.observacao ? decodeURIComponent(btn.dataset.observacao) : '';
+        const content = `
+          <div class="p-4">
+            <div class="max-h-96 overflow-y-auto bg-white p-3 rounded border border-gray-200 text-sm">
+              <p class="text-gray-700 whitespace-pre-wrap">${escapeHtml(raw)}</p>
+            </div>
+          </div>
+        `;
+
+        const { modal: obsModal, closeModal: closeObs } = createModal('Observação da Aula', content, [
+          { text: 'Fechar', classes: 'btn-secondary btn-compact' }
+        ]);
+
+        // Fechar com o botão
+        const btnFecharObs = obsModal.querySelector('.btn-secondary.btn-compact');
+        if (btnFecharObs) btnFecharObs.addEventListener('click', closeObs);
+      });
+    });
+
+    // Configurar ícones de relatório das aulas (cada linha da tabela)
+    const btnsRelatorioAula = modal.querySelectorAll('.btn-relatorio-aula');
+    btnsRelatorioAula.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const raw = btn.dataset.relatorio ? decodeURIComponent(btn.dataset.relatorio) : '';
+        const index = parseInt(btn.dataset.aulaIndex, 10);
+        if (Number.isNaN(index)) { showToast('Erro: índice da aula inválido', 'error'); return; }
+        const contratoId = btn.dataset.contratoId && btn.dataset.contratoId !== 'undefined' ? btn.dataset.contratoId : aula.id;
+
+        const content = `
+          <div class="p-4">
+            <div class="max-h-72 overflow-y-auto bg-white p-3 rounded border border-gray-200 text-sm">
+              <p class="text-gray-700 whitespace-pre-wrap">${escapeHtml(raw)}</p>
+            </div>
+            <div id="relatorio-status-area" class="mt-4"></div>
+          </div>
+        `;
+
+        const { modal: relModal, closeModal: closeRel } = createModal('Relatório da Aula', content, [
+          { text: 'Fechar', classes: 'btn-secondary btn-compact', attributes: 'id="btn-fechar-relatorio"' },
+          { text: 'Editar', classes: 'btn-secondary btn-compact', attributes: 'id="btn-editar-relatorio"' },
+          { text: 'Disponibilizar o relatório', classes: 'btn-secondary btn-compact', attributes: 'id="btn-disponibilizar-relatorio"' }
+        ]);
+
+        const btnFechar = relModal.querySelector('#btn-fechar-relatorio');
+        const btnEditar = relModal.querySelector('#btn-editar-relatorio');
+        const btnDisponibilizar = relModal.querySelector('#btn-disponibilizar-relatorio');
+        const statusArea = relModal.querySelector('#relatorio-status-area');
+
+        if (btnFechar) btnFechar.addEventListener('click', closeRel);
+
+        const renderStatus = (checked) => {
+          statusArea.innerHTML = `
+            <div class="flex items-center space-x-3">
+              <div class="text-sm text-gray-600">Disponibilizar relatório</div>
+              <button id="switch-disponibilizar" class="w-12 h-7 rounded-full p-1 focus:outline-none ${checked ? 'bg-green-500' : 'bg-gray-300'}">
+                <span class="block w-5 h-5 bg-white rounded-full transform ${checked ? 'translate-x-5' : 'translate-x-0'} transition"></span>
+              </button>
+              <div id="label-disponibilizar" class="text-sm">${checked ? 'Sim' : 'Não'}</div>
+            </div>
+          `;
+
+          const switchBtn = relModal.querySelector('#switch-disponibilizar');
+          if (!switchBtn) return;
+
+          switchBtn.addEventListener('click', async () => {
+            const newChecked = !(aula.aulas && aula.aulas[index] && aula.aulas[index].disponibilizarRelatorio === 'sim');
+
+            try {
+              const newAulas = JSON.parse(JSON.stringify(aula.aulas || []));
+              newAulas[index] = newAulas[index] || {};
+              newAulas[index].disponibilizarRelatorio = newChecked ? 'sim' : 'nao';
+
+              await BANCO.updateAula(contratoId, { aulas: newAulas, timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+
+              // Atualizar UI local
+              aula.aulas = newAulas;
+
+              // Atualizar label e switch visual
+              renderStatus(newChecked);
+
+              showToast('✅ Disponibilidade atualizada', 'success');
+            } catch (err) {
+              console.error('❌ Erro ao atualizar disponibilizarRelatorio', err);
+              showToast('❌ Erro ao atualizar disponibilidade', 'error');
+            }
+          }, { once: true });
+        };
+
+        // Disponibilizar button shows the switch area
+        if (btnDisponibilizar) {
+          btnDisponibilizar.addEventListener('click', () => {
+            const current = aula.aulas && aula.aulas[index] && aula.aulas[index].disponibilizarRelatorio === 'sim';
+            renderStatus(current);
+          });
+        }
+
+        // Editar fluxo para o relatório
+        if (btnEditar) {
+          btnEditar.addEventListener('click', () => {
+            const currentText = aula.aulas && aula.aulas[index] && aula.aulas[index].RelatorioAula || '';
+            const editArea = relModal.querySelector('.max-h-72');
+            editArea.innerHTML = `
+              <textarea id="textarea-relatorio" class="w-full h-40 p-3 border rounded text-sm" placeholder="Digite o relatório...">${escapeHtml(currentText)}</textarea>
+            `;
+
+            const footer = relModal.querySelector('.modal-footer');
+
+            const btnCancelar = document.createElement('button');
+            btnCancelar.id = 'btn-cancelar-editar-relatorio';
+            btnCancelar.className = 'btn-secondary btn-compact ml-2';
+            btnCancelar.textContent = 'Cancelar';
+
+            const btnSalvar = document.createElement('button');
+            btnSalvar.id = 'btn-salvar-relatorio';
+            btnSalvar.className = 'btn-primary btn-compact ml-2';
+            btnSalvar.textContent = 'Salvar';
+
+            footer.appendChild(btnCancelar);
+            footer.appendChild(btnSalvar);
+
+            btnCancelar.addEventListener('click', () => {
+              // Reverter área de edição
+              editArea.innerHTML = `<p class="text-gray-700 whitespace-pre-wrap">${escapeHtml(currentText)}</p>`;
+              btnSalvar.remove();
+              btnCancelar.remove();
+            });
+
+            btnSalvar.addEventListener('click', async () => {
+              const novoTexto = relModal.querySelector('#textarea-relatorio').value.trim();
+              btnSalvar.disabled = true;
+              const originalHtml = btnSalvar.innerHTML;
+              btnSalvar.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Salvando...';
+
+              try {
+                const newAulas = JSON.parse(JSON.stringify(aula.aulas || []));
+                newAulas[index] = newAulas[index] || {};
+                newAulas[index].RelatorioAula = novoTexto;
+
+                await BANCO.updateAula(contratoId, { aulas: newAulas, timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+
+                aula.aulas = newAulas;
+
+                // Atualizar ícone do botão na tabela do modal principal
+                const parentBtn = modal.querySelector(`.btn-relatorio-aula[data-aula-index="${index}"]`);
+                if (parentBtn) {
+                  parentBtn.dataset.relatorio = encodeURIComponent(novoTexto);
+                  const icon = parentBtn.querySelector('i');
+                  if (icon) {
+                    if (novoTexto) {
+                      icon.classList.remove('text-gray-300'); icon.classList.add('text-green-500');
+                    } else {
+                      icon.classList.remove('text-green-500'); icon.classList.add('text-gray-300');
+                    }
+                  }
+                }
+
+                showToast('✅ Relatório salvo com sucesso', 'success');
+
+                // Reverter área de edição
+                editArea.innerHTML = `<p class="text-gray-700 whitespace-pre-wrap">${escapeHtml(novoTexto)}</p>`;
+                btnSalvar.remove();
+                btnCancelar.remove();
+              } catch (err) {
+                console.error('❌ Erro ao salvar relatório:', err);
+                showToast('❌ Erro ao salvar relatório', 'error');
+                btnSalvar.disabled = false;
+                btnSalvar.innerHTML = originalHtml;
+              }
+            });
+          });
+        }
+      });
     });
   }
   
   // Função para mostrar modal de observações
   function showObservacoesModal(aula) {
-    const observacoes = aula.ObservacaoContratacao || 'Nenhuma observação registrada.';
+    const observacoesOriginais = aula.ObservacaoContratacao || 'Nenhuma observação registrada.';
     
     const { modal, closeModal } = createModal(
       'Observações da Contratação',
@@ -518,17 +696,124 @@ const BancoDeAulasCards = (function() {
             Observações registradas para esta contratação:
           </div>
           <div class="bg-white p-4 rounded border border-gray-200 max-h-96 overflow-y-auto">
-            <p class="text-gray-700 whitespace-pre-wrap">${observacoes}</p>
+            <p class="text-gray-700 whitespace-pre-wrap">${observacoesOriginais}</p>
           </div>
         </div>
       `,
       [
         {
           text: 'Fechar',
-          classes: 'btn-secondary btn-compact'
+          classes: 'btn-secondary btn-compact',
+          attributes: 'id="btn-fechar-observacoes"'
+        },
+        {
+          text: 'Editar',
+          classes: 'btn-secondary btn-compact',
+          attributes: 'id="btn-editar-observacoes"'
         }
       ]
     );
+
+    // Elementos
+    const btnFechar = modal.querySelector('#btn-fechar-observacoes');
+    const btnEditar = modal.querySelector('#btn-editar-observacoes');
+    const contentWrapper = modal.querySelector('.modal-body > div');
+
+    if (btnFechar) btnFechar.addEventListener('click', closeModal);
+
+    // Função para renderizar o visual somente leitura
+    const renderReadOnly = (text) => {
+      contentWrapper.innerHTML = `
+        <div class="p-4 bg-gray-50 rounded-lg">
+          <div class="text-sm text-gray-600 mb-2">
+            <i class="fas fa-info-circle text-orange-500 mr-2"></i>
+            Observações registradas para esta contratação:
+          </div>
+          <div class="bg-white p-4 rounded border border-gray-200 max-h-96 overflow-y-auto">
+            <p class="text-gray-700 whitespace-pre-wrap">${text || 'Nenhuma observação registrada.'}</p>
+          </div>
+        </div>
+      `;
+    };
+
+    // Entrar em modo de edição
+    const enterEditMode = () => {
+      const currentText = aula.ObservacaoContratacao || '';
+
+      contentWrapper.innerHTML = `
+        <div class="p-4 bg-gray-50 rounded-lg">
+          <div class="text-sm text-gray-600 mb-2">
+            <i class="fas fa-edit text-orange-500 mr-2"></i>
+            Editar observações:
+          </div>
+          <div class="bg-white p-4 rounded border border-gray-200 max-h-96">
+            <textarea id="textarea-observacoes" class="w-full h-40 p-3 border rounded text-sm" placeholder="Digite observações...">${currentText || ''}</textarea>
+          </div>
+        </div>
+      `;
+
+      // Alterar botões: esconder 'Editar' e adicionar 'Salvar' e 'Cancelar'
+      btnEditar.style.display = 'none';
+
+      const footer = modal.querySelector('.modal-footer');
+
+      const btnCancelar = document.createElement('button');
+      btnCancelar.id = 'btn-cancelar-edicao-observacoes';
+      btnCancelar.className = 'btn-secondary btn-compact ml-2';
+      btnCancelar.textContent = 'Cancelar';
+
+      const btnSalvar = document.createElement('button');
+      btnSalvar.id = 'btn-salvar-observacoes';
+      btnSalvar.className = 'btn-primary btn-compact ml-2';
+      btnSalvar.innerHTML = 'Salvar';
+
+      footer.appendChild(btnCancelar);
+      footer.appendChild(btnSalvar);
+
+      const textarea = modal.querySelector('#textarea-observacoes');
+      textarea.focus();
+
+      btnCancelar.addEventListener('click', () => {
+        // Reverter para leitura
+        renderReadOnly(aula.ObservacaoContratacao);
+        btnSalvar.remove();
+        btnCancelar.remove();
+        btnEditar.style.display = '';
+      });
+
+      btnSalvar.addEventListener('click', async () => {
+        const novoTexto = textarea.value.trim();
+        btnSalvar.disabled = true;
+        const originalHTML = btnSalvar.innerHTML;
+        btnSalvar.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Salvando...';
+
+        try {
+          await BANCO.updateAula(aula.id, { ObservacaoContratacao: novoTexto, timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+          showToast('✅ Observações atualizadas com sucesso!', 'success');
+
+          // Atualizar o objeto local (para próxima vez que abrir)
+          aula.ObservacaoContratacao = novoTexto;
+
+          // Re-renderizar em modo leitura com novo texto
+          renderReadOnly(novoTexto);
+
+          // Remover botões temporários e mostrar 'Editar' novamente
+          btnSalvar.remove();
+          btnCancelar.remove();
+          btnEditar.style.display = '';
+        } catch (error) {
+          console.error('❌ Erro ao salvar observações:', error);
+          showToast('❌ Erro ao salvar observações', 'error');
+          btnSalvar.disabled = false;
+          btnSalvar.innerHTML = originalHTML;
+        }
+      });
+    };
+
+    // Evento do botão Editar
+    if (btnEditar) {
+      btnEditar.addEventListener('click', enterEditMode);
+    }
   }
   
   // Função para abrir modal de edição
@@ -773,7 +1058,7 @@ const BancoDeAulasCards = (function() {
     
     // Evento para salvar alterações
     btnSalvar.addEventListener('click', async () => {
-      // Coletar dados do formulário
+      // Coletar dados do formulário (não bloqueamos por validações; apenas coletamos avisos)
       const dadosAtualizados = {
         statusContrato: modal.querySelector('#status-contrato').value,
         dataAssinaturaContrato: modal.querySelector('#data-assinatura-contrato').value,
@@ -784,51 +1069,88 @@ const BancoDeAulasCards = (function() {
         ObservacaoContratacao: modal.querySelector('#observacoes-contratacao').value,
         timestamp: firebase.firestore.FieldValue.serverTimestamp()
       };
-      
-      // Validar datas (formato dd/mm/aaaa) — se inválida, será ignorada
+
+      // Coletar possíveis erros/avisos (sem impedir o salvamento)
+      const errors = [];
       const dataRegex = /^\d{2}\/\d{2}\/\d{4}$/;
       const camposData = [
         { campo: 'dataAssinaturaContrato', nome: 'Assinatura do Contrato' },
         { campo: 'dataPrimeiraParcela', nome: 'Data da primeira parcela' },
         { campo: 'dataSegundaParcela', nome: 'Data da segunda parcela' }
       ];
-      
+
       for (const { campo, nome } of camposData) {
         if (dadosAtualizados[campo] && dadosAtualizados[campo].trim() !== '') {
           if (!dataRegex.test(dadosAtualizados[campo])) {
-            // Data incompleta/errada — ignorar o valor para não bloquear o salvamento
-            dadosAtualizados[campo] = '';
-            showToast(`<strong>${nome}</strong> incompleta ou inválida e foi ignorada.`, 'warning');
+            errors.push(`${nome} incompleta ou inválida`);
           }
         }
       }
-      
-      // Validar método de pagamento
+
       if (!dadosAtualizados.modoPagamento) {
-        showToast('Selecione um método de pagamento', 'error');
-        return;
+        errors.push('Nenhum método de pagamento selecionado');
       }
-      
-      // Mostrar loading no botão
-      const originalText = btnSalvar.innerHTML;
-      btnSalvar.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Salvando...';
-      btnSalvar.disabled = true;
-      
-      try {
-        await BANCO.updateAula(aula.id, dadosAtualizados);
-        showToast('✅ Contratação atualizada com sucesso!', 'success');
-        closeModal();
-        
-        // Recarregar os dados
-        if (typeof loadBancoDeAulas === 'function') {
-          loadBancoDeAulas();
+
+      // Função que executa o salvamento efetivo
+      const doSave = async () => {
+        const originalText = btnSalvar.innerHTML;
+        btnSalvar.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Salvando...';
+        btnSalvar.disabled = true;
+
+        try {
+          await BANCO.updateAula(aula.id, dadosAtualizados);
+          showToast('✅ Contratação atualizada com sucesso!', 'success');
+          closeModal();
+
+          // Recarregar os dados
+          if (typeof loadBancoDeAulas === 'function') {
+            loadBancoDeAulas();
+          }
+        } catch (error) {
+          console.error('❌ Erro ao atualizar contratação:', error);
+          showToast('❌ Erro ao atualizar contratação', 'error');
+          btnSalvar.innerHTML = originalText;
+          btnSalvar.disabled = false;
         }
-      } catch (error) {
-        console.error('❌ Erro ao atualizar contratação:', error);
-        showToast('❌ Erro ao atualizar contratação', 'error');
-        btnSalvar.innerHTML = originalText;
-        btnSalvar.disabled = false;
+      };
+
+      // Se houver erros, mostrar modal de confirmação com lista e opções
+      if (errors.length > 0) {
+        const errorsHtml = `<ul class="text-left list-disc ml-4">${errors.map(e => `<li>${e}</li>`).join('')}</ul>`;
+        const { modal: confirmModal, closeModal: closeConfirm } = createModal(
+          'Problemas encontrados',
+          `
+            <div class="p-4 text-sm text-gray-700">
+              Foram encontrados os seguintes problemas no preenchimento:
+              ${errorsHtml}
+              <p class="mt-3">Deseja salvar mesmo assim?</p>
+            </div>
+          `,
+          [
+            { text: 'Voltar', classes: 'btn-secondary btn-compact', attributes: 'id="btn-voltar-confirm"' },
+            { text: 'Salvar mesmo assim', classes: 'btn-primary btn-compact', attributes: 'id="btn-salvar-confirm"' }
+          ]
+        );
+
+        const btnVoltar = confirmModal.querySelector('#btn-voltar-confirm');
+        const btnSalvarConfirm = confirmModal.querySelector('#btn-salvar-confirm');
+
+        if (btnVoltar) btnVoltar.addEventListener('click', () => closeConfirm());
+
+        if (btnSalvarConfirm) {
+          btnSalvarConfirm.addEventListener('click', async () => {
+            btnSalvarConfirm.disabled = true;
+            btnSalvarConfirm.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Salvando...';
+            await doSave();
+            closeConfirm();
+          });
+        }
+
+        return; // Não salvar imediatamente — aguardamos a confirmação
       }
+
+      // Sem erros, salvar diretamente
+      await doSave();
     });
     
     // Fechar modal ao clicar fora
@@ -871,9 +1193,20 @@ const BancoDeAulasCards = (function() {
     
     return 'info';
   }
+
+  // Pequena função utilitária para escapar HTML em strings antes de injetar em templates
+  function escapeHtml(str) {
+    if (str === undefined || str === null) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
   
   // Renderizar aulas detalhadas para o modal
-  function renderAulasDetalhadas(aulas) {
+  function renderAulasDetalhadas(aulas, contratoId) {
     if (!aulas || aulas.length === 0) {
       return '<p class="text-gray-500 text-center py-4 text-sm">Nenhuma aula agendada</p>';
     }
@@ -888,6 +1221,8 @@ const BancoDeAulasCards = (function() {
             <th>Matéria</th>
             <th>Professor</th>
             <th>Status</th>
+            <th class="text-center">Chek Prof.</th>
+            <th class="text-center">Relatório</th>
             <th>Observações</th>
           </tr>
         </thead>
@@ -901,7 +1236,7 @@ const BancoDeAulasCards = (function() {
       html += `
         <tr>
           <td>${aula.data || '--'}</td>
-          <td>${formatTime(aula.horario)}</td>
+          <td class="text-center align-middle">${formatTime(aula.horario)}</td>
           <td>${aula.duracao || '--'}</td>
           <td>${aula.materia || '--'}</td>
           <td>
@@ -914,8 +1249,20 @@ const BancoDeAulasCards = (function() {
               ${statusAula}
             </span>
           </td>
-          <td class="max-w-xs truncate" title="${aula.observacoes || ''}">
-            ${aula.observacoes ? aula.observacoes.substring(0, 30) + (aula.observacoes.length > 30 ? '...' : '') : '--'}
+          <td class="flex items-center justify-center">
+            <div class="text-sm font-medium text-center">${aula.ConfirmacaoProfessorAula !== undefined && aula.ConfirmacaoProfessorAula !== null ? escapeHtml(aula.ConfirmacaoProfessorAula) : '--'}</div>
+          </td>
+          <td class="text-center">
+            <button type="button" class="btn-relatorio-aula inline-flex items-center justify-center w-8 h-8 rounded" data-relatorio="${encodeURIComponent(aula.RelatorioAula || '')}" data-aula-index="${index}" data-contrato-id="${contratoId || ''}" title="${aula.RelatorioAula ? 'Ver relatório' : 'Sem relatório'}">
+              <i class="fas fa-file-alt ${aula.RelatorioAula ? 'text-green-500' : 'text-gray-300'}" aria-hidden="true"></i>
+              <span class="sr-only">${aula.RelatorioAula ? 'Ver relatório' : 'Sem relatório'}</span>
+            </button>
+          </td>
+          <td class="text-center">
+            <button type="button" class="btn-observacao-aula inline-flex items-center justify-center w-8 h-8 rounded" data-observacao="${encodeURIComponent(aula.ObservacoesAula || '')}" title="${aula.ObservacoesAula ? 'Ver observação' : 'Sem observação'}">
+              <i class="fas fa-comment ${aula.ObservacoesAula ? 'text-green-500' : 'text-gray-300'}" aria-hidden="true"></i>
+              <span class="sr-only">${aula.ObservacoesAula ? 'Ver observação' : 'Sem observação'}</span>
+            </button>
           </td>
         </tr>
       `;

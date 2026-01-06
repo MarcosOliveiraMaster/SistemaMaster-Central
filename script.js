@@ -353,6 +353,20 @@ function formatDate(dateString) {
   }
 }
 
+// Retorna data no formato longo em português: dd de mmmm de yyyy (ex.: 06 de janeiro de 2026)
+function formatDateLong(dateString) {
+  if (!dateString) return '';
+
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
+
+    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+  } catch (e) {
+    return '';
+  }
+}
+
 // Função para formatar hora
 function formatTime(timeString) {
   if (!timeString) return '--:--';
