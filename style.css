@@ -193,6 +193,112 @@
   font-size: 0.8rem !important;
 }
 
+/* Botão de status - clicável */
+.btn-status-aula {
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.btn-status-aula:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+  filter: brightness(0.95);
+}
+
+/* Classes específicas para status de aulas */
+.status-pendente {
+  background-color: #F3F4F6 !important;
+  color: #9CA3AF !important;
+  border: 1px solid #D1D5DB !important;
+}
+
+.status-reagendada {
+  background-color: #FEF3C7 !important;
+  color: #F59E0B !important;
+  border: 1px solid #FCD34D !important;
+}
+
+.status-concluida {
+  background-color: #D1FAE5 !important;
+  color: #10B981 !important;
+  border: 1px solid #6EE7B7 !important;
+}
+
+.status-reposicao {
+  background-color: #DBEAFE !important;
+  color: #3B82F6 !important;
+  border: 1px solid #93C5FD !important;
+}
+
+.status-cancelada {
+  background-color: #FEE2E2 !important;
+  color: #EF4444 !important;
+  border: 1px solid #FCA5A5 !important;
+}
+
+
+/* Opções do modal de status */
+.status-option-btn {
+  border: 2px solid transparent;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.status-option-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+}
+
+.status-option-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.status-option-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* Botão de data - clicável */
+.btn-data-aula {
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+}
+
+.btn-data-aula:hover {
+  background-color: #FFF7ED !important;
+}
+
+/* Calendário customizado */
+.calendar-container {
+  padding: 8px;
+}
+
+.calendar-day {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.calendar-day:hover:not(.bg-orange-500) {
+  background-color: #FFF7ED;
+  color: #F59E0B;
+}
+
+.calendar-day-empty {
+  pointer-events: none;
+}
+
+
 /* -------------------- FILTROS -------------------- */
 .filter-container {
   background: white;
@@ -579,10 +685,11 @@
 
 .table-details th,
 .table-details td {
-  padding: 12px 16px;
+  padding: 8px 12px;
   text-align: left;
   border-bottom: 1px solid #e5e7eb;
   white-space: nowrap;
+  font-size: 0.75rem;
 }
 
 .table-details th {
@@ -593,6 +700,7 @@
   position: sticky;
   top: 0;
   z-index: 10;
+  font-size: 0.75rem;
 }
 
 .table-details tbody tr:hover {
@@ -858,6 +966,44 @@
   padding: 16px;
   border-radius: 8px;
   border: 1px solid #e2e8f0;
+}
+
+/* -------------------- SWITCH TOGGLE -------------------- */
+.switch-toggle {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  transition: background-color 0.3s ease;
+  cursor: pointer;
+}
+
+.switch-active {
+  background-color: #10b981;
+}
+
+.switch-inactive {
+  background-color: #d1d5db;
+}
+
+.switch-slider {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: white;
+  transition: transform 0.3s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.switch-active .switch-slider {
+  transform: translateX(16px);
+}
+
+.switch-inactive .switch-slider {
+  transform: translateX(0);
 }
 
 /* -------------------- AJUSTES DE RESPONSIVIDADE -------------------- */
