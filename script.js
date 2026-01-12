@@ -161,8 +161,8 @@ function loadSectionContent(sectionId) {
       }
       break;
     case 'simulacoes':
-      if (typeof loadSimulacoes === 'function') {
-        loadSimulacoes();
+      if (typeof Simulacoes !== 'undefined' && typeof Simulacoes.loadSimulacoes === 'function') {
+        Simulacoes.loadSimulacoes();
       }
       break;
     case 'fluxo-processos':

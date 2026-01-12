@@ -1018,3 +1018,57 @@
     font-size: 0.7rem !important;
   }
 }
+
+/* -------------------- ESTILOS PARA IMPRESSÃO -------------------- */
+@media print {
+  /* Ocultar elementos desnecessários na impressão */
+  .no-print,
+  .modal-header,
+  .modal-footer,
+  .sidebar,
+  .navbar,
+  #toast-container,
+  button {
+    display: none !important;
+  }
+  
+  /* Ajustar modal para ocupar página inteira */
+  .modal-overlay {
+    position: static !important;
+    background: white !important;
+  }
+  
+  .modal-container {
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+  
+  .modal-body {
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+  
+  /* Garantir quebras de página adequadas */
+  #conteudo-solicitacao {
+    page-break-inside: avoid;
+  }
+  
+  table {
+    page-break-inside: auto;
+  }
+  
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+  
+  /* Ajustar cores para impressão */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

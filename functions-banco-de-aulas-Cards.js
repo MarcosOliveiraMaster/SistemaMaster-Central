@@ -183,12 +183,13 @@ const BancoDeAulasCards = (function() {
     // Contar número de aulas
     const numAulas = aula.aulas && Array.isArray(aula.aulas) ? aula.aulas.length : 0;
     
-    // Verificar se há aulas sem professor
-    const aulasSemProfessor = aula.aulas ? 
-      aula.aulas.filter(a => !a.professor || a.professor === 'A definir' || a.professor === '').length : 0;
+    // Contar aulas com professor definido (diferente de "A definir", vazio ou null)
+    const aulasComProfessor = aula.aulas ? 
+      aula.aulas.filter(a => a.professor && a.professor !== 'A definir' && a.professor.trim() !== '').length : 0;
     
-    // Verificar se há aulas com professor atribuído
-    const aulasComProfessor = numAulas - aulasSemProfessor;
+    // Contar aulas "A definir"
+    const aulasADefinir = aula.aulas ? 
+      aula.aulas.filter(a => !a.professor || a.professor === 'A definir' || a.professor.trim() === '').length : 0;
     
     // Determinar classe CSS para status
     const getStatusClass = (status) => {
@@ -198,8 +199,8 @@ const BancoDeAulasCards = (function() {
       return 'info';
     };
     
-    // Cor para professores incompletos (vermelho suave)
-    const professorCorClass = aulasComProfessor === numAulas ? 'text-green-500' : 'text-red-400';
+    // Cor para aulas A definir (verde se não tem nenhuma, vermelho se tem)
+    const professorCorClass = aulasADefinir === 0 ? 'text-green-500' : 'text-red-400';
     
     card.innerHTML = `
       <div class="aula-card-header">
@@ -234,23 +235,14 @@ const BancoDeAulasCards = (function() {
             </span>
           </div>
           
-          <!-- Linha 3: Total de aulas -->
-          <div class="info-row">
-            <span class="info-label">
-              <i class="fas fa-book"></i>
-              Total aulas:
-            </span>
-            <span class="info-value">${numAulas}</span>
-          </div>
-          
-          <!-- Linha 4: Com professor -->
+          <!-- Linha 3: Com professor (mostrando A definir na fração) -->
           <div class="info-row">
             <span class="info-label">
               <i class="fas fa-chalkboard-teacher"></i>
               Com professor:
             </span>
             <span class="info-value font-medium ${professorCorClass}">
-              ${aulasComProfessor}/${numAulas}
+              ${aulasADefinir}/${numAulas}
             </span>
           </div>
         </div>
@@ -423,15 +415,26 @@ const BancoDeAulasCards = (function() {
                   <i class="fas fa-calendar-alt text-orange-500 mr-2"></i>
                   Aulas Agendadas
                 </h4>
-                <button 
-                  id="btnAdicionarAula" 
-                  class="btn-primary btn-compact"
-                  data-codigo-contratacao="${aula.codigoContratacao}"
-                  title="Adicionar nova aula ao cronograma"
-                >
-                  <i class="fas fa-plus mr-2"></i>
-                  Adicionar aula
-                </button>
+                <div class="flex gap-2">
+                  <button 
+                    id="btnRemoverAula" 
+                    class="btn-secondary btn-compact"
+                    data-codigo-contratacao="${aula.codigoContratacao}"
+                    title="Remover aulas do cronograma"
+                  >
+                    <i class="fas fa-trash mr-2"></i>
+                    Remover aula
+                  </button>
+                  <button 
+                    id="btnAdicionarAula" 
+                    class="btn-primary btn-compact"
+                    data-codigo-contratacao="${aula.codigoContratacao}"
+                    title="Adicionar nova aula ao cronograma"
+                  >
+                    <i class="fas fa-plus mr-2"></i>
+                    Adicionar aula
+                  </button>
+                </div>
               </div>
               
               <div class="table-container-double-scroll">
@@ -490,7 +493,7 @@ const BancoDeAulasCards = (function() {
       if (tbody) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="9" class="text-center py-8">
+            <td colspan="10" class="text-center py-8">
               <i class="fas fa-exclamation-triangle text-3xl text-orange-500 mb-3"></i>
               <p class="text-gray-500">Código de contratação não encontrado</p>
             </td>
@@ -519,8 +522,12 @@ const BancoDeAulasCards = (function() {
     // Configurar botão de gerar solicitação de aula
     const btnGerarSolicitacao = modal.querySelector('#btn-gerar-solicitacao');
     btnGerarSolicitacao.addEventListener('click', () => {
-      showToast('Gerando solicitação de aula...', 'info');
-      // TODO: Implementar funcionalidade de gerar solicitação
+      const codigoContratacao = aula.codigoContratacao;
+      if (codigoContratacao) {
+        showModalSolicitacao(codigoContratacao, aula);
+      } else {
+        showToast('❌ Código de contratação não encontrado', 'error');
+      }
     });
     
     // Configurar botão de ver observações (contratação)
@@ -1266,6 +1273,7 @@ const BancoDeAulasCards = (function() {
             <th>Duração</th>
             <th>Matéria</th>
             <th>Professor</th>
+            <th>Estudante</th>
             <th>Status</th>
             <th class="text-center">Aula concluída</th>
             <th class="text-center">Relatório</th>
@@ -1274,7 +1282,7 @@ const BancoDeAulasCards = (function() {
         </thead>
         <tbody id="tbody-aulas-detalhadas">
           <tr>
-            <td colspan="9" class="text-center py-8">
+            <td colspan="10" class="text-center py-8">
               <div class="flex flex-col items-center justify-center">
                 <div class="loading-spinner-large mb-3"></div>
                 <p class="text-orange-500 font-comfortaa font-bold">Carregando aulas...</p>
@@ -1306,7 +1314,7 @@ const BancoDeAulasCards = (function() {
       if (!aulas || aulas.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="9" class="text-center py-8">
+            <td colspan="10" class="text-center py-8">
               <i class="fas fa-inbox text-3xl text-gray-300 mb-3"></i>
               <p class="text-gray-500">Nenhuma aula encontrada para este código</p>
             </td>
@@ -1379,6 +1387,11 @@ const BancoDeAulasCards = (function() {
               </button>
             </td>
             <td>
+              <button type="button" class="btn-estudante-aula text-sm px-2 py-1 cursor-pointer hover:bg-orange-50 rounded transition-colors" data-id-aula="${aula['id-Aula']}" data-estudante="${aula.estudante || ''}" title="Clique para alterar o estudante">
+                ${aula.estudante || '--'}
+              </button>
+            </td>
+            <td>
               <button type="button" class="btn-status-aula text-xs px-3 py-1.5 cursor-pointer transition-all rounded font-medium" data-id-aula="${aula['id-Aula']}" data-status="${statusAula}" title="Clique para alterar o status" style="background-color: ${statusColors.bgColor}; color: ${statusColors.cor}; border: 1px solid ${statusColors.borderColor};">
                 ${statusAula}
               </button>
@@ -1417,7 +1430,7 @@ const BancoDeAulasCards = (function() {
       console.error('❌ Erro ao carregar aulas detalhadas:', error);
       tbody.innerHTML = `
         <tr>
-          <td colspan="9" class="text-center py-8">
+          <td colspan="10" class="text-center py-8">
             <i class="fas fa-exclamation-triangle text-3xl text-orange-500 mb-3"></i>
             <p class="text-gray-500">Erro ao carregar aulas</p>
             <p class="text-sm text-gray-400 mt-1">${error.message}</p>
@@ -1429,6 +1442,15 @@ const BancoDeAulasCards = (function() {
   
   // Função para configurar event listeners dos botões de relatório e observação
   function setupAulaDetailsEventListeners() {
+    // Botões de estudante
+    document.querySelectorAll('.btn-estudante-aula').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const idAula = this.dataset.idAula;
+        const estudanteAtual = this.dataset.estudante;
+        showEstudanteModalBancoAulas(idAula, estudanteAtual);
+      });
+    });
+    
     // Botões de relatório
     document.querySelectorAll('.btn-relatorio-aula').forEach(btn => {
       btn.addEventListener('click', function() {
@@ -1515,6 +1537,16 @@ const BancoDeAulasCards = (function() {
         e.stopPropagation();
         const codigoContratacao = this.dataset.codigoContratacao;
         showAdicionarAulaModal(codigoContratacao);
+      });
+    }
+    
+    // Botão de remover aula
+    const btnRemoverAula = document.getElementById('btnRemoverAula');
+    if (btnRemoverAula) {
+      btnRemoverAula.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const codigoContratacao = this.dataset.codigoContratacao;
+        showRemoverAulaModal(codigoContratacao);
       });
     }
   }
@@ -2615,6 +2647,389 @@ const BancoDeAulasCards = (function() {
     }
   }
   
+  // Função para mostrar modal de estudante (Banco de Aulas)
+  async function showEstudanteModalBancoAulas(idAula, estudanteAtual) {
+    // Buscar CPF do cliente da contratação
+    const modalOverlay = document.querySelector('.modal-overlay');
+    let clienteEstudantes = [];
+    let cpfCliente = '';
+    
+    if (modalOverlay) {
+      // Extrair CPF do modal de detalhes
+      const cpfElement = Array.from(modalOverlay.querySelectorAll('.text-xs.font-medium.text-gray-500'))
+        .find(el => el.textContent === 'CPF');
+      
+      if (cpfElement && cpfElement.nextElementSibling) {
+        cpfCliente = cpfElement.nextElementSibling.textContent.trim();
+      }
+      
+      // Buscar cliente por CPF
+      if (cpfCliente && cpfCliente !== '--') {
+        try {
+          const clientesSnapshot = await db.collection('cadastroClientes')
+            .where('cpf', '==', cpfCliente)
+            .get();
+          
+          if (!clientesSnapshot.empty) {
+            const clienteData = clientesSnapshot.docs[0].data();
+            
+            // Verificar se existe array de estudantes
+            if (clienteData.estudantes && Array.isArray(clienteData.estudantes)) {
+              clienteEstudantes = clienteData.estudantes
+                .filter(est => est.nome && est.nome.trim() !== '')
+                .map(est => est.nome)
+                .sort();
+            }
+          }
+        } catch (error) {
+          console.error('❌ Erro ao buscar estudantes do cliente:', error);
+        }
+      }
+    }
+    
+    // Se houver estudantes do cliente, mostrar select com busca
+    if (clienteEstudantes.length > 0) {
+      const modalHtml = `
+        <div class="modal-overlay" id="modalEstudanteBanco" style="z-index: 10000;">
+          <div class="modal-container" style="max-width: 650px;">
+            <div class="modal-header">
+              <h3 class="font-lexend font-bold text-lg">
+                <i class="fas fa-user-graduate text-orange-500 mr-2"></i>
+                Selecione Estudante
+              </h3>
+              <button class="modal-close text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+            
+            <div class="modal-body">
+              <div class="space-y-5">
+                <div class="bg-gradient-to-r from-orange-50 to-orange-100 border-l-4 border-orange-500 rounded-lg p-4 shadow-sm">
+                  <p class="text-sm text-gray-700 flex items-center">
+                    <i class="fas fa-user-graduate text-orange-500 mr-3 text-lg"></i>
+                    <span>Estudante atual: <strong class="text-orange-600 ml-1">${estudanteAtual || 'Não definido'}</strong></span>
+                  </p>
+                </div>
+                
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-3">
+                    <i class="fas fa-search text-orange-500 mr-2"></i>
+                    Buscar estudante
+                  </label>
+                  <div class="relative">
+                    <input 
+                      type="text" 
+                      id="inputBuscaEstudante" 
+                      placeholder="Digite o nome do estudante..."
+                      class="w-full border-2 border-gray-300 rounded-lg pl-11 pr-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
+                    />
+                    <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                  </div>
+                </div>
+                
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-3">
+                    <i class="fas fa-list-ul text-orange-500 mr-2"></i>
+                    Lista de estudantes do cliente
+                  </label>
+                  <select 
+                    id="selectEstudante" 
+                    class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 text-base focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white shadow-inner"
+                    size="10"
+                    style="min-height: 280px;"
+                  >
+                    ${clienteEstudantes.map(nome => {
+                      const escapedNome = nome.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                      return `<option value="${escapedNome}" ${nome === estudanteAtual ? 'selected' : ''} style="padding: 8px;">
+                        ${escapedNome}
+                      </option>`;
+                    }).join('')}
+                  </select>
+                </div>
+                
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p class="text-sm text-gray-600">
+                    <i class="fas fa-info-circle text-blue-500 mr-2"></i>
+                    <span>Ou digite um novo nome:</span>
+                  </p>
+                  <input 
+                    type="text" 
+                    id="inputNovoEstudante" 
+                    placeholder="Nome de outro estudante..."
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 mt-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <div class="modal-footer">
+              <button id="btnCancelarEstudante" class="btn-secondary btn-compact">
+                Cancelar
+              </button>
+              <button id="btnConfirmarEstudante" class="btn-primary btn-compact">
+                <i class="fas fa-check mr-2"></i>
+                Confirmar Seleção
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      const modalContainer = document.createElement('div');
+      modalContainer.innerHTML = modalHtml;
+      document.body.appendChild(modalContainer);
+      
+      const modal = modalContainer.querySelector('#modalEstudanteBanco');
+      const btnCancelar = modal.querySelector('#btnCancelarEstudante');
+      const btnConfirmar = modal.querySelector('#btnConfirmarEstudante');
+      const btnClose = modal.querySelector('.modal-close');
+      const inputBusca = modal.querySelector('#inputBuscaEstudante');
+      const selectEstudante = modal.querySelector('#selectEstudante');
+      const inputNovoEstudante = modal.querySelector('#inputNovoEstudante');
+      
+      // Array com todas as opções originais
+      const todasOpcoes = Array.from(selectEstudante.options);
+      
+      // Função para filtrar estudantes
+      inputBusca.addEventListener('input', function() {
+        const termoBusca = this.value.toLowerCase().trim();
+        
+        // Limpar select
+        selectEstudante.innerHTML = '';
+        
+        // Filtrar e adicionar opções
+        const opcoesFiltradas = todasOpcoes.filter(opcao => {
+          const texto = opcao.textContent.toLowerCase();
+          return texto.includes(termoBusca);
+        });
+        
+        opcoesFiltradas.forEach(opcao => {
+          selectEstudante.appendChild(opcao.cloneNode(true));
+        });
+      });
+      
+      const closeModal = () => {
+        modalContainer.remove();
+      };
+      
+      btnCancelar.addEventListener('click', closeModal);
+      btnClose.addEventListener('click', closeModal);
+      
+      btnConfirmar.addEventListener('click', async () => {
+        let nomeEstudante = '';
+        
+        // Verificar se digitou um novo nome
+        const novoNome = inputNovoEstudante.value.trim();
+        if (novoNome) {
+          nomeEstudante = novoNome;
+        } else {
+          // Usar o selecionado
+          const selectedOption = selectEstudante.value;
+          if (!selectedOption) {
+            showToast('⚠️ Por favor, selecione um estudante ou digite um novo nome', 'error');
+            return;
+          }
+          nomeEstudante = selectedOption;
+        }
+        
+        if (nomeEstudante === estudanteAtual) {
+          showToast('ℹ️ Este já é o estudante atual da aula', 'info');
+          return;
+        }
+        
+        try {
+          await BANCO.updateEstudanteAula(idAula, nomeEstudante);
+          showToast(`✅ Estudante alterado para ${nomeEstudante}`, 'success');
+          closeModal();
+          
+          // Recarregar a tabela
+          const tbody = document.getElementById('tbody-aulas-detalhadas');
+          if (tbody) {
+            tbody.innerHTML = `
+              <tr>
+                <td colspan="10" class="text-center py-8">
+                  <div class="flex flex-col items-center justify-center">
+                    <div class="loading-spinner-large mb-3"></div>
+                    <p class="text-orange-500 font-comfortaa font-bold">Atualizando dados...</p>
+                  </div>
+                </td>
+              </tr>
+            `;
+          }
+          
+          // Buscar o código de contratação do modal aberto
+          const modalOverlay = document.querySelector('.modal-overlay');
+          if (modalOverlay && modalOverlay.id !== 'modalEstudanteBanco') {
+            const codigoElement = modalOverlay.querySelector('h3');
+            if (codigoElement) {
+              const match = codigoElement.textContent.match(/\d{4}/);
+              if (match) {
+                const codigoContratacao = match[0];
+                await loadAulasDetalhadas(codigoContratacao);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('❌ Erro ao alterar estudante:', error);
+          showToast('❌ Erro ao alterar estudante', 'error');
+        }
+      });
+      
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeModal();
+      });
+      
+      const escHandler = (e) => {
+        if (e.key === 'Escape') closeModal();
+      };
+      document.addEventListener('keydown', escHandler);
+      modalContainer.addEventListener('remove', () => {
+        document.removeEventListener('keydown', escHandler);
+      });
+      
+      // Focar no campo de busca
+      setTimeout(() => inputBusca.focus(), 100);
+      
+    } else {
+      // Fallback: Sem cliente ou sem estudantes - mostrar input livre
+      const modalHtml = `
+        <div class="modal-overlay" id="modalEstudanteBanco" style="z-index: 10000;">
+          <div class="modal-container" style="max-width: 420px;">
+            <div class="modal-header">
+              <h3 class="font-lexend font-bold text-lg">
+                <i class="fas fa-user-graduate text-orange-500 mr-2"></i>
+                Estudante da Aula
+              </h3>
+              <button class="modal-close text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+            
+            <div class="modal-body">
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">
+                    <i class="fas fa-info-circle text-orange-500 mr-2"></i>
+                    Estudante atual: <strong>${estudanteAtual || 'Não definido'}</strong>
+                  </label>
+                </div>
+                
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">
+                    <i class="fas fa-edit text-orange-500 mr-2"></i>
+                    Digite o nome do estudante:
+                  </label>
+                  <input 
+                    type="text" 
+                    id="inputEstudante" 
+                    value="${estudanteAtual || ''}"
+                    placeholder="Nome do estudante"
+                    class="w-full border-2 border-gray-300 rounded-lg px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  />
+                </div>
+                
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p class="text-sm text-gray-600">
+                    <i class="fas fa-info-circle text-blue-500 mr-2"></i>
+                    <span>Nenhum cliente selecionado ou cliente sem estudantes cadastrados</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div class="modal-footer">
+              <button id="btnCancelarEstudante" class="btn-secondary btn-compact">
+                Cancelar
+              </button>
+              <button id="btnConfirmarEstudante" class="btn-primary btn-compact">
+                <i class="fas fa-check mr-2"></i>
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      const modalContainer = document.createElement('div');
+      modalContainer.innerHTML = modalHtml;
+      document.body.appendChild(modalContainer);
+      
+      const modal = modalContainer.querySelector('#modalEstudanteBanco');
+      const btnCancelar = modal.querySelector('#btnCancelarEstudante');
+      const btnConfirmar = modal.querySelector('#btnConfirmarEstudante');
+      const btnClose = modal.querySelector('.modal-close');
+      const inputEstudante = modal.querySelector('#inputEstudante');
+      
+      const closeModal = () => {
+        modalContainer.remove();
+      };
+      
+      btnCancelar.addEventListener('click', closeModal);
+      btnClose.addEventListener('click', closeModal);
+      
+      btnConfirmar.addEventListener('click', async () => {
+        const nomeEstudante = inputEstudante.value.trim();
+        
+        if (nomeEstudante === estudanteAtual) {
+          showToast('ℹ️ Este já é o estudante atual da aula', 'info');
+          return;
+        }
+        
+        try {
+          await BANCO.updateEstudanteAula(idAula, nomeEstudante);
+          showToast(`✅ Estudante ${nomeEstudante ? 'alterado para ' + nomeEstudante : 'removido'}`, 'success');
+          closeModal();
+          
+          // Recarregar a tabela
+          const tbody = document.getElementById('tbody-aulas-detalhadas');
+          if (tbody) {
+            tbody.innerHTML = `
+              <tr>
+                <td colspan="10" class="text-center py-8">
+                  <div class="flex flex-col items-center justify-center">
+                    <div class="loading-spinner-large mb-3"></div>
+                    <p class="text-orange-500 font-comfortaa font-bold">Atualizando dados...</p>
+                  </div>
+                </td>
+              </tr>
+            `;
+          }
+          
+          // Buscar o código de contratação do modal aberto
+          const modalOverlay = document.querySelector('.modal-overlay');
+          if (modalOverlay && modalOverlay.id !== 'modalEstudanteBanco') {
+            const codigoElement = modalOverlay.querySelector('h3');
+            if (codigoElement) {
+              const match = codigoElement.textContent.match(/\d{4}/);
+              if (match) {
+                const codigoContratacao = match[0];
+                await loadAulasDetalhadas(codigoContratacao);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('❌ Erro ao alterar estudante:', error);
+          showToast('❌ Erro ao alterar estudante', 'error');
+        }
+      });
+      
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeModal();
+      });
+      
+      const escHandler = (e) => {
+        if (e.key === 'Escape') closeModal();
+      };
+      document.addEventListener('keydown', escHandler);
+      modalContainer.addEventListener('remove', () => {
+        document.removeEventListener('keydown', escHandler);
+      });
+      
+      // Focar no input
+      setTimeout(() => inputEstudante.focus(), 100);
+    }
+  }
+  
   // Função para mostrar modal de confirmação de adição de aula
   function showAdicionarAulaModal(codigoContratacao) {
     const confirmHtml = `
@@ -3361,6 +3776,627 @@ const BancoDeAulasCards = (function() {
         btnConfirmar.disabled = false;
       }
     });
+  }
+  
+  // Função para mostrar modal de seleção de aulas para solicitação
+  async function showModalSolicitacao(codigoContratacao, aulaContratacao) {
+    console.log('📋 Abrindo modal de solicitação para código:', codigoContratacao);
+    
+    try {
+      // Buscar aulas da contratação específica
+      const aulas = await BANCO.fetchBancoDeAulasLista(codigoContratacao);
+      
+      if (!aulas || aulas.length === 0) {
+        showToast('❌ Nenhuma aula encontrada para esta contratação', 'error');
+        return;
+      }
+      
+      // Ordenar aulas por data
+      aulas.sort((a, b) => {
+        const dataA = a.data || '';
+        const dataB = b.data || '';
+        const parseData = (dataStr) => {
+          if (!dataStr) return new Date(0);
+          const match = dataStr.match(/\w{3} - (\d{2})\/(\d{2})\/(\d{4})/);
+          if (!match) return new Date(0);
+          const dia = parseInt(match[1]);
+          const mes = parseInt(match[2]) - 1;
+          const ano = parseInt(match[3]);
+          return new Date(ano, mes, dia);
+        };
+        return parseData(dataA).getTime() - parseData(dataB).getTime();
+      });
+      
+      // Criar linhas da tabela
+      let linhasHtml = '';
+      aulas.forEach((aula, index) => {
+        const statusClass = getStatusBadgeClass(aula.StatusAula || 'Pendente');
+        linhasHtml += `
+          <tr class="aula-row-solicitacao" data-id-aula="${aula['id-Aula']}" data-doc-id="${aula.id}">
+            <td class="py-2 px-3 text-center">
+              <input type="checkbox" class="checkbox-solicitacao-aula w-4 h-4 cursor-pointer" 
+                     data-id-aula="${aula['id-Aula']}" 
+                     data-doc-id="${aula.id}"
+                     data-data="${aula.data || '--'}"
+                     data-horario="${aula.horario || '--'}"
+                     data-duracao="${aula.duracao || '--'}"
+                     data-materia="${aula.materia || '--'}"
+                     data-professor="${aula.professor || 'A definir'}"
+                     data-estudante="${aula.estudante || '--'}">
+            </td>
+            <td class="py-2 px-3 text-sm">${aula.data || '--'}</td>
+            <td class="py-2 px-3 text-sm text-center">${aula.horario || '--'}</td>
+            <td class="py-2 px-3 text-sm text-center">${aula.duracao || '--'}</td>
+            <td class="py-2 px-3 text-sm">${aula.materia || '--'}</td>
+            <td class="py-2 px-3 text-sm">${aula.professor || 'A definir'}</td>
+            <td class="py-2 px-3 text-sm">${aula.estudante || '--'}</td>
+            <td class="py-2 px-3">
+              <span class="status-badge ${statusClass} text-xs px-2 py-1">
+                ${aula.StatusAula || 'Pendente'}
+              </span>
+            </td>
+          </tr>
+        `;
+      });
+      
+      const modalHtml = `
+        <div class="modal-overlay" id="modal-solicitacao" style="z-index: 10000;">
+          <div class="modal-container max-w-6xl">
+            <div class="modal-header">
+              <h3 class="font-lexend font-bold text-lg text-gray-800">
+                <i class="fas fa-calendar-plus text-orange-500 mr-2"></i>
+                Selecione as aulas para a solicitação
+              </h3>
+              <button class="modal-close text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+            
+            <div class="modal-body">
+              <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-start">
+                <i class="fas fa-info-circle text-blue-600 mr-3 mt-1"></i>
+                <div>
+                  <p class="text-sm text-blue-800 font-medium">Informação</p>
+                  <p class="text-xs text-blue-700 mt-1">Selecione as aulas que deseja incluir na solicitação de aula.</p>
+                </div>
+              </div>
+              
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                  <thead>
+                    <tr class="bg-gray-100 border-b border-gray-200">
+                      <th class="py-3 px-3 text-xs font-semibold text-gray-600 text-center">
+                        <input type="checkbox" id="select-all-aulas-solicitacao" class="w-4 h-4 cursor-pointer" title="Selecionar todas">
+                      </th>
+                      <th class="py-3 px-3 text-xs font-semibold text-gray-600">Data da Aula</th>
+                      <th class="py-3 px-3 text-xs font-semibold text-gray-600 text-center">Horário</th>
+                      <th class="py-3 px-3 text-xs font-semibold text-gray-600 text-center">Duração</th>
+                      <th class="py-3 px-3 text-xs font-semibold text-gray-600">Matéria</th>
+                      <th class="py-3 px-3 text-xs font-semibold text-gray-600">Professor</th>
+                      <th class="py-3 px-3 text-xs font-semibold text-gray-600">Estudante</th>
+                      <th class="py-3 px-3 text-xs font-semibold text-gray-600">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbody-solicitacao-aulas">
+                    ${linhasHtml}
+                  </tbody>
+                </table>
+              </div>
+              
+              <div class="mt-4 text-sm text-gray-600">
+                <span id="count-selected-solicitacao">0</span> aula(s) selecionada(s)
+              </div>
+            </div>
+            
+            <div class="modal-footer">
+              <button id="btn-cancelar-solicitacao" class="btn-secondary">
+                <i class="fas fa-times mr-2"></i>
+                Cancelar
+              </button>
+              <button id="btn-gerar-solicitacao-final" class="btn-primary" disabled>
+                <i class="fas fa-file-alt mr-2"></i>
+                Gerar Solicitação
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      // Adicionar modal ao DOM
+      document.body.insertAdjacentHTML('beforeend', modalHtml);
+      
+      const modal = document.getElementById('modal-solicitacao');
+      const btnCancelar = document.getElementById('btn-cancelar-solicitacao');
+      const btnGerar = document.getElementById('btn-gerar-solicitacao-final');
+      const selectAll = document.getElementById('select-all-aulas-solicitacao');
+      const checkboxes = modal.querySelectorAll('.checkbox-solicitacao-aula');
+      const countSelected = document.getElementById('count-selected-solicitacao');
+      
+      // Função para atualizar contador e estado do botão
+      function updateSelection() {
+        const selected = modal.querySelectorAll('.checkbox-solicitacao-aula:checked');
+        countSelected.textContent = selected.length;
+        btnGerar.disabled = selected.length === 0;
+        
+        // Atualizar checkbox "selecionar todos"
+        selectAll.checked = selected.length === checkboxes.length && checkboxes.length > 0;
+        selectAll.indeterminate = selected.length > 0 && selected.length < checkboxes.length;
+      }
+      
+      // Evento para selecionar/desselecionar todos
+      selectAll.addEventListener('change', function() {
+        checkboxes.forEach(cb => {
+          cb.checked = this.checked;
+          const row = cb.closest('tr');
+          if (this.checked) {
+            row.classList.add('bg-orange-50');
+          } else {
+            row.classList.remove('bg-orange-50');
+          }
+        });
+        updateSelection();
+      });
+      
+      // Evento para checkboxes individuais
+      checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+          const row = this.closest('tr');
+          if (this.checked) {
+            row.classList.add('bg-orange-50');
+          } else {
+            row.classList.remove('bg-orange-50');
+          }
+          updateSelection();
+        });
+      });
+      
+      // Botão cancelar
+      btnCancelar.addEventListener('click', () => {
+        modal.remove();
+      });
+      
+      // Botão fechar (X)
+      modal.querySelector('.modal-close').addEventListener('click', () => {
+        modal.remove();
+      });
+      
+      // Botão gerar solicitação
+      btnGerar.addEventListener('click', () => {
+        const selected = modal.querySelectorAll('.checkbox-solicitacao-aula:checked');
+        
+        if (selected.length === 0) {
+          showToast('⚠️ Selecione pelo menos uma aula para a solicitação', 'warning');
+          return;
+        }
+        
+        // Coletar dados das aulas selecionadas
+        const aulasSelecionadas = Array.from(selected).map(cb => ({
+          data: cb.dataset.data,
+          horario: cb.dataset.horario,
+          duracao: cb.dataset.duracao,
+          materia: cb.dataset.materia,
+          professor: cb.dataset.professor,
+          estudante: cb.dataset.estudante
+        }));
+        
+        // Fechar modal de seleção
+        modal.remove();
+        
+        // Abrir modal final com a solicitação
+        showModalSolicitacaoFinal(aulaContratacao, aulasSelecionadas);
+      });
+      
+      // Fechar ao clicar fora
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          modal.remove();
+        }
+      });
+      
+      // Fechar com ESC
+      const escHandler = (e) => {
+        if (e.key === 'Escape') {
+          modal.remove();
+          document.removeEventListener('keydown', escHandler);
+        }
+      };
+      document.addEventListener('keydown', escHandler);
+      
+    } catch (error) {
+      console.error('❌ Erro ao carregar aulas:', error);
+      showToast('❌ Erro ao carregar aulas. Tente novamente.', 'error');
+    }
+  }
+  
+  // Função para mostrar modal final com a solicitação formatada
+  function showModalSolicitacaoFinal(aulaContratacao, aulasSelecionadas) {
+    console.log('📄 Gerando solicitação final');
+    
+    // Calcular total a receber (Valor Equipe)
+    let totalReceber = 0;
+    aulasSelecionadas.forEach(aula => {
+      // Assumir valor padrão por hora se não houver cálculo específico
+      // Você pode ajustar essa lógica conforme sua necessidade
+      const duracao = aula.duracao ? parseFloat(aula.duracao.replace('h', '')) : 1;
+      totalReceber += duracao * 50; // Exemplo: R$ 50 por hora
+    });
+    
+    // Criar linhas da tabela de aulas
+    let linhasAulasHtml = '';
+    aulasSelecionadas.forEach((aula, index) => {
+      linhasAulasHtml += `
+        <tr class="${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}">
+          <td class="py-2 px-3 text-sm border-r border-gray-200">${aula.data}</td>
+          <td class="py-2 px-3 text-sm text-center border-r border-gray-200">${aula.horario}</td>
+          <td class="py-2 px-3 text-sm text-center border-r border-gray-200">${aula.duracao}</td>
+          <td class="py-2 px-3 text-sm border-r border-gray-200">${aula.materia}</td>
+          <td class="py-2 px-3 text-sm border-r border-gray-200">${aula.professor}</td>
+          <td class="py-2 px-3 text-sm">${aula.estudante}</td>
+        </tr>
+      `;
+    });
+    
+    const modalHtml = `
+      <div class="modal-overlay" id="modal-solicitacao-final" style="z-index: 10001;">
+        <div class="modal-container max-w-5xl">
+          <div class="modal-header">
+            <h3 class="font-lexend font-bold text-xl text-gray-800">
+              <i class="fas fa-file-contract text-orange-500 mr-2"></i>
+              Solicitação de Aula
+            </h3>
+            <button class="modal-close text-gray-400 hover:text-gray-600">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          
+          <div class="modal-body">
+            <!-- Informações do Cliente -->
+            <div class="bg-gradient-to-r from-orange-50 to-yellow-50 border-l-4 border-orange-500 rounded-lg p-4 mb-5 shadow-sm">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p class="text-xs font-medium text-gray-500 mb-1">
+                    <i class="fas fa-user text-orange-500 mr-2"></i>Nome do Cliente
+                  </p>
+                  <p class="text-sm font-semibold text-gray-800">${aulaContratacao.nome || aulaContratacao.nomeCliente || '--'}</p>
+                </div>
+                <div>
+                  <p class="text-xs font-medium text-gray-500 mb-1">
+                    <i class="fas fa-map-marker-alt text-orange-500 mr-2"></i>Endereço
+                  </p>
+                  <p class="text-sm font-semibold text-gray-800">${aulaContratacao.endereco || '--'}</p>
+                </div>
+                <div>
+                  <p class="text-xs font-medium text-gray-500 mb-1">
+                    <i class="fas fa-map-signs text-orange-500 mr-2"></i>Referência
+                  </p>
+                  <p class="text-sm font-semibold text-gray-800">${aulaContratacao.referencia || '--'}</p>
+                </div>
+                <div>
+                  <p class="text-xs font-medium text-gray-500 mb-1">
+                    <i class="fas fa-dollar-sign text-green-600 mr-2"></i>Total a Receber (Valor Equipe)
+                  </p>
+                  <p class="text-lg font-bold text-green-600">R$ ${totalReceber.toFixed(2)}</p>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Tabela de Aulas -->
+            <div class="mb-4">
+              <h4 class="font-lexend font-bold text-base mb-3 text-gray-700">
+                <i class="fas fa-list-ul text-orange-500 mr-2"></i>
+                Aulas Solicitadas (${aulasSelecionadas.length})
+              </h4>
+              
+              <div class="overflow-x-auto border border-gray-200 rounded-lg">
+                <table class="w-full text-left border-collapse">
+                  <thead>
+                    <tr class="bg-gradient-to-r from-orange-500 to-orange-600 text-white">
+                      <th class="py-3 px-3 text-xs font-semibold border-r border-orange-400">Data da Aula</th>
+                      <th class="py-3 px-3 text-xs font-semibold text-center border-r border-orange-400">Horário de Início</th>
+                      <th class="py-3 px-3 text-xs font-semibold text-center border-r border-orange-400">Duração</th>
+                      <th class="py-3 px-3 text-xs font-semibold border-r border-orange-400">Matéria</th>
+                      <th class="py-3 px-3 text-xs font-semibold border-r border-orange-400">Professor</th>
+                      <th class="py-3 px-3 text-xs font-semibold">Estudante</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${linhasAulasHtml}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            <!-- Rodapé com informações adicionais -->
+            <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 mt-4">
+              <p class="text-xs text-gray-600 flex items-center">
+                <i class="fas fa-info-circle text-blue-500 mr-2"></i>
+                <span>Esta solicitação contém <strong class="text-orange-600">${aulasSelecionadas.length} aula(s)</strong> agendada(s).</span>
+              </p>
+            </div>
+          </div>
+          
+          <div class="modal-footer">
+            <button id="btn-fechar-solicitacao" class="btn-secondary">
+              <i class="fas fa-times mr-2"></i>
+              Fechar
+            </button>
+            <button id="btn-imprimir-solicitacao" class="btn-primary">
+              <i class="fas fa-print mr-2"></i>
+              Imprimir Solicitação
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    // Adicionar modal ao DOM
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    const modal = document.getElementById('modal-solicitacao-final');
+    const btnFechar = document.getElementById('btn-fechar-solicitacao');
+    const btnImprimir = document.getElementById('btn-imprimir-solicitacao');
+    
+    // Botão fechar
+    btnFechar.addEventListener('click', () => {
+      modal.remove();
+    });
+    
+    // Botão fechar (X)
+    modal.querySelector('.modal-close').addEventListener('click', () => {
+      modal.remove();
+    });
+    
+    // Botão imprimir
+    btnImprimir.addEventListener('click', () => {
+      window.print();
+    });
+    
+    // Fechar ao clicar fora
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.remove();
+      }
+    });
+    
+    // Fechar com ESC
+    const escHandler = (e) => {
+      if (e.key === 'Escape') {
+        modal.remove();
+        document.removeEventListener('keydown', escHandler);
+      }
+    };
+    document.addEventListener('keydown', escHandler);
+  }
+  
+  // Função para abrir modal de remoção de aulas
+  async function showRemoverAulaModal(codigoContratacao) {
+    console.log('🗑️ Abrindo modal de remoção de aulas para código:', codigoContratacao);
+    
+    try {
+      // Buscar aulas da contratação específica
+      const aulas = await BANCO.fetchBancoDeAulasLista(codigoContratacao);
+      
+      if (!aulas || aulas.length === 0) {
+        showToast('❌ Nenhuma aula encontrada para esta contratação', 'error');
+        return;
+      }
+      
+      // Ordenar aulas por data
+      aulas.sort((a, b) => {
+        const dataA = a.data || '';
+        const dataB = b.data || '';
+        const parseData = (dataStr) => {
+          if (!dataStr) return new Date(0);
+          const match = dataStr.match(/\w{3} - (\d{2})\/(\d{2})\/(\d{4})/);
+          if (!match) return new Date(0);
+          const dia = parseInt(match[1]);
+          const mes = parseInt(match[2]) - 1;
+          const ano = parseInt(match[3]);
+          return new Date(ano, mes, dia);
+        };
+        return parseData(dataA).getTime() - parseData(dataB).getTime();
+      });
+      
+      // Criar linhas da tabela
+      let linhasHtml = '';
+      aulas.forEach((aula, index) => {
+        const statusClass = getStatusBadgeClass(aula.StatusAula || 'Pendente');
+        linhasHtml += `
+          <tr class="aula-row-remove" data-id-aula="${aula['id-Aula']}" data-doc-id="${aula.id}">
+            <td class="py-2 px-3 text-center">
+              <input type="checkbox" class="checkbox-remove-aula w-4 h-4 cursor-pointer" data-id-aula="${aula['id-Aula']}" data-doc-id="${aula.id}">
+            </td>
+            <td class="py-2 px-3 text-sm">${aula.data || '--'}</td>
+            <td class="py-2 px-3 text-sm text-center">${aula.horario || '--'}</td>
+            <td class="py-2 px-3 text-sm text-center">${aula.duracao || '--'}</td>
+            <td class="py-2 px-3 text-sm">${aula.materia || '--'}</td>
+            <td class="py-2 px-3 text-sm">${aula.professor || 'A definir'}</td>
+            <td class="py-2 px-3">
+              <span class="status-badge ${statusClass} text-xs px-2 py-1">
+                ${aula.StatusAula || 'Pendente'}
+              </span>
+            </td>
+          </tr>
+        `;
+      });
+      
+      const modalHtml = `
+        <div class="modal-overlay" id="removerAulaModal">
+          <div class="modal-container max-w-6xl">
+            <div class="modal-header">
+              <h3 class="font-lexend font-bold text-lg text-gray-800">
+                <i class="fas fa-trash-alt text-red-500 mr-2"></i>
+                Selecione as aulas que gostaria de excluir
+              </h3>
+              <button class="modal-close text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+            
+            <div class="modal-body">
+              <div class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start">
+                <i class="fas fa-exclamation-triangle text-yellow-600 mr-3 mt-1"></i>
+                <div>
+                  <p class="text-sm text-yellow-800 font-medium">Atenção!</p>
+                  <p class="text-xs text-yellow-700 mt-1">As aulas selecionadas serão excluídas permanentemente do banco de dados.</p>
+                </div>
+              </div>
+              
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                  <thead>
+                    <tr class="bg-gray-100 border-b border-gray-200">
+                      <th class="py-3 px-3 text-xs font-semibold text-gray-600 text-center">
+                        <input type="checkbox" id="select-all-aulas" class="w-4 h-4 cursor-pointer" title="Selecionar todas">
+                      </th>
+                      <th class="py-3 px-3 text-xs font-semibold text-gray-600">Data da Aula</th>
+                      <th class="py-3 px-3 text-xs font-semibold text-gray-600 text-center">Horário</th>
+                      <th class="py-3 px-3 text-xs font-semibold text-gray-600 text-center">Duração</th>
+                      <th class="py-3 px-3 text-xs font-semibold text-gray-600">Matéria</th>
+                      <th class="py-3 px-3 text-xs font-semibold text-gray-600">Professor</th>
+                      <th class="py-3 px-3 text-xs font-semibold text-gray-600">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbody-remover-aulas">
+                    ${linhasHtml}
+                  </tbody>
+                </table>
+              </div>
+              
+              <div class="mt-4 text-sm text-gray-600">
+                <span id="count-selected-aulas">0</span> aula(s) selecionada(s)
+              </div>
+            </div>
+            
+            <div class="modal-footer">
+              <button id="btn-cancelar-remover" class="btn-secondary">
+                <i class="fas fa-times mr-2"></i>
+                Cancelar
+              </button>
+              <button id="btn-confirmar-remover" class="btn-danger" disabled>
+                <i class="fas fa-trash-alt mr-2"></i>
+                Excluir Aulas
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      // Adicionar modal ao DOM
+      document.body.insertAdjacentHTML('beforeend', modalHtml);
+      
+      const modal = document.getElementById('removerAulaModal');
+      const btnCancelar = document.getElementById('btn-cancelar-remover');
+      const btnConfirmar = document.getElementById('btn-confirmar-remover');
+      const selectAll = document.getElementById('select-all-aulas');
+      const checkboxes = modal.querySelectorAll('.checkbox-remove-aula');
+      const countSelected = document.getElementById('count-selected-aulas');
+      
+      // Função para atualizar contador e estado do botão
+      function updateSelection() {
+        const selected = modal.querySelectorAll('.checkbox-remove-aula:checked');
+        countSelected.textContent = selected.length;
+        btnConfirmar.disabled = selected.length === 0;
+        
+        // Atualizar checkbox "selecionar todos"
+        selectAll.checked = selected.length === checkboxes.length && checkboxes.length > 0;
+        selectAll.indeterminate = selected.length > 0 && selected.length < checkboxes.length;
+      }
+      
+      // Evento para selecionar/desselecionar todos
+      selectAll.addEventListener('change', function() {
+        checkboxes.forEach(cb => {
+          cb.checked = this.checked;
+          const row = cb.closest('tr');
+          if (this.checked) {
+            row.classList.add('bg-red-50');
+          } else {
+            row.classList.remove('bg-red-50');
+          }
+        });
+        updateSelection();
+      });
+      
+      // Evento para checkboxes individuais
+      checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+          const row = this.closest('tr');
+          if (this.checked) {
+            row.classList.add('bg-red-50');
+          } else {
+            row.classList.remove('bg-red-50');
+          }
+          updateSelection();
+        });
+      });
+      
+      // Botão cancelar
+      btnCancelar.addEventListener('click', () => {
+        modal.remove();
+      });
+      
+      // Botão fechar (X)
+      modal.querySelector('.modal-close').addEventListener('click', () => {
+        modal.remove();
+      });
+      
+      // Botão confirmar exclusão
+      btnConfirmar.addEventListener('click', async () => {
+        const selected = modal.querySelectorAll('.checkbox-remove-aula:checked');
+        
+        if (selected.length === 0) {
+          showToast('⚠️ Selecione pelo menos uma aula para excluir', 'warning');
+          return;
+        }
+        
+        // Confirmar exclusão
+        const confirmacao = confirm(`Tem certeza que deseja excluir ${selected.length} aula(s)? Esta ação não pode ser desfeita.`);
+        if (!confirmacao) return;
+        
+        // Mostrar loading
+        btnConfirmar.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Excluindo...';
+        btnConfirmar.disabled = true;
+        btnCancelar.disabled = true;
+        
+        try {
+          // Coletar IDs das aulas selecionadas
+          const idsAulas = Array.from(selected).map(cb => cb.dataset.idAula);
+          const docIds = Array.from(selected).map(cb => cb.dataset.docId);
+          
+          console.log('🗑️ Excluindo aulas:', idsAulas);
+          
+          // Excluir aulas do banco de dados
+          await BANCO.deleteAulasLista(docIds);
+          
+          showToast(`✅ ${selected.length} aula(s) excluída(s) com sucesso`, 'success');
+          
+          // Fechar modal
+          modal.remove();
+          
+          // Recarregar lista de aulas
+          if (typeof loadBancoDeAulas === 'function') {
+            loadBancoDeAulas();
+          }
+          
+          // Fechar modal de detalhes se estiver aberto e reabrir atualizado
+          const modalDetalhes = document.querySelector('.modal-overlay');
+          if (modalDetalhes) {
+            modalDetalhes.remove();
+          }
+          
+        } catch (error) {
+          console.error('❌ Erro ao excluir aulas:', error);
+          showToast('❌ Erro ao excluir aulas. Tente novamente.', 'error');
+          btnConfirmar.innerHTML = '<i class="fas fa-trash-alt mr-2"></i>Excluir Aulas';
+          btnConfirmar.disabled = false;
+          btnCancelar.disabled = false;
+        }
+      });
+      
+    } catch (error) {
+      console.error('❌ Erro ao carregar aulas:', error);
+      showToast('❌ Erro ao carregar aulas. Tente novamente.', 'error');
+    }
   }
   
   // Função para animar contador

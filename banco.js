@@ -543,6 +543,36 @@ async function updateProfessorAula(idAula, nomeProfessor, cpfProfessor) {
   }
 }
 
+// Função para atualizar estudante de uma aula individual
+async function updateEstudanteAula(idAula, nomeEstudante) {
+  try {
+    console.log(`👨‍🎓 Atualizando estudante para aula: ${idAula}`);
+    console.log(`   Nome: ${nomeEstudante || '(removendo estudante)'}`);
+    
+    // Buscar documento pelo campo id-Aula
+    const querySnapshot = await db.collection("BancoDeAulas-Lista")
+      .where("id-Aula", "==", idAula)
+      .get();
+    
+    if (querySnapshot.empty) {
+      throw new Error(`Aula com id-Aula ${idAula} não encontrada`);
+    }
+    
+    // Atualizar o primeiro documento encontrado
+    const docRef = querySnapshot.docs[0].ref;
+    await docRef.update({
+      estudante: nomeEstudante || '',
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    
+    console.log('✅ Estudante atualizado com sucesso');
+    return true;
+  } catch (error) {
+    console.error('❌ Erro ao atualizar estudante:', error);
+    throw error;
+  }
+}
+
 // Função auxiliar para incrementar id-Aula alfabeticamente
 function incrementarIdAula(idAulaAtual) {
   // Exemplo: "0213BX" -> "0213BY" ou "0054AZ" -> "0054BA"
@@ -655,6 +685,37 @@ async function addNovaAulaLista(codigoContratacao) {
   }
 }
 
+// Função para excluir múltiplas aulas da BancoDeAulas-Lista
+async function deleteAulasLista(docIds) {
+  try {
+    console.log('🗑️ Iniciando exclusão de aulas:', docIds);
+    
+    if (!docIds || docIds.length === 0) {
+      throw new Error('Nenhum ID de documento fornecido');
+    }
+    
+    // Usar batch para excluir múltiplos documentos de forma eficiente
+    const batch = db.batch();
+    
+    docIds.forEach(docId => {
+      const docRef = db.collection("BancoDeAulas-Lista").doc(docId);
+      batch.delete(docRef);
+    });
+    
+    // Executar todas as exclusões
+    await batch.commit();
+    
+    console.log(`✅ ${docIds.length} aula(s) excluída(s) com sucesso!`);
+    
+    // Forçar atualização do cache
+    forceCacheRefresh();
+    
+  } catch (error) {
+    console.error('❌ Erro ao excluir aulas:', error);
+    throw error;
+  }
+}
+
 // Função para forçar atualização do cache
 function forceCacheRefresh() {
   CACHE.bancoDeAulas.timestamp = null;
@@ -684,7 +745,9 @@ if (typeof window !== 'undefined') {
     updateDuracaoAula,
     updateMateriaAula,
     updateProfessorAula,
+    updateEstudanteAula,
     addNovaAulaLista,
+    deleteAulasLista,
     forceCacheRefresh,
     isCacheValid
   };
