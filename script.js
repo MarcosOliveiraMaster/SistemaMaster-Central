@@ -83,23 +83,20 @@ async function loadSection(sectionId) {
     console.error(`Seção ${sectionId} não encontrada`);
     return;
   }
-  
+
   // Animação de saída da seção atual
   const currentSection = document.querySelector('.section-content.active');
   if (currentSection) {
     currentSection.classList.add('fade-out');
-    
     setTimeout(() => {
       currentSection.classList.remove('active', 'fade-out');
       currentSection.innerHTML = '';
-      
       // Carregar nova seção
       showSection(sectionId);
     }, CONFIG.animationDuration);
   } else {
     showSection(sectionId);
   }
-  
   APP_STATE.currentSection = sectionId;
 }
 
@@ -114,27 +111,19 @@ function showSection(sectionId) {
   
   // Limpar conteúdo anterior
   section.innerHTML = '';
-  
-  // Adicionar classe de loading
-  section.innerHTML = `
-    <div class="flex flex-col items-center justify-center py-12">
-      <div class="loading-spinner-large mb-4"></div>
-      <p class="text-orange-500 font-comfortaa font-bold text-center">
-        Carregando ${sectionId.replace('-', ' ')}<br>
-        <span class="text-sm font-normal text-gray-500 mt-1 block">
-          Buscando dados do Firebase...
-        </span>
-      </p>
-    </div>
-  `;
-  
+
   // Mostrar seção
   section.classList.add('active');
-  
+
   // Carregar conteúdo específico da seção
-  setTimeout(() => {
+  if (sectionId === 'mensagens') {
+    // Não exibe loading nem delay para mensagens automáticas
     loadSectionContent(sectionId);
-  }, 500);
+  } else {
+    setTimeout(() => {
+      loadSectionContent(sectionId);
+    }, 500);
+  }
 }
 
 // Carregar conteúdo específico da seção
