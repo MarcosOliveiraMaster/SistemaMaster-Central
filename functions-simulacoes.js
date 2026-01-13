@@ -557,7 +557,7 @@ const Simulacoes = (function() {
                 </div>
                 
                 <!-- CPF -->
-                <div>
+                <div style="display:none;">
                   <label class="block text-sm font-medium text-gray-700 mb-1">
                     <i class="fas fa-id-card text-orange-500 mr-1"></i>
                     CPF
@@ -708,9 +708,6 @@ const Simulacoes = (function() {
           </div>
           
           <div class="modal-footer">
-            <button id="btn-fechar-simulacao" class="btn-secondary btn-compact">
-              Fechar
-            </button>
             ${! isNova ? `
               <button id="btn-excluir-simulacao" class="btn-secondary btn-compact text-red-600 hover:bg-red-50">
                 <i class="fas fa-trash mr-2"></i>
@@ -720,6 +717,10 @@ const Simulacoes = (function() {
             <button id="btn-salvar-simulacao" class="btn-compact rounded-lg border-2 border-orange-500 text-orange-500 hover:bg-orange-50">
               <i class="fas fa-save mr-2"></i>
               ${isNova ? 'Salvar Simulação' : 'Atualizar Simulação'}
+            </button>
+            <button id="btn-enviar-simulacao" class="btn-primary btn-compact">
+              <i class="fas fa-paper-plane mr-2"></i>
+              Enviar simulação
             </button>
             <button id="btn-aprovar-simulacao" class="btn-primary btn-compact">
               <i class="fas fa-check-circle mr-2"></i>
@@ -805,7 +806,139 @@ const Simulacoes = (function() {
   
   // Função para configurar eventos do modal
   function setupModalEvents(modal, isNova) {
-    const btnFechar = modal.querySelector('#btn-fechar-simulacao');
+      const btnEnviar = modal.querySelector('#btn-enviar-simulacao');
+        // Enviar simulação
+        btnEnviar.addEventListener('click', () => {
+          abrirModalEnviarSimulacao();
+        });
+    // Modal de Enviar Simulação
+    function abrirModalEnviarSimulacao() {
+      // Obter dados da simulação atual
+      const nomeCliente = document.getElementById('select-cliente')?.selectedOptions[0]?.textContent || '--';
+      const valorPacote = document.getElementById('display-valor-pacote')?.textContent?.trim() || '--';
+      const dataPrimeiraParcela = document.getElementById('data-primeira-parcela')?.value || '--';
+      const dataSegundaParcela = document.getElementById('data-segunda-parcela')?.value || '--';
+      // Calcular total de horas
+      let totalHoras = 0;
+      const aulas = [];
+      document.querySelectorAll('#tbody-aulas-simulacao tr').forEach(tr => {
+        const tds = tr.querySelectorAll('td');
+        if (tds.length > 0) {
+          // Espera-se: Data, Horário, Duração, Matéria, Professor, Estudante
+          const duracaoStr = tds[2]?.textContent?.trim() || '';
+          let horas = 0, minutos = 0;
+          if (duracaoStr.includes('h')) {
+            const partes = duracaoStr.split('h');
+            horas = parseInt(partes[0]) || 0;
+            if (partes[1]) minutos = parseInt(partes[1]) || 0;
+          }
+          totalHoras += horas + (minutos / 60);
+          aulas.push({
+            data: tds[0]?.textContent?.trim() || '',
+            horario: tds[1]?.textContent?.trim() || '',
+            duracao: tds[2]?.textContent?.trim() || '',
+            materia: tds[3]?.textContent?.trim() || '',
+            professor: tds[4]?.textContent?.trim() || '',
+            estudante: tds[5]?.textContent?.trim() || ''
+          });
+        }
+      });
+
+      // Converter totalHoras para formato 4h ou 4h30
+      const horasInt = Math.floor(totalHoras);
+      const minutos = Math.round((totalHoras - horasInt) * 60);
+      let totalHorasFormatado = '';
+      if (minutos === 0) {
+        totalHorasFormatado = `${horasInt}h`;
+      } else {
+        totalHorasFormatado = `${horasInt}h${minutos}`;
+      }
+
+      // Montar tabela HTML (sem coluna ações)
+      let linhasAulas = '';
+      aulas.forEach(aula => {
+        linhasAulas += `<tr>
+          <td class="py-2 px-3 text-sm border-r border-gray-200">${aula.data}</td>
+          <td class="py-2 px-3 text-sm text-center border-r border-gray-200">${aula.horario}</td>
+          <td class="py-2 px-3 text-sm text-center border-r border-gray-200">${aula.duracao}</td>
+          <td class="py-2 px-3 text-sm border-r border-gray-200">${aula.materia}</td>
+          <td class="py-2 px-3 text-sm border-r border-gray-200">${aula.professor}</td>
+          <td class="py-2 px-3 text-sm">${aula.estudante}</td>
+        </tr>`;
+      });
+
+      const modalHtml = `
+        <div class="modal-overlay" id="modal-enviar-simulacao" style="z-index: 10001;">
+          <div class="modal-container max-w-3xl">
+            <div class="modal-header">
+              <h3 class="font-lexend font-bold text-xl text-gray-800">
+                <i class="fas fa-paper-plane text-orange-500 mr-2"></i>
+                Enviar simulação
+              </h3>
+              <button class="modal-close text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+            <div class="modal-body">
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                  <p class="text-xs font-medium text-gray-500 mb-1">Nome do Cliente</p>
+                  <p class="text-sm font-semibold text-gray-800">${nomeCliente}</p>
+                </div>
+                <div>
+                  <p class="text-xs font-medium text-gray-500 mb-1">Valor do Pacote</p>
+                  <p class="text-sm font-semibold text-gray-800">${valorPacote}</p>
+                </div>
+                <div>
+                  <p class="text-xs font-medium text-gray-500 mb-1">Total de Horas</p>
+                  <p class="text-sm font-semibold text-gray-800">${totalHorasFormatado}</p>
+                </div>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                  <p class="text-xs font-medium text-gray-500 mb-1">Data da Primeira Parcela</p>
+                  <p class="text-sm font-semibold text-gray-800">${dataPrimeiraParcela}</p>
+                </div>
+                <div>
+                  <p class="text-xs font-medium text-gray-500 mb-1">Data da Segunda Parcela</p>
+                  <p class="text-sm font-semibold text-gray-800">${dataSegundaParcela}</p>
+                </div>
+                <div></div>
+              </div>
+              <div class="overflow-x-auto border border-gray-200 rounded-lg">
+                <table class="w-full text-left border-collapse">
+                  <thead>
+                    <tr class="bg-gradient-to-r from-orange-500 to-orange-600 text-white">
+                      <th class="py-3 px-3 text-xs font-semibold border-r border-orange-400">Data da Aula</th>
+                      <th class="py-3 px-3 text-xs font-semibold text-center border-r border-orange-400">Horário</th>
+                      <th class="py-3 px-3 text-xs font-semibold text-center border-r border-orange-400">Duração</th>
+                      <th class="py-3 px-3 text-xs font-semibold border-r border-orange-400">Matéria</th>
+                      <th class="py-3 px-3 text-xs font-semibold border-r border-orange-400">Professor</th>
+                      <th class="py-3 px-3 text-xs font-semibold">Estudante</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${linhasAulas}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            <div class="modal-footer">
+              <button id="btn-fechar-enviar-simulacao" class="btn-secondary">
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.body.insertAdjacentHTML('beforeend', modalHtml);
+      const modal = document.getElementById('modal-enviar-simulacao');
+      modal.querySelector('.modal-close').addEventListener('click', () => modal.remove());
+      modal.querySelector('#btn-fechar-enviar-simulacao').addEventListener('click', () => modal.remove());
+      modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+    }
     const btnSalvar = modal.querySelector('#btn-salvar-simulacao');
     const btnAprovar = modal.querySelector('#btn-aprovar-simulacao');
     const btnExcluir = modal.querySelector('#btn-excluir-simulacao');
@@ -819,10 +952,7 @@ const Simulacoes = (function() {
     const closeModal = () => {
       modal.remove();
     };
-    
-    btnFechar.addEventListener('click', closeModal);
     modal.querySelector('.modal-close').addEventListener('click', closeModal);
-    
     modal.addEventListener('click', (e) => {
       if (e.target === modal) closeModal();
     });
@@ -1624,19 +1754,6 @@ const Simulacoes = (function() {
                     `).join('')}
                   </select>
                 </div>
-                
-                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p class="text-sm text-gray-600">
-                    <i class="fas fa-info-circle text-blue-500 mr-2"></i>
-                    <span>Ou digite um novo nome:</span>
-                  </p>
-                  <input 
-                    type="text" 
-                    id="inputNovoEstudante" 
-                    placeholder="Nome de outro estudante..."
-                    class="w-full border border-gray-300 rounded-lg px-3 py-2 mt-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
               </div>
             </div>
             
@@ -1694,33 +1811,21 @@ const Simulacoes = (function() {
       btnClose.addEventListener('click', closeModal);
       
       btnConfirmar.addEventListener('click', () => {
-        let nomeEstudante = '';
-        
-        // Verificar se digitou um novo nome
-        const novoNome = inputNovoEstudante.value.trim();
-        if (novoNome) {
-          nomeEstudante = novoNome;
-        } else {
-          // Usar o selecionado
-          const selectedOption = selectEstudante.value;
-          if (!selectedOption) {
-            showToast('⚠️ Por favor, selecione um estudante ou digite um novo nome', 'error');
-            return;
-          }
-          nomeEstudante = selectedOption;
+        // Usar o selecionado
+        const selectedOption = selectEstudante.value;
+        if (!selectedOption) {
+          showToast('⚠️ Por favor, selecione um estudante', 'error');
+          return;
         }
-        
-        if (nomeEstudante === estudanteAtual) {
+        if (selectedOption === estudanteAtual) {
           showToast('ℹ️ Este já é o estudante atual da aula', 'info');
           return;
         }
-        
-        editingSimulacao.aulas[index].estudante = nomeEstudante;
+        editingSimulacao.aulas[index].estudante = selectedOption;
         const tbody = document.getElementById('tbody-aulas-simulacao');
         tbody.innerHTML = renderAulasSimulacao(editingSimulacao.aulas);
         setupAulasInputEvents();
-        
-        showToast(`✅ Estudante alterado para ${nomeEstudante}`, 'success');
+        showToast(`✅ Estudante alterado para ${selectedOption}`, 'success');
         closeModal();
       });
       
@@ -2037,8 +2142,6 @@ const Simulacoes = (function() {
     setupAulasInputEvents();
     
     recalcularValores();
-    
-    showToast('✅ Aula copiada com sucesso!', 'success');
   }
   
   // Função para excluir aula
@@ -2377,7 +2480,7 @@ const Simulacoes = (function() {
       // 4. Verificar se alguma aula é emergencial
       const aulaEmergencial = verificarAulaEmergencial(editingSimulacao.aulas);
       
-      // 5. Gerar IDs de aula (formato: 0001AA, 0001AB, etc.)
+      // 5. Gerar IDs de aula (formato: 0001AA, 0001AB, 0001AC, etc.)
       const aulasComIds = editingSimulacao.aulas. map((aula, index) => {
         const idAula = novoCodigoContratacao + gerarSufixoAula(index);
         
@@ -2388,7 +2491,7 @@ const Simulacoes = (function() {
           materia:  aula.materia || '',
           estudante: aula.estudante || '',
           duracao: aula.duracao || '',
-          data: aula. data || '',
+          data: aula.data || '',
           horario: '',
           StatusAula: '',
           ObservacoesAula: '',

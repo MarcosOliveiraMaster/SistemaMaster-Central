@@ -4009,17 +4009,70 @@ const BancoDeAulasCards = (function() {
   }
   
   // Função para mostrar modal final com a solicitação formatada
-  function showModalSolicitacaoFinal(aulaContratacao, aulasSelecionadas) {
+  async function showModalSolicitacaoFinal(aulaContratacao, aulasSelecionadas) {
     console.log('📄 Gerando solicitação final');
     
+    // Mostrar loading
+    showToast('⏳ Carregando dados do cliente...', 'info');
+    
+    // Buscar dados do cliente na coleção cadastroClientes
+    let enderecoAulas = aulaContratacao.endereco || '--';
+    let complementoAulas = aulaContratacao.referencia || '--';
+    
+    try {
+      const cpfCliente = aulaContratacao.cpf;
+      
+      if (cpfCliente && cpfCliente !== '--') {
+        console.log('🔍 Buscando cliente com CPF:', cpfCliente);
+        
+        const clientesRef = db.collection('cadastroClientes');
+        const querySnapshot = await clientesRef.where('cpf', '==', cpfCliente).get();
+        
+        if (!querySnapshot.empty) {
+          const clienteDoc = querySnapshot.docs[0];
+          const clienteData = clienteDoc.data();
+          
+          console.log('✅ Cliente encontrado:', clienteData);
+          
+          // Atualizar com os dados do cadastro do cliente
+          if (clienteData.enderecoAulas) {
+            enderecoAulas = clienteData.enderecoAulas;
+          }
+          if (clienteData.complementoAulas) {
+            complementoAulas = clienteData.complementoAulas;
+          }
+        } else {
+          console.log('⚠️ Cliente não encontrado no cadastro');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Erro ao buscar dados do cliente:', error);
+    }
+    
     // Calcular total a receber (Valor Equipe)
-    let totalReceber = 0;
+    // Somar todas as durações e multiplicar por 35
+    let totalHoras = 0;
     aulasSelecionadas.forEach(aula => {
-      // Assumir valor padrão por hora se não houver cálculo específico
-      // Você pode ajustar essa lógica conforme sua necessidade
-      const duracao = aula.duracao ? parseFloat(aula.duracao.replace('h', '')) : 1;
-      totalReceber += duracao * 50; // Exemplo: R$ 50 por hora
+      if (aula.duracao) {
+        // Converter formato "1h30", "2h", "1h15" para horas decimais
+        const duracaoStr = aula.duracao.toLowerCase();
+        let horas = 0;
+        let minutos = 0;
+        
+        if (duracaoStr.includes('h')) {
+          const partes = duracaoStr.split('h');
+          horas = parseInt(partes[0]) || 0;
+          if (partes[1]) {
+            minutos = parseInt(partes[1]) || 0;
+          }
+        }
+        
+        // Converter para horas decimais (ex: 1h30 = 1.5)
+        totalHoras += horas + (minutos / 60);
+      }
     });
+    
+    const totalReceber = totalHoras * 35;
     
     // Criar linhas da tabela de aulas
     let linhasAulasHtml = '';
@@ -4063,19 +4116,19 @@ const BancoDeAulasCards = (function() {
                   <p class="text-xs font-medium text-gray-500 mb-1">
                     <i class="fas fa-map-marker-alt text-orange-500 mr-2"></i>Endereço
                   </p>
-                  <p class="text-sm font-semibold text-gray-800">${aulaContratacao.endereco || '--'}</p>
-                </div>
-                <div>
-                  <p class="text-xs font-medium text-gray-500 mb-1">
-                    <i class="fas fa-map-signs text-orange-500 mr-2"></i>Referência
-                  </p>
-                  <p class="text-sm font-semibold text-gray-800">${aulaContratacao.referencia || '--'}</p>
+                  <p class="text-sm font-semibold text-gray-800">${enderecoAulas}</p>
                 </div>
                 <div>
                   <p class="text-xs font-medium text-gray-500 mb-1">
                     <i class="fas fa-dollar-sign text-green-600 mr-2"></i>Total a Receber (Valor Equipe)
                   </p>
                   <p class="text-lg font-bold text-green-600">R$ ${totalReceber.toFixed(2)}</p>
+                </div>
+                <div>
+                  <p class="text-xs font-medium text-gray-500 mb-1">
+                    <i class="fas fa-map-signs text-orange-500 mr-2"></i>Referência
+                  </p>
+                  <p class="text-sm font-semibold text-gray-800">${complementoAulas}</p>
                 </div>
               </div>
             </div>
