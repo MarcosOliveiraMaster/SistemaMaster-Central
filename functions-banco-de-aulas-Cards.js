@@ -515,8 +515,14 @@ const BancoDeAulasCards = (function() {
     
     // Configurar botão de gerar contrato (desabilitado por enquanto)
     const btnGerarContrato = modal.querySelector('#btn-gerar-contrato');
+    // Habilita o botão
+    btnGerarContrato.removeAttribute('disabled');
     btnGerarContrato.addEventListener('click', () => {
-      showToast('Funcionalidade "Gerar Contrato" será implementada em breve', 'info');
+      if (typeof window.abrirContratoModal === 'function') {
+        window.abrirContratoModal();
+      } else {
+        showToast('Função de contrato não carregada!', 'error');
+      }
     });
     
     // Configurar botão de gerar solicitação de aula

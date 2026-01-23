@@ -1,3 +1,15 @@
+/* Botão contrato: UX igual aos demais botões */
+#btn-gerar-contrato.btn-primary {
+  background: #fff;
+  color: #f28705;
+  border: 2px solid #f28705;
+  font-weight: bold;
+  transition: background 0.2s, color 0.2s;
+}
+#btn-gerar-contrato.btn-primary:hover, #btn-gerar-contrato.btn-primary:focus {
+  background: #f28705;
+  color: #fff;
+}
 /* -------------------- VARIÁVEIS -------------------- */
 :root {
   --orange: #f28705;
@@ -1017,6 +1029,38 @@
     padding: 5px 10px !important;
     font-size: 0.7rem !important;
   }
+}
+
+/* -------------------- TEXTO E TÍTULOS -------------------- */
+
+/* Alinhar todos os títulos à esquerda, exceto h1 */
+h2, h3, h4, h5, h6,
+.font-lexend.text-lg,
+.font-lexend.text-base,
+.font-lexend.text-xl,
+.aula-card-title,
+.toast-title,
+.modal-header h3,
+.modal-header h4,
+.modal-header h5 {
+  text-align: left !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* h1 pode ter alinhamento diferente, não sobrescrever */
+
+/* Texto comum justificado */
+p, .texto-comum, .aula-card-content, .toast-message {
+  text-align: justify !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* Remover margens extras dos títulos (exceto h1) */
+h2, h3, h4, h5, h6 {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
 }
 
 /* -------------------- ESTILOS PARA IMPRESSÃO -------------------- */

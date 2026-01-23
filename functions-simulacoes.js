@@ -913,8 +913,8 @@ const Simulacoes = (function() {
                       <th class="py-3 px-3 text-xs font-semibold text-center border-r border-orange-400">Horário</th>
                       <th class="py-3 px-3 text-xs font-semibold text-center border-r border-orange-400">Duração</th>
                       <th class="py-3 px-3 text-xs font-semibold border-r border-orange-400">Matéria</th>
-                      <th class="py-3 px-3 text-xs font-semibold border-r border-orange-400">Professor</th>
-                      <th class="py-3 px-3 text-xs font-semibold">Estudante</th>
+                      <th class="py-3 px-3 text-xs font-semibold border-r border-orange-400">Estudante</th>
+                      <th class="py-3 px-3 text-xs font-semibold">Professor</th>
                     </tr>
                   </thead>
                   <tbody>
