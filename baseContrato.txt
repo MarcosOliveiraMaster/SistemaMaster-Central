@@ -1,15 +1,15 @@
 # CONTRATO DE PRESTAÇÃO DE SERVIÇOS
 
 
-
-
-###1. TERMOS E CONDIÇÕES GERAIS DE FORNECIMENTO DE AULAS PARTICULARES
+### 1. TERMOS E CONDIÇÕES GERAIS DE FORNECIMENTO DE AULAS PARTICULARES
 
 ### 1.1 CONTRATADA
 *MASTER EDUCACAO LTDA* inscrito(a) no CNPJ 48.055.955/0001-72 registrado na AV WALTER ANANIAS, 594 bairro Poço, CEP 57.025-510, Cidade Maceió, Estado Alagoas.
 
 ### 1.2 CONTRATANTE
 *Elayne F B Amaral Santos* inscrito(a) no CPF de número 11616876700 Rua projetada u, Modulo 3, Quadra U, 175 - Res. Jardim Royal, Maceió-AL, CEP 57072131.
+
+
 
 ## DO OBJETO DO CONTRATO
 
@@ -39,6 +39,8 @@ O *CONTRATANTE* somente poderá usufruir das horas-aula contratadas após a comp
 ### Cláusula Oitava
 O *CONTRATANTE* poderá exercer o seu direito de arrependimento ao efetuar a contratação, que ocorre via internet, em até *7 dias*, contados da sua assinatura ou início de utilização dos serviços, em conformidade com o art. 49, do Código de Defesa do Consumidor.
 
+
+
 ## DAS MINISTRAÇÕES E MODALIDADES
 
 ### Cláusula Nona
@@ -50,26 +52,28 @@ O(a) *CLIENTE* poderá usufruir do serviço de aulas particulares mediante pagam
 ### Cláusula Décima Primeira
 A modalidade de aula contratada poderá ser migrada e a contratação de serviços extras de gamificação e de inclusão de momento de desenvolvimento de habilidades do aluno, poderá ocorrer mediante as seguintes condições:
 
-#### Cláusula Décima Segunda
+### Cláusula Décima Segunda
 A solicitação de *MIGRAÇÃO* de modalidade poderá ser validada com o prazo de *4 (quatro) dias* antecedentes à data referente ao início das aulas.
 
-#### Cláusula Décima Terceira
+### Cláusula Décima Terceira
 A viabilidade da *MIGRAÇÃO* dependerá da disponibilidade da equipe de técnicos da *CONTRATADA*, sendo esta verificada no dia da solicitação com o prazo de *24h* a partir do horário em que foi solicitado.
 
-#### Cláusula Décima Quarta
+### Cláusula Décima Quarta
 *MIGRAÇÃO de Online para Presencial*: o *CLIENTE* deverá efetuar o pagamento da diferença de valores entre as modalidades. Após o envio do comprovante do pagamento, a *CONTRATADA* deverá confirmar a validação da alteração.
 
-#### Cláusula Décima Quinta
+### Cláusula Décima Quinta
 *MIGRAÇÃO de Presencial para Online*: a *CONTRATADA* converterá o valor da diferença entre as modalidades em créditos de aulas que podem ser utilizados em qualquer modalidade dentro do prazo de até *15 dias*, a partir do primeiro dia da aula contratada.
 
-#### Cláusula Décima Sexta
+### Cláusula Décima Sexta
 A *gamificação* será disponibilizada ao contratar pacotes com *10 (dez)* ou *15 (quinze) horas* no formato de pacote avulso, *30 (trinta)* ou *45 (quarenta e cinco) horas* aulas presenciais no formato de assinatura, ou, se for o caso, no formato online ao contratar pacotes com *6 (seis), 8 (oito), 10 (dez) ou 15 (quinze) horas* e poderá ser desfrutado mediante solicitação da *CONTRATANTE* ou disponibilidade e domínio da equipe para utilizar a ferramenta de gamificação que o tutor julgar mais adequada.
 
-#### Cláusula Décima Sétima
+### Cláusula Décima Sétima
 O *momento de desenvolvimento de habilidades* do(a) aluno(a) será disponibilizado ao contratar pacotes com *15 (quinze)* ou *45 (quarenta e cinco) horas* aulas presenciais no formato de assinatura ou no formato online ao contratar pacotes de *10 (dez)* ou *15 (quinze) horas* e poderá durar entre *1 hora ou 4 horas* no período da manhã ou da tarde a depender da disponibilidade da equipe.
 
-#### Cláusula Décima Oitava
+### Cláusula Décima Oitava
 No que se refira ao agendamento do momento de desenvolvimento de habilidades, o mesmo deverá ser efetuado com pelo menos *7 dias úteis* de antecedência, podendo escolher *1 dos temas* que a contratada estiver disponibilizando no mês corrente e será desfrutado mediante solicitação da *CONTRATANTE* via e-mail descrevendo qual tema, data e a duração que deseja.
+
+
 
 ## DO CANCELAMENTO E DO REEMBOLSO
 
@@ -100,6 +104,8 @@ O professor poderá solicitar o reagendamento da aula notificando o aluno em at�
 
 ### Cláusula Décima Nona
 O(A) *CLIENTE* terá *2 (dois) REAGENDAMENTOS* disponíveis. Ao ultrapassar esse número, a *CONTRATADA* deverá analisar a viabilidade de dar continuidade às aulas restantes, junto à equipe, nos dias e horários que foram agendados inicialmente no cronograma. Após a análise e, verificado que não é viável a continuidade do serviço, este poderá ser cancelado, sem a possibilidade de reembolso dos valores pagos.
+
+
 
 ## DA RESCISÃO
 
@@ -139,7 +145,7 @@ Pela prestação de serviço contratado, o (a) *CLIENTE* pagará à *CONTRATADA*
 
 No caso do(a) cliente optar por pagar *50%* do valor no pix ou débito total na data referente à primeira aula do cronograma ou em data anterior a esta, os outros *50%* deverão ser pagos no dia que atingir a data referente à metade do pacote de aulas contratado. Pode este sofrer alteração caso o(a) *CLIENTE* solicite modificação nas datas do cronograma original previsto no presente e-mail e esta solicitação for aprovada.Em caso de não pagamento na data e horário acordado, a *CONTRATADA* poderá suspender as atividades com o(a) *CLIENTE* até que o pagamento seja efetuado.
 
-5.### Cláusula Trigésima
+### 5.Cláusula Trigésima
 Em caso de aulas solicitadas para serem ministradas para o mesmo dia da contratação, poderá ser cobrada uma taxa extra de *30%* sobre o valor da hora aula referente à modalidade escolhida.
 
 ## DA PROTEÇÃO DE DADOS
@@ -212,7 +218,9 @@ Declaro estar ciente e de acordo com todas as cláusulas e condições estabelec
 
 Maceió - AL,
 
-[Espaço para assinatura/digital]
+[imagemAssinatura]
+
+_________________________  
 
 *Master Educação LTDA*
 CNPJ: 48.055.955/0001-72
