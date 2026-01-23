@@ -325,14 +325,7 @@ const BancoDeAulasCards = (function() {
                     <div class="text-xs font-medium text-gray-500 mb-1">CPF</div>
                     <div class="text-sm text-gray-800">${aula.cpf || '--'}</div>
                   </div>
-                  <div>
-                    <div class="text-xs font-medium text-gray-500 mb-1">Aluno(s)</div>
-                    <div class="text-sm text-gray-800">${aula.nomeAluno || '--'}</div>
-                  </div>
-                  <div>
-                    <div class="text-xs font-medium text-gray-500 mb-1">Aula Emergencial</div>
-                    <div class="text-sm text-gray-800">${(aula.AulaEmergencial !== undefined && aula.AulaEmergencial !== null) ? aula.AulaEmergencial : '--'}</div>
-                  </div>
+                  <!-- Aluno(s) e Aula Emergencial ocultos -->
                 </div>
                 
                 <!-- Coluna 2: Status do contrato -->

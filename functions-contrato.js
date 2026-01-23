@@ -12,26 +12,27 @@
 // Configurações de formatação ABNT
 const CONFIG_ABNT = {
   fonte: {
-    nome: 'helvetica',
+    nome: 'times',
     tamanhoBase: 12,
-    linhaAltura: 13.8, // 1.15 * 12 (espaçamento 1.15)
+    linhaAltura: 18, // 1.5 * 12 (espaçamento 1,5)
   },
   margens: {
     esquerda: 85,   // 3cm ≈ 85pt
-    direita: 57,    // 2cm ≈ 57pt  
+    direita: 85,    // 3cm ≈ 85pt
     topo: 85,       // 3cm ≈ 85pt
-    base: 57,       // 2cm ≈ 57pt
+    base: 85,       // 3cm ≈ 85pt
   },
   estilos: {
-    h1: { tamanho: 18, negrito: true, espacamentoAntes: 30, espacamentoDepois: 20 },
-    h2: { tamanho: 16, negrito: true, espacamentoAntes: 25, espacamentoDepois: 15 },
-    h3: { tamanho: 14, negrito: true, espacamentoAntes: 20, espacamentoDepois: 12 },
-    h4: { tamanho: 13, negrito: true, espacamentoAntes: 15, espacamentoDepois: 10 },
-    normal: { tamanho: 12, negrito: false, espacamentoAntes: 0, espacamentoDepois: 0 },
-    negrito: { tamanho: 12, negrito: true, espacamentoAntes: 0, espacamentoDepois: 0 },
-    italico: { tamanho: 12, italico: true, espacamentoAntes: 0, espacamentoDepois: 0 }
+    h1: { tamanho: 18, negrito: true, espacamentoAntes: 30, espacamentoDepois: 18, caixaAlta: true, alinhamento: 'center' },
+    h2: { tamanho: 16, negrito: true, espacamentoAntes: 22, espacamentoDepois: 12, caixaAlta: true, alinhamento: 'left' },
+    h3: { tamanho: 14, negrito: true, espacamentoAntes: 16, espacamentoDepois: 8, alinhamento: 'left' },
+    h4: { tamanho: 13, negrito: true, espacamentoAntes: 12, espacamentoDepois: 6, alinhamento: 'left' },
+    normal: { tamanho: 12, negrito: false, espacamentoAntes: 0, espacamentoDepois: 0, alinhamento: 'justify' },
+    negrito: { tamanho: 12, negrito: true, espacamentoAntes: 0, espacamentoDepois: 0, alinhamento: 'justify' },
+    italico: { tamanho: 12, italico: true, espacamentoAntes: 0, espacamentoDepois: 0, alinhamento: 'justify' }
   },
   recuoParagrafo: 35 // 1.25cm ≈ 35pt
+  , espacamentoParagrafo: 6 // 6pt entre parágrafos
 };
 
 // ============================================
@@ -398,67 +399,27 @@ function gerarPDFContrato(contratoTexto) {
   // Renderiza cada elemento
   elementos.forEach(elemento => {
     verificarEspaco(fonte.linhaAltura * 3);
-    
+    let estilo = elemento.estilo || CONFIG_ABNT.estilos.normal;
+    let conteudo = elemento.conteudo;
+    // Caixa alta para títulos principais
+    if (estilo.caixaAlta) conteudo = conteudo.toUpperCase();
     switch (elemento.tipo) {
       case 'titulo1':
-        aplicarEstilo(elemento.estilo);
-        adicionarEspaco(elemento.estilo.espacamentoAntes);
-        
-        const linhasTitulo1 = doc.splitTextToSize(elemento.conteudo, larguraUtil);
-        doc.text(linhasTitulo1, margens.esquerda, yAtual, { 
-          maxWidth: larguraUtil, 
-          align: 'center' 
-        });
-        
-        yAtual += fonte.linhaAltura * linhasTitulo1.length;
-        adicionarEspaco(elemento.estilo.espacamentoDepois);
-        primeiraLinhaParagrafo = true;
-        break;
-        
       case 'titulo2':
-        aplicarEstilo(elemento.estilo);
-        adicionarEspaco(elemento.estilo.espacamentoAntes);
-        
-        const linhasTitulo2 = doc.splitTextToSize(elemento.conteudo, larguraUtil);
-        doc.text(linhasTitulo2, margens.esquerda, yAtual, { 
-          maxWidth: larguraUtil, 
-          align: 'left' 
-        });
-        
-        yAtual += fonte.linhaAltura * linhasTitulo2.length;
-        adicionarEspaco(elemento.estilo.espacamentoDepois);
-        primeiraLinhaParagrafo = true;
-        break;
-        
       case 'titulo3':
-        aplicarEstilo(elemento.estilo);
-        adicionarEspaco(elemento.estilo.espacamentoAntes);
-        
-        const linhasTitulo3 = doc.splitTextToSize(elemento.conteudo, larguraUtil);
-        doc.text(linhasTitulo3, margens.esquerda, yAtual, { 
-          maxWidth: larguraUtil, 
-          align: 'left' 
+      case 'titulo4': {
+        aplicarEstilo(estilo);
+        adicionarEspaco(estilo.espacamentoAntes);
+        const linhasTitulo = doc.splitTextToSize(conteudo, larguraUtil);
+        doc.text(linhasTitulo, margens.esquerda, yAtual, {
+          maxWidth: larguraUtil,
+          align: estilo.alinhamento || 'left'
         });
-        
-        yAtual += fonte.linhaAltura * linhasTitulo3.length;
-        adicionarEspaco(elemento.estilo.espacamentoDepois);
+        yAtual += fonte.linhaAltura * linhasTitulo.length;
+        adicionarEspaco(estilo.espacamentoDepois);
         primeiraLinhaParagrafo = true;
         break;
-        
-      case 'titulo4':
-        aplicarEstilo(elemento.estilo);
-        adicionarEspaco(elemento.estilo.espacamentoAntes);
-        
-        const linhasTitulo4 = doc.splitTextToSize(elemento.conteudo, larguraUtil);
-        doc.text(linhasTitulo4, margens.esquerda, yAtual, { 
-          maxWidth: larguraUtil, 
-          align: 'left' 
-        });
-        
-        yAtual += fonte.linhaAltura * linhasTitulo4.length;
-        adicionarEspaco(elemento.estilo.espacamentoDepois);
-        primeiraLinhaParagrafo = true;
-        break;
+      }
         
       case 'negritoCompleto':
         aplicarEstilo(elemento.estilo);
@@ -494,17 +455,11 @@ function gerarPDFContrato(contratoTexto) {
         primeiraLinhaParagrafo = true;
         break;
         
-      case 'paragrafo':
+      case 'paragrafo': {
         aplicarEstilo(CONFIG_ABNT.estilos.normal);
-        
-        // Aplica recuo na primeira linha do parágrafo
-        const xInicio = primeiraLinhaParagrafo ? 
-          margens.esquerda + recuoParagrafo : 
-          margens.esquerda;
-        const larguraParagrafo = primeiraLinhaParagrafo ? 
-          larguraUtil - recuoParagrafo : 
-          larguraUtil;
-        
+        // Recuo apenas na primeira linha do parágrafo
+        const xInicio = primeiraLinhaParagrafo ? margens.esquerda + recuoParagrafo : margens.esquerda;
+        const larguraParagrafo = primeiraLinhaParagrafo ? larguraUtil - recuoParagrafo : larguraUtil;
         const alturaTexto = renderizarTextoFormatado(
           elemento.conteudo,
           xInicio,
@@ -512,11 +467,11 @@ function gerarPDFContrato(contratoTexto) {
           larguraParagrafo,
           'justify'
         );
-        
         yAtual += alturaTexto;
-        adicionarEspaco(8); // Espaço entre parágrafos
+        adicionarEspaco(CONFIG_ABNT.espacamentoParagrafo); // Espaço reduzido entre parágrafos
         primeiraLinhaParagrafo = false;
         break;
+      }
         
       case 'especial':
         aplicarEstilo(CONFIG_ABNT.estilos.normal);
