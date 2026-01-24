@@ -24,12 +24,13 @@ const CONFIG_ABNT = {
 };
 
 // 2. Função Global para carregar arquivo externo
-window.abrirContratoModal = async function() {
+// Agora aceita o nome do cliente e CPF como parâmetros
+window.abrirContratoModal = async function(nomeCliente, cpfCliente) {
   try {
     const response = await fetch('baseContrato.txt');
     if (!response.ok) throw new Error('Arquivo baseContrato.txt não encontrado.');
     const texto = await response.text();
-    gerarPDFContrato(texto);
+    gerarPDFContrato(texto, nomeCliente, cpfCliente);
   } catch (error) {
     alert('Erro: ' + error.message);
   }
@@ -51,7 +52,6 @@ function processarContratoParaPDF(contratoTexto) {
   
   linhas.forEach(linhaRaw => {
     const linha = linhaRaw.trim();
-    
     if (padroes.linhaVazia.test(linha)) {
       elementos.push({ tipo: 'espaco' });
     } else if (padroes.titulo1.test(linha)) {
@@ -60,6 +60,8 @@ function processarContratoParaPDF(contratoTexto) {
       elementos.push({ tipo: 'titulo2', conteudo: linha.match(padroes.titulo2)[1], estilo: CONFIG_ABNT.estilos.h2 });
     } else if (padroes.titulo3.test(linha)) {
       elementos.push({ tipo: 'titulo3', conteudo: linha.match(padroes.titulo3)[1], estilo: CONFIG_ABNT.estilos.h3 });
+    } else if (/^-.*-$/.test(linha) && linha.length > 2) {
+      elementos.push({ tipo: 'centralizado', conteudo: linha.slice(1, -1).trim() });
     } else {
       elementos.push({
         tipo: 'paragrafo',
@@ -127,16 +129,32 @@ function renderizarParagrafoFormatado(doc, elemento, x, y, larguraMax) {
 
 /**
  * 5. Função Principal de Geração
+ * Agora aceita nomeCliente e cpfCliente para substituir [NomeCliente] e [CPFCliente] no texto
  */
-function gerarPDFContrato(contratoTexto) {
+function gerarPDFContrato(contratoTexto, nomeCliente, cpfCliente) {
+  // Substituir [DataHoje] pela data atual no formato dd/mm/yyyy
+  const hoje = new Date();
+  const dia = String(hoje.getDate()).padStart(2, '0');
+  const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+  const ano = hoje.getFullYear();
+  const dataFormatada = `${dia}/${mes}/${ano}`;
+  let contratoComData = contratoTexto.replace(/\[DataHoje\]/g, dataFormatada);
+  if (nomeCliente) {
+    contratoComData = contratoComData.replace(/\[NomeCliente\]/gi, nomeCliente);
+  }
+  if (cpfCliente) {
+    // Substitui [CPFCliente] mesmo se houver espaços extras
+    contratoComData = contratoComData.replace(/\[\s*CPFCliente\s*\]/gi, cpfCliente);
+  }
+
   const jsPDF = window.jspdf ? window.jspdf.jsPDF : window.jsPDF;
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
-  
+
   const { margens, fonte } = CONFIG_ABNT;
   const larguraUtil = doc.internal.pageSize.width - margens.esquerda - margens.direita;
   let yAtual = margens.topo;
 
-  const elementos = processarContratoParaPDF(contratoTexto);
+  const elementos = processarContratoParaPDF(contratoComData);
 
   elementos.forEach(elemento => {
     // Verificação de quebra de página
@@ -151,10 +169,15 @@ function gerarPDFContrato(contratoTexto) {
       doc.setFont(fonte.nome, 'bold');
       doc.setFontSize(elemento.estilo.tamanho);
       yAtual += elemento.estilo.espacamentoAntes;
-      
+
       const linhasTitulo = doc.splitTextToSize(elemento.conteudo, larguraUtil);
       doc.text(linhasTitulo, margens.esquerda, yAtual);
       yAtual += (linhasTitulo.length * (elemento.estilo.tamanho * 1.2)) + elemento.estilo.espacamentoDepois;
+    } else if (elemento.tipo === 'centralizado') {
+      doc.setFont(CONFIG_ABNT.fonte.nome, 'normal');
+      doc.setFontSize(CONFIG_ABNT.fonte.tamanhoBase);
+      doc.text(elemento.conteudo, doc.internal.pageSize.width / 2, yAtual, { align: 'center' });
+      yAtual += CONFIG_ABNT.fonte.linhaAltura;
     } else if (elemento.tipo === 'paragrafo') {
       yAtual = renderizarParagrafoFormatado(doc, elemento, margens.esquerda, yAtual, larguraUtil);
       yAtual += 5; // Espaço entre parágrafos

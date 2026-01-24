@@ -512,7 +512,10 @@ const BancoDeAulasCards = (function() {
     btnGerarContrato.removeAttribute('disabled');
     btnGerarContrato.addEventListener('click', () => {
       if (typeof window.abrirContratoModal === 'function') {
-        window.abrirContratoModal();
+        // Usa o campo nomeCliente e cpf do objeto aula
+        const nomeCliente = aula.nomeCliente || 'Cliente não identificado';
+        const cpfCliente = aula.cpf || '';
+        window.abrirContratoModal(nomeCliente, cpfCliente);
       } else {
         showToast('Função de contrato não carregada!', 'error');
       }

@@ -7,7 +7,7 @@
 *MASTER EDUCACAO LTDA* inscrito(a) no CNPJ 48.055.955/0001-72 registrado na AV WALTER ANANIAS, 594 bairro Poço, CEP 57.025-510, Cidade Maceió, Estado Alagoas.
 
 ### 1.2 CONTRATANTE
-*Elayne F B Amaral Santos* inscrito(a) no CPF de número 11616876700 Rua projetada u, Modulo 3, Quadra U, 175 - Res. Jardim Royal, Maceió-AL, CEP 57072131.
+[NomeCliente] inscrito(a) no CPF de número [CPFCliente] Rua projetada u, Modulo 3, Quadra U, 175 - Res. Jardim Royal, Maceió-AL, CEP 57072131.
 
 
 
@@ -216,11 +216,11 @@ Segue imagem do cronograma aprovado via whatsapp:
 
 Declaro estar ciente e de acordo com todas as cláusulas e condições estabelecidas no contrato e no Google Sala de Aula, reconhecendo a validade e eficácia dessas disposições. Este contrato é celebrado com pleno conhecimento de causa e de boa-fé, sem nenhuma coação ou vício de qualquer natureza. Assim, assino o presente instrumento para que produza seus legais efeitos.
 
-Maceió - AL,
+Maceió - AL, [DataHoje]
 
-[imagemAssinatura]
+- [imagemAssinatura] -
 
-_________________________  
+-_________________________-  
 
-*Master Educação LTDA*
-CNPJ: 48.055.955/0001-72
+- Master Educação LTD* -
+- CNPJ: 48.055.955/0001-72 -
