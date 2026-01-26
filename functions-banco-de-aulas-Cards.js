@@ -512,10 +512,34 @@ const BancoDeAulasCards = (function() {
     btnGerarContrato.removeAttribute('disabled');
     btnGerarContrato.addEventListener('click', () => {
       if (typeof window.abrirContratoModal === 'function') {
-        // Usa o campo nomeCliente e cpf do objeto aula
-        const nomeCliente = aula.nomeCliente || 'Cliente não identificado';
+        const nomeCliente = aula.nomeCliente || aula.nome || 'Cliente não identificado';
         const cpfCliente = aula.cpf || '';
-        window.abrirContratoModal(nomeCliente, cpfCliente);
+        // Buscar endereço completo do cliente na coleção cadastroClientes
+        if (cpfCliente) {
+          db.collection('cadastroClientes').where('cpf', '==', cpfCliente).get().then(snapshot => {
+            if (!snapshot.empty) {
+              const data = snapshot.docs[0].data();
+              const endereco = data.endereco || '';
+              const cep = data.cep || '';
+              const cidadeUF = data.cidadeUF || '';
+              let enderecoClienteContrato = '';
+              if (endereco) enderecoClienteContrato += endereco;
+              if (cep) enderecoClienteContrato += (enderecoClienteContrato ? ', ' : '') + 'CEP: ' + cep;
+              if (cidadeUF) enderecoClienteContrato += (enderecoClienteContrato ? '. ' : '') + cidadeUF;
+              window.abrirContratoModal(nomeCliente, cpfCliente, enderecoClienteContrato);
+            } else {
+              // fallback se não encontrar no banco
+              const enderecoCliente = aula.enderecoAulas || aula.endereco || '';
+              window.abrirContratoModal(nomeCliente, cpfCliente, enderecoCliente);
+            }
+          }).catch(() => {
+            const enderecoCliente = aula.enderecoAulas || aula.endereco || '';
+            window.abrirContratoModal(nomeCliente, cpfCliente, enderecoCliente);
+          });
+        } else {
+          const enderecoCliente = aula.enderecoAulas || aula.endereco || '';
+          window.abrirContratoModal(nomeCliente, cpfCliente, enderecoCliente);
+        }
       } else {
         showToast('Função de contrato não carregada!', 'error');
       }

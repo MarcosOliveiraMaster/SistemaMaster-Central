@@ -25,12 +25,13 @@ const CONFIG_ABNT = {
 
 // 2. Função Global para carregar arquivo externo
 // Agora aceita o nome do cliente e CPF como parâmetros
-window.abrirContratoModal = async function(nomeCliente, cpfCliente) {
+// Agora aceita nomeCliente, cpfCliente e enderecoCliente
+window.abrirContratoModal = async function(nomeCliente, cpfCliente, enderecoCliente) {
   try {
     const response = await fetch('baseContrato.txt');
     if (!response.ok) throw new Error('Arquivo baseContrato.txt não encontrado.');
     const texto = await response.text();
-    gerarPDFContrato(texto, nomeCliente, cpfCliente);
+    gerarPDFContrato(texto, nomeCliente, cpfCliente, enderecoCliente);
   } catch (error) {
     alert('Erro: ' + error.message);
   }
@@ -131,7 +132,7 @@ function renderizarParagrafoFormatado(doc, elemento, x, y, larguraMax) {
  * 5. Função Principal de Geração
  * Agora aceita nomeCliente e cpfCliente para substituir [NomeCliente] e [CPFCliente] no texto
  */
-function gerarPDFContrato(contratoTexto, nomeCliente, cpfCliente) {
+function gerarPDFContrato(contratoTexto, nomeCliente, cpfCliente, enderecoCliente) {
   // Substituir [DataHoje] pela data atual no formato dd/mm/yyyy
   const hoje = new Date();
   const dia = String(hoje.getDate()).padStart(2, '0');
@@ -145,6 +146,10 @@ function gerarPDFContrato(contratoTexto, nomeCliente, cpfCliente) {
   if (cpfCliente) {
     // Substitui [CPFCliente] mesmo se houver espaços extras
     contratoComData = contratoComData.replace(/\[\s*CPFCliente\s*\]/gi, cpfCliente);
+  }
+  if (enderecoCliente) {
+    // Substitui [EnderecoCliente] mesmo se houver espaços extras
+    contratoComData = contratoComData.replace(/\[\s*EnderecoCliente\s*\]/gi, enderecoCliente);
   }
 
   const jsPDF = window.jspdf ? window.jspdf.jsPDF : window.jsPDF;

@@ -4,10 +4,10 @@
 ### 1. TERMOS E CONDIÇÕES GERAIS DE FORNECIMENTO DE AULAS PARTICULARES
 
 ### 1.1 CONTRATADA
-*MASTER EDUCACAO LTDA* inscrito(a) no CNPJ 48.055.955/0001-72 registrado na AV WALTER ANANIAS, 594 bairro Poço, CEP 57.025-510, Cidade Maceió, Estado Alagoas.
+MASTER EDUCACAO LTDA inscrito(a) no CNPJ 48.055.955/0001-72 registrado na AV WALTER ANANIAS, 594 bairro Poço, CEP 57.025-510, Cidade Maceió, Estado Alagoas.
 
 ### 1.2 CONTRATANTE
-[NomeCliente] inscrito(a) no CPF de número [CPFCliente] Rua projetada u, Modulo 3, Quadra U, 175 - Res. Jardim Royal, Maceió-AL, CEP 57072131.
+[NomeCliente] inscrito(a) no CPF de número [CPFCliente] , com endereço em: [EnderecoCliente].
 
 
 
