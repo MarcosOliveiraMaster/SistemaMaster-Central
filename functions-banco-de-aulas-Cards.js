@@ -4227,7 +4227,48 @@ const BancoDeAulasCards = (function() {
     
     // Botão imprimir
     btnImprimir.addEventListener('click', () => {
-      window.print();
+      const modalContent = modal.querySelector('.modal-container');
+      if (!modalContent) {
+        alert('Erro ao localizar o conteúdo do modal para exportação.');
+        return;
+      }
+      // Salva estilos originais
+      const originalOverflow = modalContent.style.overflow;
+      const originalMaxHeight = modalContent.style.maxHeight;
+      const originalScrollTop = modalContent.scrollTop;
+      // Expande o modal para mostrar todo o conteúdo
+      modalContent.style.overflow = 'visible';
+      modalContent.style.maxHeight = 'none';
+      modalContent.scrollTop = 0;
+      // Oculta o botão de imprimir para não aparecer na imagem
+      btnImprimir.style.display = 'none';
+      // Aguarda um frame para garantir o layout
+      setTimeout(() => {
+        html2canvas(modalContent, {
+          backgroundColor: null,
+          useCORS: true,
+          scale: 2
+        }).then(canvas => {
+          // Restaura estilos
+          modalContent.style.overflow = originalOverflow;
+          modalContent.style.maxHeight = originalMaxHeight;
+          modalContent.scrollTop = originalScrollTop;
+          btnImprimir.style.display = '';
+          // Cria o link para download
+          const link = document.createElement('a');
+          link.href = canvas.toDataURL('image/png');
+          link.download = 'solicitacao-aula.png';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }).catch(() => {
+          modalContent.style.overflow = originalOverflow;
+          modalContent.style.maxHeight = originalMaxHeight;
+          modalContent.scrollTop = originalScrollTop;
+          btnImprimir.style.display = '';
+          alert('Erro ao gerar a imagem.');
+        });
+      }, 50);
     });
     
     // Fechar ao clicar fora
