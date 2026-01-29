@@ -928,6 +928,10 @@ const Simulacoes = (function() {
               <button id="btn-fechar-enviar-simulacao" class="btn-secondary">
                 Fechar
               </button>
+              <button id="btn-imprimir-solicitacao" class="btn-primary">
+                <i class="fas fa-print mr-2"></i>
+                Imprimir Solicitação
+              </button>
             </div>
           </div>
         </div>
@@ -938,6 +942,58 @@ const Simulacoes = (function() {
       modal.querySelector('.modal-close').addEventListener('click', () => modal.remove());
       modal.querySelector('#btn-fechar-enviar-simulacao').addEventListener('click', () => modal.remove());
       modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+
+      // Botão imprimir solicitação
+      const btnImprimir = modal.querySelector('#btn-imprimir-solicitacao');
+      btnImprimir.addEventListener('click', () => {
+        const modalContent = modal.querySelector('.modal-container');
+        if (!modalContent) {
+          alert('Erro ao localizar o conteúdo do modal para exportação.');
+          return;
+        }
+        // Salva estilos originais
+        const originalOverflow = modalContent.style.overflow;
+        const originalMaxHeight = modalContent.style.maxHeight;
+        const originalScrollTop = modalContent.scrollTop;
+        // Expande o modal para mostrar todo o conteúdo
+        modalContent.style.overflow = 'visible';
+        modalContent.style.maxHeight = 'none';
+        modalContent.scrollTop = 0;
+        // Oculta o botão de imprimir para não aparecer na imagem
+        btnImprimir.style.display = 'none';
+        // Aguarda um frame para garantir o layout
+        setTimeout(() => {
+          if (typeof html2canvas === 'undefined') {
+            alert('html2canvas não está carregado.');
+            btnImprimir.style.display = '';
+            return;
+          }
+          html2canvas(modalContent, {
+            backgroundColor: null,
+            useCORS: true,
+            scale: 2
+          }).then(canvas => {
+            // Restaura estilos
+            modalContent.style.overflow = originalOverflow;
+            modalContent.style.maxHeight = originalMaxHeight;
+            modalContent.scrollTop = originalScrollTop;
+            btnImprimir.style.display = '';
+            // Cria o link para download
+            const link = document.createElement('a');
+            link.href = canvas.toDataURL('image/png');
+            link.download = 'simulacao-solicitacao.png';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          }).catch(() => {
+            modalContent.style.overflow = originalOverflow;
+            modalContent.style.maxHeight = originalMaxHeight;
+            modalContent.scrollTop = originalScrollTop;
+            btnImprimir.style.display = '';
+            alert('Erro ao gerar a imagem.');
+          });
+        }, 50);
+      });
     }
     const btnSalvar = modal.querySelector('#btn-salvar-simulacao');
     const btnAprovar = modal.querySelector('#btn-aprovar-simulacao');

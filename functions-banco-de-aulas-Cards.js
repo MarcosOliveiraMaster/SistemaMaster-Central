@@ -3555,6 +3555,10 @@ const BancoDeAulasCards = (function() {
           
           <div class="modal-footer">
             <button id="btnFecharView" class="btn-secondary">Fechar</button>
+            <button id="btnCopiarRelatorioView" class="btn-secondary">
+              <i class="fas fa-copy mr-2"></i>
+              Copiar relatório
+            </button>
             <button id="btnEditarView" class="btn-primary">
               <i class="fas fa-edit mr-2"></i>
               Editar
@@ -3571,6 +3575,7 @@ const BancoDeAulasCards = (function() {
     const modal = modalContainer.querySelector('#relatorioViewModal');
     const btnFechar = modal.querySelector('#btnFecharView');
     const btnEditar = modal.querySelector('#btnEditarView');
+      const btnCopiar = modal.querySelector('#btnCopiarRelatorioView');
     const btnClose = modal.querySelector('.modal-close');
     
     const closeModal = () => {
@@ -3578,9 +3583,164 @@ const BancoDeAulasCards = (function() {
       aulaSelecionada = null;
     };
     
+
     btnFechar.addEventListener('click', closeModal);
     btnClose.addEventListener('click', closeModal);
-    
+
+    btnCopiar.addEventListener('click', () => {
+      // Adicionar estado de loading ao botão
+      const originalHtml = btnCopiar.innerHTML;
+      btnCopiar.disabled = true;
+      btnCopiar.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Copiando...';
+
+      // Buscar dados do cliente, data e professor a partir do modal de detalhes (se aberto)
+      let nomeCliente = '';
+      let dataAula = '';
+      let nomeProfessor = '';
+
+      try {
+        // Procurar outro modal aberto (detalhes da contratação) que contenha o rótulo "Nome do Cliente"
+        const overlays = Array.from(document.querySelectorAll('.modal-overlay'));
+        for (const ov of overlays) {
+          if (ov.id === 'relatorioViewModal') continue;
+          const labels = Array.from(ov.querySelectorAll('.text-xs, .text-sm, div'));
+          const labelEl = labels.find(el => el.textContent && el.textContent.trim().startsWith('Nome do Cliente'));
+          if (labelEl) {
+            // valor costuma estar no mesmo bloco com classe text-sm
+            const valueEl = labelEl.parentElement.querySelector('.text-sm') || labelEl.nextElementSibling;
+            if (valueEl && valueEl.textContent) {
+              nomeCliente = valueEl.textContent.trim();
+            }
+            break;
+          }
+        }
+
+        // Se não encontrou no DOM, tentar variáveis globais conhecidas
+        if (!nomeCliente && window.aulaSelecionada && window.aulaSelecionada.aula) {
+          const aulaObj = window.aulaSelecionada.aula;
+          nomeCliente = aulaObj.nomeCliente || aulaObj.nome || '';
+        }
+
+        // Buscar data e professor a partir de contexto existente
+        if (window.aulaSelecionada && window.aulaSelecionada.aula) {
+          const aulaObj = window.aulaSelecionada.aula;
+          if (aulaObj.aulas && Array.isArray(aulaObj.aulas)) {
+            const aulaEspecifica = aulaObj.aulas.find(a => a['id-Aula'] === idAula || a.id === idAula);
+            if (aulaEspecifica) {
+              dataAula = aulaEspecifica.data || '';
+              nomeProfessor = aulaEspecifica.professor || '';
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Erro ao extrair dados do modal de detalhes:', err);
+      }
+
+      // Tentar extrair a data diretamente da linha da tabela (coluna 1) no DOM
+      try {
+        if (!dataAula) {
+          // procura linha na tabela detalhada via atributo data-id-aula
+          let row = document.querySelector(`#tbody-aulas-detalhadas tr[data-id-aula="${idAula}"]`) || document.querySelector(`tr[data-id-aula="${idAula}"]`);
+          if (row) {
+            const firstTd = row.querySelector('td');
+            if (firstTd && firstTd.textContent && firstTd.textContent.trim()) {
+              dataAula = firstTd.textContent.trim();
+            }
+          }
+
+          // alternativa: procurar botão que contém atributo data-data
+          if (!dataAula) {
+            const dataBtn = document.querySelector(`.btn-data-aula[data-id-aula="${idAula}"]`);
+            if (dataBtn) dataAula = dataBtn.getAttribute('data-data') || (dataBtn.textContent && dataBtn.textContent.trim());
+          }
+        }
+      } catch (err) {
+        console.warn('Erro ao extrair data da linha da tabela:', err);
+      }
+
+      // Tentar extrair o nome do professor diretamente da coluna 5 (índice 4) da linha da tabela
+      try {
+        if (!nomeProfessor) {
+          const row = document.querySelector(`#tbody-aulas-detalhadas tr[data-id-aula="${idAula}"]`) || document.querySelector(`tr[data-id-aula="${idAula}"]`);
+          if (row) {
+            const tds = row.querySelectorAll('td');
+            if (tds && tds.length >= 5) {
+              const profText = tds[4].textContent && tds[4].textContent.trim();
+              if (profText) nomeProfessor = profText;
+            }
+          }
+
+          // fallback para botão/elemento com atributo data-professor
+          if (!nomeProfessor) {
+            const profBtn = document.querySelector(`.btn-professor-aula[data-id-aula="${idAula}"]`);
+            if (profBtn) nomeProfessor = profBtn.getAttribute('data-professor') || (profBtn.textContent && profBtn.textContent.trim());
+          }
+        }
+      } catch (err) {
+        console.warn('Erro ao extrair professor da linha da tabela:', err);
+      }
+
+      // Reduzir nome do professor às primeiras 3 palavras
+      let nomeProfessorCurto = nomeProfessor || '';
+      if (nomeProfessorCurto) {
+        const partsProf = nomeProfessorCurto.split(/\s+/).filter(Boolean);
+        nomeProfessorCurto = partsProf.slice(0, 3).join(' ');
+      }
+
+      // Fallbacks genéricos
+      if (!nomeCliente) nomeCliente = (window.aulaSelecionada && window.aulaSelecionada.nomeCliente) || '';
+      if (!dataAula) dataAula = (window.aulaSelecionada && window.aulaSelecionada.data) || '';
+      if (!nomeProfessor) nomeProfessor = (window.aulaSelecionada && window.aulaSelecionada.professor) || '';
+
+      // Extrair primeiro + segundo nome do cliente (duas primeiras palavras)
+      let nomeClienteCurto = nomeCliente || '';
+      if (nomeClienteCurto) {
+        const parts = nomeClienteCurto.split(/\s+/).filter(Boolean);
+        nomeClienteCurto = parts.slice(0, 2).join(' ');
+      }
+
+      // Template com tokens entre colchetes
+      const template = `Bom dia [NomeCliente] esta é o relatório da aula do dia [DataDaAula] com prof. [NomeDoProfessor]\n\n*Descrição da Aula:*\n[Descricao]\n\n*Comportamento do estudante:*\n[Comportamento]\n\n*Recomendações:*\n[Recomendacoes]`;
+
+      // Substituir tokens
+      let texto = template
+        .replace(/\[NomeCliente\]/g, nomeClienteCurto || '[NomeCliente]')
+        .replace(/\[DataDaAula\]/g, dataAula || '[DataDaAula]')
+        .replace(/\[NomeDoProfessor\]/g, nomeProfessorCurto || '[NomeDoProfessor]')
+        .replace(/\[Descricao\]/g, dados.descricao || '')
+        .replace(/\[Comportamento\]/g, dados.comportamento || '')
+        .replace(/\[Recomendacoes\]/g, dados.recomendacoes || '');
+
+      const finish = (success) => {
+        btnCopiar.disabled = false;
+        btnCopiar.innerHTML = originalHtml;
+        if (success) showToast('Relatório de Aula copiado', 'success');
+      };
+
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(texto).then(() => {
+          finish(true);
+        }).catch(() => {
+          finish(false);
+          alert('Não foi possível copiar o relatório.');
+        });
+      } else {
+        // Fallback para browsers antigos
+        const temp = document.createElement('textarea');
+        temp.value = texto;
+        document.body.appendChild(temp);
+        temp.select();
+        try {
+          document.execCommand('copy');
+          finish(true);
+        } catch (err) {
+          finish(false);
+          alert('Não foi possível copiar o relatório.');
+        }
+        document.body.removeChild(temp);
+      }
+    });
+
     btnEditar.addEventListener('click', () => {
       closeModal();
       openRelatorioEditModal(idAula, relatorio);
@@ -3639,9 +3799,15 @@ const BancoDeAulasCards = (function() {
           
           <div class="modal-footer">
             <button id="btnCancelarEdit" class="btn-secondary">Cancelar</button>
+
+            <button id="btnCopiarRelatorio" class="btn-secondary">
+              <i class="fas fa-copy mr-2"></i>
+              Copiar relatório
+            </button>
+
             <button id="btnEnviarRelatorio" class="btn-primary">
-              <i class="fas fa-paper-plane mr-2"></i>
-              Enviar Relatório
+              <i class="fa-solid fa-floppy-disk mr-2"></i>
+              Salvar alterações
             </button>
           </div>
         </div>
@@ -3658,6 +3824,7 @@ const BancoDeAulasCards = (function() {
     const editRecomendacoes = modal.querySelector('#editRecomendacoes');
     const btnCancelar = modal.querySelector('#btnCancelarEdit');
     const btnEnviar = modal.querySelector('#btnEnviarRelatorio');
+      const btnCopiar = modal.querySelector('#btnCopiarRelatorio');
     const btnClose = modal.querySelector('.modal-close');
     
     const closeModal = () => {
@@ -3665,9 +3832,38 @@ const BancoDeAulasCards = (function() {
       aulaSelecionada = null;
     };
     
+
     btnCancelar.addEventListener('click', closeModal);
     btnClose.addEventListener('click', closeModal);
-    
+
+    btnCopiar.addEventListener('click', () => {
+      const titulo1 = 'Descrição da Aula:';
+      const titulo2 = 'Comportamento do estudante:';
+      const titulo3 = 'Recomendações:';
+      const texto = `${titulo1}\n${editDescricao.value}\n\n${titulo2}\n${editComportamento.value}\n\n${titulo3}\n${editRecomendacoes.value}`;
+      // Copiar para a área de transferência
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(texto).then(() => {
+          showToast('Relatório de Aula copiado', 'success');
+        }, () => {
+          alert('Não foi possível copiar o relatório.');
+        });
+      } else {
+        // Fallback para browsers antigos
+        const temp = document.createElement('textarea');
+        temp.value = texto;
+        document.body.appendChild(temp);
+        temp.select();
+        try {
+          document.execCommand('copy');
+          showToast('Relatório de Aula copiado', 'success');
+        } catch (err) {
+          alert('Não foi possível copiar o relatório.');
+        }
+        document.body.removeChild(temp);
+      }
+    });
+
     btnEnviar.addEventListener('click', async () => {
       await salvarRelatorioAula(idAula, editDescricao, editComportamento, editRecomendacoes, modalContainer);
     });
