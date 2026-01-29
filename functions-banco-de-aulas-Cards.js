@@ -325,7 +325,14 @@ const BancoDeAulasCards = (function() {
                     <div class="text-xs font-medium text-gray-500 mb-1">CPF</div>
                     <div class="text-sm text-gray-800">${aula.cpf || '--'}</div>
                   </div>
-                  <!-- Aluno(s) e Aula Emergencial ocultos -->
+                  <div>
+                    <div class="text-xs font-medium text-gray-500 mb-1">Estudante</div>
+                    <div class="text-sm text-gray-800" id="modal-estudantes">--</div>
+                  </div>
+                  <div>
+                    <div class="text-xs font-medium text-gray-500 mb-1">Série</div>
+                    <div class="text-sm text-gray-800" id="modal-series">--</div>
+                  </div>
                 </div>
                 
                 <!-- Coluna 2: Status do contrato -->
@@ -561,6 +568,84 @@ const BancoDeAulasCards = (function() {
     btnVerObservacoes.addEventListener('click', () => {
       showObservacoesModal(aula);
     });
+
+    // Preencher Estudante e Série a partir da coleção cadastroClientes usando CPF
+    (function populateEstudantesFromCPF() {
+      const elEstudantes = modal.querySelector('#modal-estudantes');
+      const elSeries = modal.querySelector('#modal-series');
+      if (!elEstudantes && !elSeries) return;
+
+      const cpfCliente = aula.cpf || '';
+      const nomes = [];
+      const series = [];
+
+      const applyResults = () => {
+        if (elEstudantes) elEstudantes.textContent = nomes.length ? nomes.join(', ') : '--';
+        if (elSeries) elSeries.textContent = series.length ? series.join(', ') : '--';
+      };
+
+      if (cpfCliente) {
+        db.collection('cadastroClientes').where('cpf', '==', cpfCliente).get().then(snapshot => {
+          if (!snapshot.empty) {
+            snapshot.forEach(doc => {
+              const data = doc.data() || {};
+              if (Array.isArray(data.estudantes)) {
+                data.estudantes.forEach(est => {
+                  const nome = est && est.nome ? String(est.nome).trim() : '';
+                  const serie = est && est.serie ? String(est.serie).trim() : '';
+                  if (nome) nomes.push(nome);
+                  if (serie) series.push(serie);
+                  console.log('Estudante encontrado (cadastroClientes):', { docId: doc.id, nome, serie });
+                });
+              }
+            });
+            applyResults();
+          } else {
+            console.log('Nenhum documento cadastroClientes encontrado para CPF', cpfCliente);
+            // fallback para dados presentes em `aula`
+            if (Array.isArray(aula.estudantes) && aula.estudantes.length > 0) {
+              aula.estudantes.forEach(est => {
+                const nome = est && est.nome ? String(est.nome).trim() : '';
+                const serie = est && est.serie ? String(est.serie).trim() : '';
+                if (nome) nomes.push(nome);
+                if (serie) series.push(serie);
+                console.log('Estudante encontrado (aula):', { nome, serie });
+              });
+              applyResults();
+            } else {
+              applyResults();
+            }
+          }
+        }).catch(err => {
+          console.error('Erro ao buscar cadastroClientes por CPF', cpfCliente, err);
+          // tentar fallback local
+          if (Array.isArray(aula.estudantes) && aula.estudantes.length > 0) {
+            aula.estudantes.forEach(est => {
+              const nome = est && est.nome ? String(est.nome).trim() : '';
+              const serie = est && est.serie ? String(est.serie).trim() : '';
+              if (nome) nomes.push(nome);
+              if (serie) series.push(serie);
+              console.log('Estudante encontrado (aula - fallback):', { nome, serie });
+            });
+            applyResults();
+          } else {
+            applyResults();
+          }
+        });
+      } else {
+        // Sem CPF: usar diretamente `aula.estudantes` quando disponível
+        if (Array.isArray(aula.estudantes) && aula.estudantes.length > 0) {
+          aula.estudantes.forEach(est => {
+            const nome = est && est.nome ? String(est.nome).trim() : '';
+            const serie = est && est.serie ? String(est.serie).trim() : '';
+            if (nome) nomes.push(nome);
+            if (serie) series.push(serie);
+            console.log('Estudante encontrado (aula - sem CPF):', { nome, serie });
+          });
+        }
+        applyResults();
+      }
+    })();
 
     // Configurar ícones de observação das aulas (cada linha da tabela)
     const btnsObservacoesAula = modal.querySelectorAll('.btn-observacao-aula');
