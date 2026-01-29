@@ -26,12 +26,12 @@ const CONFIG_ABNT = {
 // 2. Função Global para carregar arquivo externo
 // Agora aceita o nome do cliente e CPF como parâmetros
 // Agora aceita nomeCliente, cpfCliente e enderecoCliente
-window.abrirContratoModal = async function(nomeCliente, cpfCliente, enderecoCliente) {
+window.abrirContratoModal = async function(nomeCliente, cpfCliente, enderecoCliente, estudantesText = '', seriesText = '') {
   try {
     const response = await fetch('baseContrato.txt');
     if (!response.ok) throw new Error('Arquivo baseContrato.txt não encontrado.');
     const texto = await response.text();
-    gerarPDFContrato(texto, nomeCliente, cpfCliente, enderecoCliente);
+    gerarPDFContrato(texto, nomeCliente, cpfCliente, enderecoCliente, estudantesText, seriesText);
   } catch (error) {
     alert('Erro: ' + error.message);
   }
@@ -153,7 +153,7 @@ function renderizarParagrafoFormatado(doc, elemento, x, y, larguraMax) {
  * 5. Função Principal de Geração
  * Agora aceita nomeCliente e cpfCliente para substituir [NomeCliente] e [CPFCliente] no texto
  */
-function gerarPDFContrato(contratoTexto, nomeCliente, cpfCliente, enderecoCliente) {
+function gerarPDFContrato(contratoTexto, nomeCliente, cpfCliente, enderecoCliente, estudantesText = '', seriesText = '') {
   // Substituir [DataHoje] pela data atual no formato dd/mm/yyyy
   const hoje = new Date();
   const dia = String(hoje.getDate()).padStart(2, '0');
@@ -171,6 +171,13 @@ function gerarPDFContrato(contratoTexto, nomeCliente, cpfCliente, enderecoClient
   if (enderecoCliente) {
     // Substitui [EnderecoCliente] mesmo se houver espaços extras
     contratoComData = contratoComData.replace(/\[\s*EnderecoCliente\s*\]/gi, enderecoCliente);
+  }
+  // Substituir lista de estudantes e séries quando fornecidas
+  if (estudantesText) {
+    contratoComData = contratoComData.replace(/\[\s*estudantes\s*\]/gi, estudantesText);
+  }
+  if (seriesText) {
+    contratoComData = contratoComData.replace(/\[\s*series\s*\]/gi, seriesText);
   }
 
   const jsPDF = window.jspdf ? window.jspdf.jsPDF : window.jsPDF;

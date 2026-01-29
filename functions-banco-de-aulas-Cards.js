@@ -533,19 +533,55 @@ const BancoDeAulasCards = (function() {
               if (endereco) enderecoClienteContrato += endereco;
               if (cep) enderecoClienteContrato += (enderecoClienteContrato ? ', ' : '') + 'CEP: ' + cep;
               if (cidadeUF) enderecoClienteContrato += (enderecoClienteContrato ? '. ' : '') + cidadeUF;
-              window.abrirContratoModal(nomeCliente, cpfCliente, enderecoClienteContrato);
+
+              // Extrair estudantes e séries do documento cadastroClientes
+              let estudantesText = '';
+              let seriesText = '';
+              if (Array.isArray(data.estudantes) && data.estudantes.length) {
+                const nomes = data.estudantes.map(s => s && s.nome ? String(s.nome).trim() : '').filter(Boolean);
+                const series = data.estudantes.map(s => s && s.serie ? String(s.serie).trim() : '').filter(Boolean);
+                estudantesText = nomes.join(', ');
+                seriesText = series.join(', ');
+              }
+
+              window.abrirContratoModal(nomeCliente, cpfCliente, enderecoClienteContrato, estudantesText, seriesText);
             } else {
               // fallback se não encontrar no banco
               const enderecoCliente = aula.enderecoAulas || aula.endereco || '';
-              window.abrirContratoModal(nomeCliente, cpfCliente, enderecoCliente);
+              // fallback: extrair estudantes/series do objeto aula quando disponível
+              let estudantesTextFallback = '';
+              let seriesTextFallback = '';
+              if (Array.isArray(aula.estudantes) && aula.estudantes.length) {
+                const nomes = aula.estudantes.map(s => s && s.nome ? String(s.nome).trim() : '').filter(Boolean);
+                const series = aula.estudantes.map(s => s && s.serie ? String(s.serie).trim() : '').filter(Boolean);
+                estudantesTextFallback = nomes.join(', ');
+                seriesTextFallback = series.join(', ');
+              }
+              window.abrirContratoModal(nomeCliente, cpfCliente, enderecoCliente, estudantesTextFallback, seriesTextFallback);
             }
           }).catch(() => {
             const enderecoCliente = aula.enderecoAulas || aula.endereco || '';
-            window.abrirContratoModal(nomeCliente, cpfCliente, enderecoCliente);
+            let estudantesTextFallback = '';
+            let seriesTextFallback = '';
+            if (Array.isArray(aula.estudantes) && aula.estudantes.length) {
+              const nomes = aula.estudantes.map(s => s && s.nome ? String(s.nome).trim() : '').filter(Boolean);
+              const series = aula.estudantes.map(s => s && s.serie ? String(s.serie).trim() : '').filter(Boolean);
+              estudantesTextFallback = nomes.join(', ');
+              seriesTextFallback = series.join(', ');
+            }
+            window.abrirContratoModal(nomeCliente, cpfCliente, enderecoCliente, estudantesTextFallback, seriesTextFallback);
           });
         } else {
           const enderecoCliente = aula.enderecoAulas || aula.endereco || '';
-          window.abrirContratoModal(nomeCliente, cpfCliente, enderecoCliente);
+          let estudantesTextFallback = '';
+          let seriesTextFallback = '';
+          if (Array.isArray(aula.estudantes) && aula.estudantes.length) {
+            const nomes = aula.estudantes.map(s => s && s.nome ? String(s.nome).trim() : '').filter(Boolean);
+            const series = aula.estudantes.map(s => s && s.serie ? String(s.serie).trim() : '').filter(Boolean);
+            estudantesTextFallback = nomes.join(', ');
+            seriesTextFallback = series.join(', ');
+          }
+          window.abrirContratoModal(nomeCliente, cpfCliente, enderecoCliente, estudantesTextFallback, seriesTextFallback);
         }
       } else {
         showToast('Função de contrato não carregada!', 'error');

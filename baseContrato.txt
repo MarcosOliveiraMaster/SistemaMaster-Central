@@ -150,9 +150,6 @@ Segue imagem do cronograma aprovado pelo cliente:
 
 [FotoCronograma]
 
-
-
-
 Declaro estar ciente e de acordo com todas as cláusulas e condições estabelecidas no contrato e no Google Sala de Aula, reconhecendo a validade e eficácia dessas disposições. Este contrato é celebrado com pleno conhecimento de causa e de boa-fé, sem nenhuma coação ou vício de qualquer natureza. Assim, assino o presente instrumento para que produza seus legais efeitos.
 
 Maceió - AL, [DataHoje]
@@ -162,3 +159,9 @@ Maceió - AL, [DataHoje]
 
 - Master Educação LTD -
 - CNPJ: 48.055.955/0001-72 -
+
+
+-_________________________________-  
+- [NomeCliente] -
+- [CPFCliente] -
+
