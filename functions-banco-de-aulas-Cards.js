@@ -2123,17 +2123,17 @@ const BancoDeAulasCards = (function() {
       const closeConfirm = () => {
         confirmContainer.remove();
       };
-      
+
       btnNao.addEventListener('click', closeConfirm);
-      
+
       btnSim.addEventListener('click', async () => {
         closeConfirm();
-        
+
         try {
           await BANCO.updateHorarioAula(idAula, novoHorario);
           showToast(`✅ Horário alterado para ${novoHorario}`, 'success');
           closeModal();
-          
+
           // Recarregar a tabela
           const tbody = document.getElementById('tbody-aulas-detalhadas');
           if (tbody) {
@@ -2148,7 +2148,7 @@ const BancoDeAulasCards = (function() {
               </tr>
             `;
           }
-          
+
           // Buscar o código de contratação do modal aberto
           const modalOverlay = document.querySelector('.modal-overlay');
           if (modalOverlay && modalOverlay.id !== 'horarioModal') {
@@ -2166,6 +2166,16 @@ const BancoDeAulasCards = (function() {
           showToast('❌ Erro ao alterar horário', 'error');
         }
       });
+
+      // Pressionar Enter ativa o botão Sim
+      confirmModal.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          btnSim.click();
+        }
+      });
+      // Focar no botão Sim para acessibilidade
+      setTimeout(() => btnSim.focus(), 100);
     });
     
     modal.addEventListener('click', (e) => {
@@ -2182,6 +2192,14 @@ const BancoDeAulasCards = (function() {
     
     // Focar no input
     setTimeout(() => inputHorario.focus(), 100);
+
+    // Pressionar Enter ativa o botão Confirmar
+    inputHorario.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        btnConfirmar.click();
+      }
+    });
   }
   
   // Função para mostrar modal de alteração de duração da aula

@@ -637,7 +637,28 @@ const Simulacoes = (function() {
               </div>
               
               <!-- Valores Calculados -->
-              <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4 p-4 bg-orange-50 rounded-lg">
+              <div class="flex items-start justify-between mt-4">
+                <div class="text-sm text-gray-600 font-medium">Valores calculados automaticamente a partir das aulas</div>
+                <div class="flex items-center space-x-2">
+                  <div class="toggle-switch">
+                    <span class="text-xs text-gray-600">Valor Padrão</span>
+                    <label class="switch" style="margin:0 6px;">
+                      <input type="checkbox" id="toggle-valor-mode" aria-label="Alternar modo valor">
+                      <span class="slider"></span>
+                    </label>
+                    <span class="text-xs text-gray-600">Novo Valor</span>
+                  </div>
+                  <!-- Hidden buttons kept for backward-compatible handlers (they remain attached) -->
+                  <button id="btn-aplicar-valor-master" class="btn-secondary btn-compact text-xs" style="display:none;">
+                    Aplicar Valor Padrão Master
+                  </button>
+                  <button id="btn-novo-valor" class="btn-primary btn-compact text-xs" style="display:none;">
+                    Novo Valor
+                  </button>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-3 p-4 bg-orange-50 rounded-lg" id="valores-calculados-box">
                 <div>
                   <div class="text-xs font-medium text-gray-500 mb-1">Total de Horas</div>
                   <div class="text-lg font-bold text-orange-600" id="display-total-horas">
@@ -669,9 +690,9 @@ const Simulacoes = (function() {
             <div>
               <div class="flex justify-between items-center mb-3">
                 <h4 class="font-lexend font-bold text-base text-gray-700">
-                  <i class="fas fa-calendar-alt text-orange-500 mr-2"></i>
-                  Aulas Agendadas
-                </h4>
+                    <i class="fas fa-calendar-alt text-orange-500 mr-2"></i>
+                    Cronograma de Aula
+                  </h4>
                 <div class="flex gap-2">
                   <button id="btn-remover-aula-simulacao" class="btn-secondary btn-compact">
                     <i class="fas fa-trash mr-2"></i>
@@ -695,6 +716,7 @@ const Simulacoes = (function() {
                         <th>Matéria</th>
                         <th>Estudante</th>
                         <th>Professor</th>
+                        <th>Hora/Aula - Professor</th>
                         <th class="text-center">Ações</th>
                       </tr>
                     </thead>
@@ -739,7 +761,252 @@ const Simulacoes = (function() {
     
     // Configurar eventos do modal
     setupModalEvents(modal, isNova);
-    
+
+    // ---Handlers para os botões de valor---
+    (function setupValorButtons() {
+      const btnMaster = modal.querySelector('#btn-aplicar-valor-master');
+      const btnNovo = modal.querySelector('#btn-novo-valor');
+
+      const elTotal = modal.querySelector('#display-total-horas');
+      const elPacote = modal.querySelector('#display-valor-pacote');
+      const elEquipe = modal.querySelector('#display-valor-equipe');
+      const elLucro = modal.querySelector('#display-lucro-master');
+
+      // Helper: formata número pra BR currency (ex: 1234.5 -> 1.234,50)
+      function formatBR(value) {
+        const n = Number(value) || 0;
+        return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+
+      // Helper: converte string com máscara (R$ 1.234,56) para float (1234.56)
+      function parseCurrencyBR(str) {
+        if (!str && str !== 0) return NaN;
+        let s = String(str).trim();
+        s = s.replace(/R\$\s?/g, '');
+        // remover pontos de milhares
+        s = s.replace(/\./g, '');
+        // substituir vírgula decimal por ponto
+        s = s.replace(/,/g, '.');
+        s = s.replace(/[^0-9.\-]/g, '');
+        return parseFloat(s);
+      }
+
+      // Atualiza os displays; professorRate optional (number)
+      function atualizarDisplays(professorRate) {
+        const base = calcularValoresSimulacao(simulacao.aulas || []);
+        const horas = base.SomatorioDuracaoAulas || 0;
+        const numRows = (editingSimulacao && Array.isArray(editingSimulacao.aulas)) ? editingSimulacao.aulas.length : 0;
+
+        // Regras padrão
+        const DEFAULT_PROF_RATE = 35; // R$ por hora
+        const LUCRO_PER_HOUR = 30; // R$ por hora (incorporado conforme instrução: multiplicar por 35+30)
+
+        // Determinar taxa por hora do professor (override ou padrão)
+        const profRate = (typeof professorRate === 'number' && !Number.isNaN(professorRate) && professorRate > 0)
+          ? professorRate
+          : (editingSimulacao && editingSimulacao.valorHoraProfessor && editingSimulacao.valorHoraProfessor > 0
+            ? editingSimulacao.valorHoraProfessor
+            : DEFAULT_PROF_RATE);
+
+        const valorEquipe = profRate * horas;
+
+        // Se houver um pacote aplicado manualmente, respeitar; caso contrário usar o resultado
+        // da tabela progressiva em `calcularValoresSimulacao` (mecanismo principal).
+        let valorPacote = 0;
+        const baseValores = calcularValoresSimulacao(simulacao.aulas || []);
+        if (editingSimulacao && editingSimulacao.valorPacoteAplicado && editingSimulacao.valorPacoteAplicado > 0) {
+          valorPacote = editingSimulacao.valorPacoteAplicado;
+        } else {
+          valorPacote = (baseValores && typeof baseValores.ValorPacote === 'number') ? baseValores.ValorPacote : 0;
+        }
+
+        const lucro = valorPacote - valorEquipe;
+
+        if (elTotal) elTotal.textContent = `${horas}h`;
+        if (elPacote) elPacote.textContent = `R$ ${formatBR(valorPacote || 0)}`;
+        if (elEquipe) elEquipe.textContent = `R$ ${formatBR(valorEquipe || 0)}`;
+        if (elLucro) elLucro.textContent = `R$ ${formatBR(lucro || 0)}`;
+      }
+
+      if (btnMaster) {
+        btnMaster.addEventListener('click', () => {
+          // Ao aplicar Valor Padrão Master: limpar overrides manuais e restaurar critérios padrão
+          if (editingSimulacao) {
+            if (editingSimulacao.hasOwnProperty('valorHoraProfessor')) delete editingSimulacao.valorHoraProfessor;
+            if (editingSimulacao.hasOwnProperty('valorPacoteAplicado')) delete editingSimulacao.valorPacoteAplicado;
+            if (editingSimulacao.hasOwnProperty('valorLucroMaster')) delete editingSimulacao.valorLucroMaster;
+            editingSimulacao.overrideValoresActive = false;
+          }
+          // Recalcular usando regras padrão: professor R$35/h e lucro R$30/h (pacote = horas * (35+30))
+          recalcularValores();
+          showToast('Aplicado Valor Padrão Master (professor R$35/h + lucro R$30/h).', 'success', 2000);
+        });
+      }
+
+      if (btnNovo) {
+        btnNovo.addEventListener('click', () => {
+          // Construir modal de Novo Valor
+          const modalHtml = `
+            <div class="modal-overlay" id="modal-novo-valor">
+              <div class="modal-container" style="max-width:520px;">
+                <div class="modal-header">
+                  <h3 class="font-lexend font-bold text-lg text-gray-800">Aplicar Novos Valores</h3>
+                  <button class="modal-close text-gray-400 hover:text-gray-600" id="close-novo-valor">
+                    <i class="fas fa-times"></i>
+                  </button>
+                </div>
+                <div class="modal-body">
+                  <div class="space-y-3">
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Valor da Hora professor</label>
+                      <input id="input-valor-hora-prof" type="text" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="Ex: 65.00" />
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Lucro Master Educação</label>
+                      <input id="input-lucro-master" type="text" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="Ex: 200.00" />
+                    </div>
+                    <!-- campo 'Valor total do pacote' removido conforme solicitado -->
+                  </div>
+                </div>
+                <div class="modal-footer">
+                  <button id="btn-cancelar-novo-valor" class="btn-secondary btn-compact">Cancelar</button>
+                  <button id="btn-salvar-novo-valor" class="btn-primary btn-compact">Salvar</button>
+                </div>
+              </div>
+            </div>
+          `;
+
+          const container = document.createElement('div');
+          container.innerHTML = modalHtml;
+          document.body.appendChild(container);
+
+          const modalNovo = document.getElementById('modal-novo-valor');
+          const inputHora = modalNovo.querySelector('#input-valor-hora-prof');
+          const inputLucro = modalNovo.querySelector('#input-lucro-master');
+          const btnSalvar = modalNovo.querySelector('#btn-salvar-novo-valor');
+          const btnCancelar = modalNovo.querySelector('#btn-cancelar-novo-valor');
+          const btnClose = modalNovo.querySelector('#close-novo-valor');
+
+          // Helper para fechar/remover modal
+          function fecharModalNovo() {
+            if (modalNovo && modalNovo.parentNode) modalNovo.parentNode.remove();
+          }
+
+          // Aplica máscara tipo "digits-as-cents" enquanto digita
+          // Ex: digitar 110000 => R$ 1.100,00 (cada dígito é centavo)
+          function attachCurrencyMask(inputEl) {
+            if (!inputEl) return;
+
+            inputEl.addEventListener('input', (e) => {
+              // Pegar somente dígitos
+              const raw = inputEl.value || '';
+              const digits = String(raw).replace(/\D/g, '');
+
+              if (!digits || digits.length === 0) {
+                inputEl.value = '';
+                return;
+              }
+
+              // interpretar últimos 2 dígitos como centavos
+              const cents = parseInt(digits, 10) || 0;
+              const value = cents / 100;
+
+              inputEl.value = 'R$ ' + formatBR(value);
+            });
+
+            // inicializar valor se houver conteúdo
+            if (inputEl.value) {
+              // tentar extrair dígitos existentes ou parsear BR
+              const onlyDigits = String(inputEl.value).replace(/\D/g, '');
+              if (onlyDigits && onlyDigits.length > 0) {
+                const cents = parseInt(onlyDigits, 10) || 0;
+                inputEl.value = 'R$ ' + formatBR(cents / 100);
+              } else {
+                const nInit = parseCurrencyBR(inputEl.value);
+                if (!Number.isNaN(nInit)) inputEl.value = 'R$ ' + formatBR(nInit);
+              }
+            }
+          }
+
+          attachCurrencyMask(inputHora);
+          attachCurrencyMask(inputLucro);
+
+          // Ao salvar, aplicar lógica:
+          // Prioridade: Valor total do pacote > Valor da Hora professor > Lucro Master (aplica pacote = equipe + lucro)
+          btnSalvar.addEventListener('click', () => {
+            const horas = calcularValoresSimulacao(simulacao.aulas || []).SomatorioDuracaoAulas || 0;
+            // ler valores com parse seguro (trata R$, pontos e vírgulas)
+            const rawHora = inputHora ? inputHora.value : '';
+            const rawLucro = inputLucro ? inputLucro.value : '';
+
+            const valHora = parseCurrencyBR(rawHora);
+            const valLucro = parseCurrencyBR(rawLucro);
+
+            // Deve informar pelo menos um dos campos
+            const hasHora = !Number.isNaN(valHora) && valHora > 0;
+            const hasLucro = !Number.isNaN(valLucro) && valLucro > 0;
+            if (!hasHora && !hasLucro) {
+              showToast('Preencha ao menos "Valor da Hora professor" ou "Lucro Master" com valor válido.', 'error');
+              return;
+            }
+
+            // Persistir overrides em editingSimulacao
+            if (hasHora) {
+              editingSimulacao.valorHoraProfessor = valHora;
+            } else {
+              if (editingSimulacao && editingSimulacao.hasOwnProperty('valorHoraProfessor')) delete editingSimulacao.valorHoraProfessor;
+            }
+
+            if (hasLucro) {
+              editingSimulacao.valorLucroMaster = valLucro;
+            } else {
+              if (editingSimulacao && editingSimulacao.hasOwnProperty('valorLucroMaster')) delete editingSimulacao.valorLucroMaster;
+            }
+
+            // indicar que há overrides ativos quando algum dos campos foi preenchido
+            editingSimulacao.overrideValoresActive = !!(hasHora || hasLucro);
+
+            // Recalcular e atualizar a UI (re-renderiza linhas e atualiza displays em tempo real)
+            recalcularValores();
+
+            showToast('Novos valores aplicados', 'success', 2000);
+            fecharModalNovo();
+          });
+
+          // Cancelar/fechar
+          btnCancelar.addEventListener('click', fecharModalNovo);
+          btnClose.addEventListener('click', fecharModalNovo);
+          modalNovo.addEventListener('click', (ev) => {
+            if (ev.target === modalNovo) fecharModalNovo();
+          });
+
+          // foco inicial
+          setTimeout(() => inputHora.focus(), 50);
+        });
+      }
+
+      // Wire toggle (if present) to invoke master or novo actions immediately
+      const toggle = modal.querySelector('#toggle-valor-mode');
+      if (toggle) {
+        // default: left = Valor Padrão (unchecked)
+        toggle.checked = false;
+        toggle.addEventListener('change', () => {
+          if (toggle.checked) {
+            // Direita -> abrir modal Novo Valor
+            const hiddenNovo = modal.querySelector('#btn-novo-valor');
+            if (hiddenNovo) hiddenNovo.click();
+          } else {
+            // Esquerda -> aplicar Valor Padrão Master
+            const hiddenMaster = modal.querySelector('#btn-aplicar-valor-master');
+            if (hiddenMaster) hiddenMaster.click();
+          }
+        });
+      }
+
+      // exibir valores iniciais (sem override)
+      atualizarDisplays();
+    })();
+
     // Aplicar máscaras
     aplicarMascarasModal();
   }
@@ -789,6 +1056,9 @@ const Simulacoes = (function() {
           <button type="button" class="btn-professor-aula-sim text-sm px-2 py-1 cursor-pointer hover:bg-orange-50 rounded transition-colors ${!aula.professor || aula.professor === 'A definir' ? 'text-orange-500 font-semibold' : ''}" data-index="${index}" data-professor="${aula.professor || 'A definir'}" data-id-professor="${aula.idProfessor || ''}" title="Clique para alterar o professor">
             ${aula.professor || 'A definir'}
           </button>
+        </td>
+        <td class="text-right">
+          R$ ${Number(calcularValorAula(aula.duracao)).toFixed(2)}
         </td>
         <td class="text-center">
           <button class="btn-copiar-aula text-blue-500 hover:text-blue-700 mr-2" data-index="${index}" title="Copiar aula">
@@ -1076,6 +1346,23 @@ const Simulacoes = (function() {
     
     // Eventos de alteração nos inputs das aulas
     setupAulasInputEvents();
+
+    // Ao clicar em qualquer botão primário compacto dentro do modal,
+    // se existir um input com id `input-lucro-master`, substituir o display do lucro
+    modal.querySelectorAll('.btn-primary.btn-compact').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const inputLucro = modal.querySelector('#input-lucro-master');
+        if (!inputLucro) return;
+        // Normalizar formato BR: remover pontos de milhar e trocar vírgula por ponto
+        let valStr = String(inputLucro.value || '').trim();
+        if (!valStr) return;
+        valStr = valStr.replace(/\./g, '').replace(/,/g, '.').replace(/[^0-9.\-]/g, '');
+        const num = parseFloat(valStr);
+        if (isNaN(num)) return;
+        const displayLucro = modal.querySelector('#display-lucro-master');
+        if (displayLucro) displayLucro.textContent = `R$ ${num.toFixed(2)}`;
+      });
+    });
   }
   
   // Função para configurar eventos dos inputs das aulas
@@ -1458,8 +1745,18 @@ const Simulacoes = (function() {
     const btnConfirmar = modal.querySelector('#btnConfirmarHorario');
     const btnClose = modal.querySelector('.modal-close');
     const inputHorario = modal.querySelector('#inputHorario');
-    
+
+    // Handler: pressionar Enter no input dispara o Confirmar
+    const handleEnterKey = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        btnConfirmar.click();
+      }
+    };
+    inputHorario.addEventListener('keydown', handleEnterKey);
+
     const closeModal = () => {
+      inputHorario.removeEventListener('keydown', handleEnterKey);
       modalContainer.remove();
     };
     
@@ -1491,13 +1788,14 @@ const Simulacoes = (function() {
     modal.addEventListener('click', (e) => {
       if (e.target === modal) closeModal();
     });
-    
+
     const escHandler = (e) => {
       if (e.key === 'Escape') closeModal();
     };
     document.addEventListener('keydown', escHandler);
     modalContainer.addEventListener('remove', () => {
       document.removeEventListener('keydown', escHandler);
+      inputHorario.removeEventListener('keydown', handleEnterKey);
     });
     
     // Focar no input
@@ -2397,11 +2695,54 @@ const Simulacoes = (function() {
   // Função para recalcular valores em tempo real
   function recalcularValores() {
     const valores = calcularValoresSimulacao(editingSimulacao.aulas || []);
-    
-    document.getElementById('display-total-horas').textContent = `${valores.SomatorioDuracaoAulas}h`;
-    document.getElementById('display-valor-pacote').textContent = `R$ ${valores.ValorPacote.toFixed(2)}`;
-    document.getElementById('display-valor-equipe').textContent = `R$ ${valores.ValorEquipe.toFixed(2)}`;
-    document.getElementById('display-lucro-master').textContent = `R$ ${valores.lucroMaster.toFixed(2)}`;
+    const horas = valores.SomatorioDuracaoAulas || 0;
+
+    // Aplicar regras: default professor R$35/h, lucro R$30/h
+    const DEFAULT_PROF_RATE = 35;
+    const LUCRO_PER_HOUR = 30;
+    const numRows = (editingSimulacao && Array.isArray(editingSimulacao.aulas)) ? editingSimulacao.aulas.length : 0;
+
+    // taxa do professor (override ou padrão)
+    const profRate = (editingSimulacao && editingSimulacao.valorHoraProfessor && editingSimulacao.valorHoraProfessor > 0)
+      ? editingSimulacao.valorHoraProfessor
+      : DEFAULT_PROF_RATE;
+
+    const valorEquipe = profRate * horas;
+
+    // Determinar valor do pacote com precedência:
+    // 1) override manual `valorPacoteAplicado`
+    // 2) se existir `valorLucroMaster` => pacote = valorEquipe + valorLucroMaster (permite atualização em tempo real quando equipe muda)
+    // 3) caso contrário usar tabela progressiva em `calcularValoresSimulacao`
+    let valorPacoteCalc = 0;
+    const baseValores = calcularValoresSimulacao(editingSimulacao.aulas || []);
+    if (editingSimulacao && editingSimulacao.valorPacoteAplicado && editingSimulacao.valorPacoteAplicado > 0) {
+      valorPacoteCalc = editingSimulacao.valorPacoteAplicado;
+    } else if (editingSimulacao && editingSimulacao.valorLucroMaster && editingSimulacao.valorLucroMaster > 0) {
+      valorPacoteCalc = valorEquipe + editingSimulacao.valorLucroMaster;
+    } else {
+      valorPacoteCalc = (baseValores && typeof baseValores.ValorPacote === 'number') ? baseValores.ValorPacote : 0;
+    }
+
+    const lucroCalculado = valorPacoteCalc - valorEquipe;
+
+    document.getElementById('display-total-horas').textContent = `${horas}h`;
+    document.getElementById('display-valor-pacote').textContent = `R$ ${Number(valorPacoteCalc || 0).toFixed(2)}`;
+    document.getElementById('display-valor-equipe').textContent = `R$ ${Number(valorEquipe || 0).toFixed(2)}`;
+    // Se foi definido um Lucro Master fixo, mantê-lo independente das aulas;
+    // caso contrário mostrar o lucro calculado (pacote - equipe)
+    const lucroDisplay = (editingSimulacao && editingSimulacao.valorLucroMaster && editingSimulacao.valorLucroMaster > 0)
+      ? editingSimulacao.valorLucroMaster
+      : lucroCalculado;
+    document.getElementById('display-lucro-master').textContent = `R$ ${Number(lucroDisplay || 0).toFixed(2)}`;
+
+    // Re-renderizar linhas da tabela de aulas para atualizar valores individuais
+    const tbody = document.getElementById('tbody-aulas-simulacao');
+    if (tbody && editingSimulacao && Array.isArray(editingSimulacao.aulas)) {
+      tbody.innerHTML = renderAulasSimulacao(editingSimulacao.aulas);
+      // reaplicar eventos e máscaras nos inputs das aulas
+      setupAulasInputEvents();
+      aplicarMascarasModal();
+    }
   }
   
   // ==================== SALVAR SIMULAÇÃO ====================
@@ -2434,6 +2775,29 @@ const Simulacoes = (function() {
     // Calcular valores baseados nas aulas já editadas em editingSimulacao.aulas
     const valores = calcularValoresSimulacao(editingSimulacao.aulas || []);
     
+    // Ajustar ValorEquipe caso exista valorHoraProfessor em editingSimulacao
+    const horasTotais = valores.SomatorioDuracaoAulas || 0;
+    const valorEquipeFinal = (editingSimulacao && editingSimulacao.valorHoraProfessor && editingSimulacao.valorHoraProfessor > 0)
+      ? (editingSimulacao.valorHoraProfessor * horasTotais)
+      : (valores.ValorEquipe || 0);
+
+    // Determinar Valor do Pacote para persistência:
+    // 1) se houver override manual `valorPacoteAplicado`, usar
+    // 2) se houver `valorLucroMaster`, persistir pacote = valorEquipe + valorLucroMaster
+    // 3) caso contrário usar cálculo padrão (tabela progressiva)
+    let valorPacoteFinal = 0;
+    if (editingSimulacao && editingSimulacao.valorPacoteAplicado && editingSimulacao.valorPacoteAplicado > 0) {
+      valorPacoteFinal = editingSimulacao.valorPacoteAplicado;
+    } else if (editingSimulacao && editingSimulacao.valorLucroMaster && editingSimulacao.valorLucroMaster > 0) {
+      valorPacoteFinal = valorEquipeFinal + editingSimulacao.valorLucroMaster;
+    } else {
+      valorPacoteFinal = (valores.ValorPacote || 0);
+    }
+
+    const lucroFinal = (editingSimulacao && editingSimulacao.valorLucroMaster && editingSimulacao.valorLucroMaster > 0)
+      ? editingSimulacao.valorLucroMaster
+      : ((valorPacoteFinal || 0) - valorEquipeFinal);
+
     const simulacaoData = {
       idSimulacao: editingSimulacao.idSimulacao,
       tituloSimulacao: titulo,
@@ -2445,9 +2809,11 @@ const Simulacoes = (function() {
       tipoEquipe: tipoEquipe,
       aulas: editingSimulacao.aulas || [],
       SomatorioDuracaoAulas: valores.SomatorioDuracaoAulas,
-      ValorPacote: valores.ValorPacote,
-      ValorEquipe: valores.ValorEquipe,
-      lucroMaster: valores.lucroMaster,
+      ValorPacote: valorPacoteFinal,
+      ValorEquipe: valorEquipeFinal,
+      lucroMaster: lucroFinal,
+      valorHoraProfessor: editingSimulacao && editingSimulacao.valorHoraProfessor ? editingSimulacao.valorHoraProfessor : null,
+      valorPacoteAplicado: editingSimulacao && editingSimulacao.valorPacoteAplicado ? editingSimulacao.valorPacoteAplicado : null,
       timestamp: firebase.firestore.FieldValue.serverTimestamp()
     };
     
@@ -2530,52 +2896,81 @@ const Simulacoes = (function() {
       const dataSegundaParcela = document.getElementById('data-segunda-parcela').value;
       const tipoEquipe = document.getElementById('tipo-equipe').value;
       
-      // 3. Calcular valores
-      const valores = calcularValoresSimulacao(editingSimulacao.aulas);
-      
-      // 4. Verificar se alguma aula é emergencial
-      const aulaEmergencial = verificarAulaEmergencial(editingSimulacao.aulas);
-      
-      // 5. Gerar IDs de aula (formato: 0001AA, 0001AB, 0001AC, etc.)
-      const aulasComIds = editingSimulacao.aulas. map((aula, index) => {
+      // 3. Calcular valores considerando overrides ativos (fixar valores exibidos)
+      // Base a partir da tabela progressiva
+      const baseValores = calcularValoresSimulacao(editingSimulacao.aulas || []);
+
+      // Verificar se alguma aula é emergencial
+      const aulaEmergencial = verificarAulaEmergencial(editingSimulacao.aulas || []);
+
+      // Horas totais
+      const horasTotais = baseValores.SomatorioDuracaoAulas || 0;
+
+      // Taxa do professor (override ou padrão)
+      const DEFAULT_PROF_RATE = 35;
+      const profRate = (editingSimulacao && editingSimulacao.valorHoraProfessor && editingSimulacao.valorHoraProfessor > 0)
+        ? editingSimulacao.valorHoraProfessor
+        : DEFAULT_PROF_RATE;
+
+      // Valor da equipe baseado na taxa aplicada no momento
+      const valorEquipeCalc = profRate * horasTotais;
+
+      // Determinar valor do pacote com precedência (igual ao comportamento em recalcularValores)
+      let valorPacoteCalc = 0;
+      if (editingSimulacao && editingSimulacao.valorPacoteAplicado && editingSimulacao.valorPacoteAplicado > 0) {
+        valorPacoteCalc = editingSimulacao.valorPacoteAplicado;
+      } else if (editingSimulacao && editingSimulacao.valorLucroMaster && editingSimulacao.valorLucroMaster > 0) {
+        valorPacoteCalc = valorEquipeCalc + editingSimulacao.valorLucroMaster;
+      } else {
+        valorPacoteCalc = baseValores.ValorPacote;
+      }
+
+      const lucroMasterFinal = (editingSimulacao && editingSimulacao.valorLucroMaster && editingSimulacao.valorLucroMaster > 0)
+        ? editingSimulacao.valorLucroMaster
+        : (valorPacoteCalc - valorEquipeCalc);
+
+      // 4. Gerar IDs de aula e fixar ValorAula com os valores atualmente exibidos
+      const aulasComIds = (editingSimulacao.aulas || []).map((aula, index) => {
         const idAula = novoCodigoContratacao + gerarSufixoAula(index);
-        
+        const duracaoHours = parseDuracao(aula.duracao || '0h0');
+        const valorAulaCalc = Number((profRate * duracaoHours).toFixed(2));
+
         return {
           'id-Aula': idAula,
           idProfessor: aula.idProfessor || '',
-          professor: aula. professor || 'A definir',
-          materia:  aula.materia || '',
+          professor: aula.professor || 'A definir',
+          materia: aula.materia || '',
           estudante: aula.estudante || '',
           duracao: aula.duracao || '',
           data: aula.data || '',
-          horario: '',
-          StatusAula: '',
-          ObservacoesAula: '',
-          RelatorioAula: '',
-          ConfirmacaoProfessorAula: 'false',
-          disponibilizarRrelatório: '',
-          ValorAula: calcularValorAula(aula.duracao)
+          horario: aula.horario || '',
+          StatusAula: aula.StatusAula || '',
+          ObservacoesAula: aula.ObservacoesAula || '',
+          RelatorioAula: aula.RelatorioAula || '',
+          ConfirmacaoProfessorAula: aula.ConfirmacaoProfessorAula || 'false',
+          disponibilizarRrelatório: aula.disponibilizarRrelatório || '',
+          ValorAula: valorAulaCalc
         };
       });
-      
-      // 6. Criar documento para BancoDeAulas
+
+      // 5. Criar documento para BancoDeAulas usando os valores fixos calculados acima
       const contratoData = {
         codigoContratacao: novoCodigoContratacao,
         nomeCliente: nomeCliente,
         cpf: cpf,
-        alunos: aulasComIds. map(a => a.estudante).filter((v, i, a) => a.indexOf(v) === i).join(', '),
+        alunos: aulasComIds.map(a => a.estudante).filter((v, i, a) => a.indexOf(v) === i).join(', '),
         aulaEmergencial: aulaEmergencial,
         statusContrato: '',
         assinaturaContrato: '',
         metodoPagamento: metodoPagamento,
         statusPagamento: '',
         dataPrimeiraParcela: dataPrimeiraParcela,
-        dataSegundaParcela:  dataSegundaParcela,
+        dataSegundaParcela: dataSegundaParcela,
         equipe: tipoEquipe,
-        ValorEquipe: valores.ValorEquipe,
-        ValorPacote: valores.ValorPacote,
-        lucroMaster: valores.lucroMaster,
-        SomatorioDuracaoAulas: valores.SomatorioDuracaoAulas,
+        ValorEquipe: Number((valorEquipeCalc || 0).toFixed(2)),
+        ValorPacote: Number((valorPacoteCalc || 0).toFixed(2)),
+        lucroMaster: Number((lucroMasterFinal || 0).toFixed(2)),
+        SomatorioDuracaoAulas: horasTotais,
         aulas: aulasComIds,
         ConfirmacaoProfessorAula: '',
         ObservacaoContratacao: '',
@@ -2635,7 +3030,11 @@ const Simulacoes = (function() {
   // Função para calcular valor individual da aula
   function calcularValorAula(duracao) {
     const horas = parseDuracao(duracao || '0h');
-    return horas * 35;
+    // Se houver override de valor por hora aplicado na simulação, usar esse valor
+    const valorHora = (editingSimulacao && editingSimulacao.valorHoraProfessor && editingSimulacao.valorHoraProfessor > 0)
+      ? editingSimulacao.valorHoraProfessor
+      : 35;
+    return horas * valorHora;
   }
   
   // Função para verificar aula emergencial
