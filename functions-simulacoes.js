@@ -658,11 +658,17 @@ const Simulacoes = (function() {
                 </div>
               </div>
 
-              <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-3 p-4 bg-orange-50 rounded-lg" id="valores-calculados-box">
+              <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mt-3 p-4 bg-orange-50 rounded-lg" id="valores-calculados-box">
                 <div>
                   <div class="text-xs font-medium text-gray-500 mb-1">Total de Horas</div>
                   <div class="text-lg font-bold text-orange-600" id="display-total-horas">
                     ${valores.SomatorioDuracaoAulas}h
+                  </div>
+                </div>
+                <div>
+                  <div class="text-xs font-medium text-gray-500 mb-1">Valor Hora/Aula</div>
+                  <div class="text-lg font-bold text-gray-700" id="display-valor-hora-aula">
+                    ${ (simulacao.valorHoraProfessor && simulacao.valorHoraProfessor > 0) ? `R$ ${Number(simulacao.valorHoraProfessor).toFixed(2)}` : 'R$ 35,00' }
                   </div>
                 </div>
                 <div>
@@ -2726,6 +2732,9 @@ const Simulacoes = (function() {
     const lucroCalculado = valorPacoteCalc - valorEquipe;
 
     document.getElementById('display-total-horas').textContent = `${horas}h`;
+    // Atualizar display do valor hora/aula
+    const elValorHora = document.getElementById('display-valor-hora-aula');
+    if (elValorHora) elValorHora.textContent = `R$ ${Number(profRate || 0).toFixed(2)}`;
     document.getElementById('display-valor-pacote').textContent = `R$ ${Number(valorPacoteCalc || 0).toFixed(2)}`;
     document.getElementById('display-valor-equipe').textContent = `R$ ${Number(valorEquipe || 0).toFixed(2)}`;
     // Se foi definido um Lucro Master fixo, mantê-lo independente das aulas;
@@ -2970,6 +2979,8 @@ const Simulacoes = (function() {
         ValorEquipe: Number((valorEquipeCalc || 0).toFixed(2)),
         ValorPacote: Number((valorPacoteCalc || 0).toFixed(2)),
         lucroMaster: Number((lucroMasterFinal || 0).toFixed(2)),
+        // Hora/Aula aplicada na aprovação (valor por hora do professor)
+        horaAulaProfessor: Number((profRate || DEFAULT_PROF_RATE).toFixed(2)),
         SomatorioDuracaoAulas: horasTotais,
         aulas: aulasComIds,
         ConfirmacaoProfessorAula: '',
@@ -2985,14 +2996,32 @@ const Simulacoes = (function() {
       for (const aula of aulasComIds) {
         const aulaListaData = {
           ... aula,
+          // incluir o valor hora/aula aplicado no momento da aprovação
+          horaAulaProfessor: Number((profRate || DEFAULT_PROF_RATE).toFixed(2)),
           codigoContratacao: novoCodigoContratacao,
           nomeCliente: nomeCliente,
           cpf: cpf,
           metodoPagamento: metodoPagamento,
           timestamp: firebase.firestore.FieldValue.serverTimestamp()
         };
-        
-        await db.collection('BancoDeAulas-Lista').add(aulaListaData);
+
+        // Construir ID do documento: id-Aula + _ + primeiros dois nomes do cliente (concatenados, sem espaços)
+        try {
+          const idAula = aula['id-Aula'] || '';
+          const nomeParts = nomeCliente ? String(nomeCliente).trim().split(/\s+/).filter(Boolean) : [];
+          let doisNomes = nomeParts.length ? nomeParts.slice(0,2).join('') : 'Cliente';
+          // Remover acentos e caracteres não alfanuméricos
+          if (typeof doisNomes.normalize === 'function') {
+            doisNomes = doisNomes.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          }
+          const sanitized = doisNomes.replace(/[^a-zA-Z0-9]/g, '');
+          const docId = `${idAula}_${sanitized}`;
+
+          await db.collection('BancoDeAulas-Lista').doc(docId).set(aulaListaData);
+        } catch (errSave) {
+          console.warn('⚠️ Falha ao salvar com ID customizado, usando ID automático:', errSave);
+          await db.collection('BancoDeAulas-Lista').add(aulaListaData);
+        }
       }
       console.log('✅ Aulas salvas em BancoDeAulas-Lista:', aulasComIds.length);
       

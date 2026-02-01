@@ -51,6 +51,9 @@ const BancoDeAulasCards = (function() {
         clearFilters();
         renderAulasCards(aulas);
       });
+
+      // Inicializar estado dos controles (contagem e botão)
+      updateSelection();
       
       return;
     }
@@ -407,7 +410,40 @@ const BancoDeAulasCards = (function() {
                 </div>
               </div>
             </div>
-            
+
+            <!-- Dados da contratação -->
+            <div class="mt-4 mb-4 p-4 bg-white border border-gray-100 rounded-lg">
+              <div class="flex items-center justify-between mb-3">
+                <h4 class="font-lexend font-bold text-sm text-gray-700">Dados da contratação</h4>
+                <button id="btn-editar-valores-contrato" class="btn-secondary btn-compact text-xs py-1 px-2">
+                  <i class="fas fa-coins mr-2"></i>
+                  Editar valores
+                </button>
+              </div>
+                <div class="grid grid-cols-5 gap-4">
+                <div>
+                  <div class="text-xs font-medium text-gray-500 mb-1">Total de horas</div>
+                  <div id="display-total-horas-contrato" class="text-lg font-bold text-orange-600">0h 0m</div>
+                </div>
+                <div>
+                  <div class="text-xs font-medium text-gray-500 mb-1">Valor do pacote</div>
+                  <div id="display-valor-pacote-contrato" class="text-lg font-bold text-orange-600">R$ 0,00</div>
+                </div>
+                <div>
+                  <div class="text-xs font-medium text-gray-500 mb-1">Valor para Equipe</div>
+                  <div id="display-valor-equipe-contrato" class="text-lg font-bold text-gray-600">R$ 0,00</div>
+                </div>
+                <div>
+                  <div class="text-xs font-medium text-gray-500 mb-1">Lucro Master</div>
+                  <div id="display-lucro-master-contrato" class="text-lg font-bold text-green-600">R$ 0,00</div>
+                </div>
+                <div>
+                  <div class="text-xs font-medium text-gray-500 mb-1">Valor Hora/Aula</div>
+                  <div id="display-hora-aula-contrato" class="text-lg font-bold text-gray-700">R$ 0,00</div>
+                </div>
+              </div>
+            </div>
+
             <!-- Aulas Agendadas -->
             <div>
               <div class="flex justify-between items-center mb-3">
@@ -487,6 +523,38 @@ const BancoDeAulasCards = (function() {
     const codigoContratacao = aula.codigoContratacao;
     if (codigoContratacao) {
       loadAulasDetalhadas(codigoContratacao);
+
+      // Preencher os valores de contrato (ValorPacote, ValorEquipe, lucroMaster)
+      (async function() {
+        try {
+          const docRef = db.collection('BancoDeAulas').doc(codigoContratacao);
+          const docSnap = await docRef.get();
+          const elPacote = modal.querySelector('#display-valor-pacote-contrato');
+          const elEquipe = modal.querySelector('#display-valor-equipe-contrato');
+          const elLucro = modal.querySelector('#display-lucro-master-contrato');
+
+          const formatBR = (v) => {
+            if (v === undefined || v === null || v === '') return '--';
+            const num = Number(v);
+            if (Number.isNaN(num)) return '--';
+            return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+          };
+
+          if (docSnap.exists) {
+            const data = docSnap.data();
+            elPacote.textContent = formatBR(data.ValorPacote);
+            elEquipe.textContent = formatBR(data.ValorEquipe);
+            elLucro.textContent = formatBR(data.lucroMaster);
+          } else {
+            elPacote.textContent = '--';
+            elEquipe.textContent = '--';
+            elLucro.textContent = '--';
+          }
+        } catch (err) {
+          console.error('Erro ao carregar dados da contratação', err);
+        }
+      })();
+
     } else {
       console.warn('⚠️ Código de contratação não encontrado');
       const tbody = modal.querySelector('#tbody-aulas-detalhadas');
@@ -512,6 +580,56 @@ const BancoDeAulasCards = (function() {
       closeModal();
       openEditModal(aula);
     });
+
+    // Atualizar display do Valor Hora/Aula se o contrato já contém o campo
+    try {
+      const elHoraAulaContrato = modal.querySelector('#display-hora-aula-contrato');
+      if (elHoraAulaContrato) {
+        const horaVal = (aula && (aula.horaAulaProfessor || aula.horaAulaProfessor === 0)) ? aula.horaAulaProfessor : null;
+        if (horaVal !== null && horaVal !== undefined && horaVal !== '') {
+          elHoraAulaContrato.textContent = formatCurrencyBR(Number(horaVal));
+        } else {
+          elHoraAulaContrato.textContent = formatCurrencyBR(35);
+        }
+      }
+      // Inicializar Lucro Master, Valor para Equipe e Valor do Pacote a partir do documento do contrato, se houver
+      try {
+        const elLucroContrato = modal.querySelector('#display-lucro-master-contrato');
+        const elEquipeContrato = modal.querySelector('#display-valor-equipe-contrato');
+        const elPacoteContrato = modal.querySelector('#display-valor-pacote-contrato');
+
+        if (elLucroContrato) {
+          const lucroVal = (aula && (aula.lucroMaster || aula.lucroMaster === 0)) ? aula.lucroMaster : null;
+          if (lucroVal !== null && lucroVal !== undefined && lucroVal !== '') {
+            elLucroContrato.textContent = formatCurrencyBR(Number(lucroVal));
+          } else {
+            elLucroContrato.textContent = formatCurrencyBR(0);
+          }
+        }
+
+        if (elEquipeContrato) {
+          const equipeVal = (aula && (aula.ValorEquipe || aula.ValorEquipe === 0)) ? aula.ValorEquipe : null;
+          if (equipeVal !== null && equipeVal !== undefined && equipeVal !== '') {
+            elEquipeContrato.textContent = formatCurrencyBR(Number(equipeVal));
+          } else {
+            elEquipeContrato.textContent = formatCurrencyBR(0);
+          }
+        }
+
+        if (elPacoteContrato) {
+          const pacoteVal = (aula && (aula.ValorPacote || aula.ValorPacote === 0)) ? aula.ValorPacote : null;
+          if (pacoteVal !== null && pacoteVal !== undefined && pacoteVal !== '') {
+            elPacoteContrato.textContent = formatCurrencyBR(Number(pacoteVal));
+          } else {
+            elPacoteContrato.textContent = formatCurrencyBR(0);
+          }
+        }
+      } catch (errInit) {
+        console.warn('Não foi possível preencher valores iniciais do contrato (lucro/equipe/pacote)', errInit);
+      }
+    } catch (err) {
+      console.warn('Não foi possível preencher display-hora-aula-contrato', err);
+    }
     
     // Configurar botão de gerar contrato (desabilitado por enquanto)
     const btnGerarContrato = modal.querySelector('#btn-gerar-contrato');
@@ -604,6 +722,196 @@ const BancoDeAulasCards = (function() {
     btnVerObservacoes.addEventListener('click', () => {
       showObservacoesModal(aula);
     });
+
+    // Botão editar valores da contratação
+    const btnEditarValores = modal.querySelector('#btn-editar-valores-contrato');
+    if (btnEditarValores) {
+      btnEditarValores.addEventListener('click', () => {
+        const elPacote = modal.querySelector('#display-valor-pacote-contrato');
+        const elEquipe = modal.querySelector('#display-valor-equipe-contrato');
+        const elLucro = modal.querySelector('#display-lucro-master-contrato');
+
+        const parseBR = (str) => {
+          if (!str) return 0;
+          try {
+            const cleaned = String(str).replace(/\s/g, '').replace(/R\$|\./g, '').replace(/,/g, '.').replace(/[^0-9.\-]/g, '');
+            const n = Number(cleaned);
+            return Number.isFinite(n) ? n : 0;
+          } catch (e) { return 0; }
+        };
+
+        const initialEquipe = parseBR(elEquipe.textContent || elEquipe.innerText);
+        const initialLucro = parseBR(elLucro.textContent || elLucro.innerText);
+
+        const modalHtml = `
+          <div class="modal-overlay" id="editarValoresModal" style="z-index:10010;">
+            <div class="modal-container" style="max-width:520px;">
+              <div class="modal-header">
+                <h3 class="font-lexend font-bold text-lg">Editar valores da contratação</h3>
+                <button class="modal-close text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+              </div>
+              <div class="modal-body">
+                <div class="space-y-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Valor para Equipe</label>
+                    <input type="text" id="input-valor-equipe-editar" value="${initialEquipe.toFixed(2).replace('.',',')}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none" />
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Lucro Master</label>
+                    <input type="text" id="input-lucro-master-editar" value="${initialLucro.toFixed(2).replace('.',',')}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none" />
+                  </div>
+                  <div>
+                    <div class="text-xs text-gray-500">Valor do pacote será calculado como soma dos dois campos</div>
+                    <div class="text-lg font-bold text-orange-600 mt-2" id="preview-valor-pacote-editar">R$ 0,00</div>
+                  </div>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button id="btn-cancelar-editar-valores" class="btn-secondary btn-compact">Cancelar</button>
+                <button id="btn-aplicar-editar-valores" class="btn-primary btn-compact">Aplicar alterações</button>
+              </div>
+            </div>
+          </div>
+        `;
+
+        const container = document.createElement('div');
+        container.innerHTML = modalHtml;
+        document.body.appendChild(container);
+
+        const m = container.querySelector('#editarValoresModal');
+        const closeBtn = m.querySelector('.modal-close');
+        const btnCancelar = m.querySelector('#btn-cancelar-editar-valores');
+        const btnAplicar = m.querySelector('#btn-aplicar-editar-valores');
+        const inputEquipe = m.querySelector('#input-valor-equipe-editar');
+        const inputLucro = m.querySelector('#input-lucro-master-editar');
+        const previewPacote = m.querySelector('#preview-valor-pacote-editar');
+
+        const formatBR = (v) => {
+          if (v === undefined || v === null || v === '') return '--';
+          const n = Number(v);
+          if (!Number.isFinite(n)) return '--';
+          return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        };
+
+        // Máscara simples de moeda (bom UX para preenchimento)
+        const attachCurrencyMask = (inputEl) => {
+          if (!inputEl) return;
+          const formatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+
+          const toNumberFromInput = (s) => {
+            if (!s) return 0;
+            const cleaned = String(s).replace(/[^0-9]/g, ''); // apenas dígitos
+            const cents = cleaned === '' ? 0 : parseInt(cleaned, 10);
+            return cents / 100;
+          };
+
+          const formatFromDigits = (s) => {
+            const n = toNumberFromInput(s);
+            return formatter.format(n);
+          };
+
+          // Ao focar, deixar apenas número (opcional) — manter moeda por consistência
+          inputEl.addEventListener('input', (e) => {
+            const caret = inputEl.selectionStart;
+            const raw = inputEl.value;
+            const formatted = formatFromDigits(raw);
+            inputEl.value = formatted;
+            try { inputEl.selectionStart = inputEl.selectionEnd = inputEl.value.length - (formatted.length - (caret || 0)); } catch (err) { /* ignore caret issues */ }
+            // disparar input para atualizar preview
+            inputEl.dispatchEvent(new Event('input'));
+          });
+
+          // On blur, ensure well formatted
+          inputEl.addEventListener('blur', () => {
+            inputEl.value = formatFromDigits(inputEl.value);
+          });
+        };
+
+        const parseInput = (s) => {
+          if (!s) return 0;
+          const cleaned = String(s).trim().replace(/\./g,'').replace(/,/g,'.').replace(/[^0-9.\-]/g,'');
+          const n = Number(cleaned);
+          return Number.isFinite(n) ? n : 0;
+        };
+
+        const updatePreview = () => {
+          const e = parseInput(inputEquipe.value);
+          const l = parseInput(inputLucro.value);
+          previewPacote.textContent = formatBR(e + l);
+        };
+
+        // Aplicar máscara e inicializar valores formatados
+        try {
+          inputEquipe.value = formatBR(initialEquipe);
+          inputLucro.value = formatBR(initialLucro);
+        } catch (e) { /* ignore */ }
+
+        attachCurrencyMask(inputEquipe);
+        attachCurrencyMask(inputLucro);
+
+        inputEquipe.addEventListener('input', updatePreview);
+        inputLucro.addEventListener('input', updatePreview);
+
+        // init preview
+        updatePreview();
+
+        const closeModal = () => {
+          try {
+            const modalOverlay = container.querySelector('#editarValoresModal');
+            if (modalOverlay && modalOverlay.parentNode) modalOverlay.parentNode.removeChild(modalOverlay);
+          } catch (e) { /* ignore */ }
+          try { container.remove(); } catch (e) { /* ignore */ }
+        };
+        closeBtn.addEventListener('click', closeModal);
+        btnCancelar.addEventListener('click', closeModal);
+
+        m.addEventListener('click', (ev) => { if (ev.target === m) closeModal(); });
+
+        const escHandler = (ev) => { if (ev.key === 'Escape') closeModal(); };
+        document.addEventListener('keydown', escHandler);
+        container.addEventListener('remove', () => { document.removeEventListener('keydown', escHandler); });
+
+        btnAplicar.addEventListener('click', async () => {
+          try {
+            btnAplicar.disabled = true;
+            btnAplicar.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Aplicando...';
+
+            const valEquipe = parseInput(inputEquipe.value);
+            const valLucro = parseInput(inputLucro.value);
+            const valPacote = Number((valEquipe + valLucro).toFixed(2));
+
+            // Atualizar no banco (document id = codigoContratacao)
+            await BANCO.updateAula(codigoContratacao, {
+              ValorEquipe: valEquipe,
+              lucroMaster: valLucro,
+              ValorPacote: valPacote,
+              timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            // Atualizar UI
+            elEquipe.textContent = formatBR(valEquipe);
+            elLucro.textContent = formatBR(valLucro);
+            elPacote.textContent = formatBR(valPacote);
+            // Valor Hora/Aula definido pelo input-valor-equipe-editar (conforme regra)
+            try {
+              const elHoraAula = document.getElementById('display-hora-aula-contrato');
+              if (elHoraAula) elHoraAula.textContent = formatBR(valEquipe);
+            } catch (e) { /* ignore */ }
+
+            showToast('✅ Valores atualizados com sucesso', 'success');
+            closeModal();
+
+            // Recarregar detalhes se estiver visível
+            try { await loadAulasDetalhadas(codigoContratacao); } catch (e) { /* ignore */ }
+          } catch (err) {
+            console.error('Erro ao aplicar valores', err);
+            showToast('❌ Erro ao aplicar valores: ' + (err && err.message ? err.message : ''), 'error');
+            btnAplicar.disabled = false;
+            btnAplicar.innerHTML = 'Aplicar alterações';
+          }
+        });
+      });
+    }
 
     // Preencher Estudante e Série a partir da coleção cadastroClientes usando CPF
     (function populateEstudantesFromCPF() {
@@ -1404,6 +1712,13 @@ const BancoDeAulasCards = (function() {
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
   }
+
+  // Formatar número para moeda BR
+  function formatCurrencyBR(value) {
+    const num = Number(value);
+    if (!isFinite(num)) return 'R$ 0,00';
+    return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  }
   
   // Renderizar aulas detalhadas para o modal
   function renderAulasDetalhadas(aulas, contratoId) {
@@ -1420,6 +1735,7 @@ const BancoDeAulasCards = (function() {
             <th>Duração</th>
             <th>Matéria</th>
             <th>Professor</th>
+            <th>Valor da Aula</th>
             <th>Estudante</th>
             <th>Status</th>
             <th class="text-center">Aula concluída</th>
@@ -1429,7 +1745,7 @@ const BancoDeAulasCards = (function() {
         </thead>
         <tbody id="tbody-aulas-detalhadas">
           <tr>
-            <td colspan="10" class="text-center py-8">
+            <td colspan="11" class="text-center py-8">
               <div class="flex flex-col items-center justify-center">
                 <div class="loading-spinner-large mb-3"></div>
                 <p class="text-orange-500 font-comfortaa font-bold">Carregando aulas...</p>
@@ -1461,7 +1777,7 @@ const BancoDeAulasCards = (function() {
       if (!aulas || aulas.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="10" class="text-center py-8">
+            <td colspan="11" class="text-center py-8">
               <i class="fas fa-inbox text-3xl text-gray-300 mb-3"></i>
               <p class="text-gray-500">Nenhuma aula encontrada para este código</p>
             </td>
@@ -1498,8 +1814,23 @@ const BancoDeAulasCards = (function() {
       
       console.log('📊 Aulas ordenadas por data crescente');
       
+      // Helper: parse BRL string to Number
+      const parseBR = (str) => {
+        if (!str) return 0;
+        try {
+          const cleaned = String(str).replace(/\s/g, '').replace(/R\$|\./g, '').replace(/,/g, '.').replace(/[^0-9.\-]/g, '');
+          const n = Number(cleaned);
+          return Number.isFinite(n) ? n : 0;
+        } catch (e) { return 0; }
+      };
+
       // Renderizar as aulas
       let html = '';
+      let somaValorAulas = 0;
+      // valor por hora atual exibido no modal (pode mudar dinamicamente)
+      const elHoraAulaContrato = document.getElementById('display-hora-aula-contrato');
+      const valorHoraContratoAtual = parseBR(elHoraAulaContrato ? (elHoraAulaContrato.textContent || elHoraAulaContrato.innerText) : 'R$ 0,00');
+
       aulas.forEach((aula, index) => {
         const statusAula = aula.StatusAula || 'Pendente';
         const statusClass = getStatusBadgeClass(statusAula);
@@ -1532,6 +1863,19 @@ const BancoDeAulasCards = (function() {
               <button type="button" class="btn-professor-aula text-sm px-2 py-1 cursor-pointer hover:bg-orange-50 rounded transition-colors ${!aula.professor || aula.professor === 'A definir' ? 'text-orange-500 font-semibold' : ''}" data-id-aula="${aula['id-Aula']}" data-professor="${aula.professor || 'A definir'}" data-id-professor="${aula.idProfessor || ''}" title="Clique para alterar o professor">
                 ${aula.professor || 'A definir'}
               </button>
+            </td>
+            <td class="text-right font-mono text-sm">
+              ${(() => {
+                try {
+                  const mm = (aula.duracao && typeof aula.duracao === 'string') ? aula.duracao.match(/(\d+)h(?:([0-5]\d))?/) : null;
+                  const hours = mm ? parseInt(mm[1], 10) : 0;
+                  const minutes = (mm && mm[2]) ? parseInt(mm[2], 10) : 0;
+                  const totalHoursDecimal = (hours * 60 + minutes) / 60;
+                  const computed = Number((totalHoursDecimal * valorHoraContratoAtual).toFixed(2));
+                  somaValorAulas += isFinite(computed) ? computed : 0;
+                  return formatCurrencyBR(computed);
+                } catch (e) { return formatCurrencyBR(0); }
+              })()}
             </td>
             <td>
               <button type="button" class="btn-estudante-aula text-sm px-2 py-1 cursor-pointer hover:bg-orange-50 rounded transition-colors" data-id-aula="${aula['id-Aula']}" data-estudante="${aula.estudante || ''}" title="Clique para alterar o estudante">
@@ -1566,6 +1910,57 @@ const BancoDeAulasCards = (function() {
         `;
       });
       
+      // Calcular total de horas (somatório das durações)
+      const parseDurationToMinutes = (dur) => {
+        if (!dur || typeof dur !== 'string') return 0;
+        // Espera formatos como "1h00", "1h30", "2h" etc.
+        // fallback regex: capture hours and minutes
+        const mm = dur.match(/(\d+)h(?:([0-5]\d))?/);
+        if (!mm) return 0;
+        const hours = parseInt(mm[1], 10);
+        const minutes = mm[2] ? parseInt(mm[2], 10) : 0;
+        return hours * 60 + minutes;
+      };
+
+      let totalMinutes = 0;
+      aulas.forEach(a => { totalMinutes += parseDurationToMinutes(a.duracao || ''); });
+
+      const totalHours = Math.floor(totalMinutes / 60);
+      const remainingMinutes = totalMinutes % 60;
+      const totalDisplay = `${totalHours}h ${String(remainingMinutes).padStart(2,'0')}`;
+
+      // Atualizar o display no modal, se presente
+      try {
+        const elTotal = document.getElementById('display-total-horas-contrato');
+        if (elTotal) elTotal.textContent = totalDisplay;
+        // Usar soma calculada dinamicamente durante renderização
+        const elValorEquipe = document.getElementById('display-valor-equipe-contrato');
+        if (elValorEquipe) elValorEquipe.textContent = formatCurrencyBR(somaValorAulas);
+        // Persistir valores agregados no documento do contrato
+        try {
+          const elHora = document.getElementById('display-hora-aula-contrato');
+          const elLucro = document.getElementById('display-lucro-master-contrato');
+          const horaAulaProfessor = parseBR(elHora ? (elHora.textContent || elHora.innerText) : 'R$ 0,00');
+          const lucroMaster = parseBR(elLucro ? (elLucro.textContent || elLucro.innerText) : 'R$ 0,00');
+          const ValorEquipe = Number(Number(somaValorAulas).toFixed(2));
+          const ValorPacote = Number((ValorEquipe + lucroMaster).toFixed(2));
+
+          if (window.BANCO && typeof window.BANCO.updateAula === 'function') {
+            // SomatorioDuracaoAulas salvo como string "#h ##m"
+            BANCO.updateAula(codigoContratacao, {
+              horaAulaProfessor: horaAulaProfessor,
+              lucroMaster: lucroMaster,
+              SomatorioDuracaoAulas: totalDisplay,
+              ValorEquipe: ValorEquipe,
+              ValorPacote: ValorPacote,
+              timestamp: firebase && firebase.firestore ? firebase.firestore.FieldValue.serverTimestamp() : Date.now()
+            }).catch(err => console.warn('Erro ao persistir valores do contrato:', err));
+          }
+        } catch (errPersist) {
+          console.warn('⚠️ Não foi possível persistir valores do contrato:', errPersist);
+        }
+      } catch (e) { /* ignore */ }
+
       tbody.innerHTML = html;
       
       // Adicionar event listeners para os botões de relatório e observação
@@ -1577,7 +1972,7 @@ const BancoDeAulasCards = (function() {
       console.error('❌ Erro ao carregar aulas detalhadas:', error);
       tbody.innerHTML = `
         <tr>
-          <td colspan="10" class="text-center py-8">
+          <td colspan="11" class="text-center py-8">
             <i class="fas fa-exclamation-triangle text-3xl text-orange-500 mb-3"></i>
             <p class="text-gray-500">Erro ao carregar aulas</p>
             <p class="text-sm text-gray-400 mt-1">${error.message}</p>
@@ -3244,7 +3639,22 @@ const BancoDeAulasCards = (function() {
         btnSim.disabled = true;
         btnSim.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Adicionando...';
         
-        const novoIdAula = await BANCO.addNovaAulaLista(codigoContratacao);
+        // Ler o valor Hora/Aula exibido no contrato e converter para número
+        let valorHoraContrato = 35;
+        try {
+          const displayEl = document.getElementById('display-hora-aula-contrato');
+          if (displayEl) {
+            const raw = (displayEl.textContent || displayEl.innerText || 'R$ 0,00').trim();
+            // Remover 'R$', espaços e separar milhares/decimais
+            const numeric = raw.replace(/R\$/g, '').replace(/\s/g, '').replace(/\./g, '').replace(/,/g, '.');
+            const parsed = parseFloat(numeric);
+            if (isFinite(parsed)) valorHoraContrato = parsed;
+          }
+        } catch (err) {
+          console.warn('Não foi possível ler display-hora-aula-contrato, usando 35 por padrão', err);
+        }
+
+        const novoIdAula = await BANCO.addNovaAulaLista(codigoContratacao, valorHoraContrato);
         
         showToast(`✅ Nova aula criada com sucesso! ID: ${novoIdAula}`, 'success');
         closeConfirm();
@@ -4122,6 +4532,26 @@ const BancoDeAulasCards = (function() {
       btnConfirmar.disabled = true;
       
       try {
+        // Primeiro: tentar excluir todas as aulas individuais vinculadas (BancoDeAulas-Lista)
+        try {
+          // Ler o documento do contrato para obter o codigoContratacao
+          const contratoDoc = await db.collection('BancoDeAulas').doc(aulaId).get();
+          const codigoContratacao = contratoDoc && contratoDoc.exists ? contratoDoc.data().codigoContratacao : null;
+          if (codigoContratacao) {
+            const aulasVinculadas = await BANCO.fetchBancoDeAulasLista(codigoContratacao);
+            if (aulasVinculadas && aulasVinculadas.length) {
+              const docIds = aulasVinculadas.map(a => a.id).filter(Boolean);
+              if (docIds.length) {
+                await BANCO.deleteAulasLista(docIds);
+                console.log('✅ Aulas vinculadas excluídas:', docIds.length);
+              }
+            }
+          }
+        } catch (errLista) {
+          console.warn('⚠️ Não foi possível excluir aulas vinculadas automaticamente:', errLista);
+        }
+
+        // Em seguida, excluir o documento principal do contrato
         await BANCO.deleteAula(aulaId);
         showToast('✅ Aula excluída com sucesso', 'success');
         closeModal();
@@ -4744,45 +5174,42 @@ const BancoDeAulasCards = (function() {
       const btnCancelar = document.getElementById('btn-cancelar-remover');
       const btnConfirmar = document.getElementById('btn-confirmar-remover');
       const selectAll = document.getElementById('select-all-aulas');
-      const checkboxes = modal.querySelectorAll('.checkbox-remove-aula');
       const countSelected = document.getElementById('count-selected-aulas');
+
+      // Helper para obter checkboxes atuais (em caso de re-render)
+      const getCheckboxes = () => Array.from(modal.querySelectorAll('.checkbox-remove-aula'));
       
       // Função para atualizar contador e estado do botão
       function updateSelection() {
+        const checkboxesNow = getCheckboxes();
         const selected = modal.querySelectorAll('.checkbox-remove-aula:checked');
         countSelected.textContent = selected.length;
         btnConfirmar.disabled = selected.length === 0;
-        
+
         // Atualizar checkbox "selecionar todos"
-        selectAll.checked = selected.length === checkboxes.length && checkboxes.length > 0;
-        selectAll.indeterminate = selected.length > 0 && selected.length < checkboxes.length;
+        selectAll.checked = selected.length === checkboxesNow.length && checkboxesNow.length > 0;
+        selectAll.indeterminate = selected.length > 0 && selected.length < checkboxesNow.length;
       }
       
       // Evento para selecionar/desselecionar todos
       selectAll.addEventListener('change', function() {
-        checkboxes.forEach(cb => {
+        const checkboxesNow = getCheckboxes();
+        checkboxesNow.forEach(cb => {
           cb.checked = this.checked;
           const row = cb.closest('tr');
-          if (this.checked) {
-            row.classList.add('bg-red-50');
-          } else {
-            row.classList.remove('bg-red-50');
-          }
+          if (this.checked) row.classList.add('bg-red-50'); else row.classList.remove('bg-red-50');
         });
         updateSelection();
       });
       
-      // Evento para checkboxes individuais
-      checkboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', function() {
-          const row = this.closest('tr');
-          if (this.checked) {
-            row.classList.add('bg-red-50');
-          } else {
-            row.classList.remove('bg-red-50');
-          }
+      // Usar event delegation para lidar com checkboxes individuais dinamicamente
+      modal.addEventListener('change', (e) => {
+        if (e.target && e.target.classList && e.target.classList.contains('checkbox-remove-aula')) {
+          const cb = e.target;
+          const row = cb.closest('tr');
+          if (cb.checked) row.classList.add('bg-red-50'); else row.classList.remove('bg-red-50');
           updateSelection();
-        });
+        }
       });
       
       // Botão cancelar
@@ -4816,10 +5243,14 @@ const BancoDeAulasCards = (function() {
         try {
           // Coletar IDs das aulas selecionadas
           const idsAulas = Array.from(selected).map(cb => cb.dataset.idAula);
-          const docIds = Array.from(selected).map(cb => cb.dataset.docId);
-          
-          console.log('🗑️ Excluindo aulas:', idsAulas);
-          
+          const docIds = Array.from(selected).map(cb => cb.dataset.docId).filter(x => x);
+
+          console.log('🗑️ Excluindo aulas (id-Aula):', idsAulas, ' docIds:', docIds);
+
+          if (!window.BANCO || typeof window.BANCO.deleteAulasLista !== 'function') {
+            throw new Error('Função BANCO.deleteAulasLista não disponível');
+          }
+
           // Excluir aulas do banco de dados
           await BANCO.deleteAulasLista(docIds);
           
@@ -4833,11 +5264,14 @@ const BancoDeAulasCards = (function() {
             loadBancoDeAulas();
           }
           
-          // Fechar modal de detalhes se estiver aberto e reabrir atualizado
-          const modalDetalhes = document.querySelector('.modal-overlay');
-          if (modalDetalhes) {
-            modalDetalhes.remove();
-          }
+          // Recarregar o modal de detalhes caso esteja aberto (atualiza tabela e displays)
+          try {
+            const detalhesContainer = document.querySelector('.modal-container.max-w-6xl');
+            if (detalhesContainer) {
+              // mantém o modal de detalhes aberto e apenas recarrega a tabela
+              await loadAulasDetalhadas(codigoContratacao);
+            }
+          } catch (e) { console.warn('Erro ao recarregar detalhes após exclusão', e); }
           
         } catch (error) {
           console.error('❌ Erro ao excluir aulas:', error);

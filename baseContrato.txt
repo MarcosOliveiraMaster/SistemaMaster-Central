@@ -146,9 +146,12 @@ III – Planejamento Estratégico Trimestral.
 
 ## Cronograma aprovado
 
-Segue imagem do cronograma aprovado pelo cliente:
+Segue o cronograma aprovado pelo cliente:
 
 [FotoCronograma]
+
+
+Pela execução de Pela execução de [totalHoras] horas de aula, será devido o valor total de [valorPacote].
 
 Declaro estar ciente e de acordo com todas as cláusulas e condições estabelecidas no contrato e no Google Sala de Aula, reconhecendo a validade e eficácia dessas disposições. Este contrato é celebrado com pleno conhecimento de causa e de boa-fé, sem nenhuma coação ou vício de qualquer natureza. Assim, assino o presente instrumento para que produza seus legais efeitos.
 

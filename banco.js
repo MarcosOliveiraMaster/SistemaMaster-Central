@@ -612,7 +612,7 @@ function incrementarIdAula(idAulaAtual) {
 }
 
 // Função para adicionar nova aula a um cronograma
-async function addNovaAulaLista(codigoContratacao) {
+async function addNovaAulaLista(codigoContratacao, valorHoraContrato = 35) {
   try {
     console.log(`➕ Adicionando nova aula ao cronograma: ${codigoContratacao}`);
     
@@ -651,15 +651,32 @@ async function addNovaAulaLista(codigoContratacao) {
     const diaSemana = diasSemana[hoje.getDay()];
     const dataAtual = `${diaSemana} - ${dia}/${mes}/${ano}`;
     
+    // Determinar duração padrão a partir da última aula (se existir)
+    let duracaoPadrao = ultimaAula.duracao || '';
+
+    // Converter duração padrão para horas decimais
+    let horasDecimais = 0;
+    if (duracaoPadrao) {
+      const matchDur = duracaoPadrao.match(/(\d+)h(\d+)/);
+      if (matchDur) {
+        const horas = parseInt(matchDur[1], 10);
+        const minutos = parseInt(matchDur[2], 10);
+        horasDecimais = horas + (minutos / 60);
+      }
+    }
+
+    // Calcular ValorAula usando o valorHoraContrato recebido
+    const valorAulaCalculado = horasDecimais > 0 ? (horasDecimais * Number(valorHoraContrato)) : 0;
+
     // Criar novo documento
     const novaAula = {
       ConfirmacaoProfessorAula: false,
       ObservacoesAula: "",
       RelatorioAula: "",
       StatusAula: "Pendente",
-      ValorAula: 0,
+      ValorAula: valorAulaCalculado,
       data: dataAtual,
-      duracao: "",
+      duracao: duracaoPadrao,
       estudante: ultimaAula.estudante || "",
       horario: "",
       "id-Aula": novoIdAula,

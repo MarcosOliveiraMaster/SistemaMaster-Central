@@ -180,6 +180,24 @@ function gerarPDFContrato(contratoTexto, nomeCliente, cpfCliente, enderecoClient
     contratoComData = contratoComData.replace(/\[\s*series\s*\]/gi, seriesText);
   }
 
+  // Substituir [totalHoras] e [valorPacote] pelos valores exibidos no HTML
+  try {
+    const elTotalHoras = document.getElementById('display-total-horas-contrato');
+    const elValorPacote = document.getElementById('display-valor-pacote-contrato');
+    const totalHorasText = elTotalHoras ? elTotalHoras.textContent.trim() : null;
+    const valorPacoteText = elValorPacote ? elValorPacote.textContent.trim() : null;
+
+    if (totalHorasText) {
+      contratoComData = contratoComData.replace(/\[\s*totalHoras\s*\]/gi, totalHorasText);
+    }
+    if (valorPacoteText) {
+      contratoComData = contratoComData.replace(/\[\s*valorPacote\s*\]/gi, valorPacoteText);
+    }
+  } catch (err) {
+    // Não bloquear a geração do PDF caso o DOM não esteja disponível
+    console.warn('Não foi possível substituir totalHoras/valorPacote no texto do contrato:', err);
+  }
+
   const jsPDF = window.jspdf ? window.jspdf.jsPDF : window.jsPDF;
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
 
