@@ -233,14 +233,15 @@ function gerarPDFContrato(contratoTexto, nomeCliente, cpfCliente, enderecoClient
       const rows = table.querySelectorAll('tbody tr');
       rows.forEach(row => {
         const cells = row.querySelectorAll('td');
-        if (cells.length >= 6) {
+        // Agora extraímos colunas 1,2,3,4,5 e 7 (pulando a coluna 6 - Valor da Aula)
+        if (cells.length >= 7) {
           tableData.push({
             data: cells[0].innerText.trim(),
             hora: cells[1].innerText.trim(),
             duracao: cells[2].innerText.trim(),
             materia: cells[3].innerText.trim(),
             professor: cells[4].innerText.trim(),
-            estudante: cells[5].innerText.trim()
+            estudante: cells[6].innerText.trim()
           });
         }
       });
