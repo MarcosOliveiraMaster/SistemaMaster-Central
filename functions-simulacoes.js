@@ -333,8 +333,13 @@ const Simulacoes = (function() {
   // Função para criar um card de simulação
   function createSimulacaoCard(simulacao) {
     const valores = calcularValoresSimulacao(simulacao.aulas || []);
-    const totalHoras = valores.SomatorioDuracaoAulas;
-    const valorPacote = valores.ValorPacote;
+    // Preferir valores persistidos no documento (`SomatorioDuracaoAulas`, `ValorPacote`) quando existirem
+    const totalHoras = (simulacao && typeof simulacao.SomatorioDuracaoAulas === 'number')
+      ? Number(simulacao.SomatorioDuracaoAulas)
+      : valores.SomatorioDuracaoAulas;
+    const valorPacote = (simulacao && typeof simulacao.ValorPacote === 'number')
+      ? Number(simulacao.ValorPacote)
+      : valores.ValorPacote;
     
     return `
       <div class="card cursor-pointer hover:shadow-lg transition-shadow" data-simulacao-id="${simulacao.idSimulacao}">
@@ -348,7 +353,7 @@ const Simulacoes = (function() {
           </p>
           <div class="flex items-center justify-between">
             <span class="text-lg font-bold text-orange-500">
-              ${totalHoras}h - R$ ${valorPacote.toFixed(2)}
+              ${formatDuration(totalHoras)} - R$ ${formatBR(valorPacote)}
             </span>
             <span class="text-xs text-gray-400">
               ${simulacao.idSimulacao}
@@ -368,6 +373,22 @@ const Simulacoes = (function() {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
+  }
+
+  // Helper: formata número para moeda BR (ex: 1234.5 -> 1.234,50)
+  function formatBR(value) {
+    const n = Number(value) || 0;
+    return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  // Helper: formata horas decimais para 'Nh' ou 'NhMM' (ex: 1.5 -> '1h30')
+  function formatDuration(hoursNumber) {
+    const n = Number(hoursNumber) || 0;
+    const horas = Math.floor(n);
+    let minutos = Math.round((n - horas) * 60);
+    if (minutos === 60) { minutos = 0; return `${horas + 1}h`; }
+    if (minutos === 0) return `${horas}h`;
+    return `${horas}h${String(minutos).padStart(2, '0')}`;
   }
   
   // ==================== FILTROS ====================
@@ -485,8 +506,47 @@ const Simulacoes = (function() {
   // Função para abrir modal de simulação (nova ou editar)
   function abrirModalSimulacao(simulacao, isNova = false) {
     editingSimulacao = simulacao;
-    
+
+    // Importar valores persistidos (se houver) para garantir que a UI mostre o que foi salvo no DB
+    // Observação: no banco a propriedade persistida é `lucroMaster` (campo salvo em `salvarSimulacao`).
+    if (simulacao && (simulacao.lucroMaster || simulacao.valorLucroMaster) && (simulacao.lucroMaster || simulacao.valorLucroMaster) > 0) {
+      editingSimulacao.valorLucroMaster = simulacao.lucroMaster || simulacao.valorLucroMaster;
+    }
+    if (simulacao && simulacao.valorHoraProfessor && simulacao.valorHoraProfessor > 0) {
+      editingSimulacao.valorHoraProfessor = simulacao.valorHoraProfessor;
+    }
+    if (simulacao && simulacao.valorPacoteAplicado && simulacao.valorPacoteAplicado > 0) {
+      editingSimulacao.valorPacoteAplicado = simulacao.valorPacoteAplicado;
+    }
+
     const valores = calcularValoresSimulacao(simulacao.aulas || []);
+
+    // Preparar valores de exibição iniciais priorizando os valores salvos no DB
+    const horas = valores.SomatorioDuracaoAulas || 0;
+    const persistedLucro = (simulacao && (typeof simulacao.lucroMaster === 'number')) ? simulacao.lucroMaster :
+                          (simulacao && (typeof simulacao.valorLucroMaster === 'number') ? simulacao.valorLucroMaster : null);
+
+    const lucroInitial = (editingSimulacao && editingSimulacao.valorLucroMaster && editingSimulacao.valorLucroMaster > 0)
+      ? editingSimulacao.valorLucroMaster
+      : (persistedLucro !== null ? persistedLucro : valores.lucroMaster);
+
+    const valorHoraInitial = (editingSimulacao && editingSimulacao.valorHoraProfessor && editingSimulacao.valorHoraProfessor > 0)
+      ? Number(editingSimulacao.valorHoraProfessor)
+      : (simulacao && simulacao.valorHoraProfessor && simulacao.valorHoraProfessor > 0 ? Number(simulacao.valorHoraProfessor) : 35);
+
+    const valorEquipeInitial = (editingSimulacao && editingSimulacao.valorHoraProfessor && editingSimulacao.valorHoraProfessor > 0)
+      ? (Number(editingSimulacao.valorHoraProfessor) * horas)
+      : (valores.ValorEquipe || 0);
+
+    const valorPacoteInitial = (editingSimulacao && editingSimulacao.valorPacoteAplicado && editingSimulacao.valorPacoteAplicado > 0)
+      ? Number(editingSimulacao.valorPacoteAplicado)
+      : ( (editingSimulacao && editingSimulacao.valorLucroMaster && editingSimulacao.valorLucroMaster > 0)
+          ? (valorEquipeInitial + Number(editingSimulacao.valorLucroMaster))
+          : ( (simulacao && simulacao.valorPacoteAplicado && simulacao.valorPacoteAplicado > 0)
+              ? Number(simulacao.valorPacoteAplicado)
+              : (valores.ValorPacote || 0)
+            )
+        );
     
     const modalHtml = `
       <div class="modal-overlay" id="modal-simulacao">
@@ -668,25 +728,25 @@ const Simulacoes = (function() {
                 <div>
                   <div class="text-xs font-medium text-gray-500 mb-1">Valor Hora/Aula</div>
                   <div class="text-lg font-bold text-gray-700" id="display-valor-hora-aula">
-                    ${ (simulacao.valorHoraProfessor && simulacao.valorHoraProfessor > 0) ? `R$ ${Number(simulacao.valorHoraProfessor).toFixed(2)}` : 'R$ 35,00' }
-                  </div>
+                      R$ ${Number(valorHoraInitial || 0).toFixed(2)}
+                    </div>
                 </div>
                 <div>
                   <div class="text-xs font-medium text-gray-500 mb-1">Valor do Pacote</div>
                   <div class="text-lg font-bold text-orange-600" id="display-valor-pacote">
-                    R$ ${valores.ValorPacote.toFixed(2)}
+                      R$ ${Number(valorPacoteInitial || 0).toFixed(2)}
                   </div>
                 </div>
                 <div>
                   <div class="text-xs font-medium text-gray-500 mb-1">Valor da Equipe</div>
                   <div class="text-lg font-bold text-gray-600" id="display-valor-equipe">
-                    R$ ${valores.ValorEquipe.toFixed(2)}
+                      R$ ${Number(valorEquipeInitial || 0).toFixed(2)}
                   </div>
                 </div>
                 <div>
                   <div class="text-xs font-medium text-gray-500 mb-1">Lucro Master</div>
                   <div class="text-lg font-bold text-green-600" id="display-lucro-master">
-                    R$ ${valores.lucroMaster.toFixed(2)}
+                      R$ ${Number(lucroInitial || 0).toFixed(2)}
                   </div>
                 </div>
               </div>
@@ -764,6 +824,9 @@ const Simulacoes = (function() {
     document.body.appendChild(modalContainer);
     
     const modal = document.getElementById('modal-simulacao');
+
+    // Atualizar displays iniciais usando os valores importados do DB (se existirem)
+    try { recalcularValores(); } catch (e) { /* silencioso se falhar */ }
     
     // Configurar eventos do modal
     setupModalEvents(modal, isNova);
@@ -818,10 +881,15 @@ const Simulacoes = (function() {
 
         // Se houver um pacote aplicado manualmente, respeitar; caso contrário usar o resultado
         // da tabela progressiva em `calcularValoresSimulacao` (mecanismo principal).
+        // Se houver override de `valorLucroMaster` ou `valorHoraProfessor`, priorizar cálculo consistente
         let valorPacote = 0;
         const baseValores = calcularValoresSimulacao(simulacao.aulas || []);
         if (editingSimulacao && editingSimulacao.valorPacoteAplicado && editingSimulacao.valorPacoteAplicado > 0) {
           valorPacote = editingSimulacao.valorPacoteAplicado;
+        } else if (editingSimulacao && editingSimulacao.valorLucroMaster && editingSimulacao.valorLucroMaster > 0) {
+          valorPacote = valorEquipe + editingSimulacao.valorLucroMaster;
+        } else if (editingSimulacao && editingSimulacao.valorHoraProfessor && editingSimulacao.valorHoraProfessor > 0) {
+          valorPacote = valorEquipe + (LUCRO_PER_HOUR * horas);
         } else {
           valorPacote = (baseValores && typeof baseValores.ValorPacote === 'number') ? baseValores.ValorPacote : 0;
         }
@@ -2725,6 +2793,10 @@ const Simulacoes = (function() {
       valorPacoteCalc = editingSimulacao.valorPacoteAplicado;
     } else if (editingSimulacao && editingSimulacao.valorLucroMaster && editingSimulacao.valorLucroMaster > 0) {
       valorPacoteCalc = valorEquipe + editingSimulacao.valorLucroMaster;
+    // Se existe override de valor hora do professor, mas não há pacote aplicado nem lucro fixo,
+    // calcular pacote usando a taxa do professor + lucro padrão por hora para evitar lucro negativo.
+    } else if (editingSimulacao && editingSimulacao.valorHoraProfessor && editingSimulacao.valorHoraProfessor > 0) {
+      valorPacoteCalc = valorEquipe + (LUCRO_PER_HOUR * horas);
     } else {
       valorPacoteCalc = (baseValores && typeof baseValores.ValorPacote === 'number') ? baseValores.ValorPacote : 0;
     }
