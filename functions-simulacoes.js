@@ -151,6 +151,10 @@ const Simulacoes = (function() {
               <i class="fas fa-times mr-2"></i>
               Limpar Filtros
             </button>
+            <button id="btn-refresh-simulacoes" class="btn-secondary btn-compact">
+              <i class="fas fa-sync-alt mr-2"></i>
+              Atualizar Dados
+            </button>
           </div>
         </div>
         
@@ -467,6 +471,14 @@ const Simulacoes = (function() {
         limparFiltros();
       });
     }
+    
+      // Botão Atualizar Dados (Simulações)
+      const btnRefreshSimulacoes = document.getElementById('btn-refresh-simulacoes');
+      if (btnRefreshSimulacoes) {
+        btnRefreshSimulacoes.addEventListener('click', () => {
+          refreshSimulacoesData();
+        });
+      }
   }
   
   // Função para limpar filtros
@@ -478,6 +490,36 @@ const Simulacoes = (function() {
     
     currentFilters = {};
     renderSimulacoesCards(simulacoesData);
+  }
+
+  // Atualizar dados das Simulações (força refresh de cache e recarrega dados)
+  async function refreshSimulacoesData() {
+    const refreshBtn = document.getElementById('btn-refresh-simulacoes');
+    if (!refreshBtn) return;
+    const originalHTML = refreshBtn.innerHTML;
+    refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1 text-xs"></i> Atualizando...';
+    refreshBtn.disabled = true;
+
+    try {
+      if (typeof BANCO !== 'undefined' && BANCO.forceCacheRefresh) BANCO.forceCacheRefresh();
+
+      await Promise.all([
+        carregarSimulacoes(),
+        carregarClientes(),
+        carregarProfessores()
+      ]);
+
+      renderSimulacoesCards(simulacoesData);
+      popularFiltroProfessores();
+
+      showToast('✅ Dados atualizados com sucesso', 'success', 2000);
+    } catch (error) {
+      console.error('❌ Erro ao atualizar simulações:', error);
+      showToast('❌ Erro ao atualizar simulações', 'error');
+    } finally {
+      refreshBtn.innerHTML = originalHTML;
+      refreshBtn.disabled = false;
+    }
   }
   
   // ==================== MODAL ====================
