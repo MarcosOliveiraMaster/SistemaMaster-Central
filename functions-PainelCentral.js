@@ -187,6 +187,22 @@ function atualizarDataSelecionada(date) {
   loadAulasPainel(formatarDataInput(date));
 }
 
+// ===== FUNÇÃO PARA OBTER CLASSE DE STATUS =====
+function getStatusBadgeClass(status) {
+  if (!status) return 'status-pendente';
+  
+  const statusLower = status.toLowerCase();
+  
+  // Status específicos de aulas com cores definidas
+  if (statusLower === 'pendente') return 'status-pendente';
+  if (statusLower === 'reagendada') return 'status-reagendada';
+  if (statusLower === 'concluída') return 'status-concluida';
+  if (statusLower === 'reposição') return 'status-reposicao';
+  if (statusLower === 'cancelada') return 'status-cancelada';
+  
+  return 'status-pendente';
+}
+
 // ===== FUNÇÕES DE CARREGAMENTO DE AULAS =====
 
 async function loadAulasPainel(dataFiltro) {
@@ -262,7 +278,11 @@ async function loadAulasPainel(dataFiltro) {
           <td class="px-4 py-3 text-sm text-gray-600">${aula.duracao || '--'}</td>
           <td class="px-4 py-3 text-sm text-center">${statusIcon}</td>
           <td class="px-4 py-3 text-sm">
-            <span class="px-2 py-1 rounded text-xs font-medium ${statusClass}">
+            <span 
+              class="px-2 py-1 rounded text-xs font-medium status-badge-clickable ${statusClass}"
+              onclick="openStatusModal('${aula.id}', '${aula.StatusAula || 'Pendente'}')"
+              title="Clique para alterar"
+            >
               ${aula.StatusAula || 'Pendente'}
             </span>
           </td>
@@ -970,6 +990,93 @@ function renderGrafico(labels, data) {
     }
   });
 }
+
+// ===== FUNÇÃO PARA ABRIR MODAL DE ALTERAÇÃO DE STATUS =====
+
+window.openStatusModal = function (id, currentStatus) {
+  const statusOptions = ['Pendente', 'Reagendada', 'Concluída', 'Reposição', 'Cancelada'];
+  
+  const modalHTML = `
+    <div class="p-4">
+      <p class="text-sm text-gray-600 mb-4">
+        <i class="fas fa-info-circle text-orange-500 mr-2"></i>
+        Selecione o novo status da aula:
+      </p>
+      
+      <div class="space-y-2">
+        ${statusOptions.map(status => {
+          const isSelected = status === currentStatus;
+          const badgeClass = getStatusBadgeClass(status);
+          return `
+            <button 
+              class="w-full px-4 py-3 rounded-lg text-left font-medium transition-all status-option-btn ${badgeClass} ${isSelected ? 'ring-2 ring-offset-2 ring-orange-500' : 'hover:shadow-md'}"
+              onclick="updateAulaStatus('${id}', '${status}')"
+              title="${status}"
+            >
+              <i class="fas fa-check-circle mr-2"></i>
+              ${status}
+              ${isSelected ? '<i class="fas fa-check float-right text-lg"></i>' : ''}
+            </button>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+  
+  const { modal, closeModal } = createModal(
+    'Alterar Status da Aula',
+    modalHTML,
+    [
+      {
+        text: 'Cancelar',
+        classes: 'btn-secondary btn-compact',
+        attributes: 'onclick="this.closest(\'.modal-overlay\').remove()"'
+      }
+    ]
+  );
+};
+
+// ===== FUNÇÃO PARA ATUALIZAR STATUS NO FIREBASE =====
+
+window.updateAulaStatus = async function (id, newStatus) {
+  try {
+    console.log(`📝 Atualizando status da aula ${id} para: ${newStatus}`);
+    
+    // Atualizar no Firebase
+    await firebase.firestore()
+      .collection('BancoDeAulas-Lista')
+      .doc(id)
+      .update({
+        StatusAula: newStatus,
+        ultimaAtualizacao: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    
+    console.log(`✅ Status atualizado com sucesso!`);
+    
+    // Mostrar toast de sucesso
+    if (typeof showToast === 'function') {
+      showToast(`Status alterado para ${newStatus}! 🎯`, 'success');
+    }
+    
+    // Fechar modal
+    const modal = document.querySelector('.modal-overlay');
+    if (modal) modal.remove();
+    
+    // Recarregar tabela com a mesma data selecionada
+    setTimeout(() => {
+      loadAulasPainel(formatarDataInput(dataSelecionada));
+    }, 300);
+    
+  } catch (error) {
+    console.error('❌ Erro ao atualizar status:', error);
+    
+    if (typeof showToast === 'function') {
+      showToast('Erro ao atualizar status. Tente novamente.', 'error');
+    } else {
+      alert('Erro ao atualizar status. Tente novamente.');
+    }
+  }
+};
 
 // ===== NOVAS FUNÇÕES DE RELATÓRIO (3 SEÇÕES) =====
 

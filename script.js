@@ -5,7 +5,6 @@ const CONFIG = {
   sections: [
     'painel-central',
     'banco-aulas',
-    'aulas-dia',
     'mensagens',
     'simulacoes',
     'fluxo-processos',
@@ -145,11 +144,6 @@ function loadSectionContent(sectionId) {
         loadBancoDeAulas();
       } else {
         console.error('Função loadBancoDeAulas não encontrada');
-      }
-      break;
-    case 'aulas-dia':
-      if (typeof loadAulasDoDia === 'function') {
-        loadAulasDoDia();
       }
       break;
     case 'mensagens':

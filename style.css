@@ -273,6 +273,35 @@
   transform: translateY(0);
 }
 
+/* Status clicável na tabela */
+.status-badge-clickable {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.status-badge-clickable:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.status-badge-clickable::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  background-color: #f28705;
+  border-radius: 50%;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.status-badge-clickable:hover::after {
+  opacity: 1;
+}
+
 /* Botão de data - clicável */
 .btn-data-aula {
   border: none;
