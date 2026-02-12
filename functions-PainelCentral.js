@@ -1,0 +1,1214 @@
+﻿console.log('functions-PainelCentral.js carregado');
+
+// ===== VARIÁVEL GLOBAL PARA ARMAZENAR DADOS DA AULA =====
+let currentAulaInfo = {
+  id: null,
+  nomeCliente: '',
+  professor: '',
+  data: ''
+};
+
+// Função para carregar o Painel Central
+function loadPainelCentral() {
+  console.log('loadPainelCentral chamado');
+
+  const section = document.getElementById('painel-central');
+  if (!section) {
+    console.error('Section painel-central não encontrada');
+    return;
+  }
+
+  // Construir HTML do Painel Central
+  section.innerHTML = `
+    <!-- Filtros -->
+    <div id="filtros" class="bg-white rounded-lg border border-gray-300 p-4 mb-4 flex flex-col md:flex-row justify-start items-start md:items-center gap-4 md:gap-8">
+      <div id="selecao-data-aula">
+        <label class="block text-sm font-semibold text-gray-700 mb-2">Analisar aulas de:</label>
+        
+        <div class="flex items-center gap-2">
+          <button id="btn-ontem" class="btn-data px-4 py-2 text-sm rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors">
+            Ontem
+          </button>
+          <button id="btn-hoje" class="btn-data active px-4 py-2 text-sm rounded-lg border border-orange-500 bg-orange-500 text-white hover:bg-orange-600 hover:text-white transition-colors">
+            Hoje
+          </button>
+          <button id="btn-amanha" class="btn-data px-4 py-2 text-sm rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors">
+            Amanhã
+          </button>
+        
+          <input 
+            type="text" 
+            id="input-data-aula" 
+            readonly
+            class="px-4 py-2 text-sm border border-gray-300 rounded-lg cursor-pointer hover:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-300 transition-all"
+            placeholder="Selecione uma data"
+          />
+        </div>
+      </div>
+
+
+      <!-- Análise Gráfica -->
+      <div id="analise-grafica">
+        <label class="block text-sm font-semibold text-gray-700 mb-2">Análise Gráfica</label>
+        <div class="flex bg-gray-100 rounded-lg p-1">
+            <button onclick="mudarPeriodoGrafico('Mensal')" id="btn-mensal" class="px-4 py-1.5 text-sm font-medium rounded-md transition-all bg-white shadow text-orange-600">Mensal</button>
+            <button onclick="mudarPeriodoGrafico('Semanal')" id="btn-semanal" class="px-4 py-1.5 text-sm font-medium rounded-md transition-all text-gray-500 hover:text-gray-700">Semanal</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gráfico de Aulas -->
+    <div id="graficoAulas" class="bg-white rounded-lg border border-gray-300 p-4 mb-4 relative" style="height: 246px;">
+      <canvas id="graficoAulasCanvas"></canvas>
+    </div>
+
+    <!-- Consulta de Aulas -->
+    <div class="bg-white rounded-lg border border-gray-300 p-4">
+      <h2 class="text-lg font-lexend font-bold text-gray-800 mb-4">Consulta de Aulas</h2>
+      
+      <div class="overflow-x-auto">
+        <table id="tabelaConsultaAulas" class="w-full">
+          <thead>
+            <tr class="bg-gray-50 border-b border-gray-200">
+              <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Cliente</th>
+              <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Estudante</th>
+              <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Professor</th>
+              <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Disciplina</th>
+              <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Horário</th>
+              <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Duração</th>
+              <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Aula concluída</th>
+              <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Status da Aula</th>
+              <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Relatório</th>
+              <th colspan="2" class="px-4 py-3 text-center text-sm font-semibold text-gray-700">Mensagem Lembrete</th>
+            </tr>
+          </thead>
+          <tbody id="tabelaConsultaAulasBody">
+            <!-- Dados serão carregados aqui -->
+            <tr>
+              <td colspan="11" class="px-4 py-8 text-center text-gray-500 text-sm">
+                Nenhuma aula encontrada
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Seções Inferiores -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+      <!-- Informações de pagamento -->
+      <div class="bg-white rounded-lg border border-gray-300 p-4 h-full">
+        <h2 class="text-lg font-lexend font-bold text-gray-800 mb-4">Informações de pagamento</h2>
+        <!-- Conteúdo será implementado posteriormente -->
+      </div>
+
+      <!-- Eventos do calendário Master -->
+      <div class="bg-white rounded-lg border border-gray-300 p-4 h-full">
+        <h2 class="text-lg font-lexend font-bold text-gray-800 mb-4">Eventos do calendário Master</h2>
+        <!-- Conteúdo será implementado posteriormente -->
+      </div>
+    </div>
+  `;
+
+  // Inicializar filtros de data
+  initFiltrosData();
+
+  // Inicializar Gráfico
+  initGrafico();
+}
+
+// ===== FUNÇÕES DE GERENCIAMENTO DE DATA =====
+
+// Data selecionada atual
+let dataSelecionada = new Date();
+
+// Formatar data no formato "ddd - dd/mm/yyyy"
+function formatarDataInput(date) {
+  const diasSemana = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+  const dia = diasSemana[date.getDay()];
+  const dd = String(date.getDate()).padStart(2, '0');
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const yyyy = date.getFullYear();
+
+  return `${dia} - ${dd}/${mm}/${yyyy}`;
+}
+
+// Inicializar filtros de data
+function initFiltrosData() {
+  const btnOntem = document.getElementById('btn-ontem');
+  const btnHoje = document.getElementById('btn-hoje');
+  const btnAmanha = document.getElementById('btn-amanha');
+  const inputData = document.getElementById('input-data-aula');
+
+  if (!btnOntem || !btnHoje || !btnAmanha || !inputData) {
+    console.error('Elementos de filtro de data não encontrados');
+    return;
+  }
+
+  // Definir data inicial como hoje
+  atualizarDataSelecionada(new Date());
+
+  // Eventos dos botões
+  btnOntem.addEventListener('click', () => {
+    const ontem = new Date();
+    ontem.setDate(ontem.getDate() - 1);
+    atualizarDataSelecionada(ontem);
+    ativarBotao('btn-ontem');
+  });
+
+  btnHoje.addEventListener('click', () => {
+    atualizarDataSelecionada(new Date());
+    ativarBotao('btn-hoje');
+  });
+
+  btnAmanha.addEventListener('click', () => {
+    const amanha = new Date();
+    amanha.setDate(amanha.getDate() + 1);
+    atualizarDataSelecionada(amanha);
+    ativarBotao('btn-amanha');
+  });
+
+  // Evento do input - abrir calendário
+  inputData.addEventListener('click', () => {
+    abrirCalendario();
+  });
+}
+
+// Atualizar data selecionada
+function atualizarDataSelecionada(date) {
+  dataSelecionada = date;
+  const inputData = document.getElementById('input-data-aula');
+  if (inputData) {
+    inputData.value = formatarDataInput(date);
+  }
+
+  // Buscar e carregar aulas da data selecionada
+  console.log('📅 Data selecionada:', formatarDataInput(date));
+  loadAulasPainel(formatarDataInput(date));
+}
+
+// ===== FUNÇÕES DE CARREGAMENTO DE AULAS =====
+
+async function loadAulasPainel(dataFiltro) {
+  const tbody = document.getElementById('tabelaConsultaAulasBody');
+  if (!tbody) return;
+
+  // Mostrar loading
+  tbody.innerHTML = `
+    <tr>
+      <td colspan="11" class="px-4 py-8 text-center text-gray-500 text-sm">
+        <i class="fas fa-spinner fa-spin text-orange-500 text-2xl mb-2"></i>
+        <p>Carregando aulas...</p>
+      </td>
+    </tr>
+  `;
+
+  try {
+    console.log(`🔍 Buscando aulas para data: ${dataFiltro}`);
+
+    // Buscar todas as aulas da coleção BancoDeAulas-Lista
+    // Idealmente, filtraríamos no backend, mas como o formato de data é string "ddd - dd/mm/yy",
+    // e o Firebase pode ter limitações com queries de string parcial/exata dependendo do index,
+    // vamos buscar onde 'data' == dataFiltro se possível, ou buscar tudo e filtrar (menos performático).
+    // Tentaremos where('data', '==', dataFiltro) primeiro.
+
+    const querySnapshot = await db.collection("BancoDeAulas-Lista")
+      .where("data", "==", dataFiltro)
+      .get();
+
+    const aulas = [];
+    querySnapshot.forEach(doc => {
+      aulas.push({
+        id: doc.id,
+        ...doc.data()
+      });
+    });
+
+    console.log(`✅ ${aulas.length} aulas encontradas para ${dataFiltro}`);
+
+    if (aulas.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="11" class="px-4 py-8 text-center text-gray-500 text-sm">
+            Nenhuma aula encontrada para esta data.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    // Ordenar por horário (se existir)
+    aulas.sort((a, b) => {
+      const horaA = a.horario || '';
+      const horaB = b.horario || '';
+      return horaA.localeCompare(horaB);
+    });
+
+    // Renderizar tabela
+    tbody.innerHTML = aulas.map(aula => {
+      const statusIcon = aula.ConfirmacaoProfessorAula
+        ? '<i class="fas fa-check-circle text-green-500" title="Concluída"></i>'
+        : '<i class="fas fa-clock text-yellow-500" title="Pendente"></i>';
+
+      const statusClass = getStatusClassMain(aula.StatusAula);
+
+      return `
+        <tr class="hover:bg-gray-50 transition-colors border-b border-gray-100">
+          <td class="px-4 py-3 text-sm text-gray-800">${aula.nomeCliente || '--'}</td>
+          <td class="px-4 py-3 text-sm text-gray-600">${aula.estudante || '--'}</td>
+          <td class="px-4 py-3 text-sm text-gray-600">${aula.professor || '--'}</td>
+          <td class="px-4 py-3 text-sm text-gray-600">${aula.materia || '--'}</td>
+          <td class="px-4 py-3 text-sm text-gray-600 font-medium">${aula.horario || '--'}</td>
+          <td class="px-4 py-3 text-sm text-gray-600">${aula.duracao || '--'}</td>
+          <td class="px-4 py-3 text-sm text-center">${statusIcon}</td>
+          <td class="px-4 py-3 text-sm">
+            <span class="px-2 py-1 rounded text-xs font-medium ${statusClass}">
+              ${aula.StatusAula || 'Pendente'}
+            </span>
+          </td>
+          <td class="px-4 py-3 text-sm text-center">
+            <button 
+              onclick="verRelatorioAula('${aula.id}')"
+              class="text-orange-500 hover:text-orange-600 transition-colors p-1 rounded-full hover:bg-orange-50"
+              title="Ver/Editar Relatório"
+            >
+              <i class="fas fa-comment-alt text-lg"></i>
+            </button>
+          </td>
+          <td class="px-2 py-3 text-sm text-center">
+            <button 
+              onclick="enviarLembreteProfessor('${aula.id}', '${escapeHtml(aula.nomeCliente || '')}', '${escapeHtml(aula.professor || '')}', '${escapeHtml(aula.data || '')}', '${escapeHtml(aula.horario || '')}')" 
+              class="text-blue-500 hover:text-blue-600 transition-colors p-1 rounded-full hover:bg-blue-50" 
+              title="Copiar Lembrete Professor"
+            >
+              <i class="fas fa-chalkboard-teacher text-lg"></i>
+            </button>
+          </td>
+          <td class="px-2 py-3 text-sm text-center">
+            <button 
+              onclick="enviarLembreteCliente('${aula.id}', '${escapeHtml(aula.professor || '')}', '${escapeHtml(aula.data || '')}', '${escapeHtml(aula.horario || '')}', '${escapeHtml(aula.estudante || '')}', '${escapeHtml(aula.nomeCliente || '')}')" 
+              class="text-green-500 hover:text-green-600 transition-colors p-1 rounded-full hover:bg-green-50" 
+              title="Copiar Lembrete Cliente"
+            >
+              <i class="fas fa-user text-lg"></i>
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+  } catch (error) {
+    console.error('❌ Erro ao buscar aulas:', error);
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="9" class="px-4 py-8 text-center text-red-500 text-sm">
+          <i class="fas fa-exclamation-circle mb-2 text-xl"></i>
+          <p>Erro ao carregar aulas. Tente novamente.</p>
+        </td>
+      </tr>
+    `;
+  }
+}
+
+// Função auxiliar para escapar HTML em strings (segurança)
+function escapeHtml(text) {
+  if (!text) return '';
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+// Função auxiliar para classe de status
+function getStatusClassMain(status) {
+  switch (status) {
+    case 'Concluída': return 'bg-green-100 text-green-700';
+    case 'Cancelada': return 'bg-red-100 text-red-700';
+    case 'Agendada': return 'bg-blue-100 text-blue-700';
+    default: return 'bg-yellow-100 text-yellow-700';
+  }
+}
+
+// Função para ver/editar relatório (Modal)
+window.verRelatorioAula_OLD = async function (id) {
+  // Mostrar loading inicial
+  createModal('Detalhes do Relatório', `
+    <div class="p-6 text-center">
+      <i class="fas fa-spinner fa-spin text-orange-500 text-3xl mb-3"></i>
+      <p class="text-gray-600">Carregando relatório...</p>
+    </div>
+  `, []);
+
+  try {
+    const doc = await firebase.firestore().collection('BancoDeAulas-Lista').doc(id).get();
+
+    if (!doc.exists) {
+      // Atualizar modal com erro
+      const modalContent = document.querySelector('.modal-content div');
+      if (modalContent) {
+        modalContent.innerHTML = `
+                <div class="p-6 text-center text-red-500">
+                    <i class="fas fa-exclamation-triangle text-3xl mb-3"></i>
+                    <p>Aula não encontrada!</p>
+                </div>
+             `;
+      }
+      return;
+    }
+
+    const aula = doc.data();
+    const relatorioAtual = aula.RelatorioAula || '';
+
+    const modalHTML = `
+      <div class="p-6">
+        <div class="mb-4">
+          <h3 class="text-lg font-bold text-gray-800 mb-1">Relatório da Aula</h3>
+          <p class="text-sm text-gray-500 mb-4">ID: ${id}</p>
+          
+          <label class="block text-sm font-medium text-gray-700 mb-2">Conteúdo do Relatório:</label>
+          <textarea 
+            id="textarea-relatorio-${id}" 
+            class="w-full h-40 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm resize-none"
+            placeholder="Digite o relatório da aula aqui..."
+          >${escapeHtml(relatorioAtual)}</textarea>
+        </div>
+      </div>
+    `;
+
+    // Recriar o modal com o conteúdo carregado e botões
+    // createModal remove o anterior se já existir? A função createModal geralmente adiciona ao body. 
+    // Se eu chamar createModal de novo, vai criar outro por cima. 
+    // O ideal seria atualizar o conteúdo. Mas como createModal é uma função helper (assumo externa ou definida em outro lugar), vou fechar o loading e abrir o novo.
+
+    // Fechar modal de loading (assumindo que createModal cria um overlay com classe modal-overlay)
+    const loadingModal = document.querySelector('.modal-overlay');
+    if (loadingModal) loadingModal.remove();
+
+    createModal('Editando Relatório', modalHTML, [
+      {
+        text: 'Cancelar',
+        classes: 'px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors',
+        attributes: 'onclick="this.closest(\'.modal-overlay\').remove()"'
+      },
+      {
+        text: 'Salvar Alterações',
+        classes: 'px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors',
+        attributes: `onclick="salvarRelatorio('${id}')"`
+      }
+    ]);
+
+  } catch (error) {
+    console.error('Erro ao buscar relatório:', error);
+    const loadingModal = document.querySelector('.modal-overlay');
+    if (loadingModal) loadingModal.remove();
+    alert('Erro ao carregar relatório: ' + error.message);
+  }
+};
+
+window.salvarRelatorio_OLD = async function (id) {
+  const textarea = document.getElementById(`textarea-relatorio-${id}`);
+  if (!textarea) return;
+
+  const novoTexto = textarea.value;
+  const btnSalvar = event.target; // Captura o botão clicado
+
+  // Feedback visual no botão
+  const textoOriginalBtn = btnSalvar.innerText;
+  btnSalvar.innerText = 'Salvando...';
+  btnSalvar.disabled = true;
+
+  try {
+    await firebase.firestore().collection('BancoDeAulas-Lista').doc(id).update({
+      RelatorioAula: novoTexto
+    });
+
+    // Sucesso
+    showToast('Relatório salvo com sucesso!', 'success');
+
+    // Fechar modal
+    const modal = btnSalvar.closest('.modal-overlay');
+    if (modal) modal.remove();
+
+    // Opcional: Recarregar tabela para atualizar ícone? (se tivesse indicador de "tem relatório")
+    // Mas o conteúdo visual da tabela não mostra o texto, então não precisa recarregar tudo.
+
+  } catch (error) {
+    console.error('Erro ao salvar:', error);
+    alert('Erro ao salvar relatório: ' + error.message);
+    btnSalvar.innerText = textoOriginalBtn;
+    btnSalvar.disabled = false;
+  }
+};
+
+// Funções de envio de lembrete
+window.enviarLembreteProfessor = async function (id, nomeCliente, nomeProfessor, dataAula, horarioAula) {
+  // 1. Saudação
+  const horaAtual = new Date().getHours();
+  let saudacao = 'Bom dia';
+  if (horaAtual >= 12 && horaAtual < 18) saudacao = 'Boa tarde';
+  if (horaAtual >= 18) saudacao = 'Boa noite';
+
+  // 2. Primeiro e segundo nome
+  const getDoisNomes = (nome) => {
+    if (!nome) return '';
+    const partes = nome.trim().split(/\s+/);
+    if (partes.length <= 2) return nome;
+    return `${partes[0]} ${partes[1]}`;
+  };
+
+  const nomeClienteFormatado = getDoisNomes(nomeCliente);
+  const nomeProfessorFormatado = nomeProfessor;
+
+  // 3. Data (Hoje/Amanhã/Data)
+  let dataTexto = dataAula; // Padrão
+
+  try {
+    // dataAula formato: "dom - 12/02/2026"
+    if (dataAula && dataAula.includes('-')) {
+      const partesData = dataAula.split('-')[1].trim().split('/');
+      const dia = parseInt(partesData[0]);
+      const mes = parseInt(partesData[1]) - 1;
+      const ano = parseInt(partesData[2]);
+
+      const dataObj = new Date(ano, mes, dia);
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      const amanha = new Date(hoje);
+      amanha.setDate(hoje.getDate() + 1);
+
+      // Comparar datas (ignorando hora)
+      if (dataObj.getTime() === hoje.getTime()) {
+        dataTexto = 'Hoje';
+      } else if (dataObj.getTime() === amanha.getTime()) {
+        dataTexto = 'Amanhã';
+      }
+    }
+  } catch (e) {
+    console.error('Erro ao converter data:', e);
+  }
+
+  // Montar mensagem
+  const mensagem = `${saudacao} ${nomeClienteFormatado}! Passando para lembrar nossa aula de ${dataTexto} às ${horarioAula} com o professor ${getDoisNomes(nomeProfessorFormatado)}`;
+
+  // Copiar para área de transferência
+  try {
+    await navigator.clipboard.writeText(mensagem);
+
+    // Feedback visual
+    if (typeof showToast === 'function') {
+      showToast(`Mensagem lembrete de Professor (${nomeProfessorFormatado}) copiada com sucesso!`, 'success');
+    } else {
+      alert(`Mensagem lembrete de Professor (${nomeProfessorFormatado}) copiada com sucesso!\n\n` + mensagem);
+    }
+  } catch (err) {
+    console.error('Erro ao copiar:', err);
+    // Fallback
+    const textArea = document.createElement("textarea");
+    textArea.value = mensagem;
+    document.body.appendChild(textArea);
+    textArea.select();
+    document.execCommand("copy");
+    document.body.removeChild(textArea);
+    if (typeof showToast === 'function') {
+      showToast(`Mensagem lembrete de Professor (${nomeProfessorFormatado}) copiada com sucesso!`, 'success');
+    } else {
+      alert(`Mensagem lembrete de Professor (${nomeProfessorFormatado}) copiada com sucesso!\n\n` + mensagem);
+    }
+  }
+};
+
+window.enviarLembreteCliente = async function (id, nomeProfessor, dataAula, horarioAula, nomeEstudante, nomeCliente) {
+  // 1. Saudação
+  const horaAtual = new Date().getHours();
+  let saudacao = 'Bom dia';
+  if (horaAtual >= 12 && horaAtual < 18) saudacao = 'Boa tarde';
+  if (horaAtual >= 18) saudacao = 'Boa noite';
+
+  // 2. Primeiro e segundo nome helper
+  const getDoisNomes = (nome) => {
+    if (!nome) return '';
+    const partes = nome.trim().split(/\s+/);
+    if (partes.length <= 2) return nome;
+    return `${partes[0]} ${partes[1]}`;
+  };
+
+  const nomeProfessorFormatado = getDoisNomes(nomeProfessor);
+  const nomeEstudanteFormatado = getDoisNomes(nomeEstudante);
+  const nomeClienteFormatado = getDoisNomes(nomeCliente);
+
+  // 3. Data (Hoje/Amanhã/Data)
+  let dataTexto = dataAula;
+
+  try {
+    if (dataAula && dataAula.includes('-')) {
+      const partesData = dataAula.split('-')[1].trim().split('/');
+      const dia = parseInt(partesData[0]);
+      const mes = parseInt(partesData[1]) - 1;
+      const ano = parseInt(partesData[2]);
+
+      const dataObj = new Date(ano, mes, dia);
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      const amanha = new Date(hoje);
+      amanha.setDate(hoje.getDate() + 1);
+
+      if (dataObj.getTime() === hoje.getTime()) {
+        dataTexto = 'Hoje';
+      } else if (dataObj.getTime() === amanha.getTime()) {
+        dataTexto = 'Amanhã';
+      }
+    }
+  } catch (e) {
+    console.error('Erro ao converter data:', e);
+  }
+
+  // Montar mensagem
+  // "bom dia professor (NomeProfessor)! Passando para lembrar nossa aula de Hoje/Amanhã/dd - dd/mm/yyyy às (horário) com o estudante: (nome estudante) da cliente: (nome Cliente)"
+  const mensagem = `${saudacao} professor ${nomeProfessorFormatado}! Passando para lembrar nossa aula de ${dataTexto} às ${horarioAula} com o estudante: ${nomeEstudanteFormatado} da cliente: ${nomeClienteFormatado}`;
+
+  // Copiar para área de transferência
+  try {
+    await navigator.clipboard.writeText(mensagem);
+
+    if (typeof showToast === 'function') {
+      showToast(`Mensagem lembrete de Cliente (${nomeClienteFormatado}) copiada com sucesso!`, 'success');
+    } else {
+      alert(`Mensagem lembrete de Cliente (${nomeClienteFormatado}) copiada com sucesso!\n\n` + mensagem);
+    }
+  } catch (err) {
+    console.error('Erro ao copiar:', err);
+    // Fallback
+    const textArea = document.createElement("textarea");
+    textArea.value = mensagem;
+    document.body.appendChild(textArea);
+    textArea.select();
+    document.execCommand("copy");
+    document.body.removeChild(textArea);
+    if (typeof showToast === 'function') {
+      showToast(`Mensagem lembrete de Cliente (${nomeClienteFormatado}) copiada com sucesso!`, 'success');
+    } else {
+      alert(`Mensagem lembrete de Cliente (${nomeClienteFormatado}) copiada com sucesso!\n\n` + mensagem);
+    }
+  }
+};
+
+// Ativar botão selecionado
+function ativarBotao(btnId) {
+  // Remover classe active de todos os botões
+  document.querySelectorAll('.btn-data').forEach(btn => {
+    btn.classList.remove('active', 'bg-orange-500', 'text-white', 'border-orange-500', 'hover:bg-orange-600', 'hover:text-white');
+    btn.classList.add('border-gray-300', 'hover:bg-gray-50');
+  });
+
+  // Adicionar classe active ao botão clicado
+  const btnAtivo = document.getElementById(btnId);
+  if (btnAtivo) {
+    btnAtivo.classList.add('active', 'bg-orange-500', 'text-white', 'border-orange-500', 'hover:bg-orange-600', 'hover:text-white');
+    btnAtivo.classList.remove('border-gray-300', 'hover:bg-gray-50');
+  }
+}
+
+// Abrir calendário modal
+function abrirCalendario() {
+  const hoje = new Date();
+  let mesAtual = dataSelecionada.getMonth();
+  let anoAtual = dataSelecionada.getFullYear();
+
+  const meses = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+  ];
+
+  // Criar HTML do calendário
+  const calendarioHTML = `
+    <div class="p-4">
+      <div class="flex items-center justify-between mb-4">
+        <button id="cal-prev-mes" class="px-3 py-1 hover:bg-gray-100 rounded">
+          <i class="fas fa-chevron-left"></i>
+        </button>
+        <div class="font-semibold text-gray-800">
+          <span id="cal-mes-ano">${meses[mesAtual]} ${anoAtual}</span>
+        </div>
+        <button id="cal-next-mes" class="px-3 py-1 hover:bg-gray-100 rounded">
+          <i class="fas fa-chevron-right"></i>
+        </button>
+      </div>
+      
+      <div id="calendario-grid" class="grid grid-cols-7 gap-1 text-center">
+        <!-- Cabeçalho dos dias da semana -->
+        <div class="text-xs font-semibold text-gray-600 py-2">Dom</div>
+        <div class="text-xs font-semibold text-gray-600 py-2">Seg</div>
+        <div class="text-xs font-semibold text-gray-600 py-2">Ter</div>
+        <div class="text-xs font-semibold text-gray-600 py-2">Qua</div>
+        <div class="text-xs font-semibold text-gray-600 py-2">Qui</div>
+        <div class="text-xs font-semibold text-gray-600 py-2">Sex</div>
+        <div class="text-xs font-semibold text-gray-600 py-2">Sáb</div>
+      </div>
+    </div>
+  `;
+
+  const { modal, closeModal } = createModal('Selecionar Data', calendarioHTML, [
+    {
+      text: 'Fechar',
+      classes: 'px-4 py-2 text-sm bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors',
+      attributes: 'onclick="this.closest(\'.modal-overlay\').remove()"'
+    }
+  ]);
+
+  // Função para renderizar dias do mês
+  function renderizarDias() {
+    const grid = document.getElementById('calendario-grid');
+    if (!grid) return;
+
+    // Remover dias existentes (manter cabeçalho)
+    const diasExistentes = grid.querySelectorAll('.dia-calendario');
+    diasExistentes.forEach(dia => dia.remove());
+
+    const primeiroDia = new Date(anoAtual, mesAtual, 1).getDay();
+    const ultimoDia = new Date(anoAtual, mesAtual + 1, 0).getDate();
+
+    // Adicionar espaços vazios antes do primeiro dia
+    for (let i = 0; i < primeiroDia; i++) {
+      const espaco = document.createElement('div');
+      espaco.className = 'dia-calendario';
+      grid.appendChild(espaco);
+    }
+
+    // Adicionar dias do mês
+    for (let dia = 1; dia <= ultimoDia; dia++) {
+      const diaElement = document.createElement('button');
+      diaElement.className = 'dia-calendario py-2 hover:bg-orange-100 rounded transition-colors text-sm';
+      diaElement.textContent = dia;
+
+      // Marcar dia selecionado
+      if (dia === dataSelecionada.getDate() &&
+        mesAtual === dataSelecionada.getMonth() &&
+        anoAtual === dataSelecionada.getFullYear()) {
+        diaElement.classList.add('bg-orange-500', 'text-white', 'font-semibold');
+      }
+
+      // Marcar dia de hoje
+      if (dia === hoje.getDate() &&
+        mesAtual === hoje.getMonth() &&
+        anoAtual === hoje.getFullYear()) {
+        diaElement.classList.add('ring-2', 'ring-orange-300');
+      }
+
+      diaElement.addEventListener('click', () => {
+        const novaData = new Date(anoAtual, mesAtual, dia);
+        atualizarDataSelecionada(novaData);
+
+        // Desmarcar todos os botões de data rápida
+        document.querySelectorAll('.btn-data').forEach(btn => {
+          btn.classList.remove('active', 'bg-orange-500', 'text-white', 'border-orange-500');
+          btn.classList.add('border-gray-300');
+        });
+
+        modal.remove();
+      });
+
+      grid.appendChild(diaElement);
+    }
+  }
+
+  // Função para atualizar mês/ano exibido
+  function atualizarMesAno() {
+    const mesAnoElement = document.getElementById('cal-mes-ano');
+    if (mesAnoElement) {
+      mesAnoElement.textContent = `${meses[mesAtual]} ${anoAtual}`;
+    }
+    renderizarDias();
+  }
+
+  // Event listeners para navegação
+  setTimeout(() => {
+    const btnPrev = document.getElementById('cal-prev-mes');
+    const btnNext = document.getElementById('cal-next-mes');
+
+    if (btnPrev) {
+      btnPrev.addEventListener('click', () => {
+        mesAtual--;
+        if (mesAtual < 0) {
+          mesAtual = 11;
+          anoAtual--;
+        }
+        atualizarMesAno();
+      });
+    }
+
+    if (btnNext) {
+      btnNext.addEventListener('click', () => {
+        mesAtual++;
+        if (mesAtual > 11) {
+          mesAtual = 0;
+          anoAtual++;
+        }
+        atualizarMesAno();
+      });
+    }
+
+    renderizarDias();
+  }, 100);
+}
+
+// ===== LÓGICA DO GRÁFICO DE AULAS =====
+
+let chartInstance = null;
+let periodoAtual = 'Semanal';
+
+function initGrafico() {
+  mudarPeriodoGrafico('Semanal');
+}
+
+window.mudarPeriodoGrafico = function (periodo) {
+  periodoAtual = periodo;
+
+  // Atualizar botões
+  const btnMensal = document.getElementById('btn-mensal');
+  const btnSemanal = document.getElementById('btn-semanal');
+
+  if (btnMensal && btnSemanal) {
+    if (periodo === 'Mensal') {
+      btnMensal.className = "px-4 py-1.5 text-sm font-medium rounded-md transition-all bg-white shadow text-orange-600";
+      btnSemanal.className = "px-4 py-1.5 text-sm font-medium rounded-md transition-all text-gray-500 hover:text-gray-700";
+    } else {
+      btnMensal.className = "px-4 py-1.5 text-sm font-medium rounded-md transition-all text-gray-500 hover:text-gray-700";
+      btnSemanal.className = "px-4 py-1.5 text-sm font-medium rounded-md transition-all bg-white shadow text-orange-600";
+    }
+  }
+
+  carregarDadosGrafico();
+};
+
+async function carregarDadosGrafico() {
+  const canvas = document.getElementById('graficoAulasCanvas');
+  if (!canvas) return;
+
+  // Feedback visual de loading (opcional, mas bom)
+  // Como o canvas é transparente, talvez só logar.
+
+  try {
+    // Busca todas as aulas da coleção BancoDeAulas-Lista
+    // Em produção, isso deveria ser filtrado no back-end se possível.
+    const snapshot = await firebase.firestore().collection('BancoDeAulas-Lista').get();
+    const aulas = [];
+    snapshot.forEach(doc => aulas.push(doc.data()));
+
+    processarDadosGrafico(aulas);
+
+  } catch (error) {
+    console.error('Erro ao carregar dados do gráfico:', error);
+  }
+}
+
+function processarDadosGrafico(aulas) {
+  const hoje = new Date();
+  const labels = [];
+  const dados = [];
+  const contagem = {}; // Data -> Quantidade
+
+  if (periodoAtual === 'Mensal') {
+    // Eixo X: Dias do mês atual
+    const ano = hoje.getFullYear();
+    const mes = hoje.getMonth(); // 0-11
+    const diasNoMes = new Date(ano, mes + 1, 0).getDate();
+
+    // Inicializar contagem
+    for (let i = 1; i <= diasNoMes; i++) {
+      contagem[i] = 0;
+      labels.push(i.toString());
+    }
+
+    // Processar aulas
+    aulas.forEach(aula => {
+      // Formato esperado: ddd - dd/mm/yyyy
+      if (aula.data && aula.data.includes('-')) {
+        const partes = aula.data.split('-')[1].trim().split('/');
+        if (partes.length === 3) {
+          const d = parseInt(partes[0]);
+          const m = parseInt(partes[1]) - 1; // 0-11
+          const y = parseInt(partes[2]);
+
+          if (m === mes && y === ano) {
+            if (contagem[d] !== undefined) contagem[d]++;
+          }
+        }
+      }
+    });
+
+    for (let i = 1; i <= diasNoMes; i++) {
+      dados.push(contagem[i]);
+    }
+
+  } else { // Semanal
+    // Eixo X: Domingo a Sábado da semana atual
+    const primeiroDiaSemana = new Date(hoje);
+    const dayOfWeek = hoje.getDay(); // 0 (Domingo) a 6 (Sábado)
+    primeiroDiaSemana.setDate(hoje.getDate() - dayOfWeek); // Vai para o Domingo anterior ou hoje
+    primeiroDiaSemana.setHours(0, 0, 0, 0);
+
+    const diasSemanaNomes = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+    // Inicializar contagem por nome do dia
+    diasSemanaNomes.forEach(d => contagem[d] = 0);
+    labels.push(...diasSemanaNomes);
+
+    // Definir intervalo da semana para filtro
+    const ultimoDiaSemana = new Date(primeiroDiaSemana);
+    ultimoDiaSemana.setDate(primeiroDiaSemana.getDate() + 6);
+    ultimoDiaSemana.setHours(23, 59, 59, 999);
+
+    aulas.forEach(aula => {
+      if (aula.data && aula.data.includes('-')) {
+        const partes = aula.data.split('-')[1].trim().split('/');
+        const dia = parseInt(partes[0]);
+        const mes = parseInt(partes[1]) - 1;
+        const ano = parseInt(partes[2]);
+        const dataAula = new Date(ano, mes, dia);
+
+        // Verificar se está na semana
+        if (dataAula >= primeiroDiaSemana && dataAula <= ultimoDiaSemana) {
+          const diaSemanaIdx = dataAula.getDay();
+          const diaNome = diasSemanaNomes[diaSemanaIdx];
+          contagem[diaNome]++;
+        }
+      }
+    });
+
+    diasSemanaNomes.forEach(d => dados.push(contagem[d]));
+  }
+
+  renderGrafico(labels, dados);
+}
+
+function renderGrafico(labels, data) {
+  const ctx = document.getElementById('graficoAulasCanvas');
+  if (!ctx) return;
+
+  const context = ctx.getContext('2d');
+
+  if (chartInstance) {
+    chartInstance.destroy();
+  }
+
+  // Registrar plugin datalabels se disponível
+  if (typeof ChartDataLabels !== 'undefined') {
+    Chart.register(ChartDataLabels);
+  }
+
+  chartInstance = new Chart(context, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Aulas',
+        data: data,
+        borderColor: '#F97316', // Orange-500
+        backgroundColor: 'transparent',
+        borderWidth: 3,
+        tension: 0.4, // Suave
+        pointBackgroundColor: '#F97316',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        fill: false
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      layout: {
+        padding: {
+          top: 30,
+          left: 10,
+          right: 10,
+          bottom: 0
+        }
+      },
+      plugins: {
+        legend: {
+          display: false
+        },
+        datalabels: {
+          display: true,
+          align: 'top',
+          color: '#374151', // Gray-700
+          font: {
+            weight: 'bold'
+          },
+          offset: 4,
+          formatter: function (value) {
+            return value > 0 ? value : ''; // Só mostra se > 0 para limpar visual? Ou mostra tudo? Vou mostrar tudo ou deixar o padrão. O usuário pediu "rótulos de dados".
+          }
+        },
+        tooltip: {
+          enabled: true
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            stepSize: 1,
+            precision: 0
+          },
+          grid: {
+            borderDash: [2, 4],
+            color: '#E5E7EB'
+          },
+          display: true // Manter o eixo Y visível
+        },
+        x: {
+          grid: {
+            display: false
+          }
+        }
+      }
+    }
+  });
+}
+
+// ===== NOVAS FUNÇÕES DE RELATÓRIO (3 SEÇÕES) =====
+
+function limparTitulo(texto, titulo) {
+  if (!texto) return '';
+  const linhas = texto.trim().split('\n');
+  if (linhas.length > 0 && linhas[0].trim().toLowerCase().includes(titulo.toLowerCase())) {
+    linhas.shift();
+  }
+  return linhas.join('\n').trim();
+}
+
+window.verRelatorioAula = async function (id) {
+  createModal('Detalhes do Relatório', `
+    <div class="p-6 text-center">
+      <i class="fas fa-spinner fa-spin text-orange-500 text-3xl mb-3"></i>
+      <p class="text-gray-600">Carregando relatório...</p>
+    </div>
+  `, []);
+
+  try {
+    const doc = await firebase.firestore().collection('BancoDeAulas-Lista').doc(id).get();
+
+    if (!doc.exists) {
+      const modalContent = document.querySelector('.modal-content div');
+      if (modalContent) {
+        modalContent.innerHTML = `
+                <div class="p-6 text-center text-red-500">
+                    <i class="fas fa-exclamation-triangle text-3xl mb-3"></i>
+                    <p>Aula não encontrada!</p>
+                </div>
+             `;
+      }
+      return;
+    }
+
+    const aula = doc.data();
+    const relatorioTotal = aula.RelatorioAula || '';
+
+    let descricao = '';
+    let comportamento = '';
+    let recomendacoes = '';
+
+    const partes = relatorioTotal.split('---');
+
+    if (partes.length >= 1) descricao = limparTitulo(partes[0], 'Descrição da aula');
+    if (partes.length >= 2) comportamento = limparTitulo(partes[1], 'Comportamento do Estudante');
+    if (partes.length >= 3) recomendacoes = limparTitulo(partes[2], 'Recomendações');
+
+    if (partes.length === 1 && relatorioTotal.trim() !== '') {
+      const descTentativa = limparTitulo(relatorioTotal, 'Descrição da aula');
+      descricao = descTentativa !== '' ? descTentativa : relatorioTotal;
+      if (descTentativa === '' && relatorioTotal.includes('Descrição da aula')) descricao = '';
+    }
+
+    const modalHTML = `
+      <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+        <div>
+          <h3 class="text-lg font-bold text-gray-800 mb-1">Relatório da Aula</h3>
+          <p class="text-sm text-gray-500 mb-4">ID: ${id}</p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1">Descrição da aula</label>
+          <textarea id="relatorio-descricao-${id}" class="w-full h-24 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm resize-y" placeholder="Descreva o conteúdo da aula...">${escapeHtml(descricao)}</textarea>
+        </div>
+
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1">Comportamento do Estudante</label>
+          <textarea id="relatorio-comportamento-${id}" class="w-full h-24 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm resize-y" placeholder="Comente sobre o comportamento...">${escapeHtml(comportamento)}</textarea>
+        </div>
+
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1">Recomendações</label>
+          <textarea id="relatorio-recomendacoes-${id}" class="w-full h-24 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm resize-y" placeholder="Sugestões ou tarefas...">${escapeHtml(recomendacoes)}</textarea>
+        </div>
+      </div>
+    `;
+
+    const loadingModal = document.querySelector('.modal-overlay');
+    if (loadingModal) loadingModal.remove();
+
+    // Armazenar informações da aula para uso posterior
+    currentAulaInfo = {
+      id: id,
+      nomeCliente: aula.nomeCliente || '',
+      professor: aula.professor || '',
+      data: aula.data || ''
+    };
+
+    createModal('Editar relatório de Aula', modalHTML, [
+      {
+        text: 'Cancelar',
+        classes: 'px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors',
+        attributes: 'onclick="this.closest(\'.modal-overlay\').remove()"'
+      },
+      {
+        text: '<i class="fas fa-copy mr-1"></i> Copiar',
+        classes: 'px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors',
+        attributes: `onclick="copiarRelatorio('${id}')"`
+      },
+      {
+        text: 'Salvar Alterações',
+        classes: 'px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors',
+        attributes: `onclick="salvarRelatorio('${id}')"`
+      }
+    ]);
+
+  } catch (error) {
+    console.error('Erro ao buscar relatório:', error);
+    const loadingModal = document.querySelector('.modal-overlay');
+    if (loadingModal) loadingModal.remove();
+    alert('Erro ao carregar relatório: ' + error.message);
+  }
+};
+
+function montarTextoRelatorio(id) {
+  const desc = document.getElementById(`relatorio-descricao-${id}`)?.value || '';
+  const comp = document.getElementById(`relatorio-comportamento-${id}`)?.value || '';
+  const rec = document.getElementById(`relatorio-recomendacoes-${id}`)?.value || '';
+  return `Descrição da aula\n${desc}\n---\nComportamento do Estudante\n${comp}\n---\nRecomendações\n${rec}`;
+}
+
+window.salvarRelatorio = async function (id) {
+  const textoFinal = montarTextoRelatorio(id);
+  const btnSalvar = event.target;
+  const textoOriginalBtn = btnSalvar.innerHTML;
+  btnSalvar.innerText = 'Salvando...';
+  btnSalvar.disabled = true;
+
+  try {
+    await firebase.firestore().collection('BancoDeAulas-Lista').doc(id).update({
+      RelatorioAula: textoFinal
+    });
+
+    if (typeof showToast === 'function') {
+      showToast('Relatório salvo com sucesso!', 'success');
+    } else {
+      alert('Relatório salvo com sucesso!');
+    }
+
+    const modal = btnSalvar.closest('.modal-overlay');
+    if (modal) modal.remove();
+
+  } catch (error) {
+    console.error('Erro ao salvar:', error);
+    alert('Erro ao salvar: ' + error.message);
+    btnSalvar.innerHTML = textoOriginalBtn;
+    btnSalvar.disabled = false;
+  }
+};
+
+window.copiarRelatorio = async function (id) {
+  const textoFinal = montarTextoRelatorio(id);
+  
+  // Obter saudação
+  const horaAtual = new Date().getHours();
+  let saudacao = 'Bom dia';
+  if (horaAtual >= 12 && horaAtual < 18) saudacao = 'Boa tarde';
+  if (horaAtual >= 18) saudacao = 'Boa noite';
+
+  // Helper para obter apenas primeiro e segundo nomes
+  const getDoisNomes = (nome) => {
+    if (!nome) return '';
+    const partes = nome.trim().split(/\s+/);
+    if (partes.length <= 2) return nome;
+    return `${partes[0]} ${partes[1]}`;
+  };
+
+  // Determinar data formatada (hoje, amanhã ou data customizada)
+  let dataTexto = currentAulaInfo.data; // padrão
+  try {
+    if (currentAulaInfo.data && currentAulaInfo.data.includes('-')) {
+      const partesData = currentAulaInfo.data.split('-')[1].trim().split('/');
+      const dia = parseInt(partesData[0]);
+      const mes = parseInt(partesData[1]) - 1;
+      const ano = parseInt(partesData[2]);
+
+      const dataObj = new Date(ano, mes, dia);
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      const amanha = new Date(hoje);
+      amanha.setDate(hoje.getDate() + 1);
+
+      if (dataObj.getTime() === hoje.getTime()) {
+        dataTexto = 'hoje';
+      } else if (dataObj.getTime() === amanha.getTime()) {
+        dataTexto = 'amanhã';
+      }
+    }
+  } catch (e) {
+    console.error('Erro ao converter data:', e);
+  }
+
+  const nomeClienteFormatado = getDoisNomes(currentAulaInfo.nomeCliente);
+  const nomeProfessorFormatado = currentAulaInfo.professor;
+
+  // Montar mensagem no novo formato
+  const desc = document.getElementById(`relatorio-descricao-${id}`)?.value || '';
+  const comp = document.getElementById(`relatorio-comportamento-${id}`)?.value || '';
+  const rec = document.getElementById(`relatorio-recomendacoes-${id}`)?.value || '';
+
+  const mensagem = `${saudacao} ${nomeClienteFormatado}!
+segue o relatório da aula de ${dataTexto} com o professor: ${nomeProfessorFormatado}
+
+Descrição da aula:
+${desc}
+
+Comportamento do aluno:
+${comp}
+
+Recomendações:
+${rec}`;
+
+  try {
+    await navigator.clipboard.writeText(mensagem);
+    if (typeof showToast === 'function') {
+      showToast('Relatório de aula copiado!', 'success');
+    } else {
+      alert('Relatório de aula copiado!');
+    }
+    const btn = event.target;
+    const modal = btn.closest('.modal-overlay');
+    if (modal) modal.remove();
+  } catch (err) {
+    console.error('Erro ao copiar:', err);
+    const textArea = document.createElement("textarea");
+    textArea.value = mensagem;
+    document.body.appendChild(textArea);
+    textArea.select();
+    document.execCommand("copy");
+    document.body.removeChild(textArea);
+    if (typeof showToast === 'function') {
+      showToast('Relatório de aula copiado!', 'success');
+    } else {
+      alert('Relatório de aula copiado!');
+    }
+    const btn = event.target;
+    const modal = btn.closest('.modal-overlay');
+    if (modal) modal.remove();
+  }
+};

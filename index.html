@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Master Educação - Painel Administrativo</title>
+  <title>Master | Painel administrativo</title>
   <link rel="shortcut icon" type="image/x-icon" href="img/logo.png" />
   
   <!-- Tailwind CSS (versão estável) -->
@@ -71,7 +71,12 @@
       
       <!-- Menu Items -->
       <nav id="div-menuLateral" class="p-3 space-y-1 mt-4">
-        <button class="menu-item active" data-section="banco-aulas">
+        <button class="menu-item active" data-section="painel-central">
+          <i class="fas fa-home mr-3"></i>
+          <span>Painel Central</span>
+        </button>
+        
+        <button class="menu-item" data-section="banco-aulas">
           <i class="fas fa-book mr-3"></i>
           <span>Banco de Aulas</span>
         </button>
@@ -108,12 +113,12 @@
       </nav>
       
       <!-- Footer do Menu -->
-      <div class="absolute bottom-0 left-0 right-0 p-3 border-t border-orange-400">
+      <!-- <div class="absolute bottom-0 left-0 right-0 p-3 border-t border-orange-400">
         <div class="text-center text-xs opacity-80">
           <p class="font-lexend">Master Educação</p>
           <p class="font-comfortaa mt-1">Painel Administrativo</p>
         </div>
-      </div>
+      </div> -->
     </aside>
 
     <!-- Conteúdo Principal -->
@@ -140,7 +145,11 @@
       <!-- Área de Conteúdo -->
       <div id="content-area" class="p-4">
         <!-- Sections serão carregadas aqui -->
-        <section id="banco-aulas" class="section-content active">
+        <section id="painel-central" class="section-content active">
+          <!-- Conteúdo será carregado por functions-PainelCentral.js -->
+        </section>
+        
+        <section id="banco-aulas" class="section-content">
           <!-- Conteúdo será carregado por functions-banco-de-aulas.js -->
         </section>
         
@@ -198,10 +207,15 @@
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <!-- jsPDF para geração de PDF do contrato -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <!-- Chart.js para gráficos -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+  <!-- Chart.js Data Labels Plugin -->
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
   <!-- Funções do contrato -->
   <script src="functions-contrato.js"></script>
   <script src="banco.js"></script>
   <script src="script.js"></script>
+  <script src="functions-PainelCentral.js"></script>
   <script src="functions-banco-de-aulas.js"></script>
   <script src="functions-banco-de-aulas-Cards.js"></script>
   <script src="functions-aulas-do-dia.js"></script>

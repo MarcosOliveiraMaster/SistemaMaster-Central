@@ -3,6 +3,7 @@ const CONFIG = {
   cacheDuration: 5 * 60 * 1000, // 5 minutos
   animationDuration: 300,
   sections: [
+    'painel-central',
     'banco-aulas',
     'aulas-dia',
     'mensagens',
@@ -15,7 +16,7 @@ const CONFIG = {
 
 // Estado da aplicação
 const APP_STATE = {
-  currentSection: 'banco-aulas',
+  currentSection: 'painel-central',
   cache: {
     bancoDeAulas: null,
     cadastroClientes: null,
@@ -41,7 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function initializeApp() {
   setupMenuNavigation();
   setupGlobalListeners();
-  loadSection('banco-aulas');
+  loadSection('painel-central');
   
   // Verificar conexão com Firebase
   checkFirebaseConnection();
@@ -132,6 +133,13 @@ function loadSectionContent(sectionId) {
   
   // Chamar a função específica de cada seção
   switch(sectionId) {
+    case 'painel-central':
+      if (typeof loadPainelCentral === 'function') {
+        loadPainelCentral();
+      } else {
+        console.error('Função loadPainelCentral não encontrada');
+      }
+      break;
     case 'banco-aulas':
       if (typeof loadBancoDeAulas === 'function') {
         loadBancoDeAulas();
