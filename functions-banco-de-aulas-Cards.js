@@ -276,30 +276,52 @@ const BancoDeAulasCards = (function() {
             }).join('') : '<div class="flex-1 bg-gray-200"></div>'}
           </div>
         </div>
-        
-        <!-- Botão de ação: apenas excluir -->
-        <div class="mt-3 pt-3 border-t border-gray-100 flex justify-center">
-          <button class="btn-delete-aula text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-3 py-1.5 rounded transition-colors flex items-center">
-            <i class="fas fa-trash-alt mr-1.5"></i>
-            <span>Excluir</span>
-          </button>
-        </div>
       </div>
     `;
     
     // Adicionar evento de clique no card para abrir os detalhes
     card.addEventListener('click', (e) => {
-      // Impedir que o clique no botão delete dispare o evento do card
-      if (!e.target.closest('.btn-delete-aula')) {
-        viewAulaDetails(aula);
-      }
+      viewAulaDetails(aula);
     });
     
-    // Adicionar evento ao botão de exclusão
-    const btnDelete = card.querySelector('.btn-delete-aula');
-    btnDelete.addEventListener('click', (e) => {
-      e.stopPropagation();
-      confirmDeleteAula(aula.id, nomeCliente);
+    // Adicionar menu de contexto (clique direito)
+    card.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      
+      // Remover menu anterior se existir
+      const menuAnterior = document.querySelector('.context-menu-aula');
+      if (menuAnterior) {
+        menuAnterior.remove();
+      }
+      
+      // Criar menu de contexto
+      const contextMenu = document.createElement('div');
+      contextMenu.className = 'context-menu-aula fixed bg-white border border-gray-200 rounded-lg shadow-xl z-50';
+      contextMenu.style.left = e.clientX + 'px';
+      contextMenu.style.top = e.clientY + 'px';
+      
+      contextMenu.innerHTML = `
+        <div class="py-1">
+          <button class="context-menu-item flex items-center w-full px-4 py-2 hover:bg-red-50 text-red-500 hover:text-red-700 transition-colors text-sm">
+            <i class="fas fa-trash-alt mr-2"></i>
+            <span>Excluir</span>
+          </button>
+        </div>
+      `;
+      
+      document.body.appendChild(contextMenu);
+      
+      // Evento do item de excluir
+      const btnDelete = contextMenu.querySelector('.context-menu-item');
+      btnDelete.addEventListener('click', () => {
+        contextMenu.remove();
+        confirmDeleteAula(aula.id, nomeCliente);
+      });
+      
+      // Fechar menu ao clicar fora
+      document.addEventListener('click', () => {
+        contextMenu.remove();
+      }, { once: true });
     });
     
     // Adicionar hover effect
