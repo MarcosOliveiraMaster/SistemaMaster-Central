@@ -4858,6 +4858,7 @@ const BancoDeAulasCards = (function() {
     // Buscar dados do cliente na coleção cadastroClientes
     let enderecoAulas = aulaContratacao.endereco || '--';
     let complementoAulas = aulaContratacao.referencia || '--';
+    let estudantesComEscola = [];
     
     try {
       const cpfCliente = aulaContratacao.cpf;
@@ -4881,12 +4882,108 @@ const BancoDeAulasCards = (function() {
           if (clienteData.complementoAulas) {
             complementoAulas = clienteData.complementoAulas;
           }
+          
+          // Extrair estudantes únicos de aulasSelecionadas
+          const estudantesUnicos = new Set();
+          aulasSelecionadas.forEach(aula => {
+            if (aula.estudante && aula.estudante.trim()) {
+              // Dividir por vírgula e adicionar cada um ao Set (remove duplicatas)
+              const nomes = aula.estudante.split(',').map(n => n.trim()).filter(n => n);
+              nomes.forEach(nome => estudantesUnicos.add(nome));
+            }
+          });
+          
+          console.log('🔍 Estudantes únicos encontrados nas aulas:', Array.from(estudantesUnicos));
+          
+          // Buscar escolas para cada estudante no array "estudantes" do cadastroClientes
+          const arrayEstudantes = clienteData.estudantes || clienteData.Estudante || [];
+          
+          console.log('📋 Array estudantes do cadastroClientes:', arrayEstudantes);
+          
+          estudantesUnicos.forEach(nomeEstudante => {
+            // Procurar o estudante no array: comparar campo "nome" com case-insensitive
+            const estudanteData = arrayEstudantes.find(e => {
+              if (!e || !e.nome) return false;
+              const nomeNormalized = e.nome.trim().toLowerCase();
+              const procurandoNormalized = nomeEstudante.trim().toLowerCase();
+              return nomeNormalized === procurandoNormalized;
+            });
+            
+            if (estudanteData) {
+              const escola = estudanteData.escola && estudanteData.escola.trim() ? estudanteData.escola.trim() : 'Escola não informada';
+              const serie = estudanteData.serie && estudanteData.serie.trim() ? estudanteData.serie.trim() : 'Série não informada';
+              estudantesComEscola.push({
+                nome: nomeEstudante,
+                escola: escola,
+                serie: serie
+              });
+              console.log(`✅ Estudante localizado: "${nomeEstudante}" → Escola: "${escola}" → Série: "${serie}"`);
+            } else {
+              // Se não encontrar no cadastroClientes, ainda adiciona mas sem escola/série
+              estudantesComEscola.push({
+                nome: nomeEstudante,
+                escola: '--',
+                serie: '--'
+              });
+              console.log(`⚠️ Estudante não localizado no array: "${nomeEstudante}"`);
+            }
+          });
         } else {
           console.log('⚠️ Cliente não encontrado no cadastro');
+          
+          // Mesmo sem encontrar o cliente, extrair estudantes das aulas selecionadas
+          const estudantesUnicos = new Set();
+          aulasSelecionadas.forEach(aula => {
+            if (aula.estudante && aula.estudante.trim()) {
+              const nomes = aula.estudante.split(',').map(n => n.trim()).filter(n => n);
+              nomes.forEach(nome => estudantesUnicos.add(nome));
+            }
+          });
+          
+          estudantesUnicos.forEach(nomeEstudante => {
+            estudantesComEscola.push({
+              nome: nomeEstudante,
+              escola: '--',
+              serie: '--'
+            });
+          });
         }
+      } else {
+        // Sem CPF, apenas extrair estudantes das aulas
+        const estudantesUnicos = new Set();
+        aulasSelecionadas.forEach(aula => {
+          if (aula.estudante && aula.estudante.trim()) {
+            const nomes = aula.estudante.split(',').map(n => n.trim()).filter(n => n);
+            nomes.forEach(nome => estudantesUnicos.add(nome));
+          }
+        });
+        
+        estudantesUnicos.forEach(nomeEstudante => {
+          estudantesComEscola.push({
+            nome: nomeEstudante,
+            escola: '--',
+            serie: '--'
+          });
+        });
       }
     } catch (error) {
       console.error('❌ Erro ao buscar dados do cliente:', error);
+      
+      // Fallback: extrair estudantes das aulas mesmo com erro
+      const estudantesUnicos = new Set();
+      aulasSelecionadas.forEach(aula => {
+        if (aula.estudante && aula.estudante.trim()) {
+          const nomes = aula.estudante.split(',').map(n => n.trim()).filter(n => n);
+          nomes.forEach(nome => estudantesUnicos.add(nome));
+        }
+      });
+      
+      estudantesUnicos.forEach(nomeEstudante => {
+        estudantesComEscola.push({
+          nome: nomeEstudante,
+          escola: '--'
+        });
+      });
     }
     
     // Calcular total a receber (Valor Equipe)
@@ -4969,6 +5066,25 @@ const BancoDeAulasCards = (function() {
                     <i class="fas fa-map-signs text-orange-500 mr-2"></i>Referência
                   </p>
                   <p class="text-sm font-semibold text-gray-800">${complementoAulas}</p>
+                </div>
+              </div>
+              
+              <!-- Estudantes com Escolas -->
+              <div class="mt-4 pt-4 border-t border-orange-200">
+                <p class="text-xs font-medium text-gray-500 mb-2">
+                  <i class="fas fa-users text-orange-500 mr-2"></i>Estudantes
+                </p>
+                <div class="text-sm text-gray-800 space-y-1">
+                  ${estudantesComEscola.length > 0 ? 
+                    estudantesComEscola.map(est => `
+                      <div class="flex items-center">
+                        <span class="font-medium">${est.nome}</span>
+                        <span class="text-gray-500 ml-2">• Escola: ${est.escola}</span>
+                        <span class="text-gray-500 ml-2">• Série: ${est.serie}</span>
+                      </div>
+                    `).join('') 
+                    : '<div class="text-gray-400">Nenhum estudante registrado</div>'
+                  }
                 </div>
               </div>
             </div>
