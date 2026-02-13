@@ -194,16 +194,17 @@ const BancoDeAulasCards = (function() {
     const aulasADefinir = aula.aulas ? 
       aula.aulas.filter(a => !a.professor || a.professor === 'A definir' || a.professor.trim() === '').length : 0;
     
-    // Determinar classe CSS para status
-    const getStatusClass = (status) => {
-      if (status === 'Pagamento Efetuado' || status === 'Ativo') return 'success';
-      if (status === 'Pendente' || status === 'Inativo') return 'error';
-      if (status === 'Parcial' || status === 'Processando') return 'warning';
+    // Determinar classe CSS para status do pagamento
+    const getPaymentStatusClass = (status) => {
+      if (status && status.toLowerCase() === 'pagamento completo') return 'success';
       return 'info';
     };
     
-    // Cor para aulas A definir (verde se não tem nenhuma, vermelho se tem)
-    const professorCorClass = aulasADefinir === 0 ? 'text-green-500' : 'text-red-400';
+    // Determinar classe CSS para status do contrato
+    const getContractStatusClass = (status) => {
+      if (status && status.toLowerCase() === 'contrato assinado') return 'success';
+      return 'info';
+    };
     
     card.innerHTML = `
       <div class="aula-card-header">
@@ -219,10 +220,9 @@ const BancoDeAulasCards = (function() {
           <!-- Linha 1: Status do pagamento -->
           <div class="info-row">
             <span class="info-label">
-              <i class="fas fa-money-bill-wave"></i>
               Pagamento:
             </span>
-            <span class="status-badge ${getStatusClass(statusPagamento)} text-xs px-2 py-1">
+            <span class="status-badge ${getPaymentStatusClass(statusPagamento)} text-xs px-2 py-1">
               ${statusPagamento}
             </span>
           </div>
@@ -230,22 +230,38 @@ const BancoDeAulasCards = (function() {
           <!-- Linha 2: Status do contrato -->
           <div class="info-row">
             <span class="info-label">
-              <i class="fas fa-file-contract"></i>
               Contrato:
             </span>
-            <span class="status-badge ${getStatusClass(statusContrato)} text-xs px-2 py-1">
+            <span class="status-badge ${getContractStatusClass(statusContrato)} text-xs px-2 py-1">
               ${statusContrato}
             </span>
           </div>
           
-          <!-- Linha 3: Com professor (mostrando A definir na fração) -->
+          <!-- Linha 3: Total de Aulas e Equipe Confirmada -->
           <div class="info-row">
             <span class="info-label">
-              <i class="fas fa-chalkboard-teacher"></i>
-              Com professor:
+              Total de aulas:
             </span>
-            <span class="info-value font-medium ${professorCorClass}">
-              ${aulasADefinir}/${numAulas}
+            <span class="info-value font-medium">
+              a
+            </span>
+          </div>
+          
+          <div class="info-row">
+            <span class="info-label">
+              Equipe Confirmada:
+            </span>
+            <span class="info-value font-medium">
+              b
+            </span>
+          </div>
+          
+          <div class="info-row">
+            <span class="info-label">
+              Aulas concluídas:
+            </span>
+            <span class="info-value font-medium">
+              c
             </span>
           </div>
         </div>

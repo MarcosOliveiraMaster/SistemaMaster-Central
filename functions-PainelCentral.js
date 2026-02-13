@@ -8,6 +8,12 @@ let currentAulaInfo = {
   data: ''
 };
 
+// ===== VARIÁVEL GLOBAL PARA CONTROLE DE MÊS (PAGAMENTO) =====
+let mesPagamentoAtual = new Date().getMonth(); // 0-11
+
+// ===== VARIÁVEL GLOBAL PARA CONTROLE DE FILTRO (PAGAMENTO) =====
+let filtroSelecionado = 'todos'; // 'todos', 'pagamento', 'contrato'
+
 // Função para carregar o Painel Central
 function loadPainelCentral() {
   console.log('loadPainelCentral chamado');
@@ -99,7 +105,46 @@ function loadPainelCentral() {
       <!-- Informações de pagamento -->
       <div class="bg-white rounded-lg border border-gray-300 p-4 h-full">
         <h2 class="text-lg font-lexend font-bold text-gray-800 mb-4">Informações de pagamento</h2>
-        <!-- Conteúdo será implementado posteriormente -->
+        
+        <!-- Navegação de Mês e Filtros -->
+        <div class="flex items-center gap-4 mb-4">
+          <!-- Navegação de Mês -->
+          <div class="flex items-center justify-center gap-1">
+            <button id="btn-mes-anterior" class="px-2 py-1 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-800">
+              <i class="fas fa-chevron-left text-lg"></i>
+            </button>
+            <span id="mes-pagamento-atual" class="text-sm font-semibold text-gray-800 min-w-[80px] text-center">
+              Fevereiro
+            </span>
+            <button id="btn-mes-proximo" class="px-2 py-1 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-800">
+              <i class="fas fa-chevron-right text-lg"></i>
+            </button>
+          </div>
+          
+          <!-- Filtros de opções -->
+          <div class="flex flex-1 gap-0">
+            <button id="btn-filtro-todos" class="flex-1 py-1.5 text-xs font-medium rounded-l-lg transition-all bg-orange-500 text-white hover:bg-orange-600" data-filtro="todos">
+              Todos
+            </button>
+            <button id="btn-filtro-pagamento" class="flex-1 py-1.5 text-xs font-medium transition-all bg-gray-100 text-gray-700 hover:bg-gray-200" data-filtro="pagamento">
+              Pagamento Pendente
+            </button>
+            <button id="btn-filtro-contrato" class="flex-1 py-1.5 text-xs font-medium rounded-r-lg transition-all bg-gray-100 text-gray-700 hover:bg-gray-200" data-filtro="contrato">
+              Contrato Pendente
+            </button>
+          </div>
+        </div>
+        
+        <!-- Área de Cards de Pagamento -->
+        <div id="areaCardsPagamento" class="border-t border-gray-200 pt-4" style="height: 500px; overflow-y: auto;">
+          <div class="space-y-3">
+            <!-- Cards serão carregados aqui -->
+            <div class="text-center py-8 text-gray-500">
+              <i class="fas fa-spinner fa-spin text-orange-500 text-2xl mb-2"></i>
+              <p class="text-sm">Carregando dados...</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Eventos do calendário Master -->
@@ -115,6 +160,15 @@ function loadPainelCentral() {
 
   // Inicializar Gráfico
   initGrafico();
+
+  // Inicializar navegação de mês (Pagamento)
+  initNavegacaoMesPagamento();
+
+  // Inicializar filtros de pagamento
+  initFiltrosPagamento();
+
+  // Carregar cards de pagamento do mês atual
+  carregarCardsPagamento();
 }
 
 // ===== FUNÇÕES DE GERENCIAMENTO DE DATA =====
@@ -771,6 +825,370 @@ function abrirCalendario() {
 
     renderizarDias();
   }, 100);
+}
+
+// ===== FUNÇÕES DE NAVEGAÇÃO DE MÊS (PAGAMENTO) =====
+
+function initNavegacaoMesPagamento() {
+  const btnAnterior = document.getElementById('btn-mes-anterior');
+  const btnProximo = document.getElementById('btn-mes-proximo');
+
+  if (!btnAnterior || !btnProximo) {
+    console.error('Botões de navegação de mês não encontrados');
+    return;
+  }
+
+  btnAnterior.addEventListener('click', () => {
+    mudarMesPagamento(-1);
+  });
+
+  btnProximo.addEventListener('click', () => {
+    mudarMesPagamento(1);
+  });
+
+  // Atualizar exibição do mês atual
+  atualizarExibicaoMesPagamento();
+}
+
+function mudarMesPagamento(direcao) {
+  mesPagamentoAtual += direcao;
+
+  // Limitar entre 0 (Janeiro) e 11 (Dezembro)
+  if (mesPagamentoAtual < 0) {
+    mesPagamentoAtual = 11;
+  } else if (mesPagamentoAtual > 11) {
+    mesPagamentoAtual = 0;
+  }
+
+  atualizarExibicaoMesPagamento();
+  carregarCardsPagamento();
+  
+  console.log(`📅 Mês selecionado para pagamento: ${mesPagamentoAtual}`);
+}
+
+function atualizarExibicaoMesPagamento() {
+  const meses = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+  ];
+
+  const elementoMes = document.getElementById('mes-pagamento-atual');
+  if (elementoMes) {
+    elementoMes.textContent = meses[mesPagamentoAtual];
+  }
+}
+
+// ===== FUNÇÕES PARA CARREGAR CARDS DE PAGAMENTO =====
+
+async function carregarCardsPagamento() {
+  const areaCards = document.getElementById('areaCardsPagamento');
+  if (!areaCards) return;
+
+  // Mostrar loading
+  areaCards.innerHTML = `
+    <div class="flex justify-center items-center py-8">
+      <i class="fas fa-spinner fa-spin text-orange-500 text-2xl mr-2"></i>
+      <p class="text-gray-600 text-sm">Carregando dados...</p>
+    </div>
+  `;
+
+  try {
+    // Buscar todos os dados de BancoDeAulas
+    const snapshot = await firebase.firestore().collection('BancoDeAulas').get();
+    const contratos = [];
+    
+    snapshot.forEach(doc => {
+      contratos.push({
+        id: doc.id,
+        ...doc.data()
+      });
+    });
+
+    console.log(`📊 Total de contratos encontrados: ${contratos.length}`);
+
+    // Filtrar contratos por mês do timestamp
+    const contratosFiltrados = contratos.filter(contrato => {
+      if (!contrato.timestamp) return false;
+      
+      let dataContrato = null;
+      
+      // Handle diferentes tipos de timestamp (Timestamp do Firebase ou string)
+      if (contrato.timestamp.toDate) {
+        // Firebase Timestamp
+        dataContrato = contrato.timestamp.toDate();
+      } else if (typeof contrato.timestamp === 'string') {
+        // String de data (dd/mm/yyyy)
+        try {
+          const partes = contrato.timestamp.split('/'); 
+          if (partes.length === 3) {
+            const dia = parseInt(partes[0]);
+            const mes = parseInt(partes[1]) - 1; // 0-11
+            const ano = parseInt(partes[2]);
+            dataContrato = new Date(ano, mes, dia);
+          }
+        } catch (e) {
+          return false;
+        }
+      } else if (contrato.timestamp instanceof Date) {
+        dataContrato = contrato.timestamp;
+      }
+      
+      if (!dataContrato) return false;
+      
+      // Comparar mês e ano
+      return dataContrato.getMonth() === mesPagamentoAtual && 
+             dataContrato.getFullYear() === new Date().getFullYear();
+    });
+
+    console.log(`✅ Contratos filtrados para o mês: ${contratosFiltrados.length}`);
+
+    // Aplicar filtro adicional baseado na seleção do usuário
+    let contratosComFiltro = contratosFiltrados;
+
+    if (filtroSelecionado === 'pagamento') {
+      // Filtrar por "Aguardando 1º Pagamento" OU "Aguardando 2º Pagamento"
+      contratosComFiltro = contratosFiltrados.filter(contrato => {
+        const statusPg = (contrato.statusPagamento || '').toLowerCase();
+        return statusPg.includes('aguardando 1º pagamento') || statusPg.includes('aguardando 2º pagamento');
+      });
+      console.log(`✅ Contratos com "Pagamento Pendente": ${contratosComFiltro.length}`);
+    } else if (filtroSelecionado === 'contrato') {
+      // Filtrar por "Pendente de Assinatura"
+      contratosComFiltro = contratosFiltrados.filter(contrato => {
+        const statusCt = (contrato.statusContrato || '').toLowerCase();
+        return statusCt.includes('pendente de assinatura');
+      });
+      console.log(`✅ Contratos com "Contrato Pendente": ${contratosComFiltro.length}`);
+    }
+
+    if (contratosComFiltro.length === 0) {
+      areaCards.innerHTML = `
+        <div class="flex flex-col items-center justify-center py-8 text-gray-500">
+          <i class="fas fa-inbox text-3xl text-gray-400 mb-2"></i>
+          <p class="text-sm">Nenhum contrato encontrado para este filtro</p>
+        </div>
+      `;
+      return;
+    }
+
+    // Renderizar cards
+    renderCardsContratacao(contratosComFiltro);
+
+  } catch (error) {
+    console.error('❌ Erro ao carregar cards de pagamento:', error);
+    areaCards.innerHTML = `
+      <div class="flex flex-col items-center justify-center py-8 text-red-500">
+        <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+        <p class="text-sm">Erro ao carregar dados</p>
+      </div>
+    `;
+  }
+}
+
+function renderCardsContratacao(contratos) {
+  const areaCards = document.getElementById('areaCardsPagamento');
+  if (!areaCards) return;
+
+  const cardsHtml = contratos.map(contrato => {
+    const nomeCliente = contrato.nome || contrato.nomeCliente || 'Cliente não identificado';
+    const statusPagamento = contrato.statusPagamento || 'Não informado';
+    const statusContrato = contrato.statusContrato || 'Não informado';
+    const metodoPagamento = contrato.modoPagamento || 'Não informado';
+    const dataPrimeiraParcela = limparDadosInvalidos(formatarDataContrato(contrato.dataPrimeiraParcela));
+    const dataSegundaParcela = limparDadosInvalidos(formatarDataContrato(contrato.dataSegundaParcela));
+    const dataAssinaturaContrato = limparDadosInvalidos(formatarDataContrato(contrato.dataAssinaturaContrato));
+    const dataContratacao = formatarDataContrato(contrato.timestamp);
+
+    // Determinar cores dos badges
+    const colorPagamento = getCorStatusPagamento(statusPagamento);
+    const colorContrato = getCorStatusPagamento(statusContrato);
+
+    return `
+      <div class="bg-white border-l-4 border-orange-500 rounded-lg shadow-sm hover:shadow-md transition-all p-4 mb-[10px]">
+        <!-- Header com nome e data -->
+        <div class="flex justify-between items-start mb-3">
+          <div class="flex-1">
+            <p class="font-bold text-gray-900 text-sm leading-tight">
+              ${escapeHtml(nomeCliente)}
+            </p>
+          </div>
+          <div class="text-right">
+            <p class="text-xs text-gray-500 font-medium">
+              <i class="fas fa-calendar-alt text-gray-400 mr-1"></i>
+              ${dataContratacao}
+            </p>
+          </div>
+        </div>
+
+        <!-- Divider -->
+        <div class="h-px bg-gray-100 mb-3"></div>
+
+        <!-- Informações de Pagamento -->
+        <div class="mb-3">
+          <div class="flex justify-between items-center mb-2">
+            <p class="text-xs text-gray-600 font-semibold">
+              Informações de Pagamento
+            </p>
+            <span class="${colorPagamento} font-medium px-2.5 py-1.5 bg-opacity-10 rounded text-xs">
+              ${statusPagamento}
+            </span>
+          </div>
+          <div class="grid grid-cols-3 gap-2 text-xs">
+            <!-- Método Pagamento -->
+            <div>
+              <p class="text-gray-500 mb-1">Método Pagamento</p>
+              <p class="text-gray-700 px-2 py-1 bg-gray-50 rounded text-center">
+                ${metodoPagamento}
+              </p>
+            </div>
+            <!-- Data 1º Parcela -->
+            <div>
+              <p class="text-gray-500 mb-1">Data 1º Parcela</p>
+              <p class="text-gray-700 px-2 py-1 bg-gray-50 rounded text-center">
+                ${dataPrimeiraParcela}
+              </p>
+            </div>
+            <!-- Data 2º Parcela -->
+            <div>
+              <p class="text-gray-500 mb-1">Data 2º Parcela</p>
+              <p class="text-gray-700 px-2 py-1 bg-gray-50 rounded text-center">
+                ${dataSegundaParcela}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Status Contrato com detalhes -->
+        <div class="mb-0">
+          <div class="flex flex-wrap gap-2 items-center">
+            <p class="text-xs text-gray-600 font-semibold">
+              Contrato
+            </p>
+            <span class="text-xs ${colorContrato} font-medium px-2.5 py-1.5 bg-opacity-10 rounded">
+              ${statusContrato}
+            </span>
+            <span class="text-xs text-gray-500 px-2 py-1">
+              <i class="fas fa-calendar text-xs mr-1"></i>${dataAssinaturaContrato}
+            </span>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  areaCards.innerHTML = `${cardsHtml}`;
+}
+
+function limparDadosInvalidos(valor) {
+  if (!valor || valor === 'undefined' || valor.includes('NaN') || valor === '--') {
+    return '--';
+  }
+  return valor;
+}
+
+function formatarDataContrato(timestamp) {
+  const dias = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+  
+  let data = null;
+  
+  // Handle diferentes tipos de timestamp
+  if (timestamp instanceof Object && timestamp.toDate) {
+    // Firebase Timestamp
+    data = timestamp.toDate();
+  } else if (typeof timestamp === 'string') {
+    // String de data (dd/mm/yyyy)
+    try {
+      const partes = timestamp.split('/');
+      if (partes.length === 3) {
+        const dia = parseInt(partes[0]);
+        const mes = parseInt(partes[1]) - 1;
+        const ano = parseInt(partes[2]);
+        data = new Date(ano, mes, dia);
+      }
+    } catch (e) {
+      return 'Data inválida';
+    }
+  } else if (timestamp instanceof Date) {
+    data = timestamp;
+  }
+  
+  if (!data) return 'Data inválida';
+  
+  const dia = dias[data.getDay()];
+  const dd = String(data.getDate()).padStart(2, '0');
+  const mm = String(data.getMonth() + 1).padStart(2, '0');
+  const yyyy = data.getFullYear();
+  
+  return `${dia} - ${dd}/${mm}/${yyyy}`;
+}
+
+function getCorStatusPagamento(status) {
+  if (!status) return 'bg-gray-100 text-gray-700';
+  
+  const statusLower = status.toLowerCase();
+  
+  if (statusLower.includes('completo') || statusLower.includes('pago') || statusLower.includes('efetuado')) {
+    return 'bg-green-100 text-green-700';
+  }
+  if (statusLower.includes('pendente') || statusLower.includes('aguardando')) {
+    return 'bg-yellow-100 text-yellow-700';
+  }
+  if (statusLower.includes('cancelado') || statusLower.includes('vencido')) {
+    return 'bg-red-100 text-red-700';
+  }
+  if (statusLower.includes('parcial') || statusLower.includes('processando')) {
+    return 'bg-blue-100 text-blue-700';
+  }
+  
+  return 'bg-gray-100 text-gray-700';
+}
+
+// ===== FUNÇÕES DE FILTRO DE PAGAMENTO =====
+
+function initFiltrosPagamento() {
+  const btnTodos = document.getElementById('btn-filtro-todos');
+  const btnPagamento = document.getElementById('btn-filtro-pagamento');
+  const btnContrato = document.getElementById('btn-filtro-contrato');
+
+  if (!btnTodos || !btnPagamento || !btnContrato) {
+    console.error('Botões de filtro de pagamento não encontrados');
+    return;
+  }
+
+  btnTodos.addEventListener('click', () => mudarFiltro('todos'));
+  btnPagamento.addEventListener('click', () => mudarFiltro('pagamento'));
+  btnContrato.addEventListener('click', () => mudarFiltro('contrato'));
+}
+
+function mudarFiltro(novoFiltro) {
+  filtroSelecionado = novoFiltro;
+
+  // Atualizar estilos de todos os botões
+  const botoes = {
+    'todos': document.getElementById('btn-filtro-todos'),
+    'pagamento': document.getElementById('btn-filtro-pagamento'),
+    'contrato': document.getElementById('btn-filtro-contrato')
+  };
+
+  // Remover seleção de todos os botões
+  Object.values(botoes).forEach(btn => {
+    if (btn) {
+      btn.classList.remove('bg-orange-500', 'text-white', 'hover:bg-orange-600');
+      btn.classList.add('bg-gray-100', 'text-gray-700', 'hover:bg-gray-200');
+    }
+  });
+
+  // Adicionar seleção ao botão clicado
+  const botaoSelecionado = botoes[novoFiltro];
+  if (botaoSelecionado) {
+    botaoSelecionado.classList.remove('bg-gray-100', 'text-gray-700', 'hover:bg-gray-200');
+    botaoSelecionado.classList.add('bg-orange-500', 'text-white', 'hover:bg-orange-600');
+  }
+
+  console.log(`🔍 Filtro selecionado: ${novoFiltro}`);
+  
+  // Recarregar cards com o novo filtro aplicado
+  carregarCardsPagamento();
 }
 
 // ===== LÓGICA DO GRÁFICO DE AULAS =====

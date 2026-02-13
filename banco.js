@@ -258,6 +258,31 @@ async function addNovaAula(aulaData) {
   }
 }
 
+// Função para carregar TODAS as aulas de BancoDeAulas-Lista em batch
+async function fetchBancoDeAulasListaBatch() {
+  try {
+    console.log('📥 Carregando todas as aulas de BancoDeAulas-Lista em batch...');
+    
+    const querySnapshot = await db.collection("BancoDeAulas-Lista")
+      .get();
+    
+    const todasAulas = [];
+    querySnapshot.forEach(doc => {
+      todasAulas.push({
+        id: doc.id,
+        statusAula: doc.data().statusAula || 'Não informado',
+        ...doc.data()
+      });
+    });
+    
+    console.log(`✅ ${todasAulas.length} aulas carregadas em batch`);
+    return todasAulas;
+  } catch (error) {
+    console.error('❌ Erro ao carregar aulas em batch:', error);
+    return [];
+  }
+}
+
 // Função para buscar aulas individuais da coleção BancoDeAulas-Lista
 async function fetchBancoDeAulasLista(codigoContratacao) {
   try {
@@ -754,6 +779,7 @@ if (typeof window !== 'undefined') {
     deleteAula,
     addNovaAula,
     fetchBancoDeAulasLista,
+    fetchBancoDeAulasListaBatch,
     updateRelatorioAula,
     updateStatusAula,
     updateObservacoesAula,

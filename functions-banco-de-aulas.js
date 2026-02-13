@@ -4,6 +4,84 @@ console.log('✅ functions-banco-de-aulas.js carregado');
 let AULAS_DATA = [];
 let CLIENTES_DATA = [];
 let PROFESSORES_DATA = [];
+let AULAS_LISTA_AGRUPADAS = {}; // Cache com aulas agrupadas por prefixo
+
+// Função para carregar aulas de BancoDeAulas-Lista em batch
+async function carregarAulasBatch() {
+  console.log('📥 Carregando aulas de BancoDeAulas-Lista em batch...');
+  
+  try {
+    // Fetch todas as aulas da coleção
+    const aulasLista = await BANCO.fetchBancoDeAulasListaBatch();
+    
+    console.log(`📊 Total de aulas recebidas: ${aulasLista ? aulasLista.length : 0}`);
+    
+    if (!aulasLista || aulasLista.length === 0) {
+      console.log('⚠️ Nenhuma aula encontrada em BancoDeAulas-Lista');
+      return {};
+    }
+    
+    // Agrupar por prefixo (primeiros 4 dígitos)
+    const agrupadas = {};
+    
+    aulasLista.forEach((aula, index) => {
+      // Extrair prefixo dos primeiros 4 dígitos do ID do documento
+      const docId = aula.id || '';
+      const prefixo = docId.substring(0, 4);
+      const statusAula = aula.statusAula || 'Não informado';
+      const concluida = statusAula.toLowerCase() === 'aula concluída';
+      
+      if (!prefixo || prefixo.length < 4) {
+        console.warn(`⚠️ [${index}] Documento com prefixo inválido:`, {docId, prefixo, statusAula});
+        return;
+      }
+      
+      // Inicializar array se não existe
+      if (!agrupadas[prefixo]) {
+        agrupadas[prefixo] = [];
+      }
+      
+      // Adicionar aula ao grupo
+      agrupadas[prefixo].push({
+        id: docId,
+        statusAula: statusAula,
+        concluida: concluida
+      });
+      
+      // Log a cada 5 aulas para diagnóstico
+      if ((index + 1) % 5 === 0) {
+        console.log(`🔄 Processadas ${index + 1} aulas...`);
+      }
+    });
+    
+    console.log(`✅ ${Object.keys(agrupadas).length} grupos de aulas carregados`);
+    console.log('📋 Prefixos agrupados:', Object.keys(agrupadas).slice(0, 10)); // Mostrar primeiros 10
+    AULAS_LISTA_AGRUPADAS = agrupadas;
+    return agrupadas;
+    
+  } catch (error) {
+    console.error('❌ Erro ao carregar aulas em batch:', error);
+    return {};
+  }
+}
+
+// Função para obter aulas de uma contratação específica
+function obterAulasContratacao(idContratacao) {
+  const prefixo = idContratacao.substring(0, 4);
+  const aulas = AULAS_LISTA_AGRUPADAS[prefixo] || [];
+  
+  // Calcular estatísticas
+  const total = aulas.length;
+  const concluidas = aulas.filter(a => a.concluida).length;
+  
+  console.log(`🔍 obterAulasContratacao => ID: ${idContratacao}, Prefixo: ${prefixo}, Total: ${total}, Concluídas: ${concluidas}`);
+  
+  return {
+    total,
+    concluidas,
+    aulas: aulas
+  };
+}
 
 // Função para carregar a seção Banco de Aulas
 async function loadBancoDeAulas() {
@@ -140,6 +218,11 @@ async function initializeBancoDeAulas() {
     PROFESSORES_DATA = professores || [];
     
     console.log(`📊 Dados carregados: ${AULAS_DATA.length} aulas, ${CLIENTES_DATA.length} clientes, ${PROFESSORES_DATA.length} professores`);
+    
+    // Carregar aulas de BancoDeAulas-Lista em batch
+    console.log('⏳ Iniciando carregamento de aulas em batch...');
+    const aulasAgrupadas = await carregarAulasBatch();
+    console.log('✅ Batch de aulas carregado. AULAS_LISTA_AGRUPADAS:', Object.keys(aulasAgrupadas).length, 'grupos');
     
     // Popular filtro de clientes
     populateClienteFilter(CLIENTES_DATA);
@@ -653,5 +736,7 @@ function applyAulasFilters(aulas, filters) {
 // Exportar função para uso global
 if (typeof window !== 'undefined') {
   window.loadBancoDeAulas = loadBancoDeAulas;
-  console.log('✅ loadBancoDeAulas exportado para escopo global');
+  window.obterAulasContratacao = obterAulasContratacao;
+  window.carregarAulasBatch = carregarAulasBatch;
+  console.log('✅ Funções de Banco de Aulas exportadas para escopo global');
 }
