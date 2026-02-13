@@ -206,6 +206,13 @@ const BancoDeAulasCards = (function() {
       return 'info';
     };
     
+    // Obter dados da BancoDeAulas-Listas usando o prefixo do código
+    // IMPORTANTE: Passar o código COMPLETO para a função, não apenas o prefixo
+    const aulasContratacao = window.obterAulasContratacao(codigo);
+    const totalAulas = aulasContratacao ? aulasContratacao.total : 0;
+    const equipaConfirmada = aulasContratacao ? aulasContratacao.comProfessor : 0;
+    const aulasFinalizadas = aulasContratacao ? aulasContratacao.concluidas : 0;
+    
     card.innerHTML = `
       <div class="aula-card-header">
         <div class="aula-card-title" title="${nomeCliente}">
@@ -237,32 +244,36 @@ const BancoDeAulasCards = (function() {
             </span>
           </div>
           
-          <!-- Linha 3: Total de Aulas e Equipe Confirmada -->
-          <div class="info-row">
-            <span class="info-label">
-              Total de aulas:
-            </span>
-            <span class="info-value font-medium">
-              a
-            </span>
+          <!-- Linha 3: Total de Aulas (esquerda) e Equipe Confirmada (direita) -->
+          <div class="flex justify-between items-center text-sm">
+            <div class="flex items-center gap-1">
+              <span class="info-label">Total de aulas:</span>
+              <span class="info-value font-medium">${totalAulas}</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <span class="info-label">Equipe Confirmada:</span>
+              <span class="info-value font-medium">${equipaConfirmada}</span>
+            </div>
           </div>
           
-          <div class="info-row">
-            <span class="info-label">
-              Equipe Confirmada:
-            </span>
-            <span class="info-value font-medium">
-              b
-            </span>
-          </div>
-          
+          <!-- COMENTADO: Aulas concluídas - Oculto da tela, lógica mantida para uso futuro
           <div class="info-row">
             <span class="info-label">
               Aulas concluídas:
             </span>
             <span class="info-value font-medium">
-              c
+              ${aulasFinalizadas}
             </span>
+          </div>
+          -->
+          
+          <!-- Barra de progresso com subdivisões (usa aulasFinalizadas: "c") -->
+          <div class="mt-2 flex h-1.5 bg-gray-200 rounded-full overflow-hidden border border-gray-300">
+            ${totalAulas > 0 ? Array(totalAulas).fill(null).map((_, i) => {
+              const isCompleted = i < aulasFinalizadas;
+              const hasBorder = i < totalAulas - 1;
+              return `<div class="flex-1 ${isCompleted ? 'bg-green-500' : 'bg-gray-200'} ${hasBorder ? 'border-r border-dashed border-gray-400' : ''}"></div>`;
+            }).join('') : '<div class="flex-1 bg-gray-200"></div>'}
           </div>
         </div>
         

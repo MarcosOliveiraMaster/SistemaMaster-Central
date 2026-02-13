@@ -176,22 +176,13 @@ function loadSectionContent(sectionId) {
 
 // Configurar listeners globais
 function setupGlobalListeners() {
-  // Listener para pesquisa
-  const searchInput = document.querySelector('input[placeholder="Pesquisar..."]');
-  if (searchInput) {
-    searchInput.addEventListener('keyup', function(e) {
-      if (e.key === 'Enter') {
-        performSearch(this.value);
-      }
-    });
-  }
-  
   // Listener para redimensionamento da tela
   window.addEventListener('resize', handleResize);
   
   // Inicializar handler de resize
   handleResize();
 }
+
 
 // Handler de redimensionamento
 function handleResize() {

@@ -23,16 +23,22 @@ async function carregarAulasBatch() {
     
     // Agrupar por prefixo (primeiros 4 dígitos)
     const agrupadas = {};
+    let invalidosCount = 0;
+    let validosCount = 0;
     
     aulasLista.forEach((aula, index) => {
       // Extrair prefixo dos primeiros 4 dígitos do ID do documento
       const docId = aula.id || '';
       const prefixo = docId.substring(0, 4);
-      const statusAula = aula.statusAula || 'Não informado';
-      const concluida = statusAula.toLowerCase() === 'aula concluída';
+      const statusAula = aula.StatusAula || 'Não informado';
+      const professor = aula.professor || 'A definir';
+      // Verificar se StatusAula = "Concluída" (case-insensitive)
+      const concluida = statusAula.toLowerCase() === 'concluída';
       
-      if (!prefixo || prefixo.length < 4) {
-        console.warn(`⚠️ [${index}] Documento com prefixo inválido:`, {docId, prefixo, statusAula});
+      // Validações aprimoradas
+      if (!prefixo || prefixo.length < 4 || !/^\d{4}/.test(prefixo)) {
+        console.warn(`⚠️ [${index}] Documento com prefixo inválido:`, {docId, prefixo: prefixo || 'vazio', StatusAula: statusAula});
+        invalidosCount++;
         return;
       }
       
@@ -45,17 +51,28 @@ async function carregarAulasBatch() {
       agrupadas[prefixo].push({
         id: docId,
         statusAula: statusAula,
-        concluida: concluida
+        concluida: concluida,
+        professor: professor
       });
+      
+      validosCount++;
       
       // Log a cada 5 aulas para diagnóstico
       if ((index + 1) % 5 === 0) {
-        console.log(`🔄 Processadas ${index + 1} aulas...`);
+        console.log(`🔄 Processadas ${index + 1} aulas... (${validosCount} válidas, ${invalidosCount} inválidas)`);
       }
     });
     
     console.log(`✅ ${Object.keys(agrupadas).length} grupos de aulas carregados`);
-    console.log('📋 Prefixos agrupados:', Object.keys(agrupadas).slice(0, 10)); // Mostrar primeiros 10
+    console.log(`📈 Total: ${validosCount} aulas válidas, ${invalidosCount} inválidas`);
+    console.log('📋 Prefixos encontrados:', Object.keys(agrupadas).sort());
+    console.log('📊 Distribuição por prefixo:', 
+      Object.keys(agrupadas).reduce((acc, prefixo) => {
+        acc[prefixo] = agrupadas[prefixo].length;
+        return acc;
+      }, {})
+    );
+    
     AULAS_LISTA_AGRUPADAS = agrupadas;
     return agrupadas;
     
@@ -67,18 +84,62 @@ async function carregarAulasBatch() {
 
 // Função para obter aulas de uma contratação específica
 function obterAulasContratacao(idContratacao) {
-  const prefixo = idContratacao.substring(0, 4);
+  // Limpar espaços e caracteres extras
+  const idLimpo = (idContratacao || '').trim();
+  const prefixo = idLimpo.substring(0, 4);
+  
+  // Verificar se prefixo é válido
+  if (!prefixo || prefixo.length < 4 || !/^\d{4}/.test(prefixo)) {
+    console.error(`❌ obterAulasContratacao => ID INVÁLIDO: "${idContratacao}"`, {
+      idLimpo,
+      prefixo,
+      motivo: 'Prefixo não contém 4 dígitos ou ID vazio'
+    });
+    return {
+      total: 0,
+      concluidas: 0,
+      aulas: []
+    };
+  }
+  
   const aulas = AULAS_LISTA_AGRUPADAS[prefixo] || [];
   
   // Calcular estatísticas
   const total = aulas.length;
-  const concluidas = aulas.filter(a => a.concluida).length;
+  // Aulas concluídas: contar quantos têm StatusAula = "Concluída" (case-insensitive)
+  const concluidas = aulas.filter(a => 
+    a.statusAula && 
+    a.statusAula.toLowerCase() === 'concluída'
+  ).length;
+  // Equipe confirmada: contar quantos têm professor definido (não "A definir")
+  const comProfessor = aulas.filter(a => 
+    a.professor && 
+    a.professor.toLowerCase() !== 'a definir' && 
+    a.professor.trim() !== ''
+  ).length;
   
-  console.log(`🔍 obterAulasContratacao => ID: ${idContratacao}, Prefixo: ${prefixo}, Total: ${total}, Concluídas: ${concluidas}`);
+  if (total === 0) {
+    console.warn(`⚠️ obterAulasContratacao => SEM AULAS!`, {
+      id: idContratacao,
+      idLimpo,
+      prefixo,
+      prefixosDisponiveis: Object.keys(AULAS_LISTA_AGRUPADAS).sort(),
+      sugestao: `Procurando prefixo "${prefixo}" mas não encontrado no cache`
+    });
+  } else {
+    console.log(`✅ obterAulasContratacao => ID: ${idContratacao}`, {
+      prefixo,
+      total,
+      comProfessor,
+      concluidas,
+      detalhes: `${comProfessor} com professor | ${concluidas} concluídas`
+    });
+  }
   
   return {
     total,
     concluidas,
+    comProfessor,
     aulas: aulas
   };
 }
