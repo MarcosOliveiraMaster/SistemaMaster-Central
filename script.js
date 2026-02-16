@@ -237,8 +237,8 @@ function loadSectionContent(sectionId) {
       }
       break;
     case 'mensagens':
-      if (typeof loadMensagensAutomaticas === 'function') {
-        loadMensagensAutomaticas();
+      if (typeof loadPainelFinanceiro === 'function') {
+        loadPainelFinanceiro();
       }
       break;
     case 'calendario':
