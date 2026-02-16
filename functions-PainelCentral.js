@@ -11,6 +11,35 @@ let currentAulaInfo = {
 // ===== VARIÁVEL GLOBAL PARA CONTROLE DE MÊS (PAGAMENTO) =====
 let mesPagamentoAtual = new Date().getMonth(); // 0-11
 
+// ===== VARIÁVEL GLOBAL PARA CONTROLE DE MÊS (GRÁFICO) =====
+let mesGraficoAtual = new Date().getMonth(); // 0-11
+
+// ===== FUNÇÃO PARA CALCULAR A SEMANA ATUAL DO MÊS =====
+function calcularSemanaAtual(data = new Date()) {
+  const ano = data.getFullYear();
+  const mes = data.getMonth();
+  const primeiroDiaDoMes = new Date(ano, mes, 1);
+  const primeiroDias = primeiroDiaDoMes.getDay(); // Dia da semana do dia 1 (0=domingo)
+  
+  // Calcular o domingo da Semana 0 do mês
+  const primeiroDomingoDoMes = new Date(primeiroDiaDoMes);
+  primeiroDomingoDoMes.setDate(1 - primeiroDias);
+  
+  // Calcular dias desde o início da Semana 0
+  const diffMs = data - primeiroDomingoDoMes;
+  const diffDias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const semaná = Math.floor(diffDias / 7);
+  
+  // Limitar entre 0 e 4
+  return Math.min(Math.max(semaná, 0), 4);
+}
+
+// ===== VARIÁVEL GLOBAL PARA CONTROLE DE SEMANA (GRÁFICO) =====
+let semanaGraficoAtual = calcularSemanaAtual(); // Calcula a semana atual do mês
+
+// ===== VARIÁVEL GLOBAL PARA CONTROLE DE DIA (TABELA CONSULTA AULAS) =====
+let diaConsultaAulasAtual = new Date(); // Data atual para a tabela
+
 // ===== VARIÁVEL GLOBAL PARA CONTROLE DE FILTRO (PAGAMENTO) =====
 let filtroSelecionado = 'todos'; // 'todos', 'pagamento', 'contrato'
 
@@ -65,12 +94,45 @@ function loadPainelCentral() {
 
     <!-- Gráfico de Aulas -->
     <div id="graficoAulas" class="bg-white rounded-lg border border-gray-300 p-4 mb-4 relative" style="height: 246px;">
+      <!-- Seletor de Mês para Gráfico (Modo Mensal) -->
+      <div id="seletor-mes-grafico" class="absolute top-4 left-4 flex items-center justify-center gap-1 bg-white rounded-lg z-10" style="display: none;">
+        <button id="btn-grafico-mes-anterior" class="px-2 py-1 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-800">
+          <i class="fas fa-chevron-left text-lg"></i>
+        </button>
+        <span id="mes-grafico-atual" class="text-sm font-semibold text-gray-800 min-w-[80px] text-center">
+          Fevereiro
+        </span>
+        <button id="btn-grafico-mes-proximo" class="px-2 py-1 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-800">
+          <i class="fas fa-chevron-right text-lg"></i>
+        </button>
+      </div>
+      <!-- Seletor de Semana para Gráfico (Modo Semanal) -->
+      <div id="seletor-semana-grafico" class="absolute top-4 left-4 flex items-center justify-center gap-1 bg-white rounded-lg z-10" style="display: none;">
+        <button id="btn-grafico-semana-anterior" class="px-2 py-1 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-800">
+          <i class="fas fa-chevron-left text-lg"></i>
+        </button>
+        <button id="btn-grafico-semana-proximo" class="px-2 py-1 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-800">
+          <i class="fas fa-chevron-right text-lg"></i>
+        </button>
+      </div>
       <canvas id="graficoAulasCanvas"></canvas>
     </div>
 
     <!-- Consulta de Aulas -->
     <div class="bg-white rounded-lg border border-gray-300 p-4">
-      <h2 class="text-lg font-lexend font-bold text-gray-800 mb-4">Consulta de Aulas</h2>
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-lg font-lexend font-bold text-gray-800">Consulta de Aulas</h2>
+        <div id="navegacao-consulta-aulas" class="flex items-center gap-2">
+          <button id="btn-consulta-aulas-anterior" class="px-2 py-1 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-800">
+            <i class="fas fa-chevron-left text-lg"></i>
+          </button>
+          <span id="label-data-consulta-aulas" class="text-sm font-semibold text-gray-800 min-w-[100px] text-center" style="display: none;">
+          </span>
+          <button id="btn-consulta-aulas-proximo" class="px-2 py-1 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-800">
+            <i class="fas fa-chevron-right text-lg"></i>
+          </button>
+        </div>
+      </div>
       
       <div class="overflow-x-auto">
         <table id="tabelaConsultaAulas" class="w-full">
@@ -164,6 +226,18 @@ function loadPainelCentral() {
   // Inicializar navegação de mês (Pagamento)
   initNavegacaoMesPagamento();
 
+  // Inicializar navegação de mês (Gráfico)
+  initNavegacaoMesGrafico();
+
+  // Inicializar navegação de semana (Gráfico)
+  initNavegacaoSemanaGrafico();
+
+  // Inicializar navegação de consulta de aulas
+  initNavegacaoConsultaAulas();
+
+  // Carregar tabela de consulta de aulas com o dia de hoje
+  atualizarConsultaAulas();
+
   // Inicializar filtros de pagamento
   initFiltrosPagamento();
 
@@ -231,6 +305,7 @@ function initFiltrosData() {
 // Atualizar data selecionada
 function atualizarDataSelecionada(date) {
   dataSelecionada = date;
+  diaConsultaAulasAtual = new Date(date); // Sincronizar com a navegação da tabela
   const inputData = document.getElementById('input-data-aula');
   if (inputData) {
     inputData.value = formatarDataInput(date);
@@ -238,7 +313,7 @@ function atualizarDataSelecionada(date) {
 
   // Buscar e carregar aulas da data selecionada
   console.log('📅 Data selecionada:', formatarDataInput(date));
-  loadAulasPainel(formatarDataInput(date));
+  atualizarConsultaAulas();
 }
 
 // ===== FUNÇÃO PARA OBTER CLASSE DE STATUS =====
@@ -878,6 +953,131 @@ function atualizarExibicaoMesPagamento() {
   }
 }
 
+function initNavegacaoMesGrafico() {
+  const btnAnterior = document.getElementById('btn-grafico-mes-anterior');
+  const btnProximo = document.getElementById('btn-grafico-mes-proximo');
+
+  if (!btnAnterior || !btnProximo) {
+    console.error('Botões de navegação de mês do gráfico não encontrados');
+    return;
+  }
+
+  btnAnterior.addEventListener('click', () => {
+    mudarMesGrafico(-1);
+  });
+
+  btnProximo.addEventListener('click', () => {
+    mudarMesGrafico(1);
+  });
+
+  // Atualizar exibição do mês atual
+  atualizarExibicaoMesGrafico();
+}
+
+function mudarMesGrafico(direcao) {
+  mesGraficoAtual += direcao;
+
+  // Limitar entre 0 (Janeiro) e 11 (Dezembro)
+  if (mesGraficoAtual < 0) {
+    mesGraficoAtual = 11;
+  } else if (mesGraficoAtual > 11) {
+    mesGraficoAtual = 0;
+  }
+
+  atualizarExibicaoMesGrafico();
+  
+  console.log(`📅 Mês selecionado para gráfico: ${mesGraficoAtual}`);
+}
+
+function atualizarExibicaoMesGrafico() {
+  const meses = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+  ];
+
+  const elementoMes = document.getElementById('mes-grafico-atual');
+  if (elementoMes) {
+    elementoMes.textContent = meses[mesGraficoAtual];
+  }
+
+  // Recarregar o gráfico com o novo mês
+  carregarDadosGrafico();
+}
+
+function initNavegacaoSemanaGrafico() {
+  const btnAnterior = document.getElementById('btn-grafico-semana-anterior');
+  const btnProximo = document.getElementById('btn-grafico-semana-proximo');
+
+  if (!btnAnterior || !btnProximo) {
+    console.error('Botões de navegação de semana do gráfico não encontrados');
+    return;
+  }
+
+  btnAnterior.addEventListener('click', () => {
+    if (semanaGraficoAtual > 0) {
+      semanaGraficoAtual--;
+      carregarDadosGrafico();
+    }
+  });
+
+  btnProximo.addEventListener('click', () => {
+    // Máximo de 4 semanas (0-3)
+    if (semanaGraficoAtual < 4) {
+      semanaGraficoAtual++;
+      carregarDadosGrafico();
+    }
+  });
+}
+
+function initNavegacaoConsultaAulas() {
+  const btnAnterior = document.getElementById('btn-consulta-aulas-anterior');
+  const btnProximo = document.getElementById('btn-consulta-aulas-proximo');
+
+  if (!btnAnterior || !btnProximo) {
+    console.error('Botões de navegação de consulta de aulas não encontrados');
+    return;
+  }
+
+  btnAnterior.addEventListener('click', () => {
+    diaConsultaAulasAtual.setDate(diaConsultaAulasAtual.getDate() - 1);
+    atualizarConsultaAulas();
+  });
+
+  btnProximo.addEventListener('click', () => {
+    diaConsultaAulasAtual.setDate(diaConsultaAulasAtual.getDate() + 1);
+    atualizarConsultaAulas();
+  });
+}
+
+function atualizarConsultaAulas() {
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  
+  const diaAtual = new Date(diaConsultaAulasAtual);
+  diaAtual.setHours(0, 0, 0, 0);
+
+  const labelElement = document.getElementById('label-data-consulta-aulas');
+  
+  // Se for hoje, não exibir label
+  if (diaAtual.getTime() === hoje.getTime()) {
+    if (labelElement) labelElement.style.display = 'none';
+  } else {
+    // Formatar como "Dia completo dd/mm"
+    const diasNomes = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+    const diaNome = diasNomes[diaAtual.getDay()];
+    const dia = diaAtual.getDate().toString().padStart(2, '0');
+    const mes = (diaAtual.getMonth() + 1).toString().padStart(2, '0');
+    
+    if (labelElement) {
+      labelElement.textContent = `${diaNome} ${dia}/${mes}`;
+      labelElement.style.display = 'block';
+    }
+  }
+
+  // Recarregar tabela com a data selecionada
+  loadAulasPainel(formatarDataInput(diaConsultaAulasAtual));
+}
+
 // ===== FUNÇÕES PARA CARREGAR CARDS DE PAGAMENTO =====
 
 async function carregarCardsPagamento() {
@@ -1206,14 +1406,24 @@ window.mudarPeriodoGrafico = function (periodo) {
   // Atualizar botões
   const btnMensal = document.getElementById('btn-mensal');
   const btnSemanal = document.getElementById('btn-semanal');
+  const seletorMes = document.getElementById('seletor-mes-grafico');
+  const seletorSemana = document.getElementById('seletor-semana-grafico');
 
   if (btnMensal && btnSemanal) {
     if (periodo === 'Mensal') {
       btnMensal.className = "px-4 py-1.5 text-sm font-medium rounded-md transition-all bg-white shadow text-orange-600";
       btnSemanal.className = "px-4 py-1.5 text-sm font-medium rounded-md transition-all text-gray-500 hover:text-gray-700";
+      // Mostrar seletor de mês apenas em modo Mensal
+      if (seletorMes) seletorMes.style.display = 'flex';
+      if (seletorSemana) seletorSemana.style.display = 'none';
     } else {
       btnMensal.className = "px-4 py-1.5 text-sm font-medium rounded-md transition-all text-gray-500 hover:text-gray-700";
       btnSemanal.className = "px-4 py-1.5 text-sm font-medium rounded-md transition-all bg-white shadow text-orange-600";
+      // Ocultar seletor de mês e mostrar seletor de semana em modo Semanal
+      if (seletorMes) seletorMes.style.display = 'none';
+      if (seletorSemana) seletorSemana.style.display = 'flex';
+      // Setar semana atual ao mudar para modo semanal
+      semanaGraficoAtual = calcularSemanaAtual();
     }
   }
 
@@ -1250,7 +1460,7 @@ function processarDadosGrafico(aulas) {
   if (periodoAtual === 'Mensal') {
     // Eixo X: Dias do mês atual
     const ano = hoje.getFullYear();
-    const mes = hoje.getMonth(); // 0-11
+    const mes = mesGraficoAtual; // 0-11 (utiliza o mês selecionado)
     const diasNoMes = new Date(ano, mes + 1, 0).getDate();
 
     // Inicializar contagem
@@ -1281,19 +1491,34 @@ function processarDadosGrafico(aulas) {
     }
 
   } else { // Semanal
-    // Eixo X: Domingo a Sábado da semana atual
-    const primeiroDiaSemana = new Date(hoje);
-    const dayOfWeek = hoje.getDay(); // 0 (Domingo) a 6 (Sábado)
-    primeiroDiaSemana.setDate(hoje.getDate() - dayOfWeek); // Vai para o Domingo anterior ou hoje
+    // Calcular o domingo da semana selecionada
+    const ano = hoje.getFullYear();
+    const mes = hoje.getMonth();
+    const primeiroDiaDoMes = new Date(ano, mes, 1);
+    const primeiroDias = primeiroDiaDoMes.getDay(); // Dia da semana do dia 1 (0=domingo)
+
+    // Calcular o domingo da Semana 0 do mês
+    const primeiroDomingoDoMes = new Date(primeiroDiaDoMes);
+    primeiroDomingoDoMes.setDate(1 - primeiroDias);
+    primeiroDomingoDoMes.setHours(0, 0, 0, 0);
+
+    // Calcular a data de início da semana selecionada
+    const primeiroDiaSemana = new Date(primeiroDomingoDoMes);
+    primeiroDiaSemana.setDate(primeiroDomingoDoMes.getDate() + semanaGraficoAtual * 7);
     primeiroDiaSemana.setHours(0, 0, 0, 0);
 
     const diasSemanaNomes = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
-    // Inicializar contagem por nome do dia
-    diasSemanaNomes.forEach(d => contagem[d] = 0);
-    labels.push(...diasSemanaNomes);
+    // Gerar rótulos com datas no formato "Dia (DD)"
+    for (let i = 0; i < 7; i++) {
+      const data = new Date(primeiroDiaSemana);
+      data.setDate(primeiroDiaSemana.getDate() + i);
+      const dia = data.getDate().toString().padStart(2, '0');
+      const diaNome = diasSemanaNomes[data.getDay()];
+      labels.push(`${diaNome} (${dia})`);
+      contagem[i] = 0; // Usar índice 0-6 para contar
+    }
 
-    // Definir intervalo da semana para filtro
     const ultimoDiaSemana = new Date(primeiroDiaSemana);
     ultimoDiaSemana.setDate(primeiroDiaSemana.getDate() + 6);
     ultimoDiaSemana.setHours(23, 59, 59, 999);
@@ -1302,20 +1527,23 @@ function processarDadosGrafico(aulas) {
       if (aula.data && aula.data.includes('-')) {
         const partes = aula.data.split('-')[1].trim().split('/');
         const dia = parseInt(partes[0]);
-        const mes = parseInt(partes[1]) - 1;
-        const ano = parseInt(partes[2]);
-        const dataAula = new Date(ano, mes, dia);
+        const mesAula = parseInt(partes[1]) - 1;
+        const anoAula = parseInt(partes[2]);
+        const dataAula = new Date(anoAula, mesAula, dia);
 
         // Verificar se está na semana
         if (dataAula >= primeiroDiaSemana && dataAula <= ultimoDiaSemana) {
-          const diaSemanaIdx = dataAula.getDay();
-          const diaNome = diasSemanaNomes[diaSemanaIdx];
-          contagem[diaNome]++;
+          const diaIdx = Math.floor((dataAula - primeiroDiaSemana) / (1000 * 60 * 60 * 24)); // Índice 0-6
+          if (diaIdx >= 0 && diaIdx < 7) {
+            contagem[diaIdx]++;
+          }
         }
       }
     });
 
-    diasSemanaNomes.forEach(d => dados.push(contagem[d]));
+    for (let i = 0; i < 7; i++) {
+      dados.push(contagem[i]);
+    }
   }
 
   renderGrafico(labels, dados);
@@ -1335,6 +1563,52 @@ function renderGrafico(labels, data) {
   if (typeof ChartDataLabels !== 'undefined') {
     Chart.register(ChartDataLabels);
   }
+
+  // Plugin customizado para desenhar linhas verticais nos domingos (modo mensal)
+  const pluginLinhasDomingos = {
+    id: 'linhasDomingos',
+    afterDatasetsDraw(chart) {
+      if (periodoAtual !== 'Mensal') return; // Só no modo mensal
+
+      const ctx = chart.ctx;
+      const xScale = chart.scales.x;
+      const yScale = chart.scales.y;
+      const hoje = new Date();
+      const ano = hoje.getFullYear();
+      const mes = mesGraficoAtual; // Usa o mês selecionado
+
+      // Percorrer todos os dias do mês
+      for (let dia = 1; dia <= 31; dia++) {
+        const data = new Date(ano, mes, dia);
+        
+        // Verificar se o dia existe neste mês
+        if (data.getMonth() !== mes) break;
+        
+        // Verificar se é domingo (0 = domingo)
+        if (data.getDay() === 0) {
+          // Encontrar a posição do dia no eixo X
+          const diaIdx = dia - 1; // índice do array labels
+          const x = xScale.getPixelForValue(diaIdx);
+          
+          if (!isNaN(x)) {
+            // Desenhar linha vertical tracejada
+            ctx.save();
+            ctx.strokeStyle = '#D1D5DB'; // Gray-300
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 4]); // Tracejado: 4px linha, 4px espaço
+            ctx.beginPath();
+            ctx.moveTo(x, yScale.top);
+            ctx.lineTo(x, yScale.bottom);
+            ctx.stroke();
+            ctx.restore();
+          }
+        }
+      }
+    }
+  };
+
+  // Registrar o plugin
+  Chart.register(pluginLinhasDomingos);
 
   chartInstance = new Chart(context, {
     type: 'line',
@@ -1390,14 +1664,20 @@ function renderGrafico(labels, data) {
         y: {
           beginAtZero: true,
           ticks: {
-            stepSize: 1,
-            precision: 0
+            precision: 0,
+            callback: function(value) {
+              // Mostrar apenas inteiros
+              if (Number.isInteger(value)) {
+                return value;
+              }
+            }
           },
           grid: {
             borderDash: [2, 4],
             color: '#E5E7EB'
           },
-          display: true // Manter o eixo Y visível
+          display: true, // Manter o eixo Y visível
+          grace: '5%' // Adiciona espaço extra no topo para evitar corte de valores
         },
         x: {
           grid: {

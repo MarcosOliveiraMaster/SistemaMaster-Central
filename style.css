@@ -90,6 +90,115 @@
   width: 24px;
 }
 
+/* Menu item expansível (Dashboard) */
+.menu-item-expandable {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  font-family: 'Comfortaa', cursive;
+  font-weight: 700;
+  color: white;
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-bottom: 4px;
+  justify-content: space-between;
+}
+
+.menu-item-expandable:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateX(5px);
+}
+
+.menu-item-expandable.active {
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.menu-item-expandable i:first-child {
+  font-size: 1.1rem;
+  width: 24px;
+}
+
+#icon-dashboard-expand {
+  transition: transform 0.3s ease;
+}
+
+#icon-dashboard-expand.rotate {
+  transform: rotate(180deg);
+}
+
+/* Submenu do Dashboard */
+#submenu-dashboard {
+  animation: slideDown 0.3s ease forwards;
+}
+
+#submenu-dashboard.hidden {
+  animation: slideUp 0.3s ease forwards;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 200px;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 1;
+    max-height: 200px;
+  }
+  to {
+    opacity: 0;
+    max-height: 0;
+  }
+}
+
+/* Item de submenu */
+.menu-item-submenu {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  font-family: 'Comfortaa', cursive;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 4px;
+  font-size: 0.95rem;
+}
+
+.menu-item-submenu:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateX(4px);
+}
+
+.menu-item-submenu.active {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.menu-item-submenu i {
+  font-size: 1rem;
+  width: 24px;
+}
+
 /* -------------------- SECTIONS -------------------- */
 .section-content {
   display: none;

@@ -81,14 +81,19 @@
           <span>Banco de Aulas</span>
         </button>
         
-        <button class="menu-item" data-section="mensagens">
-          <i class="fas fa-comments mr-3"></i>
-          <span>Mensagens Automáticas</span>
-        </button>
-        
         <button class="menu-item" data-section="simulacoes">
           <i class="fas fa-chart-line mr-3"></i>
           <span>Simulações</span>
+        </button>
+        
+        <button class="menu-item" data-section="mensagens" data-title="Painel Financeiro">
+          <i class="fas fa-wallet mr-3"></i>
+          <span>Painel Financeiro</span>
+        </button>
+        
+        <button class="menu-item" data-section="calendario" data-title="Calendário Master">
+          <i class="fas fa-calendar-alt mr-3"></i>
+          <span>Calendário Master</span>
         </button>
         
         <button class="menu-item" data-section="fluxo-processos">
@@ -96,10 +101,43 @@
           <span>Fluxo de Processos</span>
         </button>
         
-        <button class="menu-item" data-section="dashboard">
+        <button class="menu-item menu-item-expandable" data-section="dashboard" id="btn-dashboard-menu">
           <i class="fas fa-tachometer-alt mr-3"></i>
           <span>Dashboard</span>
+          <i class="fas fa-chevron-down ml-auto text-sm transition-transform" id="icon-dashboard-expand"></i>
         </button>
+
+        <!-- Subtópicos do Dashboard -->
+        <div id="submenu-dashboard" class="ml-4 space-y-1 hidden">
+          <button class="menu-item-submenu" data-section="clientes" data-title="Dashboard Cliente">
+            <i class="fas fa-users mr-3"></i>
+            <span>Clientes</span>
+          </button>
+          
+          <button class="menu-item-submenu" data-section="professores" data-title="Dashboard Professores">
+            <i class="fas fa-chalkboard-user mr-3"></i>
+            <span>Professores</span>
+          </button>
+        </div>
+        
+        <button class="menu-item menu-item-expandable" data-section="areas" id="btn-areas-menu">
+          <i class="fas fa-th-large mr-3"></i>
+          <span>Áreas</span>
+          <i class="fas fa-chevron-down ml-auto text-sm transition-transform" id="icon-areas-expand"></i>
+        </button>
+
+        <!-- Subtópicos de Áreas -->
+        <div id="submenu-areas" class="ml-4 space-y-1 hidden">
+          <button class="menu-item-submenu" data-section="area-cliente" data-title="Área Cliente">
+            <i class="fas fa-user-circle mr-3"></i>
+            <span>Área Cliente</span>
+          </button>
+          
+          <button class="menu-item-submenu" data-section="area-professor" data-title="Área Professor">
+            <i class="fas fa-chalkboard-user mr-3"></i>
+            <span>Área Professor</span>
+          </button>
+        </div>
         
         <button class="menu-item" data-section="exportar-dados">
           <i class="fas fa-file-export mr-3"></i>
@@ -137,12 +175,25 @@
         </section>
         
         <section id="mensagens" class="section-content">
+          <div class="text-center py-8">
+            <i class="fas fa-wallet text-3xl text-gray-300 mb-3"></i>
+            <h3 class="font-lexend text-lg mb-2">Painel Financeiro</h3>
+            <p class="text-gray-600 text-sm">Esta seção está em desenvolvimento.</p>
+          </div>
         </section>
         
         <section id="simulacoes" class="section-content">
           <div class="text-center py-8">
             <i class="fas fa-chart-line text-3xl text-gray-300 mb-3"></i>
             <h3 class="font-lexend text-lg mb-2">Simulações</h3>
+            <p class="text-gray-600 text-sm">Esta seção está em desenvolvimento.</p>
+          </div>
+        </section>
+        
+        <section id="calendario" class="section-content">
+          <div class="text-center py-8">
+            <i class="fas fa-calendar-alt text-3xl text-gray-300 mb-3"></i>
+            <h3 class="font-lexend text-lg mb-2">Calendário Master</h3>
             <p class="text-gray-600 text-sm">Esta seção está em desenvolvimento.</p>
           </div>
         </section>
@@ -155,10 +206,34 @@
           </div>
         </section>
         
-        <section id="dashboard" class="section-content">
+        <section id="clientes" class="section-content">
           <div class="text-center py-8">
-            <i class="fas fa-tachometer-alt text-3xl text-gray-300 mb-3"></i>
-            <h3 class="font-lexend text-lg mb-2">Dashboard</h3>
+            <i class="fas fa-users text-3xl text-gray-300 mb-3"></i>
+            <h3 class="font-lexend text-lg mb-2">Dashboard Cliente</h3>
+            <p class="text-gray-600 text-sm">Esta seção está em desenvolvimento.</p>
+          </div>
+        </section>
+        
+        <section id="professores" class="section-content">
+          <div class="text-center py-8">
+            <i class="fas fa-chalkboard-user text-3xl text-gray-300 mb-3"></i>
+            <h3 class="font-lexend text-lg mb-2">Dashboard Professores</h3>
+            <p class="text-gray-600 text-sm">Esta seção está em desenvolvimento.</p>
+          </div>
+        </section>
+        
+        <section id="area-cliente" class="section-content">
+          <div class="text-center py-8">
+            <i class="fas fa-user-circle text-3xl text-gray-300 mb-3"></i>
+            <h3 class="font-lexend text-lg mb-2">Área Cliente</h3>
+            <p class="text-gray-600 text-sm">Esta seção está em desenvolvimento.</p>
+          </div>
+        </section>
+        
+        <section id="area-professor" class="section-content">
+          <div class="text-center py-8">
+            <i class="fas fa-chalkboard-user text-3xl text-gray-300 mb-3"></i>
+            <h3 class="font-lexend text-lg mb-2">Área Professor</h3>
             <p class="text-gray-600 text-sm">Esta seção está em desenvolvimento.</p>
           </div>
         </section>

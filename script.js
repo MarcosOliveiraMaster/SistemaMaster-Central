@@ -5,10 +5,14 @@ const CONFIG = {
   sections: [
     'painel-central',
     'banco-aulas',
-    'mensagens',
     'simulacoes',
+    'mensagens',
+    'calendario',
     'fluxo-processos',
-    'dashboard',
+    'clientes',
+    'professores',
+    'area-cliente',
+    'area-professor',
     'exportar-dados'
   ]
 };
@@ -40,6 +44,8 @@ document.addEventListener('DOMContentLoaded', () => {
 // Função para inicializar a aplicação
 function initializeApp() {
   setupMenuNavigation();
+  setupDashboardSubmenu();
+  setupAreasSubmenu();
   setupGlobalListeners();
   loadSection('painel-central');
   
@@ -49,7 +55,8 @@ function initializeApp() {
 
 // Configurar navegação do menu
 function setupMenuNavigation() {
-  const menuItems = document.querySelectorAll('.menu-item');
+  const menuItems = document.querySelectorAll('.menu-item, .menu-item-expandable');
+  const submenuItems = document.querySelectorAll('.menu-item-submenu');
   
   menuItems.forEach(item => {
     item.addEventListener('click', function() {
@@ -58,12 +65,38 @@ function setupMenuNavigation() {
       if (sectionId && sectionId !== APP_STATE.currentSection) {
         // Remover classe active de todos os itens
         menuItems.forEach(i => i.classList.remove('active'));
+        submenuItems.forEach(i => i.classList.remove('active'));
         
         // Adicionar classe active ao item clicado
         this.classList.add('active');
         
-        // Atualizar título da seção
-        updateSectionTitle(this.querySelector('span').textContent);
+        // Atualizar título da seção (usar data-title se disponível)
+        const title = this.getAttribute('data-title') || this.querySelector('span').textContent;
+        updateSectionTitle(title);
+        
+        // Carregar a seção
+        loadSection(sectionId);
+      }
+    });
+  });
+
+  // Configurar submenu items
+  submenuItems.forEach(item => {
+    item.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const sectionId = this.getAttribute('data-section');
+      
+      if (sectionId && sectionId !== APP_STATE.currentSection) {
+        // Remover classe active de todos os itens
+        menuItems.forEach(i => i.classList.remove('active'));
+        submenuItems.forEach(i => i.classList.remove('active'));
+        
+        // Adicionar classe active ao item clicado
+        this.classList.add('active');
+        
+        // Atualizar título da seção (usar data-title se disponível)
+        const title = this.getAttribute('data-title') || this.querySelector('span').textContent;
+        updateSectionTitle(title);
         
         // Carregar a seção
         loadSection(sectionId);
@@ -75,6 +108,63 @@ function setupMenuNavigation() {
 // Atualizar título da seção
 function updateSectionTitle(title) {
   document.getElementById('section-title').textContent = title;
+}
+
+// Configurar submenu do Dashboard
+function setupDashboardSubmenu() {
+  const btnDashboard = document.getElementById('btn-dashboard-menu');
+  const submenuDashboard = document.getElementById('submenu-dashboard');
+  const iconExpand = document.getElementById('icon-dashboard-expand');
+  let isExpanded = false;
+
+  if (!btnDashboard || !submenuDashboard) {
+    console.warn('Elementos do Dashboard submenu não encontrados');
+    return;
+  }
+
+  btnDashboard.addEventListener('click', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    isExpanded = !isExpanded;
+
+    if (isExpanded) {
+      // Expandir submenu
+      submenuDashboard.classList.remove('hidden');
+      iconExpand.classList.add('rotate');
+    } else {
+      // Retrair submenu
+      submenuDashboard.classList.add('hidden');
+      iconExpand.classList.remove('rotate');
+    }
+  });
+}
+
+function setupAreasSubmenu() {
+  const btnAreas = document.getElementById('btn-areas-menu');
+  const submenuAreas = document.getElementById('submenu-areas');
+  const iconExpand = document.getElementById('icon-areas-expand');
+  let isExpanded = false;
+
+  if (!btnAreas || !submenuAreas) {
+    console.warn('Elementos do Áreas submenu não encontrados');
+    return;
+  }
+
+  btnAreas.addEventListener('click', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    isExpanded = !isExpanded;
+
+    if (isExpanded) {
+      // Expandir submenu
+      submenuAreas.classList.remove('hidden');
+      iconExpand.classList.add('rotate');
+    } else {
+      // Retrair submenu
+      submenuAreas.classList.add('hidden');
+      iconExpand.classList.remove('rotate');
+    }
+  });
 }
 
 // Carregar seção com animação
@@ -151,6 +241,10 @@ function loadSectionContent(sectionId) {
         loadMensagensAutomaticas();
       }
       break;
+    case 'calendario':
+      // Placeholder para calendário - será implementado futuramente
+      console.log('Seção de Calendário Master em desenvolvimento');
+      break;
     case 'simulacoes':
       if (typeof Simulacoes !== 'undefined' && typeof Simulacoes.loadSimulacoes === 'function') {
         Simulacoes.loadSimulacoes();
@@ -161,10 +255,21 @@ function loadSectionContent(sectionId) {
         loadFluxoProcessos();
       }
       break;
-    case 'dashboard':
-      if (typeof loadDashboard === 'function') {
-        loadDashboard();
-      }
+    case 'clientes':
+      // Placeholder para clientes - será implementado futuramente
+      console.log('Seção de Clientes em desenvolvimento');
+      break;
+    case 'professores':
+      // Placeholder para professores - será implementado futuramente
+      console.log('Seção de Professores em desenvolvimento');
+      break;
+    case 'area-cliente':
+      // Placeholder para área cliente - será implementado futuramente
+      console.log('Seção de Área Cliente em desenvolvimento');
+      break;
+    case 'area-professor':
+      // Placeholder para área professor - será implementado futuramente
+      console.log('Seção de Área Professor em desenvolvimento');
       break;
     case 'exportar-dados':
       if (typeof loadExportarDados === 'function') {
