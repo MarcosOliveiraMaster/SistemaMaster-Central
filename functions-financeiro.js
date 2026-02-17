@@ -10,6 +10,16 @@ const meses = [
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
 ];
 
+// Variáveis para armazenar totais do mês para cálculo de despesas
+let totalInvestimentosMesAtual = 0;
+let totalPagamentoEquipeMesAtual = 0;
+
+// Variáveis para controlar sincronização de indicadores
+let faturamentoValue = 0;
+let indicadorFaturamentoCarregado = false;
+let indicadorInvestimentosCarregado = false;
+let indicadorPagamentoEquipeCarregado = false;
+
 // Função para carregar o Painel Financeiro
 window.loadPainelFinanceiro = function() {
   const section = document.getElementById('mensagens');
@@ -128,12 +138,12 @@ window.loadPainelFinanceiro = function() {
       </div>
     </div>
 
-    <!-- Seção Saídas: Investimentos -->
+    <!-- Seção Saídas: Investimentos e despesas -->
     <div class="bg-white rounded-lg border border-gray-300 p-4 mb-4">
       <div class="flex justify-between items-center mb-4">
-        <h2 class="text-lg font-lexend font-bold text-gray-800">Saídas: Investimentos</h2>
+        <h2 class="text-lg font-lexend font-bold text-gray-800">Saídas: Investimentos e despesas</h2>
         <button id="btn-adicionar-investimento" class="py-1.5 px-4 text-sm font-medium rounded-lg transition-all bg-orange-500 text-white hover:bg-orange-600">
-          + Adicionar Investimento
+          + Adicionar informação
         </button>
       </div>
       
@@ -143,14 +153,15 @@ window.loadPainelFinanceiro = function() {
           <thead>
             <tr class="bg-gray-50 border-b border-gray-200">
               <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Data</th>
-              <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Descrição</th>
+              <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700" style="width: 54%; word-break: break-word; overflow-wrap: break-word;">Descrição</th>
+              <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Tipo de Despesa</th>
               <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Valor</th>
             </tr>
           </thead>
           <tbody id="tabelaSaidasInvestimentosBody">
             <!-- Dados serão carregados aqui -->
             <tr>
-              <td colspan="3" class="px-4 py-8 text-center text-gray-500 text-sm">
+              <td colspan="4" class="px-4 py-8 text-center text-gray-500 text-sm">
                 Nenhum registro encontrado
               </td>
             </tr>
@@ -171,12 +182,13 @@ window.loadPainelFinanceiro = function() {
               <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Nome Professor</th>
               <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Nome Cliente</th>
               <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Valor das Aulas</th>
+              <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Contratação</th>
             </tr>
           </thead>
           <tbody id="tabelaPagamentoEquipeBody">
             <!-- Dados serão carregados aqui -->
             <tr>
-              <td colspan="3" class="px-4 py-8 text-center text-gray-500 text-sm">
+              <td colspan="4" class="px-4 py-8 text-center text-gray-500 text-sm">
                 Nenhum registro encontrado
               </td>
             </tr>
@@ -203,6 +215,7 @@ window.loadPainelFinanceiro = function() {
               <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Repasse para Equipe</th>
               <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Custos Fixos</th>
               <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Custos Variáveis</th>
+              <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Custos Extras</th>
               <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Despesas Totais</th>
               <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Lucro Bruto</th>
               <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Lucro Líquido</th>
@@ -213,7 +226,7 @@ window.loadPainelFinanceiro = function() {
           <tbody id="tabelaIndicadoresEstrategicosBody">
             <!-- Dados serão carregados aqui -->
             <tr>
-              <td colspan="9" class="px-4 py-8 text-center text-gray-500 text-sm">
+              <td colspan="10" class="px-4 py-8 text-center text-gray-500 text-sm">
                 Nenhum registro encontrado
               </td>
             </tr>
@@ -233,10 +246,16 @@ window.loadPainelFinanceiro = function() {
   
   // Aguardar a disponibilidade do Firebase
   setTimeout(() => {
+    // Resetar flags de indicadores
+    indicadorFaturamentoCarregado = false;
+    indicadorInvestimentosCarregado = false;
+    indicadorPagamentoEquipeCarregado = false;
+    
     initBotaoAdicionarInvestimento();
     initModalEditarInvestimento();
     carregarInvestimentos();
     carregarEntradas(); // Carregar entradas do mês
+    carregarPagamentoEquipe(); // Carregar pagamento de equipe do mês
   }, 500);
 };
 
@@ -265,16 +284,30 @@ function adicionarModalInvestimento() {
         </p>
       </div>
 
-      <!-- Campo Data -->
-      <div class="mb-4">
-        <label class="block text-sm font-semibold text-gray-700 mb-1">Data</label>
-        <input 
-          type="text" 
-          id="input-data-investimento" 
-          placeholder="DD/MM/YYYY"
-          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 transition"
-          maxlength="10"
-        />
+      <!-- Campo Data e Tipo lado a lado -->
+      <div class="mb-4 grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1">Data</label>
+          <input 
+            type="text" 
+            id="input-data-investimento" 
+            placeholder="DD/MM/YYYY"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 transition"
+            maxlength="10"
+          />
+        </div>
+        
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1">Tipo</label>
+          <select 
+            id="input-tipo-investimento"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 transition bg-white"
+          >
+            <option value="recorrente_fixa">Recorrente Fixa</option>
+            <option value="recorrente_variavel">Recorrente Variável</option>
+            <option value="extra">Extra</option>
+          </select>
+        </div>
       </div>
 
       <!-- Campo Descrição -->
@@ -350,16 +383,30 @@ function adicionarModalEditarInvestimento() {
         </p>
       </div>
 
-      <!-- Campo Data -->
-      <div class="mb-4">
-        <label class="block text-sm font-semibold text-gray-700 mb-1">Data</label>
-        <input 
-          type="text" 
-          id="input-data-editar-investimento" 
-          placeholder="DD/MM/YYYY"
-          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 transition"
-          maxlength="10"
-        />
+      <!-- Campo Data e Tipo lado a lado -->
+      <div class="mb-4 grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1">Data</label>
+          <input 
+            type="text" 
+            id="input-data-editar-investimento" 
+            placeholder="DD/MM/YYYY"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 transition"
+            maxlength="10"
+          />
+        </div>
+        
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1">Tipo</label>
+          <select 
+            id="input-tipo-editar-investimento"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 transition bg-white"
+          >
+            <option value="recorrente_fixa">Recorrente Fixa</option>
+            <option value="recorrente_variavel">Recorrente Variável</option>
+            <option value="extra">Extra</option>
+          </select>
+        </div>
       </div>
 
       <!-- Campo Descrição -->
@@ -524,9 +571,15 @@ function mudarMes(direcao) {
     anoSelecionado--;
   }
 
+  // Resetar flags de indicadores
+  indicadorFaturamentoCarregado = false;
+  indicadorInvestimentosCarregado = false;
+  indicadorPagamentoEquipeCarregado = false;
+
   atualizarMes();
   carregarInvestimentos(); // Recarregar investimentos do novo mês
   carregarEntradas(); // Recarregar entradas do novo mês
+  carregarPagamentoEquipe(); // Recarregar pagamento de equipe do novo mês
   console.log(`Mês alterado para: ${mesSelecionado + 1}/${anoSelecionado}`);
 }
 
@@ -702,6 +755,7 @@ function abrirModalInvestimento() {
   
   // Limpar campos
   document.getElementById('input-data-investimento').value = '';
+  document.getElementById('input-tipo-investimento').value = 'recorrente_fixa'; // Padrão: Recorrente Fixa
   document.getElementById('input-descricao-investimento').value = '';
   document.getElementById('input-valor-investimento').value = '';
   document.getElementById('erro-validacao-investimento').classList.add('hidden');
@@ -771,14 +825,16 @@ function aplicarMascaraFinanceira(e) {
 
 function validarCamposInvestimento() {
   const data = document.getElementById('input-data-investimento').value.trim();
+  const tipo = document.getElementById('input-tipo-investimento').value.trim();
   const descricao = document.getElementById('input-descricao-investimento').value.trim();
   const valor = document.getElementById('input-valor-investimento').value.trim();
   const erroDiv = document.getElementById('erro-validacao-investimento');
   const erroMsg = document.getElementById('erro-msg');
 
-  if (!data || !descricao || !valor || valor === 'R$ 0,00') {
+  if (!data || !tipo || !descricao || !valor || valor === 'R$ 0,00') {
     let msg = 'Preencha todos os campos';
     if (!data) msg = 'A data é obrigatória';
+    if (!tipo) msg = 'O tipo é obrigatório';
     if (!descricao) msg = 'A descrição é obrigatória';
     if (!valor || valor === 'R$ 0,00') msg = 'O valor é obrigatório';
 
@@ -794,33 +850,78 @@ function validarCamposInvestimento() {
 function salvarInvestimento() {
   if (!validarCamposInvestimento()) return;
 
+  console.log('🔍 === SALVANDO INVESTIMENTO - DEBUG COMPLETO ===');
+
   const data = document.getElementById('input-data-investimento').value;
+  const tipo = document.getElementById('input-tipo-investimento').value;
   const descricao = document.getElementById('input-descricao-investimento').value;
   const valor = document.getElementById('input-valor-investimento').value;
 
+  console.log('📝 Dados brutos do formulário:');
+  console.log(`  data: "${data}" (tipo: ${typeof data})`);
+  console.log(`  tipo: "${tipo}" (tipo: ${typeof tipo})`);
+  console.log(`  descricao: "${descricao}" (tipo: ${typeof descricao})`);
+  console.log(`  valor: "${valor}" (tipo: ${typeof valor})`);
+
   // Extrair data para obter o mês
-  const [dia, mes, ano] = data.split('/');
+  const partes = data.split('/');
+  console.log(`📅 Partes da data: [${partes.join(', ')}]`);
+  
+  const [dia, mes, ano] = partes;
   const mesNumerico = parseInt(mes) - 1;
   const nomeMes = meses[mesNumerico];
   const anoNumerico = parseInt(ano);
 
-  // Limpar valor para salvar no BD (remover R$ e converter)
-  const valorNumerico = parseFloat(valor.replace(/[^\d,]/g, '').replace(',', '.'));
-  const nomeDocumento = `${anoNumerico}-${nomeMes}-${valorNumerico}`;
+  console.log(`📅 Data extraída: dia=${dia}, mes=${mes} (num=${mesNumerico}), ano=${ano}`);
+  console.log(`📅 Nome do mês: ${nomeMes}`);
 
-  // Salvar no Firebase
-  salvarNoFirebase(nomeDocumento, {
+  // Limpar valor para salvar no BD (remover R$ e converter)
+  console.log(`💰 Convertendo valor: "${valor}"`);
+  const valorLimpo = valor.replace(/[^\d,]/g, '').replace(',', '.');
+  console.log(`💰 Valor limpo: "${valorLimpo}"`);
+  const valorNumerico = parseFloat(valorLimpo);
+  console.log(`💰 Valor numérico: ${valorNumerico} (tipo: ${typeof valorNumerico})`);
+  
+  // Gerar data e hora atual para o ID
+  const agora = new Date();
+  const diaAtual = String(agora.getDate()).padStart(2, '0');
+  const mesAtual = String(agora.getMonth() + 1).padStart(2, '0');
+  const anoAtual = agora.getFullYear();
+  const hora = String(agora.getHours()).padStart(2, '0');
+  const minuto = String(agora.getMinutes()).padStart(2, '0');
+  
+  // ID SEM caracteres problemáticos: usar underscores em vez de "/" e ":"
+  // Formato: ano-mes-valor-ddmmaaa_hhmm
+  // Exemplo: 2026-Fevereiro-180-17022026_1102
+  const dataHoraEnvio = `${diaAtual}${mesAtual}${anoAtual}_${hora}${minuto}`;
+  
+  console.log(`⏰ Data/Hora de envio: ${dataHoraEnvio}`);
+
+  const nomeDocumento = `${anoNumerico}-${nomeMes}-${valorNumerico}-${dataHoraEnvio}`;
+  
+  console.log(`\n📄 ID DO DOCUMENTO A SALVAR:`);
+  console.log(`   ${nomeDocumento}`);
+
+  const dadosParaSalvar = {
     data: data,
+    tipo: tipo,
     descricao: descricao,
     valor: valorNumerico,
     criado_em: new Date().toISOString()
-  });
+  };
+
+  console.log(`\n💾 DADOS PARA SALVAR NO FIREBASE:`);
+  console.log(JSON.stringify(dadosParaSalvar, null, 2));
+
+  // Salvar no Firebase
+  salvarNoFirebase(nomeDocumento, dadosParaSalvar);
 
   fecharModalInvestimento();
-  console.log(`Investimento salvo: ${nomeDocumento}`);
+  console.log(`✅ Investimento enviado para salvar: ${nomeDocumento}\n`);
 }
 
 function salvarNoFirebase(nomeDocumento, dados) {
+  console.log('\n🔐 === SALVANDO NO FIREBASE ===');
   console.log('Verificando disponibilidade do Firebase...');
   console.log('window.BANCO:', window.BANCO ? 'existe' : 'NÃO existe');
   console.log('window.BANCO.db:', window.BANCO?.db ? 'existe' : 'NÃO existe');
@@ -831,22 +932,40 @@ function salvarNoFirebase(nomeDocumento, dados) {
     return;
   }
 
-  // Usar Firestore
+  console.log(`\n📝 Preparando para salvar:`);
+  console.log(`   Coleção: "investimentos"`);
+  console.log(`   Documento ID: ${nomeDocumento}`);
+  console.log(`   Dados:`);
+  console.log(JSON.stringify(dados, null, 2));
+
+  // Usar Firestore - SEM merge: true para força escrita completa
+  console.log('\n⏳ Iniciando operação de escrita...');
+  
   window.BANCO.db.collection('investimentos')
     .doc(nomeDocumento)
-    .set(dados, { merge: true })
+    .set(dados)
     .then(() => {
-      console.log('Documento salvo com sucesso:', nomeDocumento);
+      console.log(`✅ SUCESSO! Documento salvo com sucesso:`);
+      console.log(`   Coleção: investimentos`);
+      console.log(`   ID: ${nomeDocumento}`);
+      console.log(`   Timestamp: ${new Date().toISOString()}`);
+      console.log(`\n🔄 Recarregando investimentos...`);
       carregarInvestimentos();
     })
     .catch((error) => {
-      console.error('Erro ao salvar:', error);
-      alert('Erro ao salvar investimento. Tente novamente.');
+      console.error('❌ ERRO CRÍTICO ao salvar no Firebase:');
+      console.error('   Código:', error.code);
+      console.error('   Mensagem:', error.message);
+      console.error('   Stack:', error.stack);
+      console.error('   Objeto completo:', error);
+      alert(`Erro ao salvar: ${error.code} - ${error.message}`);
     });
 }
 
 function carregarInvestimentos() {
-  console.log('Carregando investimentos do mês:', meses[mesSelecionado], anoSelecionado);
+  console.log('\n📂 === CARREGANDO INVESTIMENTOS ===');
+  console.log('Mês selecionado:', mesSelecionado + 1, '/', anoSelecionado);
+  console.log('Mês nome:', meses[mesSelecionado]);
   console.log('window.BANCO disponível?', window.BANCO ? 'SIM' : 'NÃO');
   
   if (!window.BANCO || !window.BANCO.db) {
@@ -858,17 +977,31 @@ function carregarInvestimentos() {
   window.BANCO.db.collection('investimentos')
     .get()
     .then((snapshot) => {
+      console.log(`📊 Total de documentos na coleção: ${snapshot.size}`);
+      
       const tbody = document.getElementById('tabelaSaidasInvestimentosBody');
-      if (!tbody) return;
+      if (!tbody) {
+        console.error('❌ tbody não encontrado');
+        return;
+      }
 
       if (snapshot.empty) {
-        tbody.innerHTML = `<tr><td colspan="3" class="px-4 py-8 text-center text-gray-500 text-sm">Nenhum registro encontrado</td></tr>`;
+        console.log('⚠️ Coleção vazia');
+        tbody.innerHTML = `<tr><td colspan="4" class="px-4 py-8 text-center text-gray-500 text-sm">Nenhum registro encontrado</td></tr>`;
         return;
       }
 
       let html = '';
+      let processados = 0;
+      let filtrados = 0;
+
       snapshot.forEach((doc) => {
+        processados++;
         const dados = doc.data();
+        
+        console.log(`\n📄 Documento ${processados}: ${doc.id}`);
+        console.log(`   Campos:`, Object.keys(dados).join(', '));
+        console.log(`   data: ${dados.data}, tipo: ${dados.tipo}, valor: ${dados.valor}, descricao: ${dados.descricao}`);
         
         // Filtrar por mês selecionado
         if (dados.data) {
@@ -879,22 +1012,33 @@ function carregarInvestimentos() {
             const mes = parseInt(partes[1]) - 1; // JavaScript months são 0-11
             const ano = parseInt(partes[2]);
             
+            console.log(`   Comparação: mes=${mes} vs mesSelecionado=${mesSelecionado}, ano=${ano} vs anoSelecionado=${anoSelecionado}`);
+            
             // Verificar se o investimento é do mês selecionado
             if (mes === mesSelecionado && ano === anoSelecionado) {
+              filtrados++;
+              console.log(`   ✅ INCLUÍDO NA TABELA`);
               html += `
-                <tr class="border-b border-gray-200 hover:bg-gray-50" data-doc-id="${doc.id}" data-data="${dados.data}" data-descricao="${dados.descricao}" data-valor="${dados.valor}">
+                <tr class="border-b border-gray-200 hover:bg-gray-50" data-doc-id="${doc.id}" data-data="${dados.data}" data-tipo="${dados.tipo || 'fixo'}" data-descricao="${dados.descricao}" data-valor="${dados.valor}">
                   <td class="px-4 py-3 text-sm text-gray-800">${dados.data || '-'}</td>
-                  <td class="px-4 py-3 text-sm text-gray-800">${dados.descricao || '-'}</td>
+                  <td class="px-4 py-3 text-sm text-gray-800" style="width: 54%; word-break: break-word; overflow-wrap: break-word;">${dados.descricao || '-'}</td>
+                  <td class="px-4 py-3 text-sm text-gray-800">${dados.tipo ? (dados.tipo.charAt(0).toUpperCase() + dados.tipo.slice(1)) : '-'}</td>
                   <td class="px-4 py-3 text-sm text-gray-800">R$ ${dados.valor?.toFixed(2) || '-'}</td>
                 </tr>
               `;
+            } else {
+              console.log(`   ❌ Fora do mês selecionado`);
             }
           }
         }
       });
 
+      console.log(`\n📊 Resumo: ${processados} documentos processados, ${filtrados} filtrados para exibição`);
+
       if (html === '') {
-        tbody.innerHTML = `<tr><td colspan="3" class="px-4 py-8 text-center text-gray-500 text-sm">Nenhum registro encontrado para este mês</td></tr>`;
+        console.log('⚠️ Nenhum investimento encontrado para este mês');
+        tbody.innerHTML = `<tr><td colspan="4" class="px-4 py-8 text-center text-gray-500 text-sm">Nenhum registro encontrado para este mês</td></tr>`;
+        totalInvestimentosMesAtual = 0;
       } else {
         tbody.innerHTML = html;
         // Adicionar event listener para clique direito nas linhas
@@ -903,9 +1047,31 @@ function carregarInvestimentos() {
           linha.addEventListener('contextmenu', (e) => exibirMenuContexto(e, 'investimento'));
         });
       }
+      
+      // Calcular total de investimentos do mês
+      totalInvestimentosMesAtual = 0;
+      snapshot.forEach((doc) => {
+        const dados = doc.data();
+        if (dados.data) {
+          const partes = dados.data.split('/');
+          if (partes.length === 3) {
+            const mes = parseInt(partes[1]) - 1;
+            const ano = parseInt(partes[2]);
+            
+            if (mes === mesSelecionado && ano === anoSelecionado) {
+              if (dados.valor) {
+                totalInvestimentosMesAtual += dados.valor;
+              }
+            }
+          }
+        }
+      });
+      
+      console.log(`💰 Total de Investimentos do mês: R$ ${totalInvestimentosMesAtual.toFixed(2)}`);
+      atualizarIndicadorDespesas();
     })
     .catch((error) => {
-      console.error('Erro ao carregar investimentos:', error);
+      console.error('❌ Erro ao carregar investimentos:', error);
     });
 }
 
@@ -1114,7 +1280,7 @@ function obterMesNumero(mesPorExtenso) {
 }
 
 function atualizarIndicadores(entradasDoMes) {
-  console.log('=== ATUALIZANDO INDICADORES ===');
+  console.log('=== ATUALIZANDO INDICADORES (FATURAMENTO) ===');
   
   // Calcular Faturamento (somatório de ValorPacote)
   let faturamento = 0;
@@ -1124,16 +1290,16 @@ function atualizarIndicadores(entradasDoMes) {
     }
   });
   
+  // Armazenar globalmente para cálculo do lucro
+  faturamentoValue = faturamento;
+  
   console.log(`📊 Faturamento calculado: R$ ${faturamento.toFixed(2)}`);
   
-  // Atualizar elemento no DOM
-  const indicadorFaturamento = document.getElementById('indicador-faturamento');
-  if (indicadorFaturamento) {
-    indicadorFaturamento.textContent = formatarMoedaBrasileira(faturamento);
-    console.log('✅ Indicador de Faturamento atualizado');
-  } else {
-    console.warn('⚠️ Elemento indicador-faturamento não encontrado');
-  }
+  // Marcar como carregado
+  indicadorFaturamentoCarregado = true;
+  
+  // Verificar se todos os indicadores estão prontos
+  verificarAndExibirIndicadores();
 }
 
 function formatarMoedaBrasileira(valor) {
@@ -1153,10 +1319,11 @@ function exibirMenuContexto(event, tipo) {
   const linha = event.currentTarget;
   const docId = linha.getAttribute('data-doc-id');
   const data = linha.getAttribute('data-data');
+  const tipoInvest = linha.getAttribute('data-tipo');
   const descricao = linha.getAttribute('data-descricao');
   const valor = linha.getAttribute('data-valor');
   
-  console.log('🔔 Menu de contexto acionado:', { docId, data, descricao, valor });
+  console.log('🔔 Menu de contexto acionado:', { docId, data, tipoInvest, descricao, valor });
   
   // Remover menu anterior se existir
   const menuAnterior = document.getElementById('menu-contexto-investimento');
@@ -1173,7 +1340,7 @@ function exibirMenuContexto(event, tipo) {
   `;
   
   menu.innerHTML = `
-    <button class="w-full text-left px-4 py-2 hover:bg-orange-50 border-b border-gray-200 flex items-center gap-2 text-sm text-gray-700 font-medium" onclick="editarInvestimento('${docId}', '${data}', '${descricao}', '${valor}')">
+    <button class="w-full text-left px-4 py-2 hover:bg-orange-50 border-b border-gray-200 flex items-center gap-2 text-sm text-gray-700 font-medium" onclick="editarInvestimento('${docId}', '${data}', '${tipoInvest}', '${descricao}', '${valor}')">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
       </svg>
@@ -1203,11 +1370,12 @@ function fecharMenuContexto() {
   }
 }
 
-function editarInvestimento(docId, data, descricao, valor) {
+function editarInvestimento(docId, data, tipoInvest, descricao, valor) {
   console.log('✏️ Editando investimento:', docId);
   
   // Pré-preencher os campos
   document.getElementById('input-data-editar-investimento').value = data;
+  document.getElementById('input-tipo-editar-investimento').value = tipoInvest || 'recorrente_fixa';
   document.getElementById('input-descricao-editar-investimento').value = descricao;
   document.getElementById('input-valor-editar-investimento').value = formatarMoedaBrasileira(parseFloat(valor));
   
@@ -1292,15 +1460,17 @@ function salvarEdicaoInvestimento() {
   console.log('💾 Salvando edição do investimento');
   
   const data = document.getElementById('input-data-editar-investimento').value.trim();
+  const tipo = document.getElementById('input-tipo-editar-investimento').value.trim();
   const descricao = document.getElementById('input-descricao-editar-investimento').value.trim();
   const valor = document.getElementById('input-valor-editar-investimento').value.trim();
   const erroDiv = document.getElementById('erro-validacao-editar-investimento');
   const erroMsg = document.getElementById('erro-msg-editar');
   
   // Validação
-  if (!data || !descricao || !valor || valor === 'R$ 0,00') {
+  if (!data || !tipo || !descricao || !valor || valor === 'R$ 0,00') {
     let msg = 'Preencha todos os campos';
     if (!data) msg = 'A data é obrigatória';
+    if (!tipo) msg = 'O tipo é obrigatório';
     if (!descricao) msg = 'A descrição é obrigatória';
     if (!valor || valor === 'R$ 0,00') msg = 'O valor é obrigatório';
     
@@ -1324,6 +1494,7 @@ function salvarEdicaoInvestimento() {
     .doc(window.docIdEmEdicao)
     .update({
       data: data,
+      tipo: tipo,
       descricao: descricao,
       valor: valorNumerico
     })
@@ -1336,4 +1507,215 @@ function salvarEdicaoInvestimento() {
       console.error('❌ Erro ao atualizar:', error);
       alert('Erro ao atualizar investimento. Tente novamente.');
     });
+}
+
+function carregarPagamentoEquipe() {
+  console.log('=== CARREGANDO PAGAMENTO EQUIPE ===');
+  console.log('Mês selecionado:', mesSelecionado + 1, '/', anoSelecionado);
+  console.log('Mês nome:', meses[mesSelecionado]);
+  
+  if (!window.BANCO || !window.BANCO.db) {
+    console.warn('⚠️ Firebase ainda não está disponível. Tentando novamente em 1s...');
+    setTimeout(() => carregarPagamentoEquipe(), 1000);
+    return;
+  }
+
+  console.log('✅ Firebase disponível');
+  console.log('Buscando coleção "BancoDeAulas-Lista"...');
+
+  window.BANCO.db.collection('BancoDeAulas-Lista')
+    .get()
+    .then((snapshot) => {
+      console.log(`📊 Total de documentos encontrados: ${snapshot.size}`);
+      
+      const tbody = document.getElementById('tabelaPagamentoEquipeBody');
+      if (!tbody) {
+        console.error('❌ tbody tabelaPagamentoEquipeBody não encontrado no DOM');
+        return;
+      }
+
+      console.log('✅ tbody encontrado no DOM');
+
+      let registrosDoMes = [];
+
+      snapshot.forEach((doc) => {
+        const dados = doc.data();
+        console.log(`📄 Documento: ${doc.id}`);
+        
+        if (dados.data) {
+          console.log(`  ✓ Encontrado: data = "${dados.data}"`);
+          
+          // Parse da data no formato "ddd - dd/mm/yyyy"
+          // Exemplo: "qui - 12/02/2026"
+          const matches = dados.data.match(/\w+\s*-\s*(\d{2})\/(\d{2})\/(\d{4})/);
+          
+          if (matches) {
+            const dia = parseInt(matches[1]);
+            const mes = parseInt(matches[2]) - 1; // JavaScript months são 0-11
+            const ano = parseInt(matches[3]);
+            
+            console.log(`  Extraído: dia=${dia}, mês=${mes}, ano=${ano}`);
+            console.log(`  Comparando com: mes=${mesSelecionado}, ano=${anoSelecionado}`);
+            
+            // Verificar se é do mês selecionado
+            if (mes === mesSelecionado && ano === anoSelecionado) {
+              console.log(`    ✅ DENTRO DO MÊS SELECIONADO!`);
+              registrosDoMes.push(dados);
+            } else {
+              console.log(`    ❌ Fora do mês`);
+            }
+          } else {
+            console.log(`  ❌ Não conseguiu fazer parse da data`);
+          }
+        } else {
+          console.log(`  ⚠️ Campo "data" não encontrado`);
+        }
+      });
+
+      console.log(`\n📈 Total de registros do mês (bruto): ${registrosDoMes.length}`);
+
+      // ============================================
+      // AGRUPAR POR PROFESSOR + CLIENTE + CONTRATACAO
+      // ============================================
+      console.log('🔄 Agrupando registros...');
+      
+      const registrosAgrupados = {};
+
+      registrosDoMes.forEach((dados) => {
+        // Chave para agrupar: professor|nomeCliente|codigoContratacao
+        const chave = `${dados.professor || 'N/A'}|${dados.nomeCliente || 'N/A'}|${dados.codigoContratacao || 'N/A'}`;
+        
+        if (!registrosAgrupados[chave]) {
+          registrosAgrupados[chave] = {
+            professor: dados.professor || '-',
+            nomeCliente: dados.nomeCliente || '-',
+            codigoContratacao: dados.codigoContratacao || '-',
+            valorTotal: 0
+          };
+        }
+
+        // Somar valores
+        if (dados.ValorAula) {
+          registrosAgrupados[chave].valorTotal += dados.ValorAula;
+        }
+      });
+
+      // Converter objeto em array
+      const registrosComSoma = Object.values(registrosAgrupados);
+      console.log(`\n📊 Total de registros após agrupamento: ${registrosComSoma.length}`);
+
+      if (registrosComSoma.length === 0) {
+        console.warn('⚠️ Nenhum registro encontrado para este mês');
+        tbody.innerHTML = `<tr><td colspan="4" class="px-4 py-8 text-center text-gray-500 text-sm">Nenhum registro encontrado para este mês</td></tr>`;
+        return;
+      }
+
+      let html = '';
+      registrosComSoma.forEach((registro, index) => {
+        console.log(`Renderizando registro agrupado ${index + 1}:`, registro.professor);
+        
+        // Formatar valor total
+        const valorTotal = formatarMoedaBrasileira(registro.valorTotal);
+        
+        html += `
+          <tr class="border-b border-gray-200 hover:bg-gray-50">
+            <td class="px-4 py-3 text-sm text-gray-800">${registro.professor}</td>
+            <td class="px-4 py-3 text-sm text-gray-800">${registro.nomeCliente}</td>
+            <td class="px-4 py-3 text-sm text-gray-800 font-semibold text-orange-600">${valorTotal}</td>
+            <td class="px-4 py-3 text-sm text-gray-800">${registro.codigoContratacao}</td>
+          </tr>
+        `;
+      });
+
+      tbody.innerHTML = html;
+      console.log(`✅ Tabela atualizada com ${registrosComSoma.length} registros agrupados`);
+      
+      // Calcular total de pagamento de equipe do mês
+      totalPagamentoEquipeMesAtual = 0;
+      registrosComSoma.forEach((registro) => {
+        if (registro.valorTotal) {
+          totalPagamentoEquipeMesAtual += registro.valorTotal;
+        }
+      });
+      
+      console.log(`💰 Total de Pagamento de Equipe do mês: R$ ${totalPagamentoEquipeMesAtual.toFixed(2)}`);
+      atualizarIndicadorDespesas();
+    })
+    .catch((error) => {
+      console.error('❌ ERRO ao carregar pagamento de equipe:', error);
+      console.error('Stack:', error.stack);
+    });
+}
+
+function atualizarIndicadorDespesas() {
+  console.log('=== ATUALIZANDO INDICADOR DE DESPESAS ===');
+  
+  // Somar investimentos + pagamento de equipe
+  const totalDespesas = totalInvestimentosMesAtual + totalPagamentoEquipeMesAtual;
+  
+  console.log(`  Total Investimentos: R$ ${totalInvestimentosMesAtual.toFixed(2)}`);
+  console.log(`  Total Pagamento Equipe: R$ ${totalPagamentoEquipeMesAtual.toFixed(2)}`);
+  console.log(`  Total Despesas: R$ ${totalDespesas.toFixed(2)}`);
+  
+  // Marcar como carregado
+  indicadorInvestimentosCarregado = true;
+  indicadorPagamentoEquipeCarregado = true;
+  
+  // Verificar se todos os indicadores estão prontos
+  verificarAndExibirIndicadores();
+}
+
+function verificarAndExibirIndicadores() {
+  console.log('🔄 Verificando se todos os indicadores estão prontos...');
+  console.log(`  Faturamento: ${indicadorFaturamentoCarregado ? '✅' : '⏳'}`);
+  console.log(`  Investimentos: ${indicadorInvestimentosCarregado ? '✅' : '⏳'}`);
+  console.log(`  Pagamento Equipe: ${indicadorPagamentoEquipeCarregado ? '✅' : '⏳'}`);
+  
+  // Se todos estão prontos, exibir os 3 indicadores
+  if (indicadorFaturamentoCarregado && indicadorInvestimentosCarregado && indicadorPagamentoEquipeCarregado) {
+    console.log('\n✨ TODOS OS INDICADORES PRONTOS! Atualizando tela...\n');
+    
+    // Calcular total de despesas
+    const totalDespesas = totalInvestimentosMesAtual + totalPagamentoEquipeMesAtual;
+    
+    // Calcular Lucro Bruto
+    const lucroBruto = faturamentoValue - totalDespesas;
+    
+    console.log('📊 RESUMO FINAL:');
+    console.log(`  Faturamento: R$ ${faturamentoValue.toFixed(2)}`);
+    console.log(`  Despesas: R$ ${totalDespesas.toFixed(2)}`);
+    console.log(`  Lucro Bruto: R$ ${lucroBruto.toFixed(2)}`);
+    
+    // Atualizar os 3 indicadores simultaneamente
+    const indicadorFaturamento = document.getElementById('indicador-faturamento');
+    const indicadorDespesas = document.getElementById('indicador-despesas');
+    const indicadorLucroBruto = document.getElementById('indicador-lucro-bruto');
+    
+    if (indicadorFaturamento) {
+      indicadorFaturamento.textContent = formatarMoedaBrasileira(faturamentoValue);
+      console.log('✅ Indicador de Faturamento atualizado');
+    }
+    
+    if (indicadorDespesas) {
+      indicadorDespesas.textContent = formatarMoedaBrasileira(totalDespesas);
+      console.log('✅ Indicador de Despesas atualizado');
+    }
+    
+    if (indicadorLucroBruto) {
+      indicadorLucroBruto.textContent = formatarMoedaBrasileira(lucroBruto);
+      
+      // Mudar cor baseado no sinal do lucro (verde se positivo, vermelho se negativo)
+      if (lucroBruto < 0) {
+        indicadorLucroBruto.className = 'text-2xl font-bold text-red-500';
+      } else {
+        indicadorLucroBruto.className = 'text-2xl font-bold text-green-500';
+      }
+      
+      console.log('✅ Indicador de Lucro Bruto atualizado');
+    } else {
+      console.warn('⚠️ Elemento indicador-lucro-bruto não encontrado');
+    }
+    
+    console.log('\n✨ Indicadores exibidos!\n');
+  }
 }
