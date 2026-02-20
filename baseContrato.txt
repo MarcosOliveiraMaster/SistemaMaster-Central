@@ -1,19 +1,16 @@
 # CONTRATO DE PRESTAÇÃO DE SERVIÇOS
 
+## TERMOS E CONDIÇÕES GERAIS DE FORNECIMENTO DE AULAS PARTICULARES
 
-### 1. TERMOS E CONDIÇÕES GERAIS DE FORNECIMENTO DE AULAS PARTICULARES
+### Qualificação das Partes
 
-### 1.1 CONTRATADA
 MASTER EDUCACAO LTDA inscrito(a) no CNPJ 48.055.955/0001-72 registrado na AV WALTER ANANIAS, 594 bairro Poço, CEP 57.025-510, Cidade Maceió, Estado Alagoas.
 
-### 1.2 CONTRATANTE
 [NomeCliente] inscrito(a) no CPF de número [CPFCliente] , com endereço em: [EnderecoCliente]. Atenderemos o(s) estudantes(s): [estudantes], nas respectivas séries [series]
 
 
+### CLÁUSULA PRIMEIRA – DO OBJETO
 
-## DO OBJETO DO CONTRATO
-
-### Cláusula Primeira
 1.1. O presente contrato tem por objeto a intermediação e organização de aulas particulares de reforço escolar, em disciplinas do ensino básico, ministradas por professores integrantes da rede MASTER EDUCAÇÃO, bem como a comercialização e gestão administrativa dos serviços educacionais descritos neste instrumento.
 
 1.2. As aulas particulares destinam-se exclusivamente a alunos regularmente matriculados em instituições de ensino reconhecidas pelo MEC.
@@ -21,80 +18,60 @@ MASTER EDUCACAO LTDA inscrito(a) no CNPJ 48.055.955/0001-72 registrado na AV WAL
 1.3. A CONTRATADA não garante resultados acadêmicos específicos, notas, aprovação ou desempenho escolar determinado, uma vez que o sucesso do processo educacional depende de fatores alheios à sua atuação, como dedicação do aluno e acompanhamento familiar.
 
 
-## DOS SERVIÇOS EDUCACIONAIS COMPLEMENTARES
+### CLÁUSULA SEGUNDA - DA NATUREZA DA INTERMEDIAÇÃO
 
-### Cláusula Segunda  
-2.1. Além das aulas particulares, a CONTRATADA poderá comercializar os seguintes serviços educacionais:
-I – Diagnóstico Estudantil;
-II – Nivelamento Escolar;
-III – Planejamento Estratégico Trimestral.
+2.1. A CONTRATADA atua como mediadora e organizadora dos serviços educacionais, não estabelecendo vínculo empregatício entre o CONTRATANTE e os professores ou profissionais técnicos.
 
-2.2. Os serviços descritos no item 2.1 serão executados exclusivamente pela Orientadora Pedagógica Letícia de Pontes Leite Monte, profissional responsável integral pelo atendimento técnico, análise pedagógica, relatórios e orientações educacionais.
+2.2. A responsabilidade pedagógica direta pelas aulas particulares é do professor designado, enquanto a CONTRATADA responde pela organização, agendamento, gestão administrativa e suporte ao serviço.
 
-2.3. A atuação da CONTRATADA, no que se refere aos serviços do item 2.1, limita-se à intermediação comercial, venda, cobrança e recebimento dos valores, não interferindo no conteúdo técnico-pedagógico, metodologia ou conclusões apresentadas pela profissional responsável.
+2.3. É expressamente vedado aos professores e profissionais integrantes da rede MASTER EDUCAÇÃO receber, solicitar ou negociar pagamentos diretamente com o CONTRATANTE, devendo todos os valores referentes aos serviços contratados serem pagos exclusivamente à CONTRATADA, pelos meios por ela disponibilizados.
 
 
-## DA NATUREZA DA INTERMEDIAÇÃO
+### CLÁUSULA TERCEIRA – DO PRAZO E DA VIGÊNCIA
 
-### Cláusula Terceira
-3.1. A CONTRATADA atua como mediadora e organizadora dos serviços educacionais, não estabelecendo vínculo empregatício entre o CONTRATANTE e os professores ou profissionais técnicos.
+3.1. O presente contrato terá vigência conforme o plano, pacote ou serviço descrito na PROPOSTA DE ATENDIMENTO.
 
-3.2. A responsabilidade pedagógica direta pelas aulas particulares é do professor designado, enquanto a CONTRATADA responde pela organização, agendamento, gestão administrativa e suporte ao serviço.
+3.2. A utilização dos serviços está condicionada à confirmação do pagamento integral ou parcial, conforme acordado na proposta.
 
-3.3. É expressamente vedado aos professores e profissionais integrantes da rede MASTER EDUCAÇÃO receber, solicitar ou negociar pagamentos diretamente com o CONTRATANTE, devendo todos os valores referentes aos serviços contratados serem pagos exclusivamente à CONTRATADA, pelos meios por ela disponibilizados.
-
-
-## DO PRAZO E DA VIGÊNCIA
-
-### Cláusula Quarta
-4.1. O presente contrato terá vigência conforme o plano, pacote ou serviço descrito na PROPOSTA DE ATENDIMENTO.
-
-4.2. A utilização dos serviços está condicionada à confirmação do pagamento integral ou parcial, conforme acordado na proposta.
-
-4.3. A contratação poderá ser renovada mediante novo pagamento e aceite das condições vigentes à época.
+3.3. A contratação poderá ser renovada mediante novo pagamento e aceite das condições vigentes à época.
 
 
-## DO PAGAMENTO
+### CLÁUSULA QUARTA - DO PAGAMENTO
 
-### Cláusula Quinta
-5.1. Os valores, forma de pagamento, número de aulas e serviços contratados constam na PROPOSTA DE ATENDIMENTO.
+4.1. Os valores, forma de pagamento, número de aulas e serviços contratados constam na PROPOSTA DE ATENDIMENTO.
 
-5.2. O inadimplemento autoriza a CONTRATADA a suspender imediatamente os serviços até a regularização dos valores devidos.
+4.2. O inadimplemento autoriza a CONTRATADA a suspender imediatamente os serviços até a regularização dos valores devidos.
 
-5.3. A solicitação de aulas para execução no mesmo dia da contratação poderá implicar acréscimo de até 15% sobre o valor da hora-aula.
-
-
-## DO CANCELAMENTO E DAS FALTAS
-
-### Cláusula Sexta
-6.1. O CONTRATANTE terá direito a 02 (dois) cancelamentos de aula por pacote contratado, desde que solicitado com antecedência mínima de 4 (quatro) horas ao horário de início da aula do dia, convertendo-se a aula em crédito válido por 7 (sete) dias úteis.
-
-6.2. Cancelamentos solicitados fora do prazo estipulado ou ausência do aluno sem aviso prévio acarretarão perda integral da aula, sem direito a reembolso ou crédito.
-
-6.3. Em caso de cancelamento ou ausência injustificada do professor, a aula será reagendada ou reembolsada integralmente, a critério do CONTRATANTE.
+4.3. A solicitação de aulas para execução no mesmo dia da contratação poderá implicar acréscimo de até 15% sobre o valor da hora-aula.
 
 
-## DO REAGENDAMENTO
+### CLÁUSULA QUINTA - DO CANCELAMENTO E DAS FALTAS
 
-### Cláusula Sétima
-7.1. O CONTRATANTE terá direito a até 02 (dois) reagendamentos por pacote contratado, desde que solicitados com antecedência mínima de 4 (quatro) horas ao horário de início da aula do dia.
+5.1. O CONTRATANTE terá direito a 02 (dois) cancelamentos de aula por pacote contratado, desde que solicitado com antecedência mínima de 4 (quatro) horas ao horário de início da aula do dia, convertendo-se a aula em crédito válido por 7 (sete) dias úteis.
 
-7.2. Ultrapassado esse limite, a continuidade do serviço ficará condicionada à análise de viabilidade pela CONTRATADA, podendo ocorrer o cancelamento do contrato sem direito a reembolso.
+5.2. Cancelamentos solicitados fora do prazo estipulado ou ausência do aluno sem aviso prévio acarretarão perda integral da aula, sem direito a reembolso ou crédito.
 
-
-## DA RESCISÃO
-
-### Cláusula Oitava
-8.1. O contrato poderá ser rescindido por qualquer das partes mediante aviso prévio mínimo de 7 (sete) dias úteis.
-
-8.2. Em caso de rescisão pelo CONTRATANTE, será retido o percentual de 50% (cinquenta por cento) do valor correspondente às aulas ou serviços não utilizados, a título de custos administrativos e operacionais.
-
-8.3. Não haverá devolução de valores quando mais de 70% (setenta por cento) dos serviços contratados já tiverem sido executados.
+5.3. Em caso de cancelamento ou ausência injustificada do professor, a aula será reagendada ou reembolsada integralmente, a critério do CONTRATANTE.
 
 
-## DA PROTEÇÃO DE DADOS
+### CLÁUSULA SEXTA - DO REAGENDAMENTO
 
-### Cláusula Nona
+6.1. O CONTRATANTE terá direito a até 02 (dois) reagendamentos por pacote contratado, desde que solicitados com antecedência mínima de 4 (quatro) horas ao horário de início da aula do dia.
+
+6.2. Ultrapassado esse limite, a continuidade do serviço ficará condicionada à análise de viabilidade pela CONTRATADA, podendo ocorrer o cancelamento do contrato sem direito a reembolso.
+
+
+### CLÁUSULA SÉTIMA – DA RESCISÃO
+
+7.1. O contrato poderá ser rescindido por qualquer das partes mediante aviso prévio mínimo de 7 (sete) dias úteis.
+
+7.2. Em caso de rescisão pelo CONTRATANTE, será retido o percentual de 50% (cinquenta por cento) do valor correspondente às aulas ou serviços não utilizados, a título de custos administrativos e operacionais.
+
+7.3. Não haverá devolução de valores quando mais de 70% (setenta por cento) dos serviços contratados já tiverem sido executados.
+
+
+### CLÁUSULA OITAVA - DA PROTEÇÃO DE DADOS
+
 9.1. As partes declaram ciência e concordância com a Lei Geral de Proteção de Dados – LGPD (Lei nº 13.709/2018).
 
 9.2. Os dados pessoais do CONTRATANTE e do ALUNO serão utilizados exclusivamente para execução do presente contrato, organização dos serviços e cumprimento de obrigações legais.
@@ -102,46 +79,37 @@ III – Planejamento Estratégico Trimestral.
 9.3. O tratamento de dados de crianças e adolescentes observará sempre o seu melhor interesse, nos termos do art. 14 da LGPD.
 
 
-## DO USO DE IMAGEM
+### CLÁUSULA NONA - DO USO DA IMAGEM
 
-### Cláusula Décima
-10.1. O CONTRATANTE autoriza, de forma livre, informada e inequívoca, o uso da imagem, nome e voz do(a) ALUNO(A), quando eventualmente captados durante a execução dos serviços educacionais, exclusivamente para fins institucionais, pedagógicos e de divulgação da CONTRATADA, incluindo, mas não se limitando à: stories, publicações em feed de redes sociais, site institucional, materiais digitais e depoimentos educacionais.
+9.1. O CONTRATANTE autoriza, de forma livre, informada e inequívoca, o uso da imagem, nome e voz do(a) ALUNO(A), quando eventualmente captados durante a execução dos serviços educacionais, exclusivamente para fins institucionais, pedagógicos e de divulgação da CONTRATADA, incluindo, mas não se limitando à: stories, publicações em feed de redes sociais, site institucional, materiais digitais e depoimentos educacionais.
 
-10.2. A autorização abrange o uso do conteúdo em meios físicos e digitais, pelo prazo indeterminado, em território nacional, sem finalidade comercial direta vinculada à venda da imagem, mas apenas à divulgação dos serviços educacionais da CONTRATADA.
+9.2. A autorização abrange o uso do conteúdo em meios físicos e digitais, pelo prazo indeterminado, em território nacional, sem finalidade comercial direta vinculada à venda da imagem, mas apenas à divulgação dos serviços educacionais da CONTRATADA.
 
-10.3. A autorização prevista nesta cláusula não é condição para a execução dos serviços contratados, podendo o CONTRATANTE revogá-la a qualquer tempo, mediante solicitação expressa por escrito, ficando a CONTRATADA obrigada a cessar novas divulgações após o recebimento da solicitação.
+9.3. A autorização prevista nesta cláusula não é condição para a execução dos serviços contratados, podendo o CONTRATANTE revogá-la a qualquer tempo, mediante solicitação expressa por escrito, ficando a CONTRATADA obrigada a cessar novas divulgações após o recebimento da solicitação.
 
-10.4. Em nenhuma hipótese serão utilizadas imagens, vídeos ou depoimentos que exponham o ALUNO a situação vexatória, constrangedora ou que viole sua dignidade, honra ou privacidade, nos termos do Estatuto da Criança e do Adolescente e da Lei Geral de Proteção de Dados Pessoais. O uso de imagem do(a) ALUNO(A) será realizado sempre em observância ao seu melhor interesse, nos termos do Estatuto da Criança e do Adolescente e da Lei Geral de Proteção de Dados Pessoais.
-
-
-## DAS DISPOSIÇÕES GERAIS
-
-### Cláusula Décima Primeira
-11.1. O CONTRATANTE compromete-se a manter um responsável maior de idade presente durante a execução das aulas presenciais.
-
-11.2. O presente contrato não estabelece obrigação de resultado, mas de meio.
-
-11.3. Eventuais tolerâncias não constituem novação ou renúncia de direitos.
+9.4. Em nenhuma hipótese serão utilizadas imagens, vídeos ou depoimentos que exponham o ALUNO a situação vexatória, constrangedora ou que viole sua dignidade, honra ou privacidade, nos termos do Estatuto da Criança e do Adolescente e da Lei Geral de Proteção de Dados Pessoais. O uso de imagem do(a) ALUNO(A) será realizado sempre em observância ao seu melhor interesse, nos termos do Estatuto da Criança e do Adolescente e da Lei Geral de Proteção de Dados Pessoais.
 
 
-## DO FORO
+### CLÁUSULA DÉCIMA - DAS DISPOSIÇÕES GERAIS
 
-### Cláusula Décima Segunda
-12.1. Fica eleito o foro do domicílio do CONTRATANTE, nos termos do Código de Defesa do Consumidor, para dirimir eventuais controvérsias decorrentes deste contrato.
+10.1. O CONTRATANTE compromete-se a manter um responsável maior de idade presente durante a execução das aulas presenciais.
+
+10.2. O presente contrato não estabelece obrigação de resultado, mas de meio.
+
+10.3. Eventuais tolerâncias não constituem novação ou renúncia de direitos.
 
 
-## AUTORIZAÇÃO DE USO DE IMAGEM DO ALUNO:
+### CLÁUSULA DÉCIMA PRIMEIRA – DO FORO
 
-### Cláusula Décima Terceira
-13.1. O(A) CONTRATANTE declara estar ciente de que a autorização para uso de imagem, voz e depoimentos do aluno não é obrigatória para a execução dos serviços contratados.
+11.1. Fica eleito o foro do domicílio do CONTRATANTE, nos termos do Código de Defesa do Consumidor, para dirimir eventuais controvérsias decorrentes deste contrato.
 
-13.2. Ao assinar o presente documento, AUTORIZA o uso de imagem, voz e depoimentos do aluno, nos termos da Cláusula Décima – Do Uso de Imagem.
+11.2 O(A) CONTRATANTE declara estar ciente de que a autorização para uso de imagem, voz e depoimentos do aluno não é obrigatória para a execução dos serviços contratados.
 
-13.3. Caso NÃO AUTORIZE, o(a) CONTRATANTE deverá manifestar sua negativa expressa, no prazo de até 48 (quarenta e oito) horas após a assinatura do contrato, por meio do e-mail mastereducacaoadm@gmail.com, informando a não autorização.
+11.3 Ao assinar o presente documento, AUTORIZA o uso de imagem, voz e depoimentos do aluno, nos termos da Cláusula Décima – Do Uso de Imagem.
 
-13.4. A negativa ou eventual revogação da autorização não acarretará qualquer prejuízo à prestação dos serviços contratados.
+11.4 Caso NÃO AUTORIZE, o(a) CONTRATANTE deverá manifestar sua negativa expressa, no prazo de até 48 (quarenta e oito) horas após a assinatura do contrato, por meio do e-mail mastereducacaoadm@gmail.com, informando a não autorização.
 
-13.5. Ao assinar este documento, declaro que todas as informações acima são verdadeiras e que estou de pleno acordo com a presente Proposta de Atendimento.
+11.5 A negativa ou eventual revogação da autorização não acarretará qualquer prejuízo à prestação dos serviços contratados.
 
 
 ## Cronograma aprovado
