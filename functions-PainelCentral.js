@@ -121,7 +121,7 @@ function loadPainelCentral() {
     <!-- Consulta de Aulas -->
     <div class="bg-white rounded-lg border border-gray-300 p-4">
       <div class="flex justify-between items-center mb-4">
-        <h2 class="text-lg font-lexend font-bold text-gray-800">Consulta de Aulas</h2>
+        <h2 class="text-lg font-lexend font-bold text-gray-800">Consulta de Aulas do dia</h2>
         <div id="navegacao-consulta-aulas" class="flex items-center gap-2">
           <button id="btn-consulta-aulas-anterior" class="px-2 py-1 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-800">
             <i class="fas fa-chevron-left text-lg"></i>
@@ -426,7 +426,7 @@ async function loadAulasPainel(dataFiltro) {
           </td>
           <td class="px-2 py-3 text-sm text-center">
             <button 
-              onclick="enviarLembreteProfessor('${aula.id}', '${escapeHtml(aula.nomeCliente || '')}', '${escapeHtml(aula.professor || '')}', '${escapeHtml(aula.data || '')}', '${escapeHtml(aula.horario || '')}')" 
+              onclick="enviarLembreteCliente('${aula.id}', '${escapeHtml(aula.professor || '')}', '${escapeHtml(aula.data || '')}', '${escapeHtml(aula.horario || '')}', '${escapeHtml(aula.estudante || '')}', '${escapeHtml(aula.nomeCliente || '')}', '${escapeHtml(aula.materia || '')}')" 
               class="text-blue-500 hover:text-blue-600 transition-colors p-1 rounded-full hover:bg-blue-50" 
               title="Copiar Lembrete Professor"
             >
@@ -435,7 +435,7 @@ async function loadAulasPainel(dataFiltro) {
           </td>
           <td class="px-2 py-3 text-sm text-center">
             <button 
-              onclick="enviarLembreteCliente('${aula.id}', '${escapeHtml(aula.professor || '')}', '${escapeHtml(aula.data || '')}', '${escapeHtml(aula.horario || '')}', '${escapeHtml(aula.estudante || '')}', '${escapeHtml(aula.nomeCliente || '')}')" 
+              onclick="enviarLembreteProfessor('${aula.id}', '${escapeHtml(aula.nomeCliente || '')}', '${escapeHtml(aula.professor || '')}', '${escapeHtml(aula.data || '')}', '${escapeHtml(aula.horario || '')}', '${escapeHtml(aula.materia || '')}')" 
               class="text-green-500 hover:text-green-600 transition-colors p-1 rounded-full hover:bg-green-50" 
               title="Copiar Lembrete Cliente"
             >
@@ -592,90 +592,8 @@ window.salvarRelatorio_OLD = async function (id) {
 };
 
 // Funções de envio de lembrete
-window.enviarLembreteProfessor = async function (id, nomeCliente, nomeProfessor, dataAula, horarioAula) {
-  // 1. Saudação
-  const horaAtual = new Date().getHours();
-  let saudacao = 'Bom dia';
-  if (horaAtual >= 12 && horaAtual < 18) saudacao = 'Boa tarde';
-  if (horaAtual >= 18) saudacao = 'Boa noite';
-
-  // 2. Primeiro e segundo nome
-  const getDoisNomes = (nome) => {
-    if (!nome) return '';
-    const partes = nome.trim().split(/\s+/);
-    if (partes.length <= 2) return nome;
-    return `${partes[0]} ${partes[1]}`;
-  };
-
-  const nomeClienteFormatado = getDoisNomes(nomeCliente);
-  const nomeProfessorFormatado = nomeProfessor;
-
-  // 3. Data (Hoje/Amanhã/Data)
-  let dataTexto = dataAula; // Padrão
-
-  try {
-    // dataAula formato: "dom - 12/02/2026"
-    if (dataAula && dataAula.includes('-')) {
-      const partesData = dataAula.split('-')[1].trim().split('/');
-      const dia = parseInt(partesData[0]);
-      const mes = parseInt(partesData[1]) - 1;
-      const ano = parseInt(partesData[2]);
-
-      const dataObj = new Date(ano, mes, dia);
-      const hoje = new Date();
-      hoje.setHours(0, 0, 0, 0);
-      const amanha = new Date(hoje);
-      amanha.setDate(hoje.getDate() + 1);
-
-      // Comparar datas (ignorando hora)
-      if (dataObj.getTime() === hoje.getTime()) {
-        dataTexto = 'Hoje';
-      } else if (dataObj.getTime() === amanha.getTime()) {
-        dataTexto = 'Amanhã';
-      }
-    }
-  } catch (e) {
-    console.error('Erro ao converter data:', e);
-  }
-
-  // Montar mensagem
-  const mensagem = `${saudacao} ${nomeClienteFormatado}! Passando para lembrar nossa aula de ${dataTexto} às ${horarioAula} com o professor ${getDoisNomes(nomeProfessorFormatado)}`;
-
-  // Copiar para área de transferência
-  try {
-    await navigator.clipboard.writeText(mensagem);
-
-    // Feedback visual
-    if (typeof showToast === 'function') {
-      showToast(`Mensagem lembrete de Professor (${nomeProfessorFormatado}) copiada com sucesso!`, 'success');
-    } else {
-      alert(`Mensagem lembrete de Professor (${nomeProfessorFormatado}) copiada com sucesso!\n\n` + mensagem);
-    }
-  } catch (err) {
-    console.error('Erro ao copiar:', err);
-    // Fallback
-    const textArea = document.createElement("textarea");
-    textArea.value = mensagem;
-    document.body.appendChild(textArea);
-    textArea.select();
-    document.execCommand("copy");
-    document.body.removeChild(textArea);
-    if (typeof showToast === 'function') {
-      showToast(`Mensagem lembrete de Professor (${nomeProfessorFormatado}) copiada com sucesso!`, 'success');
-    } else {
-      alert(`Mensagem lembrete de Professor (${nomeProfessorFormatado}) copiada com sucesso!\n\n` + mensagem);
-    }
-  }
-};
-
-window.enviarLembreteCliente = async function (id, nomeProfessor, dataAula, horarioAula, nomeEstudante, nomeCliente) {
-  // 1. Saudação
-  const horaAtual = new Date().getHours();
-  let saudacao = 'Bom dia';
-  if (horaAtual >= 12 && horaAtual < 18) saudacao = 'Boa tarde';
-  if (horaAtual >= 18) saudacao = 'Boa noite';
-
-  // 2. Primeiro e segundo nome helper
+window.enviarLembreteProfessor = async function (id, nomeCliente, nomeProfessor, dataAula, horarioAula, nomeMateria) {
+  // Helper para pegar apenas dois primeiros nomes
   const getDoisNomes = (nome) => {
     if (!nome) return '';
     const partes = nome.trim().split(/\s+/);
@@ -684,47 +602,56 @@ window.enviarLembreteCliente = async function (id, nomeProfessor, dataAula, hora
   };
 
   const nomeProfessorFormatado = getDoisNomes(nomeProfessor);
-  const nomeEstudanteFormatado = getDoisNomes(nomeEstudante);
-  const nomeClienteFormatado = getDoisNomes(nomeCliente);
 
-  // 3. Data (Hoje/Amanhã/Data)
-  let dataTexto = dataAula;
+  // Dias da semana em português (abreviado)
+  const diasSemana = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
+
+  // Processar data
+  let dataTexto = 'Aula do dia: ';
+  let dataFormatada = dataAula;
 
   try {
     if (dataAula && dataAula.includes('-')) {
       const partesData = dataAula.split('-')[1].trim().split('/');
       const dia = parseInt(partesData[0]);
-      const mes = parseInt(partesData[1]) - 1;
+      const mes = parseInt(partesData[1]);
       const ano = parseInt(partesData[2]);
 
-      const dataObj = new Date(ano, mes, dia);
+      const dataObj = new Date(ano, mes - 1, dia);
       const hoje = new Date();
       hoje.setHours(0, 0, 0, 0);
       const amanha = new Date(hoje);
       amanha.setDate(hoje.getDate() + 1);
 
+      // Formatar data com dia da semana
+      const diaSemana = diasSemana[dataObj.getDay()];
+      dataFormatada = `${String(dia).padStart(2, '0')}/${String(mes).padStart(2, '0')} - ${diaSemana}`;
+
+      // Verificar se é hoje ou amanhã
       if (dataObj.getTime() === hoje.getTime()) {
-        dataTexto = 'Hoje';
+        dataTexto = 'Hoje, ';
       } else if (dataObj.getTime() === amanha.getTime()) {
-        dataTexto = 'Amanhã';
+        dataTexto = 'Amanhã, ';
+      } else {
+        dataTexto = 'Aula do dia: ';
       }
     }
   } catch (e) {
     console.error('Erro ao converter data:', e);
   }
 
-  // Montar mensagem
-  // "bom dia professor (NomeProfessor)! Passando para lembrar nossa aula de Hoje/Amanhã/dd - dd/mm/yyyy às (horário) com o estudante: (nome estudante) da cliente: (nome Cliente)"
-  const mensagem = `${saudacao} professor ${nomeProfessorFormatado}! Passando para lembrar nossa aula de ${dataTexto} às ${horarioAula} com o estudante: ${nomeEstudanteFormatado} da cliente: ${nomeClienteFormatado}`;
+  // Montar mensagem com novo formato para cliente
+  const mensagem = `🔔 Mensagem lembrete!\nAtendimento de ${dataTexto}${dataFormatada}.\n\nProf. ${nomeProfessorFormatado} às ${horarioAula} com aula de ${nomeMateria}`;
 
   // Copiar para área de transferência
   try {
     await navigator.clipboard.writeText(mensagem);
 
+    // Feedback visual
     if (typeof showToast === 'function') {
-      showToast(`Mensagem lembrete de Cliente (${nomeClienteFormatado}) copiada com sucesso!`, 'success');
+      showToast(`Mensagem lembrete de Cliente (${nomeProfessorFormatado}) copiada com sucesso!`, 'success');
     } else {
-      alert(`Mensagem lembrete de Cliente (${nomeClienteFormatado}) copiada com sucesso!\n\n` + mensagem);
+      alert(`Mensagem lembrete de Cliente (${nomeProfessorFormatado}) copiada com sucesso!\n\n` + mensagem);
     }
   } catch (err) {
     console.error('Erro ao copiar:', err);
@@ -736,9 +663,86 @@ window.enviarLembreteCliente = async function (id, nomeProfessor, dataAula, hora
     document.execCommand("copy");
     document.body.removeChild(textArea);
     if (typeof showToast === 'function') {
-      showToast(`Mensagem lembrete de Cliente (${nomeClienteFormatado}) copiada com sucesso!`, 'success');
+      showToast(`Mensagem lembrete de Cliente (${nomeProfessorFormatado}) copiada com sucesso!`, 'success');
     } else {
-      alert(`Mensagem lembrete de Cliente (${nomeClienteFormatado}) copiada com sucesso!\n\n` + mensagem);
+      alert(`Mensagem lembrete de Cliente (${nomeProfessorFormatado}) copiada com sucesso!\n\n` + mensagem);
+    }
+  }
+};
+
+window.enviarLembreteCliente = async function (id, nomeProfessor, dataAula, horarioAula, nomeEstudante, nomeCliente, nomeMateria) {
+  // Helper para pegar apenas dois primeiros nomes
+  const getDoisNomes = (nome) => {
+    if (!nome) return '';
+    const partes = nome.trim().split(/\s+/);
+    if (partes.length <= 2) return nome;
+    return `${partes[0]} ${partes[1]}`;
+  };
+
+  const nomeClienteFormatado = getDoisNomes(nomeCliente);
+
+  // Dias da semana em português (abreviado)
+  const diasSemana = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
+
+  // Processar data
+  let dataTexto = 'Aula do dia: ';
+  let dataFormatada = dataAula;
+
+  try {
+    if (dataAula && dataAula.includes('-')) {
+      const partesData = dataAula.split('-')[1].trim().split('/');
+      const dia = parseInt(partesData[0]);
+      const mes = parseInt(partesData[1]);
+      const ano = parseInt(partesData[2]);
+
+      const dataObj = new Date(ano, mes - 1, dia);
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      const amanha = new Date(hoje);
+      amanha.setDate(hoje.getDate() + 1);
+
+      // Formatar data com dia da semana
+      const diaSemana = diasSemana[dataObj.getDay()];
+      dataFormatada = `${String(dia).padStart(2, '0')}/${String(mes).padStart(2, '0')} - ${diaSemana}`;
+
+      // Verificar se é hoje ou amanhã
+      if (dataObj.getTime() === hoje.getTime()) {
+        dataTexto = 'Hoje, ';
+      } else if (dataObj.getTime() === amanha.getTime()) {
+        dataTexto = 'Amanhã, ';
+      } else {
+        dataTexto = 'Aula do dia: ';
+      }
+    }
+  } catch (e) {
+    console.error('Erro ao converter data:', e);
+  }
+
+  // Montar mensagem com novo formato
+  const mensagem = `🔔 Mensagem lembrete!\nAtendimento de ${dataTexto}${dataFormatada}.\n\n${nomeClienteFormatado} às ${horarioAula} com aula de ${nomeMateria}`;
+
+  // Copiar para área de transferência
+  try {
+    await navigator.clipboard.writeText(mensagem);
+
+    if (typeof showToast === 'function') {
+      showToast(`Mensagem lembrete de Professor (${nomeClienteFormatado}) copiada com sucesso!`, 'success');
+    } else {
+      alert(`Mensagem lembrete de Professor (${nomeClienteFormatado}) copiada com sucesso!\n\n` + mensagem);
+    }
+  } catch (err) {
+    console.error('Erro ao copiar:', err);
+    // Fallback
+    const textArea = document.createElement("textarea");
+    textArea.value = mensagem;
+    document.body.appendChild(textArea);
+    textArea.select();
+    document.execCommand("copy");
+    document.body.removeChild(textArea);
+    if (typeof showToast === 'function') {
+      showToast(`Mensagem lembrete de Professor (${nomeClienteFormatado}) copiada com sucesso!`, 'success');
+    } else {
+      alert(`Mensagem lembrete de Professor (${nomeClienteFormatado}) copiada com sucesso!\n\n` + mensagem);
     }
   }
 };

@@ -172,7 +172,10 @@ window.loadPainelFinanceiro = function() {
 
     <!-- Seção Saída: Pagamento de Equipe -->
     <div class="bg-white rounded-lg border border-gray-300 p-4 mb-4">
-      <h2 class="text-lg font-lexend font-bold text-gray-800 mb-4">Saída: Pagamento de Equipe</h2>
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-lg font-lexend font-bold text-gray-800">Saída: Pagamento de Equipe</h2>
+        <span id="total-pagamento-equipe" class="text-sm font-lexend font-semibold text-black">Total: R$ 0,00</span>
+      </div>
       
       <!-- Tabela de Pagamento de Equipe -->
       <div class="max-h-[300px] overflow-y-auto overflow-x-auto border border-gray-200 rounded-lg">
@@ -180,15 +183,15 @@ window.loadPainelFinanceiro = function() {
           <thead>
             <tr class="bg-gray-50 border-b border-gray-200">
               <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Nome Professor</th>
-              <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Nome Cliente</th>
+              <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700" style="display: none;">Nome Cliente</th>
               <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Valor das Aulas</th>
-              <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Contratação</th>
+              <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700" style="display: none;">Contratação</th>
             </tr>
           </thead>
           <tbody id="tabelaPagamentoEquipeBody">
             <!-- Dados serão carregados aqui -->
             <tr>
-              <td colspan="4" class="px-4 py-8 text-center text-gray-500 text-sm">
+              <td colspan="2" class="px-4 py-8 text-center text-gray-500 text-sm">
                 Nenhum registro encontrado
               </td>
             </tr>
@@ -201,9 +204,6 @@ window.loadPainelFinanceiro = function() {
     <div class="bg-white rounded-lg border border-gray-300 p-4 mb-4">
       <div class="flex justify-between items-center mb-4">
         <h2 class="text-lg font-lexend font-bold text-gray-800">Indicadores Estratégicos</h2>
-        <button id="btn-adicionar-informacao" class="py-1.5 px-4 text-sm font-medium rounded-lg transition-all bg-orange-500 text-white hover:bg-orange-600">
-          + Adicionar informação
-        </button>
       </div>
       
       <!-- Tabela de Indicadores Estratégicos -->
@@ -1575,15 +1575,17 @@ function carregarPagamentoEquipe() {
       console.log(`\n📈 Total de registros do mês (bruto): ${registrosDoMes.length}`);
 
       // ============================================
-      // AGRUPAR POR PROFESSOR + CLIENTE + CONTRATACAO
+      // AGRUPAR POR PROFESSOR (APENAS)
       // ============================================
-      console.log('🔄 Agrupando registros...');
+      console.log('🔄 Agrupando registros por professor...');
       
       const registrosAgrupados = {};
 
       registrosDoMes.forEach((dados) => {
-        // Chave para agrupar: professor|nomeCliente|codigoContratacao
-        const chave = `${dados.professor || 'N/A'}|${dados.nomeCliente || 'N/A'}|${dados.codigoContratacao || 'N/A'}`;
+        // Chave para agrupar: apenas o nome do professor
+        const chave = (dados.professor || 'N/A').trim();
+        
+        console.log(`  Professor: "${chave}", Valor: ${dados.ValorAula}`);
         
         if (!registrosAgrupados[chave]) {
           registrosAgrupados[chave] = {
@@ -1592,25 +1594,38 @@ function carregarPagamentoEquipe() {
             codigoContratacao: dados.codigoContratacao || '-',
             valorTotal: 0
           };
+          console.log(`    → Criando novo registro para: ${chave}`);
         }
 
         // Somar valores
         if (dados.ValorAula) {
           registrosAgrupados[chave].valorTotal += dados.ValorAula;
+          console.log(`    → Acumulando: ${dados.ValorAula} → Total agora: ${registrosAgrupados[chave].valorTotal}`);
         }
       });
 
       // Converter objeto em array
       const registrosComSoma = Object.values(registrosAgrupados);
+      
+      // Ordenar alfabeticamente pelo nome do professor
+      registrosComSoma.sort((a, b) => {
+        const nomeA = (a.professor || '').toLowerCase();
+        const nomeB = (b.professor || '').toLowerCase();
+        return nomeA.localeCompare(nomeB, 'pt-BR');
+      });
+      
       console.log(`\n📊 Total de registros após agrupamento: ${registrosComSoma.length}`);
+      console.log(`📋 Professores em ordem: ${registrosComSoma.map(r => r.professor).join(', ')}`);
 
       if (registrosComSoma.length === 0) {
         console.warn('⚠️ Nenhum registro encontrado para este mês');
-        tbody.innerHTML = `<tr><td colspan="4" class="px-4 py-8 text-center text-gray-500 text-sm">Nenhum registro encontrado para este mês</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="2" class="px-4 py-8 text-center text-gray-500 text-sm">Nenhum registro encontrado para este mês</td></tr>`;
         return;
       }
 
       let html = '';
+      totalPagamentoEquipeMesAtual = 0;
+      
       registrosComSoma.forEach((registro, index) => {
         console.log(`Renderizando registro agrupado ${index + 1}:`, registro.professor);
         
@@ -1620,23 +1635,26 @@ function carregarPagamentoEquipe() {
         html += `
           <tr class="border-b border-gray-200 hover:bg-gray-50">
             <td class="px-4 py-3 text-sm text-gray-800">${registro.professor}</td>
-            <td class="px-4 py-3 text-sm text-gray-800">${registro.nomeCliente}</td>
+            <td class="px-4 py-3 text-sm text-gray-800" style="display: none;">${registro.nomeCliente}</td>
             <td class="px-4 py-3 text-sm text-gray-800 font-semibold text-orange-600">${valorTotal}</td>
-            <td class="px-4 py-3 text-sm text-gray-800">${registro.codigoContratacao}</td>
+            <td class="px-4 py-3 text-sm text-gray-800" style="display: none;">${registro.codigoContratacao}</td>
           </tr>
         `;
+        
+        // Accumular total
+        if (registro.valorTotal) {
+          totalPagamentoEquipeMesAtual += registro.valorTotal;
+        }
       });
 
       tbody.innerHTML = html;
       console.log(`✅ Tabela atualizada com ${registrosComSoma.length} registros agrupados`);
       
-      // Calcular total de pagamento de equipe do mês
-      totalPagamentoEquipeMesAtual = 0;
-      registrosComSoma.forEach((registro) => {
-        if (registro.valorTotal) {
-          totalPagamentoEquipeMesAtual += registro.valorTotal;
-        }
-      });
+      // Atualizar total no título
+      const totalElement = document.getElementById('total-pagamento-equipe');
+      if (totalElement) {
+        totalElement.textContent = `Total: ${formatarMoedaBrasileira(totalPagamentoEquipeMesAtual)}`;
+      }
       
       console.log(`💰 Total de Pagamento de Equipe do mês: R$ ${totalPagamentoEquipeMesAtual.toFixed(2)}`);
       atualizarIndicadorDespesas();
