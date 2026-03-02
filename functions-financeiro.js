@@ -37,18 +37,8 @@ window.loadPainelFinanceiro = function() {
         
         <!-- Botões de Visualização -->
         <div class="flex gap-4 whitespace-nowrap">
-          <!-- Botões de Período (Exclusivos) -->
-          <div class="flex gap-0">
-            <button id="btn-vendas-anual" class="py-1.5 px-6 text-sm font-medium rounded-l-lg transition-all bg-orange-500 text-white hover:bg-orange-600" data-visualizacao="anual">
-              Anual
-            </button>
-            <button id="btn-vendas-mensal" class="py-1.5 px-6 text-sm font-medium rounded-r-lg transition-all bg-gray-100 text-gray-700 hover:bg-gray-200" data-visualizacao="mensal">
-              Mensal
-            </button>
-          </div>
-          
-          <!-- Botões de Métricas (Múltipla Seleção) -->
-          <div class="flex gap-0">
+          <!-- Botões de Métricas Anual (Múltipla Seleção) -->
+          <div id="vendas-metrics-anual" class="flex gap-0">
             <button id="btn-vendas-lucro-atual" class="py-1.5 px-4 text-sm font-medium rounded-l-lg transition-all bg-gray-100 text-gray-700 hover:bg-gray-200" data-metrica="lucro-atual" title="Lucro Atual">
               Lucro Atual
             </button>
@@ -59,11 +49,34 @@ window.loadPainelFinanceiro = function() {
               Total de Despesas
             </button>
           </div>
+
+          <!-- Botões de Métricas Mensal (Entradas, Saídas, Saldos) -->
+          <div id="vendas-metrics-mensal" class="flex gap-0" style="display: none;">
+            <button id="btn-vendas-entradas" class="py-1.5 px-4 text-sm font-medium rounded-l-lg transition-all bg-gray-100 text-gray-700 hover:bg-gray-200" data-metrica="entradas" title="Entradas">
+              Entradas
+            </button>
+            <button id="btn-vendas-saidas" class="py-1.5 px-4 text-sm font-medium transition-all bg-gray-100 text-gray-700 hover:bg-gray-200" data-metrica="saidas" title="Saídas">
+              Saídas
+            </button>
+            <button id="btn-vendas-saldos" class="py-1.5 px-4 text-sm font-medium rounded-r-lg transition-all bg-gray-100 text-gray-700 hover:bg-gray-200" data-metrica="saldos" title="Saldos">
+              Saldos
+            </button>
+          </div>
+          
+          <!-- Botões de Período (Exclusivos) -->
+          <div class="flex gap-0">
+            <button id="btn-vendas-anual" class="py-1.5 px-6 text-sm font-medium rounded-l-lg transition-all bg-orange-500 text-white hover:bg-orange-600" data-visualizacao="anual">
+              Anual
+            </button>
+            <button id="btn-vendas-mensal" class="py-1.5 px-6 text-sm font-medium rounded-r-lg transition-all bg-gray-100 text-gray-700 hover:bg-gray-200" data-visualizacao="mensal">
+              Mensal
+            </button>
+          </div>
         </div>
       </div>
       
       <!-- Gráfico de Vendas -->
-      <div id="graficoVendas" class="w-full" style="height: 150px;">
+      <div id="graficoVendas" class="w-full" style="height: 400px;">
         <!-- Gráfico será adicionado aqui -->
       </div>
     </div>
@@ -204,6 +217,9 @@ window.loadPainelFinanceiro = function() {
     <div class="bg-white rounded-lg border border-gray-300 p-4 mb-4">
       <div class="flex justify-between items-center mb-4">
         <h2 class="text-lg font-lexend font-bold text-gray-800">Indicadores Estratégicos</h2>
+        <button id="btn-salvar-indicadores" class="py-2 px-4 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-semibold text-sm shadow-md">
+          <i class="fas fa-save mr-2"></i>Salvar Novos Dados
+        </button>
       </div>
       
       <!-- Tabela de Indicadores Estratégicos -->
@@ -243,6 +259,7 @@ window.loadPainelFinanceiro = function() {
   // Inicializar eventos dos botões
   initBotoesVendas();
   initSeletorMes();
+  inicializarBotaoSalvarIndicadores();
   
   // Aguardar a disponibilidade do Firebase
   setTimeout(() => {
@@ -250,6 +267,9 @@ window.loadPainelFinanceiro = function() {
     indicadorFaturamentoCarregado = false;
     indicadorInvestimentosCarregado = false;
     indicadorPagamentoEquipeCarregado = false;
+    
+    // Inicializar gráfico de vendas
+    initGraficoVendas();
     
     initBotaoAdicionarInvestimento();
     initModalEditarInvestimento();
@@ -458,9 +478,16 @@ function adicionarModalEditarInvestimento() {
 function initBotoesVendas() {
   const btnAnual = document.getElementById('btn-vendas-anual');
   const btnMensal = document.getElementById('btn-vendas-mensal');
+  
+  // Botões de métricas anuais
   const btnLucroAtual = document.getElementById('btn-vendas-lucro-atual');
   const btnMetaLucro = document.getElementById('btn-vendas-meta-lucro');
   const btnDespesas = document.getElementById('btn-vendas-despesas');
+  
+  // Botões de métricas mensais
+  const btnEntradas = document.getElementById('btn-vendas-entradas');
+  const btnSaidas = document.getElementById('btn-vendas-saidas');
+  const btnSaldos = document.getElementById('btn-vendas-saldos');
 
   if (!btnAnual || !btnMensal) {
     console.error('Botões de visualização de vendas não encontrados');
@@ -475,22 +502,35 @@ function initBotoesVendas() {
     mudarVisualizacaoVendas('mensal');
   });
 
-  // Event listeners para os botões de múltipla seleção
+  // Event listeners para os botões de múltipla seleção ANUAIS
   if (btnLucroAtual) {
-    btnLucroAtual.addEventListener('click', () => {
-      toggleMetricaVendas('lucro-atual', btnLucroAtual);
-    });
+    btnLucroAtual.addEventListener('click', (e) => handleToggleBotoesVendas(e));
   }
 
   if (btnMetaLucro) {
-    btnMetaLucro.addEventListener('click', () => {
-      toggleMetricaVendas('meta-lucro', btnMetaLucro);
-    });
+    btnMetaLucro.addEventListener('click', (e) => handleToggleBotoesVendas(e));
   }
 
   if (btnDespesas) {
-    btnDespesas.addEventListener('click', () => {
-      toggleMetricaVendas('despesas', btnDespesas);
+    btnDespesas.addEventListener('click', (e) => handleToggleBotoesVendas(e));
+  }
+
+  // Event listeners para os botões de múltipla seleção MENSAIS
+  if (btnEntradas) {
+    btnEntradas.addEventListener('click', () => {
+      toggleMetricaVendas('entradas', btnEntradas);
+    });
+  }
+
+  if (btnSaidas) {
+    btnSaidas.addEventListener('click', () => {
+      toggleMetricaVendas('saidas', btnSaidas);
+    });
+  }
+
+  if (btnSaldos) {
+    btnSaldos.addEventListener('click', () => {
+      toggleMetricaVendas('saldos', btnSaldos);
     });
   }
 }
@@ -501,9 +541,11 @@ function toggleMetricaVendas(metrica, btnElement) {
   
   // Determinar as classes de border-radius com base na posição do botão
   let radiusClass = '';
-  if (btnElement.id === 'btn-vendas-lucro-atual') {
+  
+  // Botões anuais
+  if (btnElement.id === 'btn-vendas-lucro-atual' || btnElement.id === 'btn-vendas-entradas') {
     radiusClass = 'rounded-l-lg';
-  } else if (btnElement.id === 'btn-vendas-despesas') {
+  } else if (btnElement.id === 'btn-vendas-despesas' || btnElement.id === 'btn-vendas-saldos') {
     radiusClass = 'rounded-r-lg';
   }
   
@@ -521,15 +563,27 @@ function toggleMetricaVendas(metrica, btnElement) {
 function mudarVisualizacaoVendas(visualizacao) {
   const btnAnual = document.getElementById('btn-vendas-anual');
   const btnMensal = document.getElementById('btn-vendas-mensal');
+  const metricsAnual = document.getElementById('vendas-metrics-anual');
+  const metricsMensal = document.getElementById('vendas-metrics-mensal');
 
   if (!btnAnual || !btnMensal) return;
 
   if (visualizacao === 'anual') {
+    // Estilo dos botões de período
     btnAnual.className = "py-1.5 px-6 text-sm font-medium rounded-l-lg transition-all bg-orange-500 text-white hover:bg-orange-600";
     btnMensal.className = "py-1.5 px-6 text-sm font-medium rounded-r-lg transition-all bg-gray-100 text-gray-700 hover:bg-gray-200";
+    
+    // Mostrar métricas anuais, esconder mensais
+    if (metricsAnual) metricsAnual.style.display = 'flex';
+    if (metricsMensal) metricsMensal.style.display = 'none';
   } else {
+    // Estilo dos botões de período
     btnAnual.className = "py-1.5 px-6 text-sm font-medium rounded-l-lg transition-all bg-gray-100 text-gray-700 hover:bg-gray-200";
     btnMensal.className = "py-1.5 px-6 text-sm font-medium rounded-r-lg transition-all bg-orange-500 text-white hover:bg-orange-600";
+    
+    // Esconder métricas anuais, mostrar mensais
+    if (metricsAnual) metricsAnual.style.display = 'none';
+    if (metricsMensal) metricsMensal.style.display = 'flex';
   }
 
   console.log(`Visualização de vendas alterada para: ${visualizacao}`);
@@ -1023,7 +1077,7 @@ function carregarInvestimentos() {
                   <td class="px-4 py-3 text-sm text-gray-800">${dados.data || '-'}</td>
                   <td class="px-4 py-3 text-sm text-gray-800" style="width: 54%; word-break: break-word; overflow-wrap: break-word;">${dados.descricao || '-'}</td>
                   <td class="px-4 py-3 text-sm text-gray-800">${dados.tipo ? (dados.tipo.charAt(0).toUpperCase() + dados.tipo.slice(1)) : '-'}</td>
-                  <td class="px-4 py-3 text-sm text-gray-800">R$ ${dados.valor?.toFixed(2) || '-'}</td>
+                  <td class="px-4 py-3 text-sm text-gray-800">${formatarMoedaBrasileira(dados.valor || 0)}</td>
                 </tr>
               `;
             } else {
@@ -1735,5 +1789,620 @@ function verificarAndExibirIndicadores() {
     }
     
     console.log('\n✨ Indicadores exibidos!\n');
+    
+    // Atualizar tabela de indicadores estratégicos
+    atualizarIndicadoresEstrategicos();
+  }
+}
+
+function atualizarIndicadoresEstrategicos() {
+  console.log('=== ATUALIZANDO INDICADORES ESTRATÉGICOS ===');
+  
+  try {
+    // 1. Extrair Faturamento do elemento #indicador-faturamento
+    const elementoFaturamento = document.getElementById('indicador-faturamento');
+    let faturamento = 0;
+    if (elementoFaturamento) {
+      const textoFaturamento = elementoFaturamento.textContent.replace(/[^0-9,]/g, '').replace(',', '.');
+      faturamento = parseFloat(textoFaturamento) || 0;
+    }
+    console.log(`   Faturamento: R$ ${faturamento.toFixed(2)}`);
+    
+    // 2. Extrair Repasse para Equipe do elemento #total-pagamento-equipe
+    const elementoRepasse = document.getElementById('total-pagamento-equipe');
+    let repasseEquipe = 0;
+    if (elementoRepasse) {
+      const textoRepasse = elementoRepasse.textContent.replace(/[^0-9,]/g, '').replace(',', '.');
+      repasseEquipe = parseFloat(textoRepasse) || 0;
+    }
+    console.log(`   Repasse para Equipe: R$ ${repasseEquipe.toFixed(2)}`);
+    
+    // 3. Calcular Custos Fixos, Variáveis e Extras da tabela de investimentos
+    let custosFixos = 0;
+    let custosVariaveis = 0;
+    let custosExtras = 0;
+    
+    const tabelaSaidas = document.getElementById('tabelaSaidasInvestimentos');
+    if (tabelaSaidas) {
+      const linhas = tabelaSaidas.querySelectorAll('tbody tr[data-tipo]');
+      
+      linhas.forEach((linha) => {
+        const tipoDespesa = linha.getAttribute('data-tipo') || '';
+        const valor = parseFloat(linha.getAttribute('data-valor')) || 0;
+        
+        // Normalizar tipo de despesa (remover maiúsculas e espaços)
+        const tipoNormalizado = tipoDespesa.toLowerCase().trim();
+        
+        console.log(`   Processando: Tipo="${tipoDespesa}" (normalizado="${tipoNormalizado}"), Valor=R$ ${valor.toFixed(2)}`);
+        
+        // Verificar tipo e somar
+        if (tipoNormalizado === 'recorrente_fixa' || tipoNormalizado === 'recorrente fixa') {
+          custosFixos += valor;
+          console.log(`     ✅ Adicionado a Custos Fixos`);
+        } else if (tipoNormalizado === 'recorrente variável' || tipoNormalizado === 'recorrente_variável') {
+          custosVariaveis += valor;
+          console.log(`     ✅ Adicionado a Custos Variáveis`);
+        } else if (tipoNormalizado === 'extra') {
+          custosExtras += valor;
+          console.log(`     ✅ Adicionado a Custos Extras`);
+        }
+      });
+    }
+    
+    console.log(`   Custos Fixos: R$ ${custosFixos.toFixed(2)}`);
+    console.log(`   Custos Variáveis: R$ ${custosVariaveis.toFixed(2)}`);
+    console.log(`   Custos Extras: R$ ${custosExtras.toFixed(2)}`);
+    
+    // 4. Calcular Despesas Totais (Repasse Equipe + Custos Fixos + Custos Variáveis + Custos Extras)
+    const despesasTotais = repasseEquipe + custosFixos + custosVariaveis + custosExtras;
+    console.log(`   Despesas Totais: R$ ${despesasTotais.toFixed(2)}`);
+    
+    // 5. Calcular Lucro Bruto (Faturamento - Repasse Equipe)
+    const lucroBruto = faturamento - repasseEquipe;
+    console.log(`   Lucro Bruto: R$ ${lucroBruto.toFixed(2)}`);
+    
+    // 6. Calcular Lucro Líquido (Faturamento - Despesas Totais)
+    const lucroLiquido = faturamento - despesasTotais;
+    console.log(`   Lucro Líquido: R$ ${lucroLiquido.toFixed(2)}`);
+    
+    // 7. Calcular Reserva de Emergência (10% do Lucro Líquido)
+    const reservaEmergencia = lucroLiquido * 0.10;
+    console.log(`   Reserva de Emergência: R$ ${reservaEmergencia.toFixed(2)}`);
+    
+    // 8. Calcular Meta Alcançada (Lucro Líquido - 4000)
+    const metaAlcancada = lucroLiquido - 4000;
+    console.log(`   Meta Alcançada: R$ ${metaAlcancada.toFixed(2)}`);
+    
+    // Atualizar tabela de indicadores estratégicos
+    const tbody = document.getElementById('tabelaIndicadoresEstrategicosBody');
+    if (tbody) {
+      const html = `
+        <tr class="border-b border-gray-200">
+          <td class="px-4 py-3 text-sm text-gray-800">${formatarMoedaBrasileira(faturamento)}</td>
+          <td class="px-4 py-3 text-sm text-gray-800">${formatarMoedaBrasileira(repasseEquipe)}</td>
+          <td class="px-4 py-3 text-sm text-gray-800">${formatarMoedaBrasileira(custosFixos)}</td>
+          <td class="px-4 py-3 text-sm text-gray-800">${formatarMoedaBrasileira(custosVariaveis)}</td>
+          <td class="px-4 py-3 text-sm text-gray-800">${formatarMoedaBrasileira(custosExtras)}</td>
+          <td class="px-4 py-3 text-sm text-gray-800">${formatarMoedaBrasileira(despesasTotais)}</td>
+          <td class="px-4 py-3 text-sm text-gray-800">${formatarMoedaBrasileira(lucroBruto)}</td>
+          <td class="px-4 py-3 text-sm text-gray-800">${formatarMoedaBrasileira(lucroLiquido)}</td>
+          <td class="px-4 py-3 text-sm text-gray-800">${formatarMoedaBrasileira(reservaEmergencia)}</td>
+          <td class="px-4 py-3 text-sm text-gray-800">${formatarMoedaBrasileira(metaAlcancada)}</td>
+        </tr>
+      `;
+      tbody.innerHTML = html;
+      console.log('✅ Tabela de Indicadores Estratégicos atualizada!');
+    } else {
+      console.error('❌ tbody de indicadores estratégicos não encontrado');
+    }
+    
+  } catch (error) {
+    console.error('❌ Erro ao atualizar indicadores estratégicos:', error);
+  }
+}
+
+function inicializarBotaoSalvarIndicadores() {
+  console.log('=== INICIALIZANDO BOTÃO SALVAR INDICADORES ===');
+  
+  const btnSalvar = document.getElementById('btn-salvar-indicadores');
+  if (!btnSalvar) {
+    console.error('❌ Botão de salvar indicadores não encontrado');
+    return;
+  }
+  
+  btnSalvar.addEventListener('click', salvarIndicadoresEstrategicos);
+  console.log('✅ Botão de salvar indicadores inicializado');
+}
+
+function salvarIndicadoresEstrategicos() {
+  console.log('=== SALVANDO INDICADORES ESTRATÉGICOS ===');
+  
+  try {
+    if (!window.BANCO || !window.BANCO.db) {
+      console.error('❌ Firebase não está disponível');
+      if (typeof showToast === 'function') {
+        showToast('Erro: Banco de dados não disponível', 'error');
+      }
+      return;
+    }
+    
+    // Extrair nomes das colunas do cabeçalho
+    const thead = document.querySelector('#tabelaIndicadoresEstrategicos thead');
+    const thElements = thead?.querySelectorAll('th');
+    let nomesColunasRaw = [];
+    
+    thElements?.forEach((th) => {
+      nomesColunasRaw.push(th.textContent.trim());
+    });
+    
+    console.log(`\n📊 Nomes das colunas extraídos do cabeçalho:`, nomesColunasRaw);
+    
+    // Normalizar nomes para snake_case
+    const normalizarNome = (nome) => {
+      return nome
+        .toLowerCase()
+        .replace(/\s+/g, '_')  // Espaços em _
+        .normalize('NFD')       // Remove acentos
+        .replace(/[\u0300-\u036f]/g, '');
+    };
+    
+    const nomesColunasNormalizados = nomesColunasRaw.map(normalizarNome);
+    console.log(`   Nomes normalizados:`, nomesColunasNormalizados);
+    
+    // Extrair valores da tabela
+    const tbody = document.getElementById('tabelaIndicadoresEstrategicosBody');
+    const linha = tbody?.querySelector('tr');
+    
+    if (!linha || !linha.querySelector('td')) {
+      if (typeof showToast === 'function') {
+        showToast('Erro: Nenhum dado na tabela para salvar', 'error');
+      }
+      return;
+    }
+    
+    // Extrair valores das células
+    const dados = {};
+    const celulas = linha.querySelectorAll('td');
+    
+    celulas.forEach((td, index) => {
+      const textoValor = td.textContent.trim();
+      // Extrair número removendo "R$", espaços, e pontos (separador de milhares)
+      // Converter vírgula em ponto para parseFloat
+      const valorCleaned = textoValor
+        .replace(/R\$\s?/g, '')  // Remove R$
+        .replace(/\./g, '')      // Remove pontos (milhares)
+        .replace(',', '.');      // Converte vírgula em ponto
+      
+      const valor = parseFloat(valorCleaned) || 0;
+      const nomeColuna = nomesColunasNormalizados[index];
+      
+      dados[nomeColuna] = valor;
+      console.log(`   ${nomeColuna}: R$ ${valor.toFixed(2)}`);
+    });
+    
+    // Gerar data de hoje (dd/mm/yy)
+    const dataHoje = new Date();
+    const dia = String(dataHoje.getDate()).padStart(2, '0');
+    const mesAtual = String(dataHoje.getMonth() + 1).padStart(2, '0');
+    const anoAtual = String(dataHoje.getFullYear() % 100).padStart(2, '0');
+    const dataAtual = `${dia}/${mesAtual}/${anoAtual}`;
+    
+    // Gerar nome do mês selecionado
+    const nomesMeses = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
+    const mesSelecionadoNome = nomesMeses[mesSelecionado];
+    const anoSelecionado4Digitos = String(anoSelecionado).slice(-4);
+    
+    console.log(`\n📋 DEBUG - Construção do ID:`);
+    console.log(`   mesSelecionado: ${mesSelecionado} (tipo: ${typeof mesSelecionado})`);
+    console.log(`   mesSelecionadoNome: "${mesSelecionadoNome}" (tipo: ${typeof mesSelecionadoNome})`);
+    console.log(`   anoSelecionado: ${anoSelecionado} (tipo: ${typeof anoSelecionado})`);
+    console.log(`   anoSelecionado4Digitos: "${anoSelecionado4Digitos}"`);
+    console.log(`   dataAtual: "${dataAtual}"`);
+    
+    // ID principal usa mes_ano como KEY (permanecerá igual mesmo salvando em dias diferentes)
+    // Assim garante que não cria duplicatas por mês/ano
+    const idBusca = `${anoSelecionado4Digitos}_${mesSelecionadoNome}`;
+    const idDocumento = idBusca;  // Usar o mesmo ID para garantir substituição
+    
+    // Adicionar campo mes_ano para queries
+    dados.mes_ano = idBusca;
+    dados.data_salvamento = new Date();
+    dados.mes_numero = mesSelecionado + 1;
+    dados.ano = anoSelecionado;
+    
+    console.log(`\n📋 DADOS A SALVAR:`);
+    console.log(`   ID Documento: ${idDocumento}`);
+    console.log(`   Data Atual: ${dataAtual}`);
+    console.log(`   Mês Selecionado: ${mesSelecionadoNome} (${anoSelecionado4Digitos})`);
+    console.log(`   Dados:`, dados);
+    
+    // Salvar/Substituir documento (se existir, será sobrescrito automaticamente)
+    window.BANCO.db.collection('relatorioFinanceiro')
+      .doc(idDocumento)
+      .set(dados)
+      .then(() => {
+        console.log(`\n✅ INDICADORES SALVOS COM SUCESSO!`);
+        console.log(`   ID: ${idDocumento}`);
+        console.log(`   Data salvamento: ${new Date().toLocaleString('pt-BR')}`);
+        
+        if (typeof showToast === 'function') {
+          showToast(`✅ Dados salvos com sucesso! (${idDocumento})`, 'success');
+        } else {
+          alert(`Dados salvos com sucesso!\n\nID: ${idDocumento}`);
+        }
+      })
+      .catch((error) => {
+        console.error('❌ Erro ao salvar documento:', error);
+        console.error('   Código:', error.code);
+        console.error('   Mensagem:', error.message);
+        if (typeof showToast === 'function') {
+          showToast('Erro ao salvar dados: ' + error.message, 'error');
+        }
+      });
+      
+  } catch (error) {
+    console.error('❌ Erro geral ao salvar indicadores:', error);
+    if (typeof showToast === 'function') {
+      showToast('Erro ao salvar dados: ' + error.message, 'error');
+    }
+  }
+}
+
+// ===== GRÁFICO DE VENDAS ANUAL =====
+
+// Variáveis globais para o gráfico de vendas
+let chartVendas = null;
+let metricasAtivasVendas = {}; // { 'lucro-atual': true, 'meta-lucro': false, 'despesas': false }
+
+// Inicializar o gráfico de vendas
+function initGraficoVendas() {
+  // Carregar dados do Firebase
+  carregarDadosVendas();
+  
+  console.log('✅ Gráfico de vendas inicializado');
+}
+
+// Handler para toggle dos botões com validação
+function handleToggleBotoesVendas(event) {
+  const btnElement = event.target.closest('button');
+  if (!btnElement) return;
+
+  const btnId = btnElement.id;
+  let metrica = '';
+
+  if (btnId === 'btn-vendas-lucro-atual') metrica = 'lucro-atual';
+  if (btnId === 'btn-vendas-meta-lucro') metrica = 'meta-lucro';
+  if (btnId === 'btn-vendas-despesas') metrica = 'despesas';
+
+  if (!metrica) return;
+
+  const isCurrentlyActive = btnElement.classList.contains('bg-orange-500');
+  
+  // Contar quantas métricas estão ativas
+  const ativasCount = Object.values(metricasAtivasVendas).filter(v => v).length;
+
+  // Se está ativo e é a última ativa, não permitir desativar
+  if (isCurrentlyActive && ativasCount === 1) {
+    console.log('⚠️ Pelo menos uma métrica deve estar ativa');
+    return;
+  }
+
+  // Toggle a métrica
+  metricasAtivasVendas[metrica] = !metricasAtivasVendas[metrica];
+
+  // Atualizar estilo do botão
+  let radiusClass = '';
+  if (btnId === 'btn-vendas-lucro-atual') {
+    radiusClass = 'rounded-l-lg';
+  } else if (btnId === 'btn-vendas-despesas') {
+    radiusClass = 'rounded-r-lg';
+  }
+
+  if (metricasAtivasVendas[metrica]) {
+    // Ativar
+    btnElement.className = `py-1.5 px-4 text-sm font-medium transition-all bg-orange-500 text-white hover:bg-orange-600 ${radiusClass}`;
+  } else {
+    // Desativar
+    btnElement.className = `py-1.5 px-4 text-sm font-medium transition-all bg-gray-100 text-gray-700 hover:bg-gray-200 ${radiusClass}`;
+  }
+
+  // Atualizar o gráfico
+  atualizarGraficoVendas();
+}
+
+// Carregar dados de vendas do Firebase
+async function carregarDadosVendas() {
+  try {
+    console.log('🔄 Iniciando carregamento de dados de vendas...');
+    
+    // Inicializar com "lucro-atual" ativo por padrão
+    metricasAtivasVendas = {
+      'lucro-atual': true,
+      'meta-lucro': false,
+      'despesas': false
+    };
+
+    // Atualizar estilos dos botões
+    const btnLucroAtual = document.getElementById('btn-vendas-lucro-atual');
+    if (btnLucroAtual) {
+      btnLucroAtual.className = 'py-1.5 px-4 text-sm font-medium rounded-l-lg transition-all bg-orange-500 text-white hover:bg-orange-600';
+    }
+
+    const db = firebase.firestore();
+    const anoAtual = new Date().getFullYear();
+    
+    console.log(`📅 Ano atual: ${anoAtual}`);
+    
+    // Inicializar dados para todos os meses com zero
+    const dadosMeses = {};
+    for (let mes = 0; mes < 12; mes++) {
+      dadosMeses[mes] = {
+        lucro_liquido: 0,
+        despesas_totais: 0
+      };
+    }
+
+    // Buscar TODOS os documentos da coleção
+    console.log('📂 Buscando todos os documentos de relatorioFinanceiro...');
+    const snapshot = await db.collection('relatorioFinanceiro').get();
+    
+    console.log(`📊 Total de documentos encontrados: ${snapshot.size}`);
+
+    // Iterar sobre cada documento
+    snapshot.forEach(doc => {
+      const docId = doc.id;
+      const docData = doc.data();
+
+      console.log(`\n📄 Analisando documento: ${docId}`);
+
+      // Verificar se o documento começa com o ano atual (ex: 2026_)
+      if (docId.startsWith(`${anoAtual}_`)) {
+        console.log(`  ✅ Documento é do ano ${anoAtual}`);
+
+        // Extrair o nome do mês do ID do documento
+        // Formato esperado: "2026_Fevereiro" ou "2026_fevereiro"
+        const partes = docId.split('_');
+        if (partes.length === 2) {
+          const nomeMesDocumento = partes[1].toLowerCase(); // Converter para minúsculo para comparação
+          
+          console.log(`  🗓️ Nome do mês no documento: '${nomeMesDocumento}'`);
+
+          // Encontrar o índice do mês correspondente
+          const mesIndex = meses.findIndex(m => m.toLowerCase() === nomeMesDocumento);
+
+          if (mesIndex !== -1) {
+            console.log(`  🎯 Mês encontrado! Índice: ${mesIndex} (${meses[mesIndex]})`);
+
+            // Extrair valores
+            const lucroLiquido = docData.lucro_liquido || 0;
+            const despesasTotais = docData.despesas_totais || 0;
+
+            console.log(`  💰 Lucro Líquido: ${lucroLiquido}`);
+            console.log(`  💸 Despesas Totais: ${despesasTotais}`);
+
+            // Adicionar os dados ao índice do mês
+            dadosMeses[mesIndex] = {
+              lucro_liquido: lucroLiquido,
+              despesas_totais: despesasTotais
+            };
+
+            console.log(`  ✅ Dados adicionados ao mês ${mesIndex}`);
+          } else {
+            console.log(`  ❌ Mês '${nomeMesDocumento}' não encontrado no array de meses`);
+            console.log(`  📋 Meses disponíveis: ${meses.map(m => m.toLowerCase()).join(', ')}`);
+          }
+        } else {
+          console.log(`  ⚠️ Formato de ID inválido: esperado 'ano_mês', recebido '${docId}'`);
+        }
+      } else {
+        console.log(`  ⏭️ Documento não é do ano ${anoAtual}, ignorando`);
+      }
+    });
+
+    console.log('\n✅ Processamento de documentos concluído!');
+    console.log('📊 Dados finais dos meses:', dadosMeses);
+    
+    // Renderizar o gráfico com os dados
+    renderizarGraficoVendas(dadosMeses);
+  } catch (error) {
+    console.error('❌ Erro ao carregar dados de vendas:', error);
+  }
+}
+
+// Renderizar gráfico de vendas
+function renderizarGraficoVendas(dadosMeses) {
+  console.log('🎨 Iniciando renderização do gráfico...');
+  
+  const container = document.getElementById('graficoVendas');
+  if (!container) {
+    console.error('❌ Container graficoVendas não encontrado!');
+    return;
+  }
+
+  console.log('✅ Container encontrado, limpando...');
+  
+  // Limpar container
+  container.innerHTML = '';
+
+  // Criar canvas
+  const canvas = document.createElement('canvas');
+  canvas.id = 'graficoVendasCanvas';
+  container.appendChild(canvas);
+
+  console.log('✅ Canvas criado e adicionado ao DOM');
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    console.error('❌ Não foi possível obter contexto do canvas');
+    return;
+  }
+
+  // Destruir gráfico anterior se existir
+  if (chartVendas) {
+    console.log('🗑️ Destruindo gráfico anterior...');
+    chartVendas.destroy();
+  }
+
+  // Preparar labels dos meses
+  const labels = meses; // Array global já definido
+
+  // Preparar datasets
+  const datasets = [];
+
+  // Dataset Lucro Atual (Laranja)
+  datasets.push({
+    label: 'Lucro Atual',
+    data: Object.values(dadosMeses).map(d => d.lucro_liquido),
+    backgroundColor: '#f28705', // Orange-500
+    borderColor: '#d97804', // Orange-600
+    borderWidth: 1,
+    borderRadius: 4,
+    datalabels: {
+      display: true
+    },
+    hidden: !metricasAtivasVendas['lucro-atual']
+  });
+
+  // Dataset Despesas Totais (Vermelho)
+  datasets.push({
+    label: 'Total de Despesas',
+    data: Object.values(dadosMeses).map(d => d.despesas_totais),
+    backgroundColor: '#ef4444', // Red-500
+    borderColor: '#dc2626', // Red-600
+    borderWidth: 1,
+    borderRadius: 4,
+    datalabels: {
+      display: true
+    },
+    hidden: !metricasAtivasVendas['despesas']
+  });
+
+  // Dataset Meta de Lucro (Verde - linha constante)
+  datasets.push({
+    label: 'Meta de Lucro',
+    data: Array(12).fill(4000), // Meta fixa de R$ 4.000
+    type: 'line',
+    borderColor: '#22c55e', // Green-500
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderDash: [5, 5], // Linha tracejada
+    pointBackgroundColor: '#22c55e',
+    pointBorderColor: '#fff',
+    pointBorderWidth: 1,
+    pointRadius: 3,
+    tension: 0,
+    fill: false,
+    datalabels: {
+      display: false // Sem rótulos para meta de lucro
+    },
+    hidden: !metricasAtivasVendas['meta-lucro']
+  });
+
+  // Registrar plugin datalabels se disponível
+  if (typeof ChartDataLabels !== 'undefined') {
+    try {
+      Chart.register(ChartDataLabels);
+      console.log('✅ Plugin ChartDataLabels registrado');
+    } catch (e) {
+      console.warn('⚠️ ChartDataLabels já estava registrado');
+    }
+  }
+
+  console.log('📊 Criando Chart.js com', datasets.length, 'datasets');
+
+  // Criar o gráfico
+  try {
+    chartVendas = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: datasets
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        indexAxis: undefined,
+        plugins: {
+          legend: {
+            display: false // Sem legenda
+          },
+          datalabels: {
+            align: 'top',
+            anchor: 'end',
+            color: '#374151', // Gray-700
+            font: {
+              weight: 'bold',
+              size: 10
+            },
+            offset: 4,
+            formatter: function(value, context) {
+              // Mostrar apenas se o dataset tem datalabels ativado
+              if (context.dataset.datalabels && context.dataset.datalabels.display && value > 0) {
+                return 'R$ ' + value.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
+              }
+              return '';
+            }
+          },
+          tooltip: {
+            enabled: true,
+            callbacks: {
+              label: function(context) {
+                let label = context.dataset.label || '';
+                if (label) {
+                  label += ': ';
+                }
+                if (context.parsed.y !== null) {
+                  label += 'R$ ' + context.parsed.y.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                }
+                return label;
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              callback: function(value) {
+                return 'R$ ' + value.toLocaleString('pt-BR');
+              }
+            },
+            grid: {
+              borderDash: [2, 4],
+              color: '#E5E7EB'
+            }
+          },
+          x: {
+            grid: {
+              display: false
+            }
+          }
+        }
+      }
+    });
+
+    console.log('✅ Chart.js criado com sucesso!');
+    console.log('📊 Gráfico de vendas renderizado com sucesso');
+  } catch (error) {
+    console.error('❌ Erro ao criar Chart.js:', error);
+  }
+}
+
+// Atualizar gráfico ao mudar seleção de métricas
+function atualizarGraficoVendas() {
+  if (chartVendas && chartVendas.data) {
+    // Atualizar hidden de cada dataset
+    chartVendas.data.datasets.forEach((dataset, index) => {
+      if (index === 0) { // Lucro Atual
+        dataset.hidden = !metricasAtivasVendas['lucro-atual'];
+      } else if (index === 1) { // Despesas
+        dataset.hidden = !metricasAtivasVendas['despesas'];
+      } else if (index === 2) { // Meta de Lucro
+        dataset.hidden = !metricasAtivasVendas['meta-lucro'];
+      }
+    });
+
+    chartVendas.update();
+    console.log('🔄 Gráfico de vendas atualizado', metricasAtivasVendas);
   }
 }
