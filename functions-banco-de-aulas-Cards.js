@@ -4651,6 +4651,34 @@ const BancoDeAulasCards = (function() {
       let linhasHtml = '';
       aulas.forEach((aula, index) => {
         const statusClass = getStatusBadgeClass(aula.StatusAula || 'Pendente');
+        // Buscar valor da aula diretamente do DOM da tabela 'Aulas Agendadas'
+        let valorAulaHtml = '--';
+        try {
+          // Procura a tabela de aulas agendadas já renderizada
+          const tabelaAgendadas = document.querySelector('.table-details');
+          if (tabelaAgendadas) {
+            // Busca todas as linhas da tabela
+            const linhas = tabelaAgendadas.querySelectorAll('tbody tr');
+            // Procura a linha que corresponde à aula pelo id ou data/horário/matéria
+            for (const linha of linhas) {
+              // Pega as células da linha
+              const tds = linha.querySelectorAll('td');
+              // Checa se a linha corresponde (por data, horário, matéria, estudante)
+              if (
+                tds.length > 5 &&
+                tds[0].textContent.trim() === (aula.data || '--') &&
+                tds[1].textContent.trim() === (aula.horario || '--') &&
+                tds[3].textContent.trim() === (aula.materia || '--') &&
+                tds[6].textContent.trim() === (aula.estudante || '--')
+              ) {
+                valorAulaHtml = tds[5].textContent.trim();
+                break;
+              }
+            }
+          }
+        } catch (err) {
+          valorAulaHtml = '--';
+        }
         linhasHtml += `
           <tr class="aula-row-solicitacao" data-id-aula="${aula['id-Aula']}" data-doc-id="${aula.id}">
             <td class="py-2 px-3 text-center">
@@ -4662,7 +4690,8 @@ const BancoDeAulasCards = (function() {
                      data-duracao="${aula.duracao || '--'}"
                      data-materia="${aula.materia || '--'}"
                      data-professor="${aula.professor || 'A definir'}"
-                     data-estudante="${aula.estudante || '--'}">
+                     data-estudante="${aula.estudante || '--'}"
+                     data-valor-aula="${valorAulaHtml}">
             </td>
             <td class="py-2 px-3 text-sm">${aula.data || '--'}</td>
             <td class="py-2 px-3 text-sm text-center">${aula.horario || '--'}</td>
@@ -4670,6 +4699,7 @@ const BancoDeAulasCards = (function() {
             <td class="py-2 px-3 text-sm">${aula.materia || '--'}</td>
             <td class="py-2 px-3 text-sm">${aula.professor || 'A definir'}</td>
             <td class="py-2 px-3 text-sm">${aula.estudante || '--'}</td>
+            <td class="py-2 px-3 text-sm text-right">${valorAulaHtml}</td>
             <td class="py-2 px-3">
               <span class="status-badge ${statusClass} text-xs px-2 py-1">
                 ${aula.StatusAula || 'Pendente'}
@@ -4714,9 +4744,10 @@ const BancoDeAulasCards = (function() {
                       <th class="py-3 px-3 text-xs font-semibold text-gray-600">Matéria</th>
                       <th class="py-3 px-3 text-xs font-semibold text-gray-600">Professor</th>
                       <th class="py-3 px-3 text-xs font-semibold text-gray-600">Estudante</th>
+                      <th class="py-3 px-3 text-xs font-semibold text-gray-600 text-right">Valor da Aula</th>
                       <th class="py-3 px-3 text-xs font-semibold text-gray-600">Status</th>
                     </tr>
-                  </thead>
+                  </thead
                   <tbody id="tbody-solicitacao-aulas">
                     ${linhasHtml}
                   </tbody>
@@ -4793,7 +4824,7 @@ const BancoDeAulasCards = (function() {
       // Botão cancelar
       btnCancelar.addEventListener('click', () => {
         modal.remove();
-      });
+       });
       
       // Botão fechar (X)
       modal.querySelector('.modal-close').addEventListener('click', () => {
@@ -4986,34 +5017,54 @@ const BancoDeAulasCards = (function() {
       });
     }
     
-    // Calcular total a receber (Valor Equipe)
-    // Somar todas as durações e multiplicar por 35
-    let totalHoras = 0;
-    aulasSelecionadas.forEach(aula => {
-      if (aula.duracao) {
-        // Converter formato "1h30", "2h", "1h15" para horas decimais
-        const duracaoStr = aula.duracao.toLowerCase();
-        let horas = 0;
-        let minutos = 0;
-        
-        if (duracaoStr.includes('h')) {
-          const partes = duracaoStr.split('h');
-          horas = parseInt(partes[0]) || 0;
-          if (partes[1]) {
-            minutos = parseInt(partes[1]) || 0;
-          }
+    // Capturar os valores diretamente dos checkboxes selecionados no DOM, sempre tratando o formato
+    let totalReceber = 0;
+    let valoresAulasSelecionadas = [];
+    const checkboxesSelecionados = document.querySelectorAll('.checkbox-solicitacao-aula:checked');
+    checkboxesSelecionados.forEach(checkbox => {
+        let valorStr = checkbox.getAttribute('data-valor-aula') || '0';
+        // Corrigir extração do valor: remover R$, espaços, trocar vírgula por ponto
+        valorStr = valorStr.replace(/[^0-9,.-]+/g, '').replace(',', '.');
+        let valor = parseFloat(valorStr);
+        if (!isNaN(valor)) {
+            totalReceber += valor;
+            valoresAulasSelecionadas.push(valor);
+        } else {
+            valoresAulasSelecionadas.push(0);
         }
-        
-        // Converter para horas decimais (ex: 1h30 = 1.5)
-        totalHoras += horas + (minutos / 60);
-      }
     });
-    
-    const totalReceber = totalHoras * 35;
+    // Atualizar os valores em aulasSelecionadas para garantir exibição correta
+    // Faz correspondência por data, horário, matéria e estudante
+    aulasSelecionadas.forEach(aula => {
+        let valor = 0;
+        checkboxesSelecionados.forEach(checkbox => {
+            if (
+                checkbox.getAttribute('data-data') === (aula.data || '--') &&
+                checkbox.getAttribute('data-horario') === (aula.horario || '--') &&
+                checkbox.getAttribute('data-materia') === (aula.materia || '--') &&
+                checkbox.getAttribute('data-estudante') === (aula.estudante || '--')
+            ) {
+                let valorStr = checkbox.getAttribute('data-valor-aula') || '0';
+                valorStr = valorStr.replace(/[^0-9,.-]+/g, '').replace(',', '.');
+                valor = parseFloat(valorStr);
+                if (isNaN(valor)) valor = 0;
+            }
+        });
+        aula.valorAula = !isNaN(valor) ? valor : 0;
+    });
     
     // Criar linhas da tabela de aulas
     let linhasAulasHtml = '';
     aulasSelecionadas.forEach((aula, index) => {
+      // Usar o valor da aula já extraído do checkbox ou do campo correto
+      let valorAula = 0;
+      if (aula.valorAula !== undefined) {
+        valorAula = typeof aula.valorAula === 'string' ? parseFloat(aula.valorAula.replace(/[^0-9,.-]+/g, '').replace(',', '.')) : Number(aula.valorAula);
+      } else if (aula['valorAula'] !== undefined) {
+        valorAula = typeof aula['valorAula'] === 'string' ? parseFloat(aula['valorAula'].replace(/[^0-9,.-]+/g, '').replace(',', '.')) : Number(aula['valorAula']);
+      } else if (aula['valor-aula'] !== undefined) {
+        valorAula = typeof aula['valor-aula'] === 'string' ? parseFloat(aula['valor-aula'].replace(/[^0-9,.-]+/g, '').replace(',', '.')) : Number(aula['valor-aula']);
+      }
       linhasAulasHtml += `
         <tr class="${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}">
           <td class="py-2 px-3 text-sm border-r border-gray-200">${aula.data}</td>
@@ -5021,7 +5072,8 @@ const BancoDeAulasCards = (function() {
           <td class="py-2 px-3 text-sm text-center border-r border-gray-200">${aula.duracao}</td>
           <td class="py-2 px-3 text-sm border-r border-gray-200">${aula.materia}</td>
           <td class="py-2 px-3 text-sm border-r border-gray-200">${aula.professor}</td>
-          <td class="py-2 px-3 text-sm">${aula.estudante}</td>
+          <td class="py-2 px-3 text-sm border-r border-gray-200">${aula.estudante}</td>
+          <td class="py-2 px-3 text-sm text-right">R$ ${!isNaN(valorAula) ? valorAula.toFixed(2) : '--'}</td>
         </tr>
       `;
     });
@@ -5105,7 +5157,8 @@ const BancoDeAulasCards = (function() {
                       <th class="py-3 px-3 text-xs font-semibold text-center border-r border-orange-400">Duração</th>
                       <th class="py-3 px-3 text-xs font-semibold border-r border-orange-400">Matéria</th>
                       <th class="py-3 px-3 text-xs font-semibold border-r border-orange-400">Professor</th>
-                      <th class="py-3 px-3 text-xs font-semibold">Estudante</th>
+                      <th class="py-3 px-3 text-xs font-semibold border-r border-orange-400">Estudante</th>
+                      <th class="py-3 px-3 text-xs font-semibold text-right">Valor da Aula</th>
                     </tr>
                   </thead>
                   <tbody>

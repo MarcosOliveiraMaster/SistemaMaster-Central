@@ -256,8 +256,11 @@ function loadSectionContent(sectionId) {
       }
       break;
     case 'clientes':
-      // Placeholder para clientes - será implementado futuramente
-      console.log('Seção de Clientes em desenvolvimento');
+      if (typeof loadDashboardCliente === 'function') {
+        loadDashboardCliente();
+      } else {
+        console.error('Função loadDashboardCliente não encontrada');
+      }
       break;
     case 'professores':
       // Placeholder para professores - será implementado futuramente
