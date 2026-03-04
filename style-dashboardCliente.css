@@ -1,0 +1,84 @@
+/* ===== Dashboard Cliente — Estilos específicos ===== */
+
+/* KPI Card */
+.dc-kpi-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  transition: box-shadow 0.2s ease;
+}
+
+.dc-kpi-card:hover {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.09);
+}
+
+.dc-kpi-icon {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+}
+
+.dc-kpi-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.dc-kpi-label {
+  font-family: 'Comfortaa', cursive;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+
+.dc-kpi-value {
+  font-family: 'Lexend', sans-serif;
+  font-size: 1.8rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Chart container */
+.dc-chart-container {
+  position: relative;
+  height: 220px;
+}
+
+/* Status badges */
+.dc-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.dc-badge-success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.dc-badge-warning {
+  background: #fef9c3;
+  color: #92400e;
+}
+
+.dc-badge-info {
+  background: #e0f2fe;
+  color: #075985;
+}
