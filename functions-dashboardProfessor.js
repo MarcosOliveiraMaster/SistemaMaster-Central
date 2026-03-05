@@ -30,7 +30,7 @@ window.DashboardProfessores = (function () {
     },
     colProfessores: 'dataBaseProfessores',
     colCandidatos: 'candidatos',
-    colunasOcultas: ['id', 'expAulas', 'expNeuro', 'expTdics'],
+    colunasOcultas: ['id', 'expAulas', 'expNeuro', 'expTdics', 'foto', 'fotoPerfil', 'dataEnvio', 'timeStamp', 'timestamp'],
     colunasDiasTurnos: [
       'segManha','segTarde','terManha','terTarde',
       'quaManha','quaTarde','quiManha','quiTarde',
@@ -60,15 +60,18 @@ window.DashboardProfessores = (function () {
       cpf              : 'CPF',
       email            : 'E-mail',
       contato          : 'Contato',
+      endereco         : 'Endereço',
       nivel            : 'Nível Acadêmico',
       descricaoExpAulas: 'Descrição — Aulas',
       bairros          : 'Bairros de acesso',
+      disciplinas      : 'Disciplinas',
       curso            : 'Curso e Instituição',
       descricaoExpNeuro: 'Descrição — Alunos Atípicos',
       descricaoTdics   : 'Descrição — TDICs',
       pix              : 'Chave Pix',
       status           : 'Status',
       dataAtivacao     : 'Data de Ativação',
+      dataNascimento   : 'Data de Nascimento',
     },
     msgAprovacao: `É com muita alegria que informamos sua aprovação no processo seletivo da Master Educação! 🌟\n\nFicamos impressionados com sua didática e paixão pelo ensino. Estamos ansiosos para iniciar essa parceria de sucesso e transformar a educação juntos. 🧑‍🏫✨\n\nEntre no Link abaixo para participar no nosso grupo de professores. Enviamos solicitações de aulas no privado, porém quando surge solicitação emergencial nós enviamos no grupo:\n\nhttps://chat.whatsapp.com/Km8Ap56yusNKef1W5d6aMS\n\nVamos encaminhar o manual de Tutores Master, com todas as informações sobre a Empresa e boas práticas. Entraremos em contato para alinhar os detalhes e próximos passos. 🚀\n\nSeja bem-vindo(a) à equipe Master Educação! 💼💙`,
     msgReprovacao: `Olá Professor\n\nAgradecemos muito por participar do processo seletivo da Master Educação e por compartilhar suas habilidades e experiências conosco. 🙏\n\nApós uma análise cuidadosa, informamos que, no momento, você não foi selecionado para a vaga.\n\nNo entanto, ficaremos felizes em manter seu perfil em nosso banco de talentos para futuras oportunidades.\n\nDesejamos muito sucesso em sua trajetória e esperamos ter a chance de trabalharmos juntos em breve! 💼\n\nAtenciosamente, Equipe Master Educação`,
@@ -1128,11 +1131,11 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
   const SECOES_COLUNAS = [
     {
       titulo: 'Informações de Perfil',
-      campos: ['nome', 'cpf', 'email', 'contato']
+      campos: ['nome', 'cpf', 'email', 'contato', 'endereco']
     },
     {
       titulo: 'Informações de Aula',
-      campos: ['bairros', 'Disponibilidade']
+      campos: ['bairros', 'Disponibilidade', 'disciplinas']
     },
     {
       titulo: 'Informações Acadêmicas',
@@ -1143,13 +1146,13 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
       campos: ['pix']
     },
     {
-      titulo: 'Outras Informações',
-      campos: ['status', 'dataAtivacao']
+      titulo: 'Informações do Professor',
+      campos: ['dataNascimento', 'status', 'dataAtivacao']
     }
   ];
 
   // Campos a serem excluídos do dropdown
-  const CAMPOS_EXCLUIDOS = ['expAulas', 'expNeuro', 'expTdics'];
+  const CAMPOS_EXCLUIDOS = ['expAulas', 'expNeuro', 'expTdics', 'foto', 'fotoPerfil', 'dataEnvio', 'timeStamp', 'timestamp'];
 
   function montarDropdownColunas() {
     const list = $id('dp-colunasList');
