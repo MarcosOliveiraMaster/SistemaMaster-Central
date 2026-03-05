@@ -55,7 +55,7 @@ function initializeApp() {
 
 // Configurar navegação do menu
 function setupMenuNavigation() {
-  const menuItems = document.querySelectorAll('.menu-item, .menu-item-expandable');
+  const menuItems = document.querySelectorAll('.menu-item:not(.menu-item-expandable)');
   const submenuItems = document.querySelectorAll('.menu-item-submenu');
   
   menuItems.forEach(item => {
@@ -263,8 +263,11 @@ function loadSectionContent(sectionId) {
       }
       break;
     case 'professores':
-      // Placeholder para professores - será implementado futuramente
-      console.log('Seção de Professores em desenvolvimento');
+      if (typeof DashboardProfessores !== 'undefined' && typeof DashboardProfessores.init === 'function') {
+        DashboardProfessores.init();
+      } else {
+        console.error('Módulo DashboardProfessores não encontrado');
+      }
       break;
     case 'area-cliente':
       // Placeholder para área cliente - será implementado futuramente
