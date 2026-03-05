@@ -1184,12 +1184,20 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
         cb.addEventListener('change', (e) => {
           e.stopPropagation();
           if (cb.checked) {
+            // Adiciona à lista de selecionadas
             if (!S.colunasSelecionadas.includes(col)) S.colunasSelecionadas.push(col);
-            if (!S.colunasOrdem.includes(col)) { S.colunasOrdem.push(col); saveColOrder(); }
+            // Adiciona ao FINAL da ordem (nova seleção vai para o fim)
+            S.colunasOrdem = S.colunasOrdem.filter(c => c !== col); // Remove se existir
+            S.colunasOrdem.push(col); // Adiciona no final
           } else {
+            // Remove da lista de selecionadas
             S.colunasSelecionadas = S.colunasSelecionadas.filter(c => c !== col);
+            // Remove da ordem também
+            S.colunasOrdem = S.colunasOrdem.filter(c => c !== col);
           }
+          // Aplica a ordem às colunas selecionadas
           S.colunasSelecionadas = aplicarOrdem(S.colunasSelecionadas);
+          saveColOrder();
           saveColPrefs();
           aplicarFiltros();
         });
