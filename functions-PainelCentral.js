@@ -641,7 +641,7 @@ window.enviarLembreteProfessor = async function (id, nomeCliente, nomeProfessor,
   }
 
   // Montar mensagem com novo formato para cliente
-  const mensagem = `🔔 Mensagem lembrete!\nAtendimento de ${dataTexto}${dataFormatada}.\n\nProf. ${nomeProfessorFormatado} às ${horarioAula} com aula de ${nomeMateria}`;
+  const mensagem = `🔔 Mensagem lembrete!\nAtendimento de ${dataTexto}${dataFormatada}.\n\nProf. ${nomeProfessorFormatado} às ${horarioAula}`;
 
   // Copiar para área de transferência
   try {
@@ -719,7 +719,7 @@ window.enviarLembreteCliente = async function (id, nomeProfessor, dataAula, hora
   }
 
   // Montar mensagem com novo formato
-  const mensagem = `🔔 Mensagem lembrete!\nAtendimento de ${dataTexto}${dataFormatada}.\n\n${nomeClienteFormatado} às ${horarioAula} com aula de ${nomeMateria}`;
+  const mensagem = `🔔 Mensagem lembrete!\nAtendimento de ${dataTexto}${dataFormatada}.\n\n${nomeClienteFormatado} às ${horarioAula}`;
 
   // Copiar para área de transferência
   try {
