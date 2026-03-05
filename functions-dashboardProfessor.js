@@ -1152,7 +1152,7 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
   ];
 
   // Campos a serem excluídos do dropdown
-  const CAMPOS_EXCLUIDOS = ['expAulas', 'expNeuro', 'expTdics', 'foto', 'fotoPerfil', 'dataEnvio', 'timeStamp', 'timestamp'];
+  const CAMPOS_EXCLUIDOS = ['expAulas', 'expNeuro', 'expTdics', 'foto', 'fotoPerfil', 'dataEnvio', 'timeStamp', 'timestamp', 'dataenviolegivel'];
 
   function montarDropdownColunas() {
     const list = $id('dp-colunasList');
