@@ -1,19 +1,17 @@
-// Estrutura para Mensagens Automáticas - Aba: Relatório de Aula
-// Adaptável para novas fontes de dados (outras tabs no futuro)
-
-// Supondo integração com um framework ou utilitário de UI já existente
-// Adapte os seletores, funções de toast/edição, e integração de banco conforme sua stack
+// functions-mensagens-automaticas.js — Master Educação
+// Correção: removido o listener DOMContentLoaded que tentava acessar
+// elementos que não existem ainda (o app é SPA — seções carregam sob demanda).
+// A função loadMensagensAutomaticas() é chamada pelo script.js quando necessário.
 
 (function () {
-  // Elementos de UI e variáveis de estado
+
   let abaSelecionada = 'relatorio';
-  let filtroData = ''; // hoje, ontem, ou string data (yyyy-mm-dd)
+  let filtroData = '';
   let filtroCliente = '';
-  let listaCompletaDeAulas = []; // Preencher do banco de dados
+  let listaCompletaDeAulas = [];
   let listaFiltrada = [];
   let editandoIndice = null;
 
-  // Utilitário para formatar saudação pelo horário
   function gerarSaudacao() {
     const hora = new Date().getHours();
     if (hora >= 5 && hora < 12) return 'Bom dia!';
@@ -21,28 +19,25 @@
     return 'Boa noite!';
   }
 
-  // Simule aqui a busca dos dados do banco de dados no seu contexto real
   async function carregarBancoDeAulas() {
-    // Exemplo fictício - troque por fetch/busca real do seu banco
-    listaCompletaDeAulas = await fetchBancoDeAulas();
+    try {
+      listaCompletaDeAulas = await fetchBancoDeAulas();
+    } catch (_) {
+      listaCompletaDeAulas = [];
+    }
     aplicarFiltros();
   }
 
-  // Lógica de filtragem adaptada
   function aplicarFiltros() {
     listaFiltrada = listaCompletaDeAulas.filter((aula) => {
-      // Filtro data
       let passaData = true;
-      if (filtroData === 'hoje') {
-        passaData = ehHoje(aula.data);
-      } else if (filtroData === 'ontem') {
-        passaData = ehOntem(aula.data);
-      } else if (filtroData && filtroData !== '') {
-        passaData = aula.data === filtroData;
-      }
-      // Filtro cliente
+      if (filtroData === 'hoje')        passaData = ehHoje(aula.data);
+      else if (filtroData === 'ontem')  passaData = ehOntem(aula.data);
+      else if (filtroData)              passaData = aula.data === filtroData;
+
       const passaCliente = !filtroCliente ||
-        aula.nomeCliente.toLowerCase().includes(filtroCliente.toLowerCase());
+        (aula.nomeCliente || '').toLowerCase().includes(filtroCliente.toLowerCase());
+
       return passaData && passaCliente;
     });
     renderizarGrid();
@@ -57,83 +52,67 @@
   function ehOntem(dataStr) {
     const hoje = new Date();
     hoje.setDate(hoje.getDate() - 1);
-    const data = new Date(dataStr);
-    return data.toDateString() === hoje.toDateString();
+    return new Date(dataStr).toDateString() === hoje.toDateString();
   }
 
-  // Gera mensagem pronta para copiar
   function gerarMensagem(aula) {
-    const saudacao = gerarSaudacao();
-    // Adapte a variável do estudante se necessário
-    return `${saudacao} ${aula.nomeCliente}.
-Este é o relatório da aula do dia ${aula.data} com ${aula.estudante}.
-
-${aula.RelatorioAula}`;
+    return `${gerarSaudacao()} ${aula.nomeCliente}.\nEste é o relatório da aula do dia ${aula.data} com ${aula.estudante}.\n\n${aula.RelatorioAula}`;
   }
 
-  // Handler do botão de copiar mensagem
   function copiarParaClipboard(mensagem) {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(mensagem).then(() => mostrarToast('Conteúdo copiado!'));
     } else {
-      // Fallback para browsers antigos
-      const textarea = document.createElement('textarea');
-      textarea.value = mensagem;
-      document.body.appendChild(textarea);
-      textarea.select();
+      const ta = document.createElement('textarea');
+      ta.value = mensagem;
+      document.body.appendChild(ta);
+      ta.select();
       document.execCommand('copy');
-      document.body.removeChild(textarea);
+      document.body.removeChild(ta);
       mostrarToast('Conteúdo copiado!');
     }
   }
 
-  // Toast simples - adapte para seus componentes ou framework
   function mostrarToast(msg) {
-    // User experience: exibe toast por 2s
+    if (typeof showToast === 'function') { showToast(msg, 'success'); return; }
     const toast = document.createElement('div');
-    toast.className = 'mensagem-toast';
-    toast.innerText = msg;
+    toast.textContent = msg;
     Object.assign(toast.style, {
       position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)',
-      padding: '12px 24px', background: '#ed7d31', color: '#fff', borderRadius: '6px',
-      zIndex: 9999, fontWeight: 'bold', fontSize: '1rem', transition: 'opacity 0.2s'
+      padding: '12px 24px', background: '#f28705', color: '#fff',
+      borderRadius: '6px', zIndex: 9999, fontWeight: 'bold'
     });
     document.body.appendChild(toast);
     setTimeout(() => { toast.style.opacity = 0; setTimeout(() => toast.remove(), 400); }, 1800);
   }
 
-  // Handler para edição do card
   function editarCard(indice) {
     editandoIndice = indice;
-    // Adapte: abrir modal, inline editing etc, como no banco-de-aulas
-    // Exemplo básico para continuidade:
     renderizarGrid();
   }
 
-  // Handler para salvar edição
   function salvarEdicao(novoRelatorio) {
     if (editandoIndice !== null) {
       listaFiltrada[editandoIndice].RelatorioAula = novoRelatorio;
-      // Ideal: replicar alteração na lista original e salvar no banco
       editandoIndice = null;
       renderizarGrid();
       mostrarToast('Relatório atualizado!');
     }
   }
 
-  // Renderização visual do grid/cards
   function renderizarGrid() {
     const grid = document.getElementById('mensagens-automaticas-card-grid');
+    if (!grid) return;
     grid.innerHTML = '';
+
     listaFiltrada.forEach((aula, idx) => {
       const card = document.createElement('div');
       card.className = 'card-mensagem-aula';
 
       if (editandoIndice === idx) {
-        // Modo edição
         const textarea = document.createElement('textarea');
         textarea.value = aula.RelatorioAula;
-        textarea.rows = 5;
+        textarea.rows  = 5;
         textarea.style.width = '100%';
         card.appendChild(textarea);
 
@@ -148,24 +127,18 @@ ${aula.RelatorioAula}`;
         btnCancelar.onclick = () => { editandoIndice = null; renderizarGrid(); };
         card.appendChild(btnCancelar);
       } else {
-        // Visual padrão
         const cliente = document.createElement('strong');
         cliente.innerText = aula.nomeCliente;
         card.appendChild(cliente);
 
         const data = document.createElement('div');
-        data.innerText = aula.data; // Adapte formato se quiser
+        data.innerText = aula.data;
         card.appendChild(data);
 
         const btnCopiar = document.createElement('button');
         btnCopiar.innerText = 'Copiar mensagem';
-        btnCopiar.style.background = '#ed7d31';
-        btnCopiar.style.color = '#fff';
-        btnCopiar.style.marginTop = '6px';
-        btnCopiar.onclick = (e) => {
-          e.stopPropagation();
-          copiarParaClipboard(gerarMensagem(aula));
-        };
+        Object.assign(btnCopiar.style, { background: '#f28705', color: '#fff', marginTop: '6px' });
+        btnCopiar.onclick = (e) => { e.stopPropagation(); copiarParaClipboard(gerarMensagem(aula)); };
         card.appendChild(btnCopiar);
 
         card.onclick = () => editarCard(idx);
@@ -175,107 +148,78 @@ ${aula.RelatorioAula}`;
     });
   }
 
-  // Renderização dos filtros e tabs iniciais
   function renderizarFiltrosETabs() {
-    // Simplificado para HTML direto - adapte p/ seu framework/lib
+    const tabs    = document.getElementById('mensagens-automaticas-tabs');
+    const filtros = document.getElementById('mensagens-automaticas-filtros');
+    if (!tabs || !filtros) return; // Seção ainda não foi carregada no DOM
 
-    // Tabs
-    const tabs = document.getElementById('mensagens-automaticas-tabs');
     tabs.innerHTML = '';
     const tabNomes = [
-      { id: 'relatorio', label: 'Relatório de Aula' },
-      { id: 'lembretes-prof', label: 'Lembretes Professores' },
-      { id: 'lembretes-cliente', label: 'Lembretes Clientes' }
+      { id: 'relatorio',        label: 'Relatório de Aula' },
+      { id: 'lembretes-prof',   label: 'Lembretes Professores' },
+      { id: 'lembretes-cliente',label: 'Lembretes Clientes' }
     ];
+
     tabNomes.forEach(tab => {
       const btn = document.createElement('button');
-      btn.innerText = tab.label;
-      btn.className = abaSelecionada === tab.id ? 'tab-btn ativo' : 'tab-btn';
+      btn.innerText  = tab.label;
+      btn.className  = abaSelecionada === tab.id ? 'tab-btn ativo' : 'tab-btn';
       btn.onclick = () => {
         abaSelecionada = tab.id;
-        // Lógica para carregar/focar o conteúdo respectivo
-        if (abaSelecionada === 'relatorio') {
-          // só recarrega filtros/grid do relatório por enquanto
-          renderizarFiltrosETabs();
-        } else {
-          // em breve: renderizar outras tabs
-          mostrarToast('Aba em construção.');
-        }
+        if (abaSelecionada === 'relatorio') renderizarFiltrosETabs();
+        else mostrarToast('Aba em construção.');
       };
       tabs.appendChild(btn);
     });
 
-    // Filtros
-    const filtros = document.getElementById('mensagens-automaticas-filtros');
     filtros.innerHTML = '';
-    // Botões: Hoje, Ontem
     ['hoje', 'ontem'].forEach(opt => {
       const btn = document.createElement('button');
-      btn.innerText = opt === 'hoje' ? 'Relatório de Hoje' : 'Relatório de Ontem';
-      btn.className = filtroData === opt ? 'filtro-btn ativo' : 'filtro-btn';
+      btn.innerText  = opt === 'hoje' ? 'Relatório de Hoje' : 'Relatório de Ontem';
+      btn.className  = filtroData === opt ? 'filtro-btn ativo' : 'filtro-btn';
       btn.onclick = () => { filtroData = opt; aplicarFiltros(); };
       filtros.appendChild(btn);
     });
-    // Input data
+
     const inputDt = document.createElement('input');
     inputDt.type = 'date';
-    inputDt.onchange = (e) => { filtroData = e.target.value; aplicarFiltros(); };
+    inputDt.onchange = e => { filtroData = e.target.value; aplicarFiltros(); };
     filtros.appendChild(inputDt);
 
-    // Input cliente
     const inputCliente = document.createElement('input');
-    inputCliente.type = 'text';
+    inputCliente.type        = 'text';
     inputCliente.placeholder = 'Buscar por cliente';
-    inputCliente.value = filtroCliente;
-    inputCliente.oninput = (e) => { filtroCliente = e.target.value; aplicarFiltros(); };
+    inputCliente.value       = filtroCliente;
+    inputCliente.oninput = e => { filtroCliente = e.target.value; aplicarFiltros(); };
     filtros.appendChild(inputCliente);
 
-    // Grid (abaixo dos filtros)
     renderizarGrid();
   }
 
+  // Expor para uso global pelo script.js
+  window.loadMensagensAutomaticas = function () {
+    const section = document.getElementById('mensagens');
+    if (!section) return;
 
-  // Setup inicial na DOM
-  document.addEventListener('DOMContentLoaded', () => {
-    renderizarFiltrosETabs();
-    carregarBancoDeAulas();
-  });
-
-  // Função global para integração com SPA
-  window.loadMensagensAutomaticas = function() {
-    // Garante que os containers existem (caso a seção seja recarregada dinamicamente)
+    // Garantir que os containers existem na seção atual
     if (!document.getElementById('mensagens-automaticas-tabs')) {
       const tabsDiv = document.createElement('div');
       tabsDiv.id = 'mensagens-automaticas-tabs';
-      document.getElementById('mensagens').appendChild(tabsDiv);
+      section.appendChild(tabsDiv);
     }
     if (!document.getElementById('mensagens-automaticas-filtros')) {
       const filtrosDiv = document.createElement('div');
       filtrosDiv.id = 'mensagens-automaticas-filtros';
-      document.getElementById('mensagens').appendChild(filtrosDiv);
+      section.appendChild(filtrosDiv);
     }
     if (!document.getElementById('mensagens-automaticas-card-grid')) {
       const gridDiv = document.createElement('div');
       gridDiv.id = 'mensagens-automaticas-card-grid';
-      document.getElementById('mensagens').appendChild(gridDiv);
+      section.appendChild(gridDiv);
     }
+
     renderizarFiltrosETabs();
     carregarBancoDeAulas();
-  }
-
-  // Supondo integração por container já existente no HTML:
-  // <div id="mensagens-automaticas-tabs"></div>
-  // <div id="mensagens-automaticas-filtros"></div>
-  // <div id="mensagens-automaticas-card-grid"></div>
-
-  // Função fictícia para simular busca do banco (remover no real)
-  async function fetchBancoDeAulas() {
-    // Simulação de dados (remova para buscar real)
-    return [
-      { nomeCliente: 'Cliente 1', data: '2026-01-13', estudante: 'José', RelatorioAula: 'Avançou no conteúdo de inglês.' },
-      { nomeCliente: 'Cliente 2', data: '2026-01-12', estudante: 'Ana', RelatorioAula: 'Revisou expressões idiomáticas.' },
-      // ...adicione mais exemplos...
-    ];
-  }
+  };
 
 })();

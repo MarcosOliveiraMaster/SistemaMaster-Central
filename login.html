@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Master Educação — Acesso Administrativo</title>
+  <link rel="shortcut icon" type="image/x-icon" href="img/logo.png">
+  <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;700&family=Lexend:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --orange: #f28705;
+      --orange-dk: #d97804;
+      --orange-light: #fff7eb;
+      --gray: #6b7280;
+      --gray-dk: #374151;
+      --radius: 14px;
+      --shadow: 0 20px 60px rgba(0,0,0,.12);
+    }
+
+    body {
+      font-family: 'Comfortaa', cursive;
+      background: linear-gradient(135deg, #fff7eb 0%, #ffe0b2 50%, #ffcc7f 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    /* ── Card ── */
+    .login-card {
+      background: white;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      width: 100%;
+      max-width: 420px;
+      padding: 40px 36px;
+      animation: fadeUp .4s ease;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Logo ── */
+    .login-logo {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 32px;
+    }
+
+    .login-logo img {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      border: 3px solid var(--orange);
+      padding: 4px;
+    }
+
+    .login-logo h1 {
+      font-family: 'Lexend', sans-serif;
+      font-size: 1.4rem;
+      color: var(--gray-dk);
+      margin-top: 12px;
+    }
+
+    .login-logo p {
+      font-size: .75rem;
+      color: var(--gray);
+      margin-top: 4px;
+    }
+
+    /* ── Campos ── */
+    .field {
+      margin-bottom: 18px;
+    }
+
+    .field label {
+      display: block;
+      font-size: .75rem;
+      font-weight: 700;
+      color: var(--gray-dk);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+    }
+
+    .input-wrap {
+      position: relative;
+    }
+
+    .input-wrap i {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #9ca3af;
+      font-size: .9rem;
+      pointer-events: none;
+    }
+
+    .input-wrap input {
+      width: 100%;
+      padding: 12px 40px 12px 40px;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      font-family: 'Comfortaa', cursive;
+      font-size: .9rem;
+      color: var(--gray-dk);
+      background: white;
+      transition: border-color .2s, box-shadow .2s;
+    }
+
+    .input-wrap input:focus {
+      outline: none;
+      border-color: var(--orange);
+      box-shadow: 0 0 0 3px rgba(242,135,5,.15);
+    }
+
+    /* Olho da senha */
+    .btn-toggle-pw {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #9ca3af;
+      font-size: .9rem;
+      padding: 4px;
+      line-height: 1;
+      transition: color .2s;
+    }
+
+    .btn-toggle-pw:hover { color: var(--orange); }
+
+    /* ── Erro ── */
+    .alert {
+      display: none;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px 14px;
+      border-radius: 8px;
+      margin-bottom: 18px;
+      font-size: .82rem;
+      line-height: 1.4;
+    }
+
+    .alert.error   { background: #fee2e2; color: #991b1b; border-left: 3px solid #ef4444; }
+    .alert.success { background: #d1fae5; color: #065f46; border-left: 3px solid #10b981; }
+    .alert.visible { display: flex; }
+
+    /* ── Botão ── */
+    .btn-login {
+      width: 100%;
+      padding: 13px;
+      background: var(--orange);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-family: 'Comfortaa', cursive;
+      font-weight: 700;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background .2s, transform .15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .btn-login:hover:not(:disabled) { background: var(--orange-dk); transform: translateY(-1px); }
+    .btn-login:disabled { background: #d1d5db; cursor: not-allowed; transform: none; }
+
+    /* ── Link de senha ── */
+    .link-forgot {
+      display: block;
+      text-align: right;
+      font-size: .78rem;
+      color: var(--orange);
+      text-decoration: none;
+      margin-top: -10px;
+      margin-bottom: 20px;
+      cursor: pointer;
+    }
+
+    .link-forgot:hover { text-decoration: underline; }
+
+    /* ── Rodapé ── */
+    .login-footer {
+      margin-top: 28px;
+      text-align: center;
+      font-size: .72rem;
+      color: #9ca3af;
+    }
+
+    /* ── Spinner ── */
+    .spinner {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border: 3px solid rgba(255,255,255,.4);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Painel de redefinição ── */
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* ── Lockout bar ── */
+    #lockout-bar {
+      display: none;
+      background: #fef3c7;
+      border: 1px solid #fcd34d;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: .8rem;
+      color: #92400e;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<div class="login-card">
+
+  <!-- Logo -->
+  <div class="login-logo">
+    <img src="img/logo.png" alt="Logo Master Educação" onerror="this.style.display='none'">
+    <h1>Master Educação</h1>
+    <p>Painel Administrativo</p>
+  </div>
+
+  <!-- Aviso de bloqueio por tentativas -->
+  <div id="lockout-bar">
+    <i class="fas fa-lock mr-1"></i>
+    <span id="lockout-msg">Aguarde antes de tentar novamente.</span>
+  </div>
+
+  <!-- ─────────── PAINEL DE LOGIN ─────────── -->
+  <div id="panel-login" class="panel active">
+
+    <div id="alert-login" class="alert error" role="alert" aria-live="assertive">
+      <i class="fas fa-exclamation-circle" style="flex-shrink:0;margin-top:2px"></i>
+      <span id="alert-login-msg"></span>
+    </div>
+
+    <!-- E-mail -->
+    <div class="field">
+      <label for="input-email">E-mail</label>
+      <div class="input-wrap">
+        <i class="fas fa-envelope"></i>
+        <input
+          type="email"
+          id="input-email"
+          autocomplete="email"
+          placeholder="seu@email.com"
+          maxlength="100"
+        >
+      </div>
+    </div>
+
+    <!-- Senha -->
+    <div class="field">
+      <label for="input-senha">Senha</label>
+      <div class="input-wrap">
+        <i class="fas fa-lock"></i>
+        <input
+          type="password"
+          id="input-senha"
+          autocomplete="current-password"
+          placeholder="••••••••"
+          maxlength="128"
+        >
+        <button type="button" class="btn-toggle-pw" id="btn-toggle-pw" aria-label="Mostrar/ocultar senha">
+          <i class="fas fa-eye" id="icon-eye"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Esqueci a senha -->
+    <span class="link-forgot" id="link-forgot" role="button" tabindex="0">
+      Esqueci minha senha
+    </span>
+
+    <!-- Botão entrar -->
+    <button class="btn-login" id="btn-entrar">
+      <i class="fas fa-sign-in-alt"></i>
+      Entrar
+    </button>
+
+  </div><!-- /panel-login -->
+
+
+  <!-- ─────────── PAINEL DE REDEFINIÇÃO ─────────── -->
+  <div id="panel-reset" class="panel">
+
+    <div id="alert-reset" class="alert error" role="alert">
+      <i class="fas fa-exclamation-circle" style="flex-shrink:0;margin-top:2px"></i>
+      <span id="alert-reset-msg"></span>
+    </div>
+
+    <p style="font-size:.85rem;color:#6b7280;margin-bottom:20px;line-height:1.5;">
+      Digite seu e-mail para receber o link de redefinição de senha.
+    </p>
+
+    <div class="field">
+      <label for="input-reset-email">E-mail</label>
+      <div class="input-wrap">
+        <i class="fas fa-envelope"></i>
+        <input
+          type="email"
+          id="input-reset-email"
+          autocomplete="email"
+          placeholder="seu@email.com"
+          maxlength="100"
+        >
+      </div>
+    </div>
+
+    <button class="btn-login" id="btn-reset" style="margin-bottom:12px">
+      <i class="fas fa-paper-plane"></i>
+      Enviar link de redefinição
+    </button>
+
+    <span class="link-forgot" id="link-back" role="button" tabindex="0" style="text-align:left">
+      ← Voltar para o login
+    </span>
+
+  </div><!-- /panel-reset -->
+
+
+  <!-- Rodapé -->
+  <div class="login-footer">
+    © 2025 Master Educação LTDA &nbsp;·&nbsp; CNPJ 48.055.955/0001-72
+  </div>
+
+</div><!-- /login-card -->
+
+
+<!-- ──────────── SCRIPTS ──────────── -->
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-check-compat.js"></script>
+
+<!-- Configuração centralizada -->
+<script src="firebase-config.js"></script>
+
+<!-- Módulo de autenticação -->
+<script src="auth.js"></script>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ── Inicializar Firebase ──────────────────────────── */
+  AUTH.initFirebase();
+
+  /* ── Redirecionar se já estiver logado ─────────────── */
+  AUTH.getAuth().onAuthStateChanged(function (user) {
+    if (user && AUTH.isAuthorizedUser(user)) {
+      window.location.replace('index.html');
+    }
+  });
+
+  /* ── Ler parâmetro de erro da URL ─────────────────── */
+  (function checkUrlError() {
+    const params  = new URLSearchParams(window.location.search);
+    const erro    = params.get('erro');
+    if (erro === 'nao_autorizado') {
+      showAlert('login', 'Acesso não autorizado para este e-mail.');
+    }
+    // Limpar URL sem recarregar
+    history.replaceState(null, '', window.location.pathname);
+  })();
+
+  /* ── Referências DOM ───────────────────────────────── */
+  const panelLogin    = document.getElementById('panel-login');
+  const panelReset    = document.getElementById('panel-reset');
+  const inputEmail    = document.getElementById('input-email');
+  const inputSenha    = document.getElementById('input-senha');
+  const btnEntrar     = document.getElementById('btn-entrar');
+  const btnTogglePw   = document.getElementById('btn-toggle-pw');
+  const iconEye       = document.getElementById('icon-eye');
+  const linkForgot    = document.getElementById('link-forgot');
+  const linkBack      = document.getElementById('link-back');
+  const inputReset    = document.getElementById('input-reset-email');
+  const btnReset      = document.getElementById('btn-reset');
+  const lockoutBar    = document.getElementById('lockout-bar');
+  const lockoutMsg    = document.getElementById('lockout-msg');
+
+  /* ── Mostrar/ocultar alerta ────────────────────────── */
+  function showAlert(panel, msg, type) {
+    type = type || 'error';
+    const alertEl = document.getElementById('alert-' + panel);
+    const msgEl   = document.getElementById('alert-' + panel + '-msg');
+    if (!alertEl || !msgEl) return;
+    msgEl.textContent = msg;
+    alertEl.className = 'alert ' + type + ' visible';
+  }
+
+  function hideAlert(panel) {
+    const alertEl = document.getElementById('alert-' + panel);
+    if (alertEl) alertEl.className = 'alert error';
+  }
+
+  /* ── Toggle mostrar senha ──────────────────────────── */
+  btnTogglePw.addEventListener('click', function () {
+    const isPw = inputSenha.type === 'password';
+    inputSenha.type  = isPw ? 'text' : 'password';
+    iconEye.className = isPw ? 'fas fa-eye-slash' : 'fas fa-eye';
+  });
+
+  /* ── Navegar para redefinição ──────────────────────── */
+  function goToReset() {
+    panelLogin.classList.remove('active');
+    panelReset.classList.add('active');
+    hideAlert('login');
+    hideAlert('reset');
+    inputReset.value = inputEmail.value;
+    inputReset.focus();
+  }
+
+  function goToLogin() {
+    panelReset.classList.remove('active');
+    panelLogin.classList.add('active');
+    hideAlert('reset');
+  }
+
+  linkForgot.addEventListener('click', goToReset);
+  linkForgot.addEventListener('keydown', function (e) { if (e.key === 'Enter') goToReset(); });
+  linkBack.addEventListener('click', goToLogin);
+  linkBack.addEventListener('keydown', function (e)   { if (e.key === 'Enter') goToLogin(); });
+
+  /* ── Enter nas entradas ────────────────────────────── */
+  inputEmail.addEventListener('keydown', function (e) { if (e.key === 'Enter') inputSenha.focus(); });
+  inputSenha.addEventListener('keydown', function (e) { if (e.key === 'Enter') doLogin(); });
+
+  /* ── Verificar bloqueio ────────────────────────────── */
+  function checkLockout() {
+    // Re-usa funções de rl_ expostas no escopo global via auth.js
+    // (elas ficam no escopo de auth.js, não window — verificamos indiretamente)
+    // Tentativa via localStorage/sessionStorage
+    const count = parseInt(sessionStorage.getItem('auth_attempts') || '0', 10);
+    const ts    = parseInt(sessionStorage.getItem('auth_first_attempt') || '0', 10);
+    if (count >= 5 && ts) {
+      const elapsed = Date.now() - ts;
+      const lockMs  = 15 * 60 * 1000;
+      if (elapsed < lockMs) {
+        const mins = Math.ceil((lockMs - elapsed) / 60000);
+        lockoutBar.style.display = 'block';
+        lockoutMsg.textContent   = 'Muitas tentativas incorretas. Aguarde ' + mins + ' minuto(s).';
+        btnEntrar.disabled = true;
+        return true;
+      }
+    }
+    lockoutBar.style.display = 'none';
+    btnEntrar.disabled = false;
+    return false;
+  }
+
+  // Verificar ao carregar
+  checkLockout();
+
+  // Verificar periodicamente
+  setInterval(checkLockout, 10000);
+
+  /* ── Login ─────────────────────────────────────────── */
+  async function doLogin() {
+    hideAlert('login');
+
+    if (checkLockout()) return;
+
+    const email = (inputEmail.value || '').trim();
+    const senha = (inputSenha.value || '').trim();
+
+    if (!email || !senha) {
+      showAlert('login', 'Preencha e-mail e senha.');
+      return;
+    }
+
+    // Feedback visual
+    btnEntrar.disabled = true;
+    btnEntrar.innerHTML = '<span class="spinner"></span> Entrando...';
+
+    const result = await AUTH.loginWithEmail(email, senha);
+
+    if (result.success) {
+      btnEntrar.innerHTML = '<i class="fas fa-check"></i> Redirecionando...';
+      window.location.replace('index.html');
+    } else {
+      btnEntrar.disabled = false;
+      btnEntrar.innerHTML = '<i class="fas fa-sign-in-alt"></i> Entrar';
+      showAlert('login', result.error);
+      checkLockout();
+    }
+  }
+
+  btnEntrar.addEventListener('click', doLogin);
+
+  /* ── Redefinição de senha ──────────────────────────── */
+  async function doReset() {
+    hideAlert('reset');
+
+    const email = (inputReset.value || '').trim();
+    if (!email) {
+      showAlert('reset', 'Informe seu e-mail.');
+      return;
+    }
+
+    btnReset.disabled = true;
+    btnReset.innerHTML = '<span class="spinner"></span> Enviando...';
+
+    const result = await AUTH.sendPasswordReset(email);
+
+    btnReset.disabled = false;
+    btnReset.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar link de redefinição';
+
+    if (result.success) {
+      showAlert(
+        'reset',
+        'Se este e-mail estiver autorizado, você receberá um link em breve. Verifique também o spam.',
+        'success'
+      );
+    } else {
+      showAlert('reset', result.error || 'Erro ao enviar e-mail. Tente novamente.');
+    }
+  }
+
+  btnReset.addEventListener('click', doReset);
+  inputReset.addEventListener('keydown', function (e) { if (e.key === 'Enter') doReset(); });
+
+})();
+</script>
+
+</body>
+</html>

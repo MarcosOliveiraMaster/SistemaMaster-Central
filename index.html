@@ -6,15 +6,17 @@
   <title>Master | Painel administrativo</title>
   <link rel="shortcut icon" type="image/x-icon" href="img/logo.png" />
   
-  <!-- Tailwind CSS (versão estável) -->
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com/3.3.0"></script>
   
   <!-- Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;700&family=Lexend:wght@400;700&display=swap" rel="stylesheet">
   
-  <!-- Firebase -->
+  <!-- Firebase SDKs (ANTES dos scripts do app) -->
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-check-compat.js"></script>
   
   <!-- Ícones -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -22,30 +24,33 @@
   <!-- CSS Personalizado -->
   <link rel="stylesheet" href="style.css">
   
-  <!-- Configuração do Tailwind -->
+  <!-- Tailwind Config -->
   <script>
     tailwind.config = {
       theme: {
         extend: {
           colors: {
             orange: {
-              500: '#f28705',
-              600: '#d97804',
-              400: '#ffb347',
-              300: '#ffcc7f',
-              100: '#fff7eb'
+              500: '#f28705', 600: '#d97804',
+              400: '#ffb347', 300: '#ffcc7f', 100: '#fff7eb'
             }
           },
           fontFamily: {
-            'comfortaa': ['Comfortaa', 'cursive'],
-            'lexend': ['Lexend', 'sans-serif']
+            comfortaa: ['Comfortaa', 'cursive'],
+            lexend:    ['Lexend', 'sans-serif']
           }
         }
       }
     }
   </script>
+
+  <!-- <style>
+    /* Ocultar corpo até autenticação ser verificada */
+    body { visibility: hidden; }
+  </style> -->
 </head>
 <body class="bg-gray-50 font-sans">
+
   <!-- Loading Inicial -->
   <div id="loading-screen" class="fixed inset-0 bg-white z-50 flex flex-col items-center justify-center">
     <div class="loading-spinner-large"></div>
@@ -59,7 +64,6 @@
       <div class="p-4 border-b border-orange-400">
         <div class="flex items-center justify-center">
           <div class="w-16 h-16 bg-white rounded-full flex items-center justify-center">
-            <!-- <i class="fas fa-graduation-cap text-orange-500 text-2xl"></i> -->
             <img src="img/logo.png" alt="Logo Master Educação" class="w-12 h-12">
           </div>
           <div class="ml-3">
@@ -72,161 +76,120 @@
       <!-- Menu Items -->
       <nav id="div-menuLateral" class="p-3 space-y-1 mt-4">
         <button class="menu-item active" data-section="painel-central">
-          <i class="fas fa-home mr-3"></i>
-          <span>Painel Central</span>
+          <i class="fas fa-home mr-3"></i><span>Painel Central</span>
         </button>
-        
         <button class="menu-item" data-section="banco-aulas">
-          <i class="fas fa-book mr-3"></i>
-          <span>Banco de Aulas</span>
+          <i class="fas fa-book mr-3"></i><span>Banco de Aulas</span>
         </button>
-        
         <button class="menu-item" data-section="simulacoes">
-          <i class="fas fa-chart-line mr-3"></i>
-          <span>Simulações</span>
+          <i class="fas fa-chart-line mr-3"></i><span>Simulações</span>
         </button>
-        
         <button class="menu-item" data-section="mensagens" data-title="Painel Financeiro">
-          <i class="fas fa-wallet mr-3"></i>
-          <span>Painel Financeiro</span>
+          <i class="fas fa-wallet mr-3"></i><span>Painel Financeiro</span>
         </button>
-        
         <button class="menu-item" data-section="calendario" data-title="Calendário Master">
-          <i class="fas fa-calendar-alt mr-3"></i>
-          <span>Calendário Master</span>
+          <i class="fas fa-calendar-alt mr-3"></i><span>Calendário Master</span>
         </button>
-        
         <button class="menu-item" data-section="fluxo-processos">
-          <i class="fas fa-project-diagram mr-3"></i>
-          <span>Fluxo de Processos</span>
+          <i class="fas fa-project-diagram mr-3"></i><span>Fluxo de Processos</span>
         </button>
-        
         <button class="menu-item menu-item-expandable" data-section="dashboard" id="btn-dashboard-menu">
           <i class="fas fa-tachometer-alt mr-3"></i>
           <span>Dashboard</span>
           <i class="fas fa-chevron-down ml-auto text-sm transition-transform" id="icon-dashboard-expand"></i>
         </button>
-
-        <!-- Subtópicos do Dashboard -->
         <div id="submenu-dashboard" class="ml-4 space-y-1 hidden">
           <button class="menu-item-submenu" data-section="clientes" data-title="Dashboard Cliente">
-            <i class="fas fa-users mr-3"></i>
-            <span>Clientes</span>
+            <i class="fas fa-users mr-3"></i><span>Clientes</span>
           </button>
-          
           <button class="menu-item-submenu" data-section="professores" data-title="Dashboard Professores">
-            <i class="fas fa-chalkboard-user mr-3"></i>
-            <span>Professores</span>
+            <i class="fas fa-chalkboard-user mr-3"></i><span>Professores</span>
           </button>
         </div>
-        
         <button class="menu-item menu-item-expandable" data-section="areas" id="btn-areas-menu">
           <i class="fas fa-th-large mr-3"></i>
           <span>Áreas</span>
           <i class="fas fa-chevron-down ml-auto text-sm transition-transform" id="icon-areas-expand"></i>
         </button>
-
-        <!-- Subtópicos de Áreas -->
         <div id="submenu-areas" class="ml-4 space-y-1 hidden">
           <button class="menu-item-submenu" data-section="area-cliente" data-title="Área Cliente">
-            <i class="fas fa-user-circle mr-3"></i>
-            <span>Área Cliente</span>
+            <i class="fas fa-user-circle mr-3"></i><span>Área Cliente</span>
           </button>
-          
           <button class="menu-item-submenu" data-section="area-professor" data-title="Área Professor">
-            <i class="fas fa-chalkboard-user mr-3"></i>
-            <span>Área Professor</span>
+            <i class="fas fa-chalkboard-user mr-3"></i><span>Área Professor</span>
           </button>
         </div>
-        
         <button class="menu-item" data-section="exportar-dados">
-          <i class="fas fa-file-export mr-3"></i>
-          <span>Exportar Dados</span>
+          <i class="fas fa-file-export mr-3"></i><span>Exportar Dados</span>
         </button>
       </nav>
-      
-      <!-- Footer do Menu -->
-      <!-- <div class="absolute bottom-0 left-0 right-0 p-3 border-t border-orange-400">
-        <div class="text-center text-xs opacity-80">
-          <p class="font-lexend">Master Educação</p>
-          <p class="font-comfortaa mt-1">Painel Administrativo</p>
+
+      <!-- ── Usuário logado + Logout ── -->
+      <div class="absolute bottom-0 left-0 right-0 p-3 border-t border-orange-400">
+        <div class="flex items-center gap-2 text-white text-xs mb-2 px-1">
+          <i class="fas fa-user-circle text-base opacity-80"></i>
+          <span id="user-email-display" class="truncate opacity-90 flex-1"></span>
         </div>
-      </div> -->
+        <button
+          id="btn-logout"
+          class="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-white bg-opacity-10 hover:bg-opacity-20 transition text-white text-xs font-semibold"
+        >
+          <i class="fas fa-sign-out-alt"></i>
+          Sair
+        </button>
+      </div>
     </aside>
 
     <!-- Conteúdo Principal -->
     <main class="flex-1 overflow-auto">
-      <!-- Header -->
       <header class="bg-white shadow-sm border-b px-4 py-3">
         <div class="flex justify-between items-center">
-          <h1 id="section-title" class="text-xl font-lexend font-bold text-gray-800">Banco de Aulas</h1>
+          <h1 id="section-title" class="text-xl font-lexend font-bold text-gray-800">Painel Central</h1>
         </div>
       </header>
 
-      <!-- Área de Conteúdo -->
       <div id="content-area" class="p-4">
-        <!-- Sections serão carregadas aqui -->
-        <section id="painel-central" class="section-content active">
-          <!-- Conteúdo será carregado por functions-PainelCentral.js -->
-        </section>
-        
-        <section id="banco-aulas" class="section-content">
-          <!-- Conteúdo será carregado por functions-banco-de-aulas.js -->
-        </section>
-        
-        <section id="mensagens" class="section-content">
-          <!-- Conteúdo do Painel Financeiro será carregado aqui -->
-        </section>
-        
-        <section id="simulacoes" class="section-content">
+        <section id="painel-central"   class="section-content active"></section>
+        <section id="banco-aulas"       class="section-content"></section>
+        <section id="mensagens"         class="section-content"></section>
+        <section id="simulacoes"        class="section-content">
           <div class="text-center py-8">
             <i class="fas fa-chart-line text-3xl text-gray-300 mb-3"></i>
             <h3 class="font-lexend text-lg mb-2">Simulações</h3>
             <p class="text-gray-600 text-sm">Esta seção está em desenvolvimento.</p>
           </div>
         </section>
-        
-        <section id="calendario" class="section-content">
+        <section id="calendario"       class="section-content">
           <div class="text-center py-8">
             <i class="fas fa-calendar-alt text-3xl text-gray-300 mb-3"></i>
             <h3 class="font-lexend text-lg mb-2">Calendário Master</h3>
             <p class="text-gray-600 text-sm">Esta seção está em desenvolvimento.</p>
           </div>
         </section>
-        
-        <section id="fluxo-processos" class="section-content">
+        <section id="fluxo-processos"  class="section-content">
           <div class="text-center py-8">
             <i class="fas fa-project-diagram text-3xl text-gray-300 mb-3"></i>
             <h3 class="font-lexend text-lg mb-2">Fluxo de Processos</h3>
             <p class="text-gray-600 text-sm">Esta seção está em desenvolvimento.</p>
           </div>
         </section>
-        
-        <section id="clientes" class="section-content">
-          <!-- Conteúdo será carregado por functions-dashboardCliente.js -->
-        </section>
-        
-        <section id="professores" class="section-content">
-          <!-- Conteúdo será carregado por functions-dashboardProfessor.js -->
-        </section>
-        
-        <section id="area-cliente" class="section-content">
+        <section id="clientes"         class="section-content"></section>
+        <section id="professores"      class="section-content"></section>
+        <section id="area-cliente"     class="section-content">
           <div class="text-center py-8">
             <i class="fas fa-user-circle text-3xl text-gray-300 mb-3"></i>
             <h3 class="font-lexend text-lg mb-2">Área Cliente</h3>
             <p class="text-gray-600 text-sm">Esta seção está em desenvolvimento.</p>
           </div>
         </section>
-        
-        <section id="area-professor" class="section-content">
+        <section id="area-professor"   class="section-content">
           <div class="text-center py-8">
             <i class="fas fa-chalkboard-user text-3xl text-gray-300 mb-3"></i>
             <h3 class="font-lexend text-lg mb-2">Área Professor</h3>
             <p class="text-gray-600 text-sm">Esta seção está em desenvolvimento.</p>
           </div>
         </section>
-        
-        <section id="exportar-dados" class="section-content">
+        <section id="exportar-dados"   class="section-content">
           <div class="text-center py-8">
             <i class="fas fa-file-export text-3xl text-gray-300 mb-3"></i>
             <h3 class="font-lexend text-lg mb-2">Exportar Dados</h3>
@@ -240,16 +203,38 @@
   <!-- Toast Container -->
   <div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
 
-  <!-- Scripts -->
-  <!-- html2canvas para capturar imagem do modal -->
+  <!-- ──────── SCRIPTS (ordem importa) ──────── -->
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-  <!-- jsPDF para geração de PDF do contrato -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <!-- Chart.js para gráficos -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
-  <!-- Chart.js Data Labels Plugin -->
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-  <!-- Funções do contrato -->
+
+  <!-- 1. Config centralizada -->
+  <script src="firebase-config.js"></script>
+
+  <!-- 2. Autenticação (inicializa Firebase + App Check + guard) -->
+  <script src="auth.js"></script>
+
+  <!-- 3. Guard de rota — BLOQUEIA se não autenticado -->
+  <script>
+    AUTH.requireAuth().then(function (user) {
+      // Garantir visibilidade
+      document.body.style.visibility = 'visible';
+      document.body.style.opacity    = '1';
+
+      var el = document.getElementById('user-email-display');
+      if (el) el.textContent = user.email;
+
+      var btnLogout = document.getElementById('btn-logout');
+      if (btnLogout) {
+        btnLogout.addEventListener('click', function () {
+          AUTH.logout();
+        });
+      }
+    });
+  </script>
+
+  <!-- 4. Scripts do app (ordem original preservada) -->
   <script src="functions-contrato.js"></script>
   <script src="functions-contratoProfessor.js"></script>
   <script src="banco.js"></script>

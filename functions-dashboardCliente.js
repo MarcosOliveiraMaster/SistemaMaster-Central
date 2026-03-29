@@ -57,24 +57,9 @@ class DashboardCliente {
   }
 
   async initializeFirebase() {
-    const firebaseConfig = {
-      apiKey: "AIzaSyDPPbSA8SB-L_giAhWIqGbPGSMRBDTPi40",
-      authDomain: "master-ecossistemaprofessor.firebaseapp.com",
-      databaseURL: "https://master-ecossistemaprofessor-default-rtdb.firebaseio.com",
-      projectId: "master-ecossistemaprofessor",
-      storageBucket: "master-ecossistemaprofessor.firebasestorage.app",
-      messagingSenderId: "532224860209",
-      appId: "1:532224860209:web:686657b6fae13b937cf510",
-      measurementId: "G-B0KMX4E67D"
-    };
-
-    try {
-      this.firebaseApp = firebase.app('DashboardClientes');
-    } catch {
-      this.firebaseApp = firebase.initializeApp(firebaseConfig, 'DashboardClientes');
-    }
-
-    this.firestore = this.firebaseApp.firestore();
+    // Reutiliza instância global
+    this.firebaseApp = firebase.apps[0];
+    this.firestore   = this.firebaseApp.firestore();
   }
 
   async loadClients() {
