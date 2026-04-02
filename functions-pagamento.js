@@ -10,9 +10,6 @@ function loadAreaPagamento() {
     <div class="filter-container p-3" style="border-radius: var(--radius); box-shadow: var(--shadow);">
       <div class="flex flex-wrap gap-3 items-end">
         <div class="filter-group" style="min-width:auto;">
-          <label class="filter-label filter-label-compact">
-            <i class="fas fa-calendar-alt mr-1 text-orange-400"></i>Mês de análise de pagamento
-          </label>
           <select id="pag-mes" class="filter-select filter-compact">
             <option value="1">Janeiro</option>
             <option value="2">Fevereiro</option>
@@ -33,10 +30,6 @@ function loadAreaPagamento() {
           <input id="pag-ano" type="text" class="filter-input filter-compact" value="${anoAtual}" style="width:80px;">
         </div>
 
-        <button id="btn-analisar-pagamentos" class="btn-primary btn-compact" onclick="analisarPagamentos()">
-          <i class="fas fa-search mr-2"></i>Analisar pagamentos
-        </button>
-
         <!-- Separador vertical -->
         <div style="width:1px; height:32px; background:#d1d5db; align-self:flex-end; margin-bottom:4px;"></div>
 
@@ -46,26 +39,51 @@ function loadAreaPagamento() {
           <div id="pag-toggle-modo" class="switch-toggle switch-inactive" style="cursor:pointer;" onclick="togglePagModo()">
             <div class="switch-slider"></div>
           </div>
-          <span id="pag-label-colecao" class="font-comfortaa text-xs text-gray-400" style="cursor:pointer;" onclick="setPagModo(true)">Coleção</span>
+          <span id="pag-label-colecao" class="font-comfortaa text-xs text-gray-400" style="cursor:pointer;" onclick="setPagModo(true)">Grupo</span>
         </div>
 
         <!-- Dropdown Professor / Equipe -->
         <div id="pag-professor-container" class="filter-group" style="flex:1; min-width:150px;">
-          <label class="filter-label filter-label-compact">
-            <i class="fas fa-user mr-1 text-orange-400"></i><span id="pag-professor-label">Professor</span>
-          </label>
           <select id="pag-professor-select" class="filter-select filter-compact w-full">
             <option value="">Carregando...</option>
           </select>
         </div>
+
+        <!-- Separador vertical -->
+        <div style="width:1px; height:32px; background:#d1d5db; align-self:flex-end; margin-bottom:4px;"></div>
+
+        <button id="btn-analisar-pagamentos" class="btn-primary btn-compact" onclick="analisarPagamentos()">
+          <i class="fas fa-search mr-2"></i>Analisar pagamentos
+        </button>
       </div>
+    </div>
+
+    <!-- Seção Individual -->
+    <div id="pag-secao-individual" style="opacity:1; transition: opacity 0.3s ease;">
+      <h3 class="font-lexend text-lg font-bold text-gray-800 mt-5 mb-3">
+        <i class="fas fa-user mr-2 text-orange-500"></i>Relatório Individual
+      </h3>
+    </div>
+
+    <!-- Seção Grupo -->
+    <div id="pag-secao-grupo" style="opacity:0; display:none; transition: opacity 0.3s ease;">
+      <h3 class="font-lexend text-lg font-bold text-gray-800 mt-5 mb-3">
+        <i class="fas fa-users mr-2 text-orange-500"></i>Relatório em Grupo
+      </h3>
     </div>
   `;
 
-  // Seleciona o mês atual no dropdown
+  // Seleciona o mês anterior no dropdown (se janeiro, volta pra dezembro do ano anterior)
   const selectMes = document.getElementById('pag-mes');
+  const inputAnoEl = document.getElementById('pag-ano');
+  const mesAtual = new Date().getMonth() + 1; // 1-12
   if (selectMes) {
-    selectMes.value = String(new Date().getMonth() + 1);
+    if (mesAtual === 1) {
+      selectMes.value = '12';
+      if (inputAnoEl) inputAnoEl.value = String(anoAtual - 1);
+    } else {
+      selectMes.value = String(mesAtual - 1);
+    }
   }
 
   // Estado inicial: Individual
@@ -84,36 +102,43 @@ function setPagModo(colecao) {
   const toggle = document.getElementById('pag-toggle-modo');
   const labelInd = document.getElementById('pag-label-individual');
   const labelCol = document.getElementById('pag-label-colecao');
-  const profLabel = document.getElementById('pag-professor-label');
-
   if (colecao) {
     toggle.className = 'switch-toggle switch-active';
     labelInd.className = 'font-comfortaa text-xs text-gray-400';
     labelInd.style.cursor = 'pointer';
     labelCol.className = 'font-comfortaa text-xs font-bold text-orange-500';
     labelCol.style.cursor = 'pointer';
-    profLabel.textContent = 'Equipe';
   } else {
     toggle.className = 'switch-toggle switch-inactive';
     labelInd.className = 'font-comfortaa text-xs font-bold text-orange-500';
     labelInd.style.cursor = 'pointer';
     labelCol.className = 'font-comfortaa text-xs text-gray-400';
     labelCol.style.cursor = 'pointer';
-    profLabel.textContent = 'Professor';
   }
 
-  renderProfessorSelect(window._pagProfessoresAtivos || [], colecao);
+  renderProfessorSelect(window._pagProfessoresFiltrados || window._pagProfessoresAtivos || [], colecao);
+  alternarSecoesPagamento(colecao);
 }
 
 // ─── Carregar Professores ───
 
 async function carregarProfessoresPagamento() {
   try {
-    const professores = await fetchDataBaseProfessores();
+    const [professores, todasAulas] = await Promise.all([
+      fetchDataBaseProfessores(),
+      fetchBancoDeAulasListaBatch()
+    ]);
     const ativos = professores.filter(p => (p.status || '').toLowerCase() === 'ativo');
     ativos.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
     window._pagProfessoresAtivos = ativos;
-    renderProfessorSelect(ativos, window._pagModoColecao);
+    window._pagTodasAulas = todasAulas || [];
+    filtrarProfessoresPorMesAno();
+
+    // Listeners para atualizar ao trocar mês/ano
+    const selectMes = document.getElementById('pag-mes');
+    const inputAno = document.getElementById('pag-ano');
+    if (selectMes) selectMes.addEventListener('change', filtrarProfessoresPorMesAno);
+    if (inputAno) inputAno.addEventListener('input', filtrarProfessoresPorMesAno);
   } catch (error) {
     console.error('Erro ao carregar professores para pagamento:', error);
     const select = document.getElementById('pag-professor-select');
@@ -123,16 +148,42 @@ async function carregarProfessoresPagamento() {
   }
 }
 
+// ─── Filtrar professores que tiveram aula no mês/ano selecionado ───
+
+function filtrarProfessoresPorMesAno() {
+  const mes = parseInt(document.getElementById('pag-mes')?.value);
+  const ano = parseInt(document.getElementById('pag-ano')?.value);
+  const ativos = window._pagProfessoresAtivos || [];
+  const todasAulas = window._pagTodasAulas || [];
+
+  if (!mes || !ano) {
+    window._pagProfessoresFiltrados = ativos;
+    renderProfessorSelect(ativos, window._pagModoColecao);
+    return;
+  }
+
+  // Filtrar aulas pelo mês/ano — formato do campo data: "seg - 23/02/2026"
+  const idsProfessoresComAula = new Set();
+  todasAulas.forEach(aula => {
+    const data = aula.data || '';
+    const match = data.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    if (!match) return;
+    const mesAula = parseInt(match[2], 10);
+    const anoAula = parseInt(match[3], 10);
+    if (mesAula === mes && anoAula === ano && aula.idProfessor) {
+      idsProfessoresComAula.add(aula.idProfessor);
+    }
+  });
+
+  // Manter apenas professores ativos que tiveram aula no período
+  const filtrados = ativos.filter(p => idsProfessoresComAula.has(p.cpf));
+  window._pagProfessoresFiltrados = filtrados;
+  renderProfessorSelect(filtrados, window._pagModoColecao);
+}
+
 function renderProfessorSelect(professores, modoColecao) {
   const container = document.getElementById('pag-professor-container');
   if (!container) return;
-
-  const label = container.querySelector('label');
-  const labelHTML = modoColecao
-    ? '<i class="fas fa-users mr-1 text-orange-400"></i><span id="pag-professor-label">Equipe</span>'
-    : '<i class="fas fa-user mr-1 text-orange-400"></i><span id="pag-professor-label">Professor</span>';
-  label.innerHTML = labelHTML;
-  label.className = 'filter-label filter-label-compact';
 
   if (modoColecao) {
     // Multi-select com checkboxes
@@ -143,7 +194,7 @@ function renderProfessorSelect(professores, modoColecao) {
 
     let html = '<div class="pag-multiselect" style="position:relative;">';
     html += `<button type="button" id="pag-multi-btn" class="filter-select filter-compact w-full" style="text-align:left; cursor:pointer;" onclick="togglePagMultiMenu()">
-      Selecione... <i class="fas fa-chevron-down" style="float:right; margin-top:3px; font-size:10px;"></i>
+      Emitir o relatório em grupo... <i class="fas fa-chevron-down" style="float:right; margin-top:3px; font-size:10px;"></i>
     </button>`;
     html += '<div id="pag-multi-menu" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:50; background:white; border:2px solid #e5e7eb; border-radius:var(--radius-sm); max-height:200px; overflow-y:auto; box-shadow:var(--shadow-sm);">';
     html += `<label style="display:flex; align-items:center; padding:6px 10px; cursor:pointer; border-bottom:1px solid #f3f4f6; font-weight:bold;" class="text-sm font-comfortaa">
@@ -152,7 +203,7 @@ function renderProfessorSelect(professores, modoColecao) {
     professores.forEach(p => {
       const nome = p.nome || 'Sem nome';
       html += `<label style="display:flex; align-items:center; padding:6px 10px; cursor:pointer;" class="text-sm font-comfortaa hover:bg-gray-50">
-        <input type="checkbox" value="${p.id}" class="pag-multi-check mr-2" onchange="pagMultiCheckChanged()"> ${nome}
+        <input type="checkbox" value="${p.cpf}" class="pag-multi-check mr-2" onchange="pagMultiCheckChanged()"> ${nome}
       </label>`;
     });
     html += '</div></div>';
@@ -167,9 +218,9 @@ function renderProfessorSelect(professores, modoColecao) {
       oldSelect = container.querySelector('select');
     }
     oldSelect.id = 'pag-professor-select';
-    let opts = '<option value="">Selecione...</option>';
+    let opts = '<option value="">Selecione um professor...</option>';
     professores.forEach(p => {
-      opts += `<option value="${p.id}">${p.nome || 'Sem nome'}</option>`;
+      opts += `<option value="${p.cpf}">${p.nome || 'Sem nome'}</option>`;
     });
     oldSelect.innerHTML = opts;
   }
@@ -218,10 +269,141 @@ document.addEventListener('click', function(e) {
   }
 });
 
+// ─── Alternar seções Individual / Grupo ───
+
+function alternarSecoesPagamento(colecao) {
+  const secIndividual = document.getElementById('pag-secao-individual');
+  const secGrupo = document.getElementById('pag-secao-grupo');
+  if (!secIndividual || !secGrupo) return;
+
+  const mostrar = colecao ? secGrupo : secIndividual;
+  const esconder = colecao ? secIndividual : secGrupo;
+
+  // Fade out da seção atual
+  esconder.style.opacity = '0';
+  setTimeout(() => {
+    esconder.style.display = 'none';
+    // Fade in da nova seção
+    mostrar.style.display = '';
+    requestAnimationFrame(() => {
+      mostrar.style.opacity = '1';
+    });
+  }, 300);
+}
+
 function analisarPagamentos() {
-  const mes = document.getElementById('pag-mes')?.value;
-  const ano = document.getElementById('pag-ano')?.value;
-  if (!mes || !ano) return;
-  console.log(`Analisando pagamentos: ${mes}/${ano}`);
-  // TODO: implementar lógica de análise
+  if (window._pagModoColecao) {
+    // TODO: implementar modo grupo
+    return;
+  }
+  analisarPagamentoIndividual();
+}
+
+function analisarPagamentoIndividual() {
+  const mes = parseInt(document.getElementById('pag-mes')?.value);
+  const ano = parseInt(document.getElementById('pag-ano')?.value);
+  const professorId = document.getElementById('pag-professor-select')?.value;
+
+  if (!mes || !ano) {
+    showToast('Selecione mês e ano.', 'error');
+    return;
+  }
+  if (!professorId) {
+    showToast('Selecione um professor.', 'error');
+    return;
+  }
+
+  const todasAulas = window._pagTodasAulas || [];
+
+  // Filtrar aulas do professor no mês/ano selecionado
+  const aulasFiltradas = todasAulas.filter(aula => {
+    if (aula.idProfessor !== professorId) return false;
+    const match = (aula.data || '').match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    if (!match) return false;
+    return parseInt(match[2], 10) === mes && parseInt(match[3], 10) === ano;
+  });
+
+  // Ordenar por data (dia)
+  aulasFiltradas.sort((a, b) => {
+    const diaA = parseInt((a.data || '').match(/(\d{2})\/\d{2}\/\d{4}/)?.[1] || '0', 10);
+    const diaB = parseInt((b.data || '').match(/(\d{2})\/\d{2}\/\d{4}/)?.[1] || '0', 10);
+    return diaA - diaB;
+  });
+
+  const secao = document.getElementById('pag-secao-individual');
+  if (!secao) return;
+
+  // Nome do professor selecionado
+  const professor = (window._pagProfessoresAtivos || []).find(p => p.cpf === professorId);
+  const nomeProfessor = professor?.nome || 'Professor';
+
+  const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const nomeMes = meses[mes - 1] || '';
+
+  if (aulasFiltradas.length === 0) {
+    secao.innerHTML = `
+      <h3 class="font-lexend text-lg font-bold text-gray-800 mt-5 mb-3">
+        <i class="fas fa-user mr-2 text-orange-500"></i>Relatório Individual — ${nomeProfessor}
+      </h3>
+      <div class="p-4 text-center text-gray-500 font-comfortaa text-sm">
+        Nenhuma aula encontrada para <strong>${nomeProfessor}</strong> em <strong>${nomeMes}/${ano}</strong>.
+      </div>`;
+    return;
+  }
+
+  // Calcular totais
+  const totalValor = aulasFiltradas.reduce((acc, a) => acc + (parseFloat(a.ValorAula) || 0), 0);
+
+  // Montar tabela
+  let linhas = '';
+  aulasFiltradas.forEach(aula => {
+    const valor = parseFloat(aula.ValorAula) || 0;
+    linhas += `
+      <tr>
+        <td class="font-comfortaa">${aula.data || '—'}</td>
+        <td class="font-comfortaa">${aula.idContratacao || '—'}</td>
+        <td class="font-comfortaa">${aula.nomeCliente || '—'}</td>
+        <td class="font-comfortaa">${aula.duracao || '—'}</td>
+        <td class="font-comfortaa">R$ ${valor.toFixed(2).replace('.', ',')}</td>
+      </tr>`;
+  });
+
+  secao.innerHTML = `
+    <h3 class="font-lexend text-lg font-bold text-gray-800 mt-5 mb-3">
+      <i class="fas fa-user mr-2 text-orange-500"></i>Relatório Individual — ${nomeProfessor}
+      <span class="text-sm font-normal text-gray-500 ml-2">${nomeMes}/${ano}</span>
+    </h3>
+
+    <div class="table-container-double-scroll">
+      <div class="table-wrapper">
+        <table class="table-details" id="tabela-pagamento-individual" style="min-width:600px; table-layout:fixed;">
+          <colgroup>
+            <col style="width:150px;">
+            <col style="width:150px;">
+            <col>
+            <col style="width:120px;">
+            <col style="width:130px;">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Data da Aula</th>
+              <th>Contratação</th>
+              <th>Nome Cliente</th>
+              <th>Duração</th>
+              <th>Valor da Aula</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${linhas}
+          </tbody>
+          <tfoot>
+            <tr style="background:#f9fafb; font-weight:bold;">
+              <td class="font-lexend" colspan="3">${aulasFiltradas.length} aula(s)</td>
+              <td></td>
+              <td class="font-lexend">R$ ${totalValor.toFixed(2).replace('.', ',')}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>`;
 }
