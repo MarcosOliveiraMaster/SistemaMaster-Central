@@ -155,92 +155,116 @@ async function loadBancoDeAulas() {
     return;
   }
   
-  // Estrutura da seção ATUALIZADA com novos botões
+  // Estrutura da seção com barra de filtros em dropdowns
   section.innerHTML = `
     <div class="space-y-4">
-      <!-- Botões Especiais - Primeira Div (Compacta) -->
-      <div class="botões-especiais">
-        <div class="flex flex-wrap gap-2 mb-2">
-          <button id="btn-aulas-hoje" class="btn-primary btn-compact">
-            <i class="fas fa-calendar-day mr-1 text-xs"></i>
-            Aulas de Hoje
-          </button>
-          <button id="btn-aulas-semana" class="btn-primary btn-compact">
-            <i class="fas fa-calendar-week mr-1 text-xs"></i>
-            Aulas para esta semana
-          </button>
-          <button id="btn-sem-professor" class="btn-primary btn-compact">
-            <i class="fas fa-user-slash mr-1 text-xs"></i>
-            Cronogramas sem professor
-          </button>
-          <button id="btn-pagamentos-pendentes" class="btn-primary btn-compact">
-            <i class="fas fa-money-bill-wave mr-1 text-xs"></i>
-            Pagamentos pendentes
-          </button>
-          <button id="btn-refresh" class="btn-secondary btn-compact">
-            <i class="fas fa-sync-alt mr-1 text-xs"></i>
-            Atualizar Dados
-          </button>
-        </div>
-      </div>
-      
-      <!-- Filtros - Segunda Div (Compacta e Alinhada) -->
+      <!-- Barra de Filtros Unificada -->
       <div class="filter-container p-3">
-        <h3 class="font-lexend font-bold text-sm mb-3 text-orange-500">Filtrar Aulas</h3>
-        
-        <div class="filter-row-compact">
+        <!-- Linha principal: Datas, Professores, Atualizar, Limpar, Mais Filtros -->
+        <div class="flex flex-wrap gap-3 items-end w-full">
+
+          <!-- Filtros de Datas -->
+          <div class="filter-group flex-1 min-w-[150px]">
+            <label class="filter-label filter-label-compact">
+              <i class="fas fa-calendar-alt mr-1 text-orange-400"></i>Filtros de Datas
+            </label>
+            <select id="filter-datas" class="filter-select filter-compact w-full">
+              <option value="">Selecione...</option>
+              <option value="hoje">Aulas de Hoje</option>
+              <option value="semana">Aulas para Semana</option>
+            </select>
+          </div>
+
+          <!-- Filtro Professores -->
+          <div class="filter-group flex-1 min-w-[150px]">
+            <label class="filter-label filter-label-compact">
+              <i class="fas fa-chalkboard-user mr-1 text-orange-400"></i>Filtro Professores
+            </label>
+            <select id="filter-professor" class="filter-select filter-compact w-full">
+              <option value="">Selecione...</option>
+            </select>
+          </div>
+
+          <!-- Filtro Aulas -->
+          <div class="filter-group flex-1 min-w-[150px]">
+            <label class="filter-label filter-label-compact">
+              <i class="fas fa-book-open mr-1 text-orange-400"></i>Filtro Aulas
+            </label>
+            <select id="filter-aulas" class="filter-select filter-compact w-full">
+              <option value="">Selecione...</option>
+              <option value="todos">Todos os Cronogramas</option>
+              <option value="execucao" selected>Cronogramas em execução</option>
+              <option value="completos">Cronogramas completos</option>
+            </select>
+          </div>
+
+          <!-- Atualizar Dados -->
+          <div class="filter-group flex-1 min-w-[120px] flex items-end">
+            <button id="btn-refresh" class="btn-secondary btn-compact w-full">
+              <i class="fas fa-sync-alt mr-1 text-xs"></i>
+              Atualizar Dados
+            </button>
+          </div>
+
+          <!-- Limpar Filtros -->
+          <div class="filter-group flex-1 min-w-[120px] flex items-end">
+            <button id="btn-limpar-filtros" class="btn-secondary btn-compact w-full">
+              <i class="fas fa-eraser mr-1 text-xs"></i>
+              Limpar Filtros
+            </button>
+          </div>
+
+          <!-- Mais Filtros (toggle) -->
+          <div class="filter-group flex-1 min-w-[120px] flex items-end">
+            <button id="btn-mais-filtros" class="btn-secondary btn-compact w-full">
+              <i class="fas fa-chevron-down mr-1 text-xs" id="icon-mais-filtros"></i>
+              Mais Filtros
+            </button>
+          </div>
+
+        </div>
+
+        <!-- Segunda linha: filtros extras (oculta por padrão) -->
+        <div id="filtros-extras" class="flex flex-wrap gap-3 items-end mt-3 hidden w-full">
+
+          <!-- Filtro Pagamento -->
+          <div class="filter-group flex-1 min-w-[150px]">
+            <label class="filter-label filter-label-compact">
+              <i class="fas fa-money-bill-wave mr-1 text-orange-400"></i>Filtro Pagamento
+            </label>
+            <select id="filter-pagamento" class="filter-select filter-compact w-full">
+              <option value="">Selecione...</option>
+              <option value="Aguardando 1º Pagamento">Pagamento Pendente</option>
+              <option value="Aguardando 2º Pagamento">Aguardando 2º Pagamento</option>
+              <option value="Pagamento completo">Pagamento Completo</option>
+            </select>
+          </div>
+
           <!-- Cliente -->
-          <div class="filter-group">
-            <label class="filter-label filter-label-compact">Cliente</label>
-            <select id="filter-cliente" class="filter-select filter-compact">
+          <div class="filter-group flex-1 min-w-[150px]">
+            <label class="filter-label filter-label-compact">
+              <i class="fas fa-user mr-1 text-orange-400"></i>Cliente
+            </label>
+            <select id="filter-cliente" class="filter-select filter-compact w-full">
               <option value="">Todos os clientes</option>
             </select>
           </div>
-          
-          <!-- Data -->
-          <div class="filter-group">
-            <label class="filter-label filter-label-compact">Data</label>
-            <select id="filter-data" class="filter-select filter-compact">
-              <option value="">Selecione uma opção</option>
-              <option value="hoje">Aulas para hoje</option>
-              <option value="amanha">Aulas para amanhã</option>
-              <option value="ontem">Aulas de ontem</option>
-              <option value="personalizada">Data específica</option>
-            </select>
-            <input type="text" id="filter-data-custom" 
-                   class="filter-input filter-compact mt-1 hidden" 
-                   placeholder="dd/mm/aaaa" 
-                   maxlength="10">
-          </div>
-          
+
           <!-- Código -->
-          <div class="filter-group">
-            <label class="filter-label filter-label-compact">Código</label>
-            <input type="text" id="filter-codigo" 
-                   class="filter-input filter-compact" 
-                   placeholder="Digite o código" 
+          <div class="filter-group flex-1 min-w-[150px]">
+            <label class="filter-label filter-label-compact">
+              <i class="fas fa-hashtag mr-1 text-orange-400"></i>Código
+            </label>
+            <input type="text" id="filter-codigo"
+                   class="filter-input filter-compact w-full"
+                   placeholder="Digite o código"
                    maxlength="10">
           </div>
-          
-          <!-- Professor -->
-          <div class="filter-group">
-            <label class="filter-label filter-label-compact">Professor</label>
-            <select id="filter-professor" class="filter-select filter-compact">
-              <option value="">Todos os professores</option>
-            </select>
-          </div>
-          
-          <!-- Botão Aplicar Filtros (Alinhado) -->
-          <div class="filter-group flex items-end">
-            <button id="btn-aplicar-filtros" class="btn-primary btn-compact w-full">
-              <i class="fas fa-filter mr-1"></i>
-              Aplicar
-            </button>
-          </div>
+
         </div>
       </div>
-      
-      <!-- Cards de Aulas - Terceira Div -->
+
+      <!-- Cards de Aulas -->
       <div id="aulas-container">
         <div class="flex flex-col items-center justify-center py-12">
           <div class="loading-spinner-large mb-4"></div>
@@ -291,9 +315,6 @@ async function initializeBancoDeAulas() {
     // Popular filtro de professores
     populateProfessorFilter(PROFESSORES_DATA);
     
-    // Configurar filtro de data
-    setupDateFilter();
-    
     // Renderizar cards usando a função do arquivo de cards
     if (typeof BancoDeAulasCards !== 'undefined' && BancoDeAulasCards.renderAulasCards) {
       BancoDeAulasCards.renderAulasCards(AULAS_DATA);
@@ -305,6 +326,13 @@ async function initializeBancoDeAulas() {
     
     // Configurar eventos
     setupBancoDeAulasEvents();
+    
+    // Aplicar filtro padrão: Cronogramas em execução
+    const filterAulas = document.getElementById('filter-aulas');
+    if (filterAulas) {
+      filterAulas.value = 'execucao';
+      filterAulas.dispatchEvent(new Event('change'));
+    }
     
     showToast(`✅ Carregadas ${AULAS_DATA.length} aulas`, 'success', 3000);
     
@@ -403,231 +431,201 @@ function populateProfessorFilter(professores) {
     option.textContent = nome;
     select.appendChild(option);
   });
+
+  // Adicionar separador e opção "Cronograma sem professor"
+  const separador = document.createElement('option');
+  separador.disabled = true;
+  separador.textContent = '──────────────';
+  select.appendChild(separador);
+
+  const semProfessor = document.createElement('option');
+  semProfessor.value = '__sem-professor__';
+  semProfessor.textContent = 'Cronograma sem professor';
+  select.appendChild(semProfessor);
 }
 
-// Configurar filtro de data
-function setupDateFilter() {
-  const select = document.getElementById('filter-data');
-  const customInput = document.getElementById('filter-data-custom');
-  
-  if (!select || !customInput) return;
-  
-  select.addEventListener('change', function() {
-    if (this.value === 'personalizada') {
-      customInput.classList.remove('hidden');
-      customInput.focus();
-    } else {
-      customInput.classList.add('hidden');
-      customInput.value = '';
-    }
+// Helper: resetar todos os filtros exceto o que está sendo usado
+function resetOtherFilters(exceptId) {
+  const filterIds = ['filter-datas', 'filter-professor', 'filter-pagamento', 'filter-aulas', 'filter-cliente'];
+  filterIds.forEach(id => {
+    if (id === exceptId) return;
+    const el = document.getElementById(id);
+    if (el) el.value = '';
   });
-  
-  // Adicionar máscara de data
-  customInput.addEventListener('input', function(e) {
-    let value = e.target.value.replace(/\D/g, '');
-    
-    if (value.length > 2 && value.length <= 4) {
-      value = value.replace(/(\d{2})(\d{1,2})/, '$1/$2');
-    } else if (value.length > 4) {
-      value = value.replace(/(\d{2})(\d{2})(\d{1,4})/, '$1/$2/$3');
-    }
-    
-    e.target.value = value.substring(0, 10);
-  });
+  // Limpar código também se não for o filtro ativo
+  if (exceptId !== 'filter-codigo') {
+    const codigoInput = document.getElementById('filter-codigo');
+    if (codigoInput) codigoInput.value = '';
+  }
+}
+
+// Helper: renderizar resultado filtrado
+function renderFilteredResults(filteredAulas, msg) {
+  if (typeof BancoDeAulasCards !== 'undefined' && BancoDeAulasCards.renderAulasCards) {
+    BancoDeAulasCards.renderAulasCards(filteredAulas);
+  }
+  if (msg) showToast(msg, 'info', 2000);
 }
 
 // Configurar eventos da seção
 function setupBancoDeAulasEvents() {
   console.log('⚙️ Configurando eventos da seção Banco de Aulas');
-  
-  // Botão "Aulas de Hoje"
-  document.getElementById('btn-aulas-hoje')?.addEventListener('click', () => {
-    filterAulasHoje();
+
+  // ── Filtro de Datas ──
+  document.getElementById('filter-datas')?.addEventListener('change', function () {
+    if (!this.value) {
+      renderFilteredResults(AULAS_DATA);
+      return;
+    }
+    resetOtherFilters('filter-datas');
+
+    if (this.value === 'hoje') {
+      const hoje = getTodayFormatted();
+      const result = AULAS_DATA.filter(aula =>
+        aula.aulas?.some(a => a.data && a.data.includes(hoje))
+      );
+      renderFilteredResults(result, `📅 ${result.length} aula(s) para hoje`);
+    } else if (this.value === 'semana') {
+      const hoje = new Date();
+      const fimDaSemana = new Date();
+      fimDaSemana.setDate(hoje.getDate() + 7);
+      const result = AULAS_DATA.filter(aula =>
+        aula.aulas?.some(a => {
+          if (!a.data) return false;
+          const match = a.data.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+          if (!match) return false;
+          const dataAula = new Date(match[3], match[2] - 1, match[1]);
+          return dataAula >= hoje && dataAula <= fimDaSemana;
+        })
+      );
+      renderFilteredResults(result, `📅 ${result.length} aula(s) para esta semana`);
+    }
   });
-  
-  // Botão "Aulas para esta semana"
-  document.getElementById('btn-aulas-semana')?.addEventListener('click', () => {
-    filterAulasEstaSemana();
+
+  // ── Filtro de Professores ──
+  document.getElementById('filter-professor')?.addEventListener('change', function () {
+    if (!this.value) {
+      renderFilteredResults(AULAS_DATA);
+      return;
+    }
+    resetOtherFilters('filter-professor');
+
+    if (this.value === '__sem-professor__') {
+      const result = AULAS_DATA.filter(aula =>
+        aula.aulas?.some(a =>
+          !a.professor || a.professor === 'A definir' || a.professor.trim() === ''
+        )
+      );
+      renderFilteredResults(result, `👨‍🏫 ${result.length} cronograma(s) sem professor`);
+    } else {
+      // Buscar nome do professor pelo ID selecionado
+      const selectedOption = this.options[this.selectedIndex];
+      const nomeProfessor = selectedOption ? selectedOption.textContent : '';
+      const result = AULAS_DATA.filter(aula =>
+        aula.aulas?.some(a =>
+          a.professor && a.professor.toLowerCase().includes(nomeProfessor.toLowerCase())
+        )
+      );
+      renderFilteredResults(result, `👨‍🏫 ${result.length} cronograma(s) com ${nomeProfessor}`);
+    }
   });
-  
-  // Botão "Cronogramas sem professor"
-  document.getElementById('btn-sem-professor')?.addEventListener('click', () => {
-    filterAulasSemProfessor();
+
+  // ── Filtro de Pagamento ──
+  document.getElementById('filter-pagamento')?.addEventListener('change', function () {
+    if (!this.value) {
+      renderFilteredResults(AULAS_DATA);
+      return;
+    }
+    resetOtherFilters('filter-pagamento');
+
+    const result = AULAS_DATA.filter(aula => aula.statusPagamento === this.value);
+    const label = this.options[this.selectedIndex]?.textContent || this.value;
+    renderFilteredResults(result, `💰 ${result.length} cronograma(s) — ${label}`);
   });
-  
-  // Botão "Pagamentos pendentes"
-  document.getElementById('btn-pagamentos-pendentes')?.addEventListener('click', () => {
-    filterPagamentosPendentes();
+
+  // ── Filtro de Aulas (status dos cronogramas) ──
+  document.getElementById('filter-aulas')?.addEventListener('change', function () {
+    if (!this.value) {
+      renderFilteredResults(AULAS_DATA);
+      return;
+    }
+    resetOtherFilters('filter-aulas');
+
+    if (this.value === 'todos') {
+      renderFilteredResults(AULAS_DATA, `📋 ${AULAS_DATA.length} cronograma(s) no total`);
+    } else if (this.value === 'execucao') {
+      // Cronogramas em execução: pelo menos uma aula com status "Pendente" ou sem status
+      const result = AULAS_DATA.filter(aula => {
+        const aulasInfo = obterAulasContratacao(aula.codigoContratacao || '');
+        if (aulasInfo.total === 0) return false;
+        return aulasInfo.aulas.some(a => {
+          const st = (a.statusAula || '').toLowerCase();
+          return st === 'pendente' || st === 'não informado' || st === '';
+        });
+      });
+      renderFilteredResults(result, `▶️ ${result.length} cronograma(s) em execução`);
+    } else if (this.value === 'completos') {
+      // Cronogramas completos: TODAS as aulas são "Concluída" ou "Reposição"
+      const result = AULAS_DATA.filter(aula => {
+        const aulasInfo = obterAulasContratacao(aula.codigoContratacao || '');
+        if (aulasInfo.total === 0) return false;
+        return aulasInfo.aulas.every(a => {
+          const st = (a.statusAula || '').toLowerCase();
+          return st === 'concluída' || st === 'reposição';
+        });
+      });
+      renderFilteredResults(result, `✅ ${result.length} cronograma(s) completo(s)`);
+    }
   });
-  
-  // Botão "Atualizar Dados"
+
+  // ── Filtro de Cliente ──
+  document.getElementById('filter-cliente')?.addEventListener('change', function () {
+    if (!this.value) {
+      renderFilteredResults(AULAS_DATA);
+      return;
+    }
+    resetOtherFilters('filter-cliente');
+
+    const result = AULAS_DATA.filter(aula => aula.cpf === this.value);
+    renderFilteredResults(result, `👤 ${result.length} cronograma(s) do cliente`);
+  });
+
+  // ── Filtro de Código (Enter) ──
+  document.getElementById('filter-codigo')?.addEventListener('keyup', function (e) {
+    if (e.key === 'Enter' && this.value.trim()) {
+      resetOtherFilters('filter-codigo');
+      const termo = this.value.trim().toLowerCase();
+      const result = AULAS_DATA.filter(aula => {
+        const codigo = (aula.codigoContratacao || '').toLowerCase();
+        return codigo.includes(termo);
+      });
+      renderFilteredResults(result, `🔍 ${result.length} cronograma(s) encontrado(s)`);
+    }
+  });
+
+  // ── Botão Atualizar Dados ──
   document.getElementById('btn-refresh')?.addEventListener('click', () => {
     refreshAulasData();
   });
-  
-  // Botão "Aplicar Filtros"
-  document.getElementById('btn-aplicar-filtros')?.addEventListener('click', () => {
-    applyFilters();
+
+  // ── Botão Limpar Filtros ──
+  document.getElementById('btn-limpar-filtros')?.addEventListener('click', () => {
+    resetOtherFilters(null);
+    renderFilteredResults(AULAS_DATA, '🧹 Filtros limpos');
   });
-  
-  // Permitir Enter no campo de código
-  document.getElementById('filter-codigo')?.addEventListener('keyup', (e) => {
-    if (e.key === 'Enter') {
-      applyFilters();
+
+  // ── Botão Mais Filtros (toggle segunda linha) ──
+  document.getElementById('btn-mais-filtros')?.addEventListener('click', function () {
+    const extras = document.getElementById('filtros-extras');
+    const icon = document.getElementById('icon-mais-filtros');
+    if (!extras) return;
+    const hidden = extras.classList.toggle('hidden');
+    if (icon) {
+      icon.classList.toggle('fa-chevron-down', hidden);
+      icon.classList.toggle('fa-chevron-up', !hidden);
     }
+    this.querySelector('span')?.remove();
   });
-}
-
-// Filtrar aulas de hoje
-async function filterAulasHoje() {
-  const btn = document.getElementById('btn-aulas-hoje');
-  if (!btn) return;
-  
-  const originalHTML = btn.innerHTML;
-  
-  // Mostrar loading no botão
-  btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1 text-xs"></i> Buscando...';
-  btn.disabled = true;
-  
-  try {
-    const hoje = getTodayFormatted();
-    const filteredAulas = AULAS_DATA.filter(aula => {
-      if (!aula.aulas || !Array.isArray(aula.aulas)) return false;
-      
-      return aula.aulas.some(a => {
-        if (!a.data) return false;
-        return a.data.includes(hoje);
-      });
-    });
-    
-    if (typeof BancoDeAulasCards !== 'undefined' && BancoDeAulasCards.renderAulasCards) {
-      BancoDeAulasCards.renderAulasCards(filteredAulas);
-    }
-    
-    showToast(`📅 Encontradas ${filteredAulas.length} aulas para hoje`, 'info', 2000);
-  } catch (error) {
-    console.error('❌ Erro ao filtrar aulas de hoje:', error);
-    showToast('❌ Erro ao filtrar aulas de hoje', 'error');
-  } finally {
-    // Restaurar botão
-    btn.innerHTML = originalHTML;
-    btn.disabled = false;
-  }
-}
-
-// Filtrar aulas desta semana
-async function filterAulasEstaSemana() {
-  const btn = document.getElementById('btn-aulas-semana');
-  if (!btn) return;
-  
-  const originalHTML = btn.innerHTML;
-  
-  // Mostrar loading no botão
-  btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1 text-xs"></i> Buscando...';
-  btn.disabled = true;
-  
-  try {
-    const hoje = new Date();
-    const fimDaSemana = new Date();
-    fimDaSemana.setDate(hoje.getDate() + 7);
-    
-    const filteredAulas = AULAS_DATA.filter(aula => {
-      if (!aula.aulas || !Array.isArray(aula.aulas)) return false;
-      
-      return aula.aulas.some(a => {
-        if (!a.data) return false;
-        
-        // Tentar extrair data no formato dd/mm/yyyy
-        const match = a.data.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-        if (!match) return false;
-        
-        const [_, dia, mes, ano] = match;
-        const dataAula = new Date(ano, mes - 1, dia);
-        
-        return dataAula >= hoje && dataAula <= fimDaSemana;
-      });
-    });
-    
-    if (typeof BancoDeAulasCards !== 'undefined' && BancoDeAulasCards.renderAulasCards) {
-      BancoDeAulasCards.renderAulasCards(filteredAulas);
-    }
-    
-    showToast(`📅 Encontradas ${filteredAulas.length} aulas para esta semana`, 'info', 2000);
-  } catch (error) {
-    console.error('❌ Erro ao filtrar aulas da semana:', error);
-    showToast('❌ Erro ao filtrar aulas da semana', 'error');
-  } finally {
-    // Restaurar botão
-    btn.innerHTML = originalHTML;
-    btn.disabled = false;
-  }
-}
-
-// Filtrar aulas sem professor
-async function filterAulasSemProfessor() {
-  const btn = document.getElementById('btn-sem-professor');
-  if (!btn) return;
-  
-  const originalHTML = btn.innerHTML;
-  
-  // Mostrar loading no botão
-  btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1 text-xs"></i> Buscando...';
-  btn.disabled = true;
-  
-  try {
-    const filteredAulas = AULAS_DATA.filter(aula => {
-      if (!aula.aulas || !Array.isArray(aula.aulas)) return false;
-      
-      return aula.aulas.some(a => 
-        !a.professor || a.professor === 'A definir' || a.professor === ''
-      );
-    });
-    
-    if (typeof BancoDeAulasCards !== 'undefined' && BancoDeAulasCards.renderAulasCards) {
-      BancoDeAulasCards.renderAulasCards(filteredAulas);
-    }
-    
-    showToast(`👨‍🏫 Encontrados ${filteredAulas.length} cronogramas com aulas sem professor`, 'info', 2000);
-  } catch (error) {
-    console.error('❌ Erro ao filtrar aulas sem professor:', error);
-    showToast('❌ Erro ao filtrar aulas sem professor', 'error');
-  } finally {
-    // Restaurar botão
-    btn.innerHTML = originalHTML;
-    btn.disabled = false;
-  }
-}
-
-// Filtrar pagamentos pendentes
-async function filterPagamentosPendentes() {
-  const btn = document.getElementById('btn-pagamentos-pendentes');
-  if (!btn) return;
-  
-  const originalHTML = btn.innerHTML;
-  
-  // Mostrar loading no botão
-  btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1 text-xs"></i> Buscando...';
-  btn.disabled = true;
-  
-  try {
-    const filteredAulas = AULAS_DATA.filter(aula => {
-      // Verificar se statusPagamento existe e não é "Pagamento Efetuado"
-      return aula.statusPagamento && aula.statusPagamento !== 'Pagamento Efetuado';
-    });
-    
-    if (typeof BancoDeAulasCards !== 'undefined' && BancoDeAulasCards.renderAulasCards) {
-      BancoDeAulasCards.renderAulasCards(filteredAulas);
-    }
-    
-    showToast(`💰 Encontrados ${filteredAulas.length} contratos com pagamentos pendentes`, 'info', 2000);
-  } catch (error) {
-    console.error('❌ Erro ao filtrar pagamentos pendentes:', error);
-    showToast('❌ Erro ao filtrar pagamentos pendentes', 'error');
-  } finally {
-    // Restaurar botão
-    btn.innerHTML = originalHTML;
-    btn.disabled = false;
-  }
 }
 
 // Atualizar dados
@@ -675,123 +673,6 @@ async function refreshAulasData() {
     refreshBtn.innerHTML = originalHTML;
     refreshBtn.disabled = false;
   }
-}
-
-// Aplicar filtros
-function applyFilters() {
-  const filters = {};
-  
-  // Cliente
-  const clienteSelect = document.getElementById('filter-cliente');
-  if (clienteSelect && clienteSelect.value) {
-    filters.cliente = clienteSelect.value;
-  }
-  
-  // Data
-  const dataSelect = document.getElementById('filter-data');
-  if (dataSelect && dataSelect.value) {
-    if (dataSelect.value === 'personalizada') {
-      const customInput = document.getElementById('filter-data-custom');
-      if (customInput && customInput.value) {
-        filters.data = customInput.value;
-      }
-    } else {
-      const hoje = new Date();
-      let dataFiltro = '';
-      
-      switch (dataSelect.value) {
-        case 'hoje':
-          dataFiltro = getTodayFormatted();
-          break;
-        case 'amanha':
-          const amanha = new Date(hoje);
-          amanha.setDate(hoje.getDate() + 1);
-          dataFiltro = formatDate(amanha);
-          break;
-        case 'ontem':
-          const ontem = new Date(hoje);
-          ontem.setDate(hoje.getDate() - 1);
-          dataFiltro = formatDate(ontem);
-          break;
-      }
-      
-      if (dataFiltro) {
-        filters.data = dataFiltro;
-      }
-    }
-  }
-  
-  // Código
-  const codigoInput = document.getElementById('filter-codigo');
-  if (codigoInput && codigoInput.value.trim()) {
-    filters.codigo = codigoInput.value.trim();
-  }
-  
-  // Professor
-  const professorSelect = document.getElementById('filter-professor');
-  if (professorSelect && professorSelect.value) {
-    // Buscar nome do professor pelo ID
-    const professorId = professorSelect.value;
-    const professorOption = professorSelect.querySelector(`option[value="${professorId}"]`);
-    if (professorOption) {
-      filters.professor = professorOption.textContent;
-    }
-  }
-  
-  // Aplicar filtros e renderizar
-  const filteredAulas = applyAulasFilters(AULAS_DATA, filters);
-  
-  if (typeof BancoDeAulasCards !== 'undefined' && BancoDeAulasCards.renderAulasCards) {
-    BancoDeAulasCards.renderAulasCards(filteredAulas, filters);
-  }
-  
-  // Mostrar mensagem de filtros aplicados
-  const numFiltros = Object.keys(filters).length;
-  if (numFiltros > 0) {
-    showToast(`🔍 ${numFiltros} filtro${numFiltros !== 1 ? 's' : ''} aplicado${numFiltros !== 1 ? 's' : ''}`, 'info', 2000);
-  }
-}
-
-// Função para aplicar filtros às aulas
-function applyAulasFilters(aulas, filters) {
-  if (Object.keys(filters).length === 0) return aulas;
-  
-  console.log('🔍 Aplicando filtros:', filters);
-  
-  return aulas.filter(aula => {
-    // Filtro por cliente (CPF)
-    if (filters.cliente && aula.cpf !== filters.cliente) {
-      return false;
-    }
-    
-    // Filtro por código
-    if (filters.codigo) {
-      const codigo = aula.codigoContratacao || '';
-      if (!codigo.toLowerCase().includes(filters.codigo.toLowerCase())) {
-        return false;
-      }
-    }
-    
-    // Filtro por professor
-    if (filters.professor) {
-      const temProfessor = aula.aulas?.some(a => {
-        const professorAula = a.professor || '';
-        return professorAula.toLowerCase().includes(filters.professor.toLowerCase());
-      });
-      if (!temProfessor) return false;
-    }
-    
-    // Filtro por data
-    if (filters.data) {
-      const temData = aula.aulas?.some(a => {
-        const dataAula = a.data || '';
-        return dataAula.includes(filters.data);
-      });
-      if (!temData) return false;
-    }
-    
-    return true;
-  });
 }
 
 // Exportar função para uso global

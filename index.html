@@ -106,19 +106,9 @@
             <i class="fas fa-chalkboard-user mr-3"></i><span>Professores</span>
           </button>
         </div>
-        <button class="menu-item menu-item-expandable" data-section="areas" id="btn-areas-menu">
-          <i class="fas fa-th-large mr-3"></i>
-          <span>Áreas</span>
-          <i class="fas fa-chevron-down ml-auto text-sm transition-transform" id="icon-areas-expand"></i>
+        <button class="menu-item" data-section="area-pagamento">
+          <i class="fas fa-credit-card mr-3"></i><span>Área Pagamento</span>
         </button>
-        <div id="submenu-areas" class="ml-4 space-y-1 hidden">
-          <button class="menu-item-submenu" data-section="area-cliente" data-title="Área Cliente">
-            <i class="fas fa-user-circle mr-3"></i><span>Área Cliente</span>
-          </button>
-          <button class="menu-item-submenu" data-section="area-professor" data-title="Área Professor">
-            <i class="fas fa-chalkboard-user mr-3"></i><span>Área Professor</span>
-          </button>
-        </div>
         <button class="menu-item" data-section="exportar-dados">
           <i class="fas fa-file-export mr-3"></i><span>Exportar Dados</span>
         </button>
@@ -175,20 +165,7 @@
         </section>
         <section id="clientes"         class="section-content"></section>
         <section id="professores"      class="section-content"></section>
-        <section id="area-cliente"     class="section-content">
-          <div class="text-center py-8">
-            <i class="fas fa-user-circle text-3xl text-gray-300 mb-3"></i>
-            <h3 class="font-lexend text-lg mb-2">Área Cliente</h3>
-            <p class="text-gray-600 text-sm">Esta seção está em desenvolvimento.</p>
-          </div>
-        </section>
-        <section id="area-professor"   class="section-content">
-          <div class="text-center py-8">
-            <i class="fas fa-chalkboard-user text-3xl text-gray-300 mb-3"></i>
-            <h3 class="font-lexend text-lg mb-2">Área Professor</h3>
-            <p class="text-gray-600 text-sm">Esta seção está em desenvolvimento.</p>
-          </div>
-        </section>
+        <section id="area-pagamento"   class="section-content"></section>
         <section id="exportar-dados"   class="section-content">
           <div class="text-center py-8">
             <i class="fas fa-file-export text-3xl text-gray-300 mb-3"></i>
@@ -250,5 +227,6 @@
   <script src="functions-dashboardCliente.js"></script>
   <script src="functions-dashboardProfessor.js"></script>
   <script src="functions-exportar-dados.js"></script>
+  <script src="functions-pagamento.js"></script>
 </body>
 </html>

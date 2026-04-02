@@ -7,7 +7,7 @@ const CONFIG = {
   sections: [
     'painel-central', 'banco-aulas', 'simulacoes', 'mensagens',
     'calendario', 'fluxo-processos', 'clientes', 'professores',
-    'area-cliente', 'area-professor', 'exportar-dados'
+    'area-pagamento', 'exportar-dados'
   ]
 };
 
@@ -51,7 +51,6 @@ document.addEventListener('DOMContentLoaded', () => {
 function initializeApp() {
   setupMenuNavigation();
   setupDashboardSubmenu();
-  setupAreasSubmenu();
   setupGlobalListeners();
   loadSection('painel-central');
   checkFirebaseConnection();
@@ -100,20 +99,6 @@ function setupDashboardSubmenu() {
   const btn    = document.getElementById('btn-dashboard-menu');
   const sub    = document.getElementById('submenu-dashboard');
   const icon   = document.getElementById('icon-dashboard-expand');
-  let expanded = false;
-  if (!btn || !sub) return;
-  btn.addEventListener('click', function (e) {
-    e.preventDefault(); e.stopPropagation();
-    expanded = !expanded;
-    sub.classList.toggle('hidden', !expanded);
-    if (icon) icon.classList.toggle('rotate', expanded);
-  });
-}
-
-function setupAreasSubmenu() {
-  const btn    = document.getElementById('btn-areas-menu');
-  const sub    = document.getElementById('submenu-areas');
-  const icon   = document.getElementById('icon-areas-expand');
   let expanded = false;
   if (!btn || !sub) return;
   btn.addEventListener('click', function (e) {
@@ -179,6 +164,9 @@ function loadSectionContent(sectionId) {
       break;
     case 'exportar-dados':
       if (typeof loadExportarDados === 'function') loadExportarDados();
+      break;
+    case 'area-pagamento':
+      if (typeof loadAreaPagamento === 'function') loadAreaPagamento();
       break;
   }
 }
