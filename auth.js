@@ -85,27 +85,34 @@ function initFirebase() {
     _auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
 
     // ── App Check ────────────────────────────────────────────────
-    // Em localhost o reCAPTCHA rejeita requisições (domínio não cadastrado),
-    // o que bloquearia o Firestore inteiro. Ativamos apenas em produção.
     const isLocalhost = ['localhost', '127.0.0.1', ''].includes(window.location.hostname);
 
-    if (
-      !isLocalhost &&
-      typeof firebase.appCheck === 'function' &&
-      typeof RECAPTCHA_SITE_KEY !== 'undefined' &&
-      typeof firebase.appCheck.ReCaptchaV3Provider !== 'undefined'
-    ) {
+    if (typeof firebase.appCheck === 'function') {
       try {
-        const appCheck = firebase.appCheck(_firebaseApp);
-        appCheck.activate(
-          new firebase.appCheck.ReCaptchaV3Provider(RECAPTCHA_SITE_KEY),
-          true
-        );
+        if (isLocalhost) {
+          // Em localhost: ativa o debug provider para gerar um token de debug.
+          // Na primeira execução, o token será exibido no console — registre-o
+          // em Firebase Console → App Check → Debug tokens.
+          self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+          const appCheck = firebase.appCheck(_firebaseApp);
+          appCheck.activate(
+            new firebase.appCheck.ReCaptchaV3Provider(RECAPTCHA_SITE_KEY),
+            true
+          );
+          console.info('[auth] App Check em modo DEBUG (localhost). Registre o token do console no Firebase Console.');
+        } else if (
+          typeof RECAPTCHA_SITE_KEY !== 'undefined' &&
+          typeof firebase.appCheck.ReCaptchaV3Provider !== 'undefined'
+        ) {
+          const appCheck = firebase.appCheck(_firebaseApp);
+          appCheck.activate(
+            new firebase.appCheck.ReCaptchaV3Provider(RECAPTCHA_SITE_KEY),
+            true
+          );
+        }
       } catch (acErr) {
         console.warn('[auth] App Check não ativado:', acErr.message);
       }
-    } else if (isLocalhost) {
-      console.info('[auth] App Check desativado em localhost (desenvolvimento).');
     }
 
     // Expor db globalmente para banco.js existente
