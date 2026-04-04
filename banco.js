@@ -437,6 +437,8 @@ async function addNovaAulaLista(codigoContratacao, valorHoraContrato = 35) {
       RelatorioAula: "",
       StatusAula: "Pendente",
       ValorAula: valorAulaCalculado,
+      codigoContratacao: ultimaAula.codigoContratacao || "",
+      cpf: ultimaAula.cpf || "",
       data: dataAtual,
       duracao: duracaoPadrao,
       estudante: ultimaAula.estudante || "",
@@ -444,6 +446,7 @@ async function addNovaAulaLista(codigoContratacao, valorHoraContrato = 35) {
       "id-Aula": novoIdAula,
       idProfessor: "",
       materia: "",
+      metodoPagamento: ultimaAula.metodoPagamento || "",
       nomeCliente: ultimaAula.nomeCliente || "",
       professor: "",
       timestamp: firebase.firestore.FieldValue.serverTimestamp()
