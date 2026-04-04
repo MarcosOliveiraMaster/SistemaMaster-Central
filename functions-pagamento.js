@@ -63,6 +63,74 @@ function loadAreaPagamento() {
       <h3 class="font-lexend text-lg font-bold text-gray-800 mt-5 mb-3">
         <i class="fas fa-user mr-2 text-orange-500"></i>Relatório Individual
       </h3>
+
+      <div class="table-container-double-scroll">
+        <div class="table-wrapper" style="max-height:400px; min-height:400px;">
+          <table class="table-details" id="tabela-pagamento-individual" style="min-width:600px; table-layout:fixed;">
+            <colgroup>
+              <col style="width:150px;">
+              <col style="width:150px;">
+              <col>
+              <col style="width:120px;">
+              <col style="width:130px;">
+            </colgroup>
+            <thead>
+              <tr>
+                <th>Data da Aula</th>
+                <th>Contratação</th>
+                <th>Nome Cliente</th>
+                <th>Duração</th>
+                <th>Valor da Aula</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-pagamento-individual">
+              <tr>
+                <td colspan="5" class="text-center py-8 text-gray-400 font-comfortaa text-sm">
+                  Selecione um professor e clique em <strong>Analisar pagamentos</strong>.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="flex gap-4 mt-4">
+        <div style="flex: 7; display:flex; flex-direction:column; gap:8px;">
+          <h4 class="font-lexend text-md font-bold text-gray-800">
+            <i class="fas fa-info-circle mr-2 text-orange-500"></i>Informações adicionais
+          </h4>
+          <div id="informacoesAdicionais" class="bg-white rounded-lg border border-gray-200 p-4" style="flex:1; display:flex; flex-direction:column;">
+            <div style="display:grid; grid-template-columns:1fr 130px 130px 110px 40px; gap:8px; align-items:center; margin-bottom:8px;">
+              <span class="font-lexend text-xs font-bold text-gray-600">Descrição</span>
+              <span class="font-lexend text-xs font-bold text-gray-600">Data</span>
+              <span class="font-lexend text-xs font-bold text-gray-600">Valor</span>
+              <span class="font-lexend text-xs font-bold text-gray-600">Tipo</span>
+              <span></span>
+            </div>
+            <div id="info-adicional-rows" style="flex:1; max-height:120px; overflow-y:auto;"></div>
+            <div style="display:flex; justify-content:flex-end; margin-top:auto; padding-top:10px;">
+              <button id="addInformacao" class="btn-primary btn-compact" type="button" onclick="adicionarInfoAdicional()">
+                <i class="fas fa-plus mr-2"></i>Adicionar informação
+              </button>
+            </div>
+          </div>
+        </div>
+        <div style="flex: 3; display:flex; flex-direction:column; gap:8px;">
+          <h4 class="font-lexend text-md font-bold text-gray-800">
+            <i class="fas fa-file-invoice-dollar mr-2 text-orange-500"></i>Resumo de Pagamento
+          </h4>
+          <div id="resumoPagamento" class="bg-white rounded-lg border border-gray-200 p-4" style="flex:1; display:flex; flex-direction:column;">
+            <div id="resumo-conteudo" style="flex:1;">
+              <p class="text-center text-gray-400 font-comfortaa text-sm py-4">Clique em <strong>Analisar pagamentos</strong> para ver o resumo.</p>
+            </div>
+            <div style="margin-top:auto; padding-top:10px; text-align:center;">
+              <button id="btn-gerar-relatorio" class="btn-primary btn-compact" type="button" onclick="gerarRelatorioPagamento()" style="display:none;">
+                <i class="fas fa-file-alt mr-2"></i>Gerar relatório de pagamento
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Seção Grupo -->
@@ -260,6 +328,36 @@ function atualizarBtnMultiPag() {
   }
 }
 
+// ─── Abrir detalhes da contratação a partir da tabela de pagamento ───
+
+async function abrirDetalhesContratacaoPagamento(codigoContratacao) {
+  if (!codigoContratacao) {
+    showToast('Código de contratação não encontrado.', 'error');
+    return;
+  }
+
+  try {
+    showToast('Carregando detalhes...', 'info');
+    const docSnap = await db.collection('BancoDeAulas').doc(codigoContratacao).get();
+
+    if (!docSnap.exists) {
+      showToast('Contratação não encontrada no banco de dados.', 'error');
+      return;
+    }
+
+    const aula = { id: docSnap.id, ...docSnap.data() };
+
+    if (window.BancoDeAulasCards && typeof window.BancoDeAulasCards.viewAulaDetails === 'function') {
+      window.BancoDeAulasCards.viewAulaDetails(aula);
+    } else {
+      showToast('Módulo de detalhes não carregado.', 'error');
+    }
+  } catch (error) {
+    console.error('Erro ao buscar contratação:', error);
+    showToast('Erro ao carregar detalhes da contratação.', 'error');
+  }
+}
+
 // Fecha multi-select ao clicar fora
 document.addEventListener('click', function(e) {
   const menu = document.getElementById('pag-multi-menu');
@@ -289,6 +387,119 @@ function alternarSecoesPagamento(colecao) {
       mostrar.style.opacity = '1';
     });
   }, 300);
+}
+
+// ─── Informações Adicionais: adicionar/remover linhas ───
+
+let _infoAdicionalCounter = 0;
+
+function adicionarInfoAdicional() {
+  const container = document.getElementById('info-adicional-rows');
+  if (!container) return;
+  _infoAdicionalCounter++;
+  const id = _infoAdicionalCounter;
+  const row = document.createElement('div');
+  row.id = 'info-row-' + id;
+  row.style.cssText = 'display:grid; grid-template-columns:1fr 130px 130px 110px 40px; gap:8px; align-items:center; margin-bottom:6px;';
+  row.innerHTML = `
+    <input type="text" class="filter-input filter-compact font-comfortaa" placeholder="Descrição..." style="width:100%;">
+    <input type="text" class="filter-input filter-compact font-comfortaa" placeholder="dd/mm/aaaa" maxlength="10" oninput="mascaraDataInfoAdicional(this)" style="width:100%;">
+    <input type="text" class="filter-input filter-compact font-comfortaa" placeholder="R$ 0,00" oninput="mascaraValorInfoAdicional(this)" style="width:100%;">
+    <select class="filter-select filter-compact font-comfortaa" style="width:100%;" onchange="atualizarCorBordaInfoAdicional(this)">
+      <option value="entrada">Entrada</option>
+      <option value="saida">Saída</option>
+    </select>
+    <button type="button" onclick="removerInfoAdicional(${id})" style="background:none; border:none; cursor:pointer; color:#ef4444; font-size:16px;" title="Remover">
+      <i class="fas fa-trash-alt"></i>
+    </button>
+  `;
+  container.appendChild(row);
+  const select = row.querySelector('select');
+  if (select) atualizarCorBordaInfoAdicional(select);
+}
+
+function atualizarCorBordaInfoAdicional(select) {
+  const row = select.closest('[id^="info-row-"]');
+  if (!row) return;
+  const cor = select.value === 'entrada' ? '#22c55e' : '#ef4444';
+  row.querySelectorAll('input, select').forEach(el => {
+    el.style.borderColor = cor;
+  });
+}
+
+function removerInfoAdicional(id) {
+  const row = document.getElementById('info-row-' + id);
+  if (row) row.remove();
+}
+
+function mascaraDataInfoAdicional(input) {
+  let v = input.value.replace(/\D/g, '').substring(0, 8);
+  if (v.length > 4) v = v.substring(0, 2) + '/' + v.substring(2, 4) + '/' + v.substring(4);
+  else if (v.length > 2) v = v.substring(0, 2) + '/' + v.substring(2);
+  input.value = v;
+}
+
+function calcularInfoAdicionais() {
+  let entradas = 0;
+  let saidas = 0;
+  const rows = document.querySelectorAll('[id^="info-row-"]');
+  rows.forEach(row => {
+    const select = row.querySelector('select');
+    const inputValor = row.querySelectorAll('input')[2];
+    if (!select || !inputValor) return;
+    const valorStr = (inputValor.value || '').replace(/[^\d,]/g, '').replace(',', '.');
+    const valor = parseFloat(valorStr) || 0;
+    if (select.value === 'entrada') entradas += valor;
+    else saidas += valor;
+  });
+  return { entradas, saidas };
+}
+
+function atualizarResumoPagamento(valorReceber) {
+  const conteudo = document.getElementById('resumo-conteudo');
+  const btnRelatorio = document.getElementById('btn-gerar-relatorio');
+  if (!conteudo) return;
+
+  const { entradas, saidas } = calcularInfoAdicionais();
+  const total = valorReceber + entradas - saidas;
+
+  const fmt = (v) => 'R$ ' + v.toFixed(2).replace('.', ',');
+
+  conteudo.innerHTML = `
+    <div style="display:flex; flex-direction:column; gap:12px;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span class="font-comfortaa text-sm text-gray-600">Valor à receber:</span>
+        <span class="font-lexend text-sm font-bold text-gray-800">${fmt(valorReceber)}</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span class="font-comfortaa text-sm text-gray-600">Entradas:</span>
+        <span class="font-lexend text-sm font-bold text-green-600">+ ${fmt(entradas)}</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span class="font-comfortaa text-sm text-gray-600">Saídas:</span>
+        <span class="font-lexend text-sm font-bold text-red-500">- ${fmt(saidas)}</span>
+      </div>
+      <hr style="border-top:1px solid #e5e7eb;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span class="font-lexend text-sm font-bold text-gray-800">Total:</span>
+        <span class="font-lexend text-md font-bold ${total >= 0 ? 'text-green-600' : 'text-red-500'}">${fmt(total)}</span>
+      </div>
+    </div>
+  `;
+
+  if (btnRelatorio) btnRelatorio.style.display = '';
+}
+
+function gerarRelatorioPagamento() {
+  // TODO: implementar geração do relatório
+  showToast('Funcionalidade em desenvolvimento.', 'info');
+}
+
+function mascaraValorInfoAdicional(input) {
+  let v = input.value.replace(/\D/g, '');
+  if (v === '') { input.value = ''; return; }
+  v = (parseInt(v, 10) / 100).toFixed(2);
+  input.value = 'R$ ' + v.replace('.', ',');
 }
 
 function analisarPagamentos() {
@@ -341,13 +552,23 @@ function analisarPagamentoIndividual() {
   const nomeMes = meses[mes - 1] || '';
 
   if (aulasFiltradas.length === 0) {
-    secao.innerHTML = `
-      <h3 class="font-lexend text-lg font-bold text-gray-800 mt-5 mb-3">
-        <i class="fas fa-user mr-2 text-orange-500"></i>Relatório Individual — ${nomeProfessor}
-      </h3>
-      <div class="p-4 text-center text-gray-500 font-comfortaa text-sm">
-        Nenhuma aula encontrada para <strong>${nomeProfessor}</strong> em <strong>${nomeMes}/${ano}</strong>.
-      </div>`;
+    // Atualizar título
+    const h3 = secao.querySelector('h3');
+    if (h3) h3.innerHTML = `<i class="fas fa-user mr-2 text-orange-500"></i>Relatório Individual — ${nomeProfessor} <span class="text-sm font-normal text-gray-500 ml-2">${nomeMes}/${ano}</span>`;
+
+    const tbody = document.getElementById('tbody-pagamento-individual');
+    if (tbody) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="5" class="text-center py-8 text-gray-400 font-comfortaa text-sm">
+            Nenhuma aula encontrada para <strong>${nomeProfessor}</strong> em <strong>${nomeMes}/${ano}</strong>.
+          </td>
+        </tr>`;
+    }
+    // Limpar tfoot
+    const tfoot = document.querySelector('#tabela-pagamento-individual tfoot');
+    if (tfoot) tfoot.innerHTML = '';
+    atualizarResumoPagamento(0);
     return;
   }
 
@@ -358,52 +579,40 @@ function analisarPagamentoIndividual() {
   let linhas = '';
   aulasFiltradas.forEach(aula => {
     const valor = parseFloat(aula.ValorAula) || 0;
+    const codigoContr = aula.codigoContratacao || aula.idContratacao || '';
     linhas += `
       <tr>
         <td class="font-comfortaa">${aula.data || '—'}</td>
-        <td class="font-comfortaa">${aula.codigoContratacao || aula.idContratacao || '—'}</td>
+        <td class="font-comfortaa">${codigoContr ? `<a href="#" class="text-orange-500 hover:text-orange-700 underline cursor-pointer font-medium" onclick="abrirDetalhesContratacaoPagamento('${codigoContr}'); return false;">${codigoContr}</a>` : '—'}</td>
         <td class="font-comfortaa">${aula.nomeCliente || '—'}</td>
         <td class="font-comfortaa">${aula.duracao || '—'}</td>
         <td class="font-comfortaa">R$ ${valor.toFixed(2).replace('.', ',')}</td>
       </tr>`;
   });
 
-  secao.innerHTML = `
-    <h3 class="font-lexend text-lg font-bold text-gray-800 mt-5 mb-3">
-      <i class="fas fa-user mr-2 text-orange-500"></i>Relatório Individual — ${nomeProfessor}
-      <span class="text-sm font-normal text-gray-500 ml-2">${nomeMes}/${ano}</span>
-    </h3>
+  // Atualizar título
+  const h3 = secao.querySelector('h3');
+  if (h3) h3.innerHTML = `<i class="fas fa-user mr-2 text-orange-500"></i>Relatório Individual — ${nomeProfessor} <span class="text-sm font-normal text-gray-500 ml-2">${nomeMes}/${ano}</span>`;
 
-    <div class="table-container-double-scroll">
-      <div class="table-wrapper">
-        <table class="table-details" id="tabela-pagamento-individual" style="min-width:600px; table-layout:fixed;">
-          <colgroup>
-            <col style="width:150px;">
-            <col style="width:150px;">
-            <col>
-            <col style="width:120px;">
-            <col style="width:130px;">
-          </colgroup>
-          <thead>
-            <tr>
-              <th>Data da Aula</th>
-              <th>Contratação</th>
-              <th>Nome Cliente</th>
-              <th>Duração</th>
-              <th>Valor da Aula</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${linhas}
-          </tbody>
-          <tfoot>
-            <tr style="background:#f9fafb; font-weight:bold;">
-              <td class="font-lexend" colspan="3">${aulasFiltradas.length} aula(s)</td>
-              <td></td>
-              <td class="font-lexend">R$ ${totalValor.toFixed(2).replace('.', ',')}</td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-    </div>`;
+  // Atualizar tbody
+  const tbody = document.getElementById('tbody-pagamento-individual');
+  if (tbody) tbody.innerHTML = linhas;
+
+  // Atualizar tfoot
+  const table = document.getElementById('tabela-pagamento-individual');
+  let tfoot = table ? table.querySelector('tfoot') : null;
+  if (!tfoot && table) {
+    tfoot = document.createElement('tfoot');
+    table.appendChild(tfoot);
+  }
+  if (tfoot) {
+    tfoot.innerHTML = `
+      <tr style="background:#f9fafb; font-weight:bold;">
+        <td class="font-lexend" colspan="3">${aulasFiltradas.length} aula(s)</td>
+        <td></td>
+        <td class="font-lexend">R$ ${totalValor.toFixed(2).replace('.', ',')}</td>
+      </tr>`;
+  }
+
+  atualizarResumoPagamento(totalValor);
 }
