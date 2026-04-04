@@ -474,6 +474,18 @@ const BancoDeAulasCards = (function() {
                   </div>
                 </div>
               </div>
+
+              <!-- Observações da Contratação (editável, span full width) -->
+              <div class="mt-3">
+                <div class="text-xs font-medium text-gray-500 mb-1">
+                  <i class="fas fa-sticky-note text-orange-400 mr-1"></i>
+                  Observações da Contratação
+                </div>
+                <textarea id="edit-observacao-contratacao" rows="2"
+                  class="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500 resize-none"
+                  placeholder="Observações sobre esta contratação..."
+                >${escapeHtml(aula.ObservacaoContratacao || '')}</textarea>
+              </div>
             </div>
 
             <!-- Dados da contratação -->
@@ -636,12 +648,13 @@ const BancoDeAulasCards = (function() {
         try {
           // (a) Salvar Informações do Cliente em BancoDeAulas
           const dadosCliente = {
-            statusContrato:          (modal.querySelector('#edit-status-contrato')?.value || aula.statusContrato || ''),
-            dataAssinaturaContrato:  (modal.querySelector('#edit-data-assinatura')?.value || ''),
-            modoPagamento:           (modal.querySelector('#edit-modo-pagamento')?.value || aula.modoPagamento || ''),
-            statusPagamento:         (modal.querySelector('#edit-status-pagamento')?.value || 'Pagamento completo'),
-            dataPrimeiraParcela:     (modal.querySelector('#edit-data-primeira-parcela')?.value || ''),
-            dataSegundaParcela:      (modal.querySelector('#edit-data-segunda-parcela')?.value || ''),
+            statusContrato:          (modal.querySelector('#edit-status-contrato')?.value          || aula.statusContrato || ''),
+            dataAssinaturaContrato:  (modal.querySelector('#edit-data-assinatura')?.value          || ''),
+            modoPagamento:           (modal.querySelector('#edit-modo-pagamento')?.value           || aula.modoPagamento || ''),
+            statusPagamento:         (modal.querySelector('#edit-status-pagamento')?.value         || 'Pagamento completo'),
+            dataPrimeiraParcela:     (modal.querySelector('#edit-data-primeira-parcela')?.value    || ''),
+            dataSegundaParcela:      (modal.querySelector('#edit-data-segunda-parcela')?.value     || ''),
+            ObservacaoContratacao:   (modal.querySelector('#edit-observacao-contratacao')?.value   ?? aula.ObservacaoContratacao ?? ''),
             timestamp:               firebase.firestore.FieldValue.serverTimestamp()
           };
           await BANCO.updateAula(aula.id, dadosCliente);
