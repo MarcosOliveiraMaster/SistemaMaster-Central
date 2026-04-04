@@ -598,6 +598,24 @@ const BancoDeAulasCards = (function() {
       }
     });
 
+    // Botão de adicionar aula — registrado UMA vez quando o modal abre
+    const btnAdicionarAula = modal.querySelector('#btnAdicionarAula');
+    if (btnAdicionarAula) {
+      btnAdicionarAula.addEventListener('click', function(e) {
+        e.stopPropagation();
+        showAdicionarAulaModal(this.dataset.codigoContratacao);
+      });
+    }
+
+    // Botão de remover aula — registrado UMA vez quando o modal abre
+    const btnRemoverAula = modal.querySelector('#btnRemoverAula');
+    if (btnRemoverAula) {
+      btnRemoverAula.addEventListener('click', function(e) {
+        e.stopPropagation();
+        showRemoverAulaModal(this.dataset.codigoContratacao);
+      });
+    }
+
     // Fechar com ESC
     const escHandler = (e) => {
       if (e.key === 'Escape') closeModal();
@@ -2295,25 +2313,7 @@ const BancoDeAulasCards = (function() {
       });
     });
     
-    // Botão de adicionar aula
-    const btnAdicionarAula = document.getElementById('btnAdicionarAula');
-    if (btnAdicionarAula) {
-      btnAdicionarAula.addEventListener('click', function(e) {
-        e.stopPropagation();
-        const codigoContratacao = this.dataset.codigoContratacao;
-        showAdicionarAulaModal(codigoContratacao);
-      });
-    }
-    
-    // Botão de remover aula
-    const btnRemoverAula = document.getElementById('btnRemoverAula');
-    if (btnRemoverAula) {
-      btnRemoverAula.addEventListener('click', function(e) {
-        e.stopPropagation();
-        const codigoContratacao = this.dataset.codigoContratacao;
-        showRemoverAulaModal(codigoContratacao);
-      });
-    }
+    // Nota: btnAdicionarAula e btnRemoverAula são registrados em viewAulaDetails (uma vez por abertura de modal)
   }
   
   // Variável para armazenar aula selecionada temporariamente
