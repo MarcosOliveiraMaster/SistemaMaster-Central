@@ -13,6 +13,10 @@
  *   node firebase-query.js professores   → lista dataBaseProfessores
  *   node firebase-query.js aulas         → lista BancoDeAulas
  *   node firebase-query.js lista         → lista BancoDeAulas-Lista
+ *   node firebase-query.js candidatos    → lista candidatos
+ *   node firebase-query.js investimentos → lista investimentos
+ *   node firebase-query.js financeiro    → lista relatorioFinanceiro
+ *   node firebase-query.js simulacoes    → lista simulacoes
  */
 
 const admin = require('firebase-admin');
@@ -79,10 +83,14 @@ async function modoResumo() {
   console.log('====================================================');
 
   const colecoes = [
-    'cadastroClientes',
-    'dataBaseProfessores',
     'BancoDeAulas',
     'BancoDeAulas-Lista',
+    'cadastroClientes',
+    'candidatos',
+    'dataBaseProfessores',
+    'investimentos',
+    'relatorioFinanceiro',
+    'simulacoes',
   ];
 
   const resultados = await Promise.all(
@@ -112,10 +120,14 @@ async function modoResumo() {
 // ── Modos específicos ──────────────────────────────────────────
 async function modoColecao(arg) {
   const mapa = {
-    clientes:    'cadastroClientes',
-    professores: 'dataBaseProfessores',
-    aulas:       'BancoDeAulas',
-    lista:       'BancoDeAulas-Lista',
+    aulas:        'BancoDeAulas',
+    lista:        'BancoDeAulas-Lista',
+    clientes:     'cadastroClientes',
+    candidatos:   'candidatos',
+    professores:  'dataBaseProfessores',
+    investimentos:'investimentos',
+    financeiro:   'relatorioFinanceiro',
+    simulacoes:   'simulacoes',
   };
   const nome = mapa[arg] || arg;
   const docs = await getCollection(nome, 50);
