@@ -1,0 +1,11 @@
+{
+  "name": "sistemamaster-central-tools",
+  "version": "1.0.0",
+  "description": "Scripts administrativos para SistemaMaster Central",
+  "scripts": {
+    "query-firebase": "node firebase-query.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.0.0"
+  }
+}
