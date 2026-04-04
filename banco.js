@@ -314,10 +314,12 @@ async function updateDuracaoAula(idAula, novaDuracao) {
 
     let horasDecimais = 0;
     if (novaDuracao) {
-      const match = novaDuracao.match(/(\d+)h(\d+)/);
-      if (match) horasDecimais = parseInt(match[1]) + parseInt(match[2]) / 60;
+      const match = novaDuracao.match(/(\d+)h(?:(\d+))?/);
+      if (match) horasDecimais = parseInt(match[1]) + (match[2] ? parseInt(match[2]) / 60 : 0);
     }
-    const valorAula = horasDecimais * 35;
+    const docData = querySnapshot.docs[0].data();
+    const valorHora = docData.horaAulaProfessor || 35;
+    const valorAula = Number((horasDecimais * valorHora).toFixed(2));
 
     await querySnapshot.docs[0].ref.update({
       duracao: novaDuracao,
@@ -448,9 +450,50 @@ async function addNovaAulaLista(codigoContratacao, valorHoraContrato = 35) {
     };
 
     await db.collection("BancoDeAulas-Lista").add(novaAula);
+    forceCacheRefresh();
     return novoIdAula;
   } catch (error) {
     console.error('❌ Erro ao adicionar nova aula:', error.message);
+    throw error;
+  }
+}
+
+// Atualizar ValorAula em múltiplas aulas da BancoDeAulas-Lista (batch)
+async function updateValorAulaLista(codigoContratacao, valorHoraAula) {
+  try {
+    const querySnapshot = await db.collection("BancoDeAulas-Lista")
+      .where("id-Aula", ">=", codigoContratacao)
+      .where("id-Aula", "<", codigoContratacao + "\uf8ff")
+      .get();
+
+    if (querySnapshot.empty) return 0;
+
+    const batch = db.batch();
+    let count = 0;
+
+    querySnapshot.forEach(doc => {
+      const data = doc.data();
+      const duracao = data.duracao || '';
+      const mm = duracao.match(/(\d+)h(?:([0-5]\d))?/);
+      const hours = mm ? parseInt(mm[1], 10) : 0;
+      const minutes = (mm && mm[2]) ? parseInt(mm[2], 10) : 0;
+      const totalHoursDecimal = (hours * 60 + minutes) / 60;
+      const novoValor = Number((totalHoursDecimal * valorHoraAula).toFixed(2));
+
+      batch.update(doc.ref, {
+        ValorAula: novoValor,
+        horaAulaProfessor: valorHoraAula,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      count++;
+    });
+
+    await batch.commit();
+    forceCacheRefresh();
+    console.log(`✅ ValorAula atualizado em ${count} aulas de ${codigoContratacao}`);
+    return count;
+  } catch (error) {
+    console.error('❌ Erro ao atualizar ValorAula em lote:', error.message);
     throw error;
   }
 }
@@ -501,6 +544,7 @@ if (typeof window !== 'undefined') {
     updateMateriaAula,
     updateProfessorAula,
     updateEstudanteAula,
+    updateValorAulaLista,
     addNovaAulaLista,
     deleteAulasLista,
     forceCacheRefresh,

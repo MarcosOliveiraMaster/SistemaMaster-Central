@@ -361,7 +361,7 @@ function analisarPagamentoIndividual() {
     linhas += `
       <tr>
         <td class="font-comfortaa">${aula.data || '—'}</td>
-        <td class="font-comfortaa">${aula.idContratacao || '—'}</td>
+        <td class="font-comfortaa">${aula.codigoContratacao || aula.idContratacao || '—'}</td>
         <td class="font-comfortaa">${aula.nomeCliente || '—'}</td>
         <td class="font-comfortaa">${aula.duracao || '—'}</td>
         <td class="font-comfortaa">R$ ${valor.toFixed(2).replace('.', ',')}</td>

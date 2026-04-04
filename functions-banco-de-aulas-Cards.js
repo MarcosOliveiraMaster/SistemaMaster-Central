@@ -534,6 +534,10 @@ const BancoDeAulasCards = (function() {
             <button id="btn-fechar-modal" class="btn-secondary btn-compact">
               Fechar
             </button>
+            <button id="btn-salvar-alteracoes" class="btn-primary btn-compact">
+              <i class="fas fa-save mr-2"></i>
+              Salvar Alterações
+            </button>
           </div>
         </div>
       </div>
@@ -934,6 +938,7 @@ const BancoDeAulasCards = (function() {
               ValorEquipe: valEquipe,
               lucroMaster: valLucro,
               ValorPacote: valPacote,
+              horaAulaProfessor: valEquipe,
               timestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
 
@@ -959,6 +964,208 @@ const BancoDeAulasCards = (function() {
             btnAplicar.innerHTML = 'Aplicar alterações';
           }
         });
+      });
+    }
+
+    // Configurar botão "Salvar Alterações"
+    const btnSalvarAlteracoes = modal.querySelector('#btn-salvar-alteracoes');
+    if (btnSalvarAlteracoes) {
+      btnSalvarAlteracoes.addEventListener('click', async () => {
+        try {
+          btnSalvarAlteracoes.disabled = true;
+          btnSalvarAlteracoes.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Salvando...';
+
+          const codigoDoc = aula.codigoContratacao;
+          if (!codigoDoc) {
+            showToast('❌ Código de contratação não encontrado', 'error');
+            btnSalvarAlteracoes.disabled = false;
+            btnSalvarAlteracoes.innerHTML = '<i class="fas fa-save mr-2"></i> Salvar Alterações';
+            return;
+          }
+
+          // ═══════════════════════════════════════════════════════════
+          // 1) SALVAR "Informações do Cliente" + "Dados da contratação"
+          //    → Coleção: BancoDeAulas (doc = codigoContratacao)
+          // ═══════════════════════════════════════════════════════════
+
+          const parseValorBR = (el) => {
+            if (!el) return undefined;
+            const txt = el.textContent.trim();
+            if (txt === '--' || txt === 'R$ 0,00' || txt === '0h 0m') return undefined;
+            const num = Number(txt.replace(/[^0-9,.-]/g, '').replace(',', '.'));
+            return Number.isNaN(num) ? undefined : num;
+          };
+
+          // Informações do Cliente (capturadas do objeto aula em escopo)
+          const dadosContratacao = {
+            nome: aula.nome || aula.nomeCliente || '',
+            cpf: aula.cpf || '',
+            statusContrato: aula.statusContrato || '',
+            dataAssinaturaContrato: aula.dataAssinaturaContrato || '',
+            modoPagamento: aula.modoPagamento || '',
+            codigoContratacao: codigoDoc,
+            statusPagamento: aula.statusPagamento || '',
+            dataPrimeiraParcela: aula.dataPrimeiraParcela || '',
+            dataSegundaParcela: aula.dataSegundaParcela || '',
+            equipe: aula.equipe || ''
+          };
+
+          // Estudante e Série (podem ter sido preenchidos dinamicamente)
+          const elEstudantes = modal.querySelector('#modal-estudantes');
+          const elSeries = modal.querySelector('#modal-series');
+          if (elEstudantes && elEstudantes.textContent.trim() !== '--') {
+            dadosContratacao.estudante = elEstudantes.textContent.trim();
+          }
+          if (elSeries && elSeries.textContent.trim() !== '--') {
+            dadosContratacao.serie = elSeries.textContent.trim();
+          }
+
+          // Valores financeiros (Dados da contratação)
+          const valorPacote = parseValorBR(modal.querySelector('#display-valor-pacote-contrato'));
+          const valorEquipe = parseValorBR(modal.querySelector('#display-valor-equipe-contrato'));
+          const lucroMaster = parseValorBR(modal.querySelector('#display-lucro-master-contrato'));
+          const valorHoraAula = parseValorBR(modal.querySelector('#display-hora-aula-contrato'));
+          const totalHoras = modal.querySelector('#display-total-horas-contrato');
+
+          if (valorPacote !== undefined) dadosContratacao.ValorPacote = valorPacote;
+          if (valorEquipe !== undefined) dadosContratacao.ValorEquipe = valorEquipe;
+          if (lucroMaster !== undefined) dadosContratacao.lucroMaster = lucroMaster;
+          if (valorHoraAula !== undefined) dadosContratacao.valorHoraAula = valorHoraAula;
+          if (totalHoras && totalHoras.textContent.trim() !== '0h 0m') {
+            dadosContratacao.SomatorioDuracaoAulas = totalHoras.textContent.trim();
+          }
+
+          dadosContratacao.ultimaAtualizacao = new Date().toISOString();
+
+          // Salvar no BancoDeAulas
+          await db.collection('BancoDeAulas').doc(codigoDoc).update(dadosContratacao);
+          console.log('✅ BancoDeAulas atualizado para:', codigoDoc);
+
+          // ═══════════════════════════════════════════════════════════
+          // 2) SALVAR "Aulas Agendadas" (cada linha da tabela)
+          //    → Coleção: BancoDeAulas-Lista (identificador: id-Aula)
+          // ═══════════════════════════════════════════════════════════
+
+          const tbody = modal.querySelector('#tbody-aulas-detalhadas');
+          const rows = tbody ? tbody.querySelectorAll('tr') : [];
+          let aulasAtualizadas = 0;
+          let aulasComErro = 0;
+
+          if (rows.length > 0) {
+            // Buscar todos os docs da BancoDeAulas-Lista para este código (uma query só)
+            const snapshotLista = await db.collection('BancoDeAulas-Lista')
+              .where('id-Aula', '>=', codigoDoc)
+              .where('id-Aula', '<=', codigoDoc + '\uf8ff')
+              .get();
+
+            // Mapear por id-Aula para acesso rápido
+            const docsMap = {};
+            snapshotLista.forEach(doc => {
+              const idAula = doc.data()['id-Aula'];
+              if (idAula) docsMap[idAula] = doc.ref;
+            });
+
+            // Usar batch para eficiência (máx. 500 por batch)
+            let batch = db.batch();
+            let batchCount = 0;
+
+            for (const row of rows) {
+              // Capturar dados de cada botão na linha
+              const btnData = row.querySelector('.btn-data-aula');
+              const btnHorario = row.querySelector('.btn-horario-aula');
+              const btnDuracao = row.querySelector('.btn-duracao-aula');
+              const btnMateria = row.querySelector('.btn-materia-aula');
+              const btnProfessor = row.querySelector('.btn-professor-aula');
+              const btnEstudante = row.querySelector('.btn-estudante-aula');
+              const btnStatus = row.querySelector('.btn-status-aula');
+              const btnRelatorio = row.querySelector('.btn-relatorio-aula');
+              const btnObservacao = row.querySelector('.btn-observacao-aula');
+
+              if (!btnData) continue; // Linha sem dados (ex: loading)
+
+              const idAula = btnData.dataset.idAula;
+              if (!idAula) continue;
+
+              const switchEl = row.querySelector('.switch-toggle');
+
+              // Capturar ValorAula da célula da tabela (coluna 5, texto formatado em BRL)
+              const cells = row.querySelectorAll('td');
+              let valorAulaCelula = undefined;
+              if (cells.length > 5) {
+                const txtValor = cells[5].textContent.trim();
+                const numVal = Number(txtValor.replace(/[^0-9,.-]/g, '').replace('.', '').replace(',', '.'));
+                if (Number.isFinite(numVal)) valorAulaCelula = numVal;
+              }
+
+              // Montar objeto para atualizar apenas os campos visíveis na tabela
+              const dadosAula = {
+                codigoContratacao: codigoDoc,
+                nomeCliente: aula.nome || aula.nomeCliente || '',
+                data: btnData.dataset.data || '',
+                horario: btnHorario ? (btnHorario.dataset.horario || '') : '',
+                duracao: btnDuracao ? (btnDuracao.dataset.duracao || '') : '',
+                materia: btnMateria ? (btnMateria.dataset.materia || '') : '',
+                professor: btnProfessor ? (btnProfessor.dataset.professor || '') : '',
+                idProfessor: btnProfessor ? (btnProfessor.dataset.idProfessor || '') : '',
+                estudante: btnEstudante ? (btnEstudante.dataset.estudante || '') : '',
+                StatusAula: btnStatus ? (btnStatus.dataset.status || '') : '',
+                RelatorioAula: (btnRelatorio && btnRelatorio.dataset.relatorio) ? decodeURIComponent(btnRelatorio.dataset.relatorio) : '',
+                ObservacoesAula: (btnObservacao && btnObservacao.dataset.observacao) ? decodeURIComponent(btnObservacao.dataset.observacao) : '',
+                ConfirmacaoProfessorAula: switchEl ? switchEl.classList.contains('switch-active') : false,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+              };
+
+              if (valorAulaCelula !== undefined) dadosAula.ValorAula = valorAulaCelula;
+
+              const docRef = docsMap[idAula];
+              if (docRef) {
+                // update() preserva campos existentes no documento (nomeCliente, cpf, codigoContratacao, etc.)
+                batch.update(docRef, dadosAula);
+                batchCount++;
+                aulasAtualizadas++;
+
+                // Firestore batch limit = 500
+                if (batchCount >= 499) {
+                  await batch.commit();
+                  batch = db.batch();
+                  batchCount = 0;
+                }
+              } else {
+                console.warn(`⚠️ Documento não encontrado para id-Aula: ${idAula}`);
+                aulasComErro++;
+              }
+            }
+
+            // Commit do batch restante
+            if (batchCount > 0) {
+              await batch.commit();
+            }
+
+            console.log(`✅ BancoDeAulas-Lista: ${aulasAtualizadas} aulas atualizadas`);
+          }
+
+          // Feedback final
+          let mensagem = '✅ Alterações salvas com sucesso!';
+          if (aulasAtualizadas > 0) {
+            mensagem += ` (${aulasAtualizadas} aula${aulasAtualizadas !== 1 ? 's' : ''})`;
+          }
+          if (aulasComErro > 0) {
+            mensagem += ` | ⚠️ ${aulasComErro} aula${aulasComErro !== 1 ? 's' : ''} não encontrada${aulasComErro !== 1 ? 's' : ''}`;
+          }
+
+          showToast(mensagem, aulasComErro > 0 ? 'warning' : 'success');
+          btnSalvarAlteracoes.innerHTML = '<i class="fas fa-check mr-2"></i> Salvo!';
+          setTimeout(() => {
+            btnSalvarAlteracoes.disabled = false;
+            btnSalvarAlteracoes.innerHTML = '<i class="fas fa-save mr-2"></i> Salvar Alterações';
+          }, 2000);
+
+        } catch (err) {
+          console.error('Erro ao salvar alterações:', err);
+          showToast('❌ Erro ao salvar: ' + (err && err.message ? err.message : ''), 'error');
+          btnSalvarAlteracoes.disabled = false;
+          btnSalvarAlteracoes.innerHTML = '<i class="fas fa-save mr-2"></i> Salvar Alterações';
+        }
       });
     }
 
@@ -1880,11 +2087,28 @@ const BancoDeAulasCards = (function() {
       const elHoraAulaContrato = document.getElementById('display-hora-aula-contrato');
       const valorHoraContratoAtual = parseBR(elHoraAulaContrato ? (elHoraAulaContrato.textContent || elHoraAulaContrato.innerText) : 'R$ 0,00');
 
+      // Coletar valores computados para persistir no banco
+      const valoresComputados = [];
+
       aulas.forEach((aula, index) => {
         const statusAula = aula.StatusAula || 'Pendente';
         const statusClass = getStatusBadgeClass(statusAula);
         const statusColors = getStatusColors(statusAula);
         const confirmada = aula.ConfirmacaoProfessorAula === true;
+
+        // Calcular ValorAula a partir da duração × valor hora/aula
+        let valorAulaComputado = 0;
+        try {
+          const mm = (aula.duracao && typeof aula.duracao === 'string') ? aula.duracao.match(/(\d+)h(?:([0-5]\d))?/) : null;
+          const hours = mm ? parseInt(mm[1], 10) : 0;
+          const minutes = (mm && mm[2]) ? parseInt(mm[2], 10) : 0;
+          const totalHoursDecimal = (hours * 60 + minutes) / 60;
+          valorAulaComputado = Number((totalHoursDecimal * valorHoraContratoAtual).toFixed(2));
+        } catch (e) { valorAulaComputado = 0; }
+        somaValorAulas += isFinite(valorAulaComputado) ? valorAulaComputado : 0;
+
+        // Guardar para persistir depois
+        valoresComputados.push({ docId: aula.id, valor: valorAulaComputado });
         
         html += `
           <tr>
@@ -1914,17 +2138,7 @@ const BancoDeAulasCards = (function() {
               </button>
             </td>
             <td class="text-right font-mono text-sm">
-              ${(() => {
-                try {
-                  const mm = (aula.duracao && typeof aula.duracao === 'string') ? aula.duracao.match(/(\d+)h(?:([0-5]\d))?/) : null;
-                  const hours = mm ? parseInt(mm[1], 10) : 0;
-                  const minutes = (mm && mm[2]) ? parseInt(mm[2], 10) : 0;
-                  const totalHoursDecimal = (hours * 60 + minutes) / 60;
-                  const computed = Number((totalHoursDecimal * valorHoraContratoAtual).toFixed(2));
-                  somaValorAulas += isFinite(computed) ? computed : 0;
-                  return formatCurrencyBR(computed);
-                } catch (e) { return formatCurrencyBR(0); }
-              })()}
+              ${formatCurrencyBR(valorAulaComputado)}
             </td>
             <td>
               <button type="button" class="btn-estudante-aula text-sm px-2 py-1 cursor-pointer hover:bg-orange-50 rounded transition-colors" data-id-aula="${aula['id-Aula']}" data-estudante="${aula.estudante || ''}" title="Clique para alterar o estudante">
@@ -2012,6 +2226,25 @@ const BancoDeAulasCards = (function() {
 
       tbody.innerHTML = html;
       
+      // Persistir ValorAula computado em cada documento da BancoDeAulas-Lista
+      try {
+        if (valoresComputados.length > 0 && BANCO && BANCO.db) {
+          const batch = BANCO.db.batch();
+          valoresComputados.forEach(item => {
+            const docRef = BANCO.db.collection('BancoDeAulas-Lista').doc(item.docId);
+            batch.update(docRef, {
+              ValorAula: item.valor,
+              horaAulaProfessor: valorHoraContratoAtual
+            });
+          });
+          batch.commit()
+            .then(() => console.log(`✅ ValorAula persistido em ${valoresComputados.length} aulas`))
+            .catch(err => console.warn('⚠️ Erro ao persistir ValorAula:', err));
+        }
+      } catch (errBatch) {
+        console.warn('⚠️ Erro ao preparar batch de ValorAula:', errBatch);
+      }
+
       // Adicionar event listeners para os botões de relatório e observação
       setupAulaDetailsEventListeners();
       
