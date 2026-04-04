@@ -52,8 +52,14 @@ function loadAreaPagamento() {
         <!-- Separador vertical -->
         <div style="width:1px; height:32px; background:#d1d5db; align-self:flex-end; margin-bottom:4px;"></div>
 
-        <button id="btn-analisar-pagamentos" class="btn-primary btn-compact" onclick="analisarPagamentos()">
+        <button id="btn-analisar-pagamentos" class="btn-primary btn-compact" onclick="analisarPagamentos()" style="transition: opacity 0.3s ease;">
           <i class="fas fa-search mr-2"></i>Analisar pagamentos
+        </button>
+        <button id="btn-gerar-relatorios-grupo" class="btn-primary btn-compact" onclick="gerarRelatoriosGrupo()" style="display:none; opacity:0; transition: opacity 0.3s ease;">
+          <i class="fas fa-file-alt mr-2"></i>Gerar Relatórios
+        </button>
+        <button id="btn-resumo-geral-pagamentos" class="btn-primary btn-compact" onclick="abrirResumoGeralPagamentos()" style="aspect-ratio:1; padding:6px;" title="Resumo geral de pagamentos">
+          <i class="fas fa-table"></i>
         </button>
       </div>
     </div>
@@ -138,6 +144,9 @@ function loadAreaPagamento() {
       <h3 class="font-lexend text-lg font-bold text-gray-800 mt-5 mb-3">
         <i class="fas fa-users mr-2 text-orange-500"></i>Relatório em Grupo
       </h3>
+      <div id="pag-grafico-grupo-wrapper" class="bg-white rounded-lg border border-gray-200 p-4" style="width:100%; overflow-y:auto;">
+        <canvas id="grafico-pagamento-grupo"></canvas>
+      </div>
     </div>
   `;
 
@@ -186,6 +195,17 @@ function setPagModo(colecao) {
 
   renderProfessorSelect(window._pagProfessoresFiltrados || window._pagProfessoresAtivos || [], colecao);
   alternarSecoesPagamento(colecao);
+
+  // Alternar botões Analisar / Gerar Relatórios
+  const btnAnalisar = document.getElementById('btn-analisar-pagamentos');
+  const btnGrupo = document.getElementById('btn-gerar-relatorios-grupo');
+  if (colecao) {
+    if (btnAnalisar) { btnAnalisar.style.opacity = '0'; setTimeout(() => { btnAnalisar.style.display = 'none'; }, 300); }
+    if (btnGrupo) { btnGrupo.style.display = ''; setTimeout(() => { btnGrupo.style.opacity = '1'; }, 50); }
+  } else {
+    if (btnGrupo) { btnGrupo.style.opacity = '0'; setTimeout(() => { btnGrupo.style.display = 'none'; }, 300); }
+    if (btnAnalisar) { btnAnalisar.style.display = ''; setTimeout(() => { btnAnalisar.style.opacity = '1'; }, 50); }
+  }
 }
 
 // ─── Carregar Professores ───
@@ -247,6 +267,7 @@ function filtrarProfessoresPorMesAno() {
   const filtrados = ativos.filter(p => idsProfessoresComAula.has(p.cpf));
   window._pagProfessoresFiltrados = filtrados;
   renderProfessorSelect(filtrados, window._pagModoColecao);
+  if (window._pagModoColecao) renderizarGraficoPagamentoGrupo();
 }
 
 function renderProfessorSelect(professores, modoColecao) {
@@ -385,6 +406,7 @@ function alternarSecoesPagamento(colecao) {
     mostrar.style.display = '';
     requestAnimationFrame(() => {
       mostrar.style.opacity = '1';
+      if (colecao) renderizarGraficoPagamentoGrupo();
     });
   }, 300);
 }
@@ -1074,4 +1096,676 @@ async function analisarPagamentoIndividual() {
   window._pagUltimoTotalValor = totalValor;
   await carregarInfoAdicionaisDoFirebase(professorId, mes, ano);
   atualizarResumoPagamento(totalValor);
+}
+
+// ─── Gerar Relatórios em Grupo ───
+
+async function gerarRelatoriosGrupo() {
+  const mes = parseInt(document.getElementById('pag-mes')?.value);
+  const ano = parseInt(document.getElementById('pag-ano')?.value);
+
+  if (!mes || !ano) {
+    showToast('Selecione mês e ano.', 'error');
+    return;
+  }
+
+  // Coletar professores selecionados via checkboxes
+  const checks = Array.from(document.querySelectorAll('.pag-multi-check'))
+    .filter(c => c.value !== 'todos' && c.checked);
+
+  if (checks.length === 0) {
+    showToast('Selecione ao menos um professor.', 'error');
+    return;
+  }
+
+  const professoresAtivos = window._pagProfessoresAtivos || [];
+  const todasAulas = window._pagTodasAulas || [];
+  const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const nomeMes = meses[mes - 1] || '';
+  const diasSemana = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+
+  const formatarDataCompleta = (d) => {
+    if (/^[a-záéíóúâêôã]{3}\s*-\s*\d{2}\/\d{2}\/\d{4}$/i.test(d)) return d;
+    const match = (d || '').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (match) {
+      const dt = new Date(parseInt(match[3]), parseInt(match[2]) - 1, parseInt(match[1]));
+      const dia = diasSemana[dt.getDay()] || '';
+      return `${dia} - ${match[1]}/${match[2]}/${match[3]}`;
+    }
+    return d || '—';
+  };
+
+  const professorIds = checks.map(c => c.value);
+  const total = professorIds.length;
+
+  // ─── Loading overlay ───
+  const loadingOverlay = document.createElement('div');
+  loadingOverlay.id = 'loading-relatorios-grupo';
+  loadingOverlay.style.cssText = `
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(0, 0, 0, 0.7); display: flex; align-items: center;
+    justify-content: center; z-index: 99999;
+  `;
+  loadingOverlay.innerHTML = `
+    <div style="
+      background: white; padding: 40px 60px; border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3); text-align: center;
+      font-family: 'Lexend', sans-serif; min-width: 380px;
+    ">
+      <div style="font-size: 3rem; margin-bottom: 20px;">📊</div>
+      <h2 style="margin: 0 0 15px 0; color: #1f2937; font-size: 1.3rem;">Gerando Relatórios</h2>
+      <p id="loading-grupo-text" style="margin: 0; color: #4b5563; font-size: 1rem;">Preparando...</p>
+      <div style="margin-top: 20px; width: 300px; height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden;">
+        <div id="loading-grupo-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #f28705, #16a34a); border-radius: 4px; transition: width 0.3s ease;"></div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(loadingOverlay);
+
+  const progressText = document.getElementById('loading-grupo-text');
+  const progressBar = document.getElementById('loading-grupo-bar');
+
+  try {
+    for (let i = 0; i < total; i++) {
+      const professorId = professorIds[i];
+      const professor = professoresAtivos.find(p => p.cpf === professorId);
+      const nomeProfessor = professor?.nome || 'Professor';
+      const numeroAtual = i + 1;
+
+      // Atualizar progresso
+      progressText.textContent = `Gerando relatório ${numeroAtual} de ${total}: ${nomeProfessor}...`;
+      progressBar.style.width = `${((numeroAtual - 0.5) / total) * 100}%`;
+      await new Promise(r => setTimeout(r, 100));
+
+      // 1. Filtrar aulas do professor no mês/ano
+      const aulasFiltradas = todasAulas.filter(aula => {
+        if (aula.idProfessor !== professorId) return false;
+        const match = (aula.data || '').match(/(\d{2})\/(\d{2})\/(\d{4})/);
+        if (!match) return false;
+        return parseInt(match[2], 10) === mes && parseInt(match[3], 10) === ano;
+      });
+
+      aulasFiltradas.sort((a, b) => {
+        const diaA = parseInt((a.data || '').match(/(\d{2})\/\d{2}\/\d{4}/)?.[1] || '0', 10);
+        const diaB = parseInt((b.data || '').match(/(\d{2})\/\d{2}\/\d{4}/)?.[1] || '0', 10);
+        return diaA - diaB;
+      });
+
+      // 2. Montar linhas de aulas
+      const linhasAulas = aulasFiltradas.map(aula => ({
+        data: aula.data || '—',
+        descricao: aula.nomeCliente || aula.estudante || '—',
+        duracao: aula.duracao || '',
+        valor: parseFloat(aula.ValorAula) || 0,
+        tipo: 'entrada'
+      }));
+
+      // 3. Buscar informações adicionais do Firebase
+      const linhasAdicionais = [];
+      try {
+        const snapshot = await db.collection('informacoesPagamento')
+          .where('idProfessor', '==', professorId)
+          .where('mes', '==', mes)
+          .where('ano', '==', ano)
+          .get();
+
+        snapshot.forEach(docSnap => {
+          const d = docSnap.data();
+          linhasAdicionais.push({
+            data: d.data || '',
+            descricao: d.descricao || '',
+            duracao: '',
+            valor: d.valor || 0,
+            tipo: d.tipo || 'entrada'
+          });
+        });
+      } catch (err) {
+        console.warn(`Erro ao buscar info adicionais de ${nomeProfessor}:`, err);
+      }
+
+      // 4. Juntar, formatar datas e ordenar
+      const todasLinhas = [...linhasAulas, ...linhasAdicionais];
+      todasLinhas.forEach(l => { l.data = formatarDataCompleta(l.data); });
+      todasLinhas.sort((a, b) => {
+        const parseData = (d) => {
+          const match = (d || '').match(/(\d{2})\/(\d{2})\/(\d{4})/);
+          if (!match) return 0;
+          return new Date(parseInt(match[3]), parseInt(match[2]) - 1, parseInt(match[1])).getTime();
+        };
+        return parseData(a.data) - parseData(b.data);
+      });
+
+      // 5. Gerar o PDF (mesmo layout do relatório individual)
+      progressText.textContent = `Baixando relatório ${numeroAtual} de ${total}: ${nomeProfessor}...`;
+      progressBar.style.width = `${(numeroAtual / total) * 100}%`;
+
+      await gerarPDFRelatorioGrupo(nomeProfessor, nomeMes, ano, todasLinhas);
+
+      // Delay entre downloads para o navegador processar
+      if (i < total - 1) {
+        await new Promise(r => setTimeout(r, 1500));
+      }
+    }
+
+    // Sucesso
+    progressText.textContent = `✅ ${total} relatório(s) gerado(s) com sucesso!`;
+    progressBar.style.width = '100%';
+    progressBar.style.background = '#16a34a';
+    setTimeout(() => {
+      if (loadingOverlay.parentNode) document.body.removeChild(loadingOverlay);
+    }, 2000);
+
+  } catch (error) {
+    console.error('Erro ao gerar relatórios em grupo:', error);
+    progressText.innerHTML = `<span style="color: #dc2626;">❌ Erro: ${error.message}</span>`;
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = 'Fechar';
+    closeBtn.style.cssText = `
+      margin-top: 20px; padding: 10px 30px; border: none;
+      background: #dc2626; color: white; border-radius: 8px;
+      cursor: pointer; font-family: inherit; font-size: 0.9rem;
+    `;
+    closeBtn.onclick = () => { if (loadingOverlay.parentNode) document.body.removeChild(loadingOverlay); };
+    loadingOverlay.querySelector('div').appendChild(closeBtn);
+  }
+}
+
+// ─── Gerar PDF individual para relatório em grupo (sem depender do DOM) ───
+
+function gerarPDFRelatorioGrupo(nomeProfessor, nomeMes, ano, todasLinhas) {
+  return new Promise((resolve) => {
+    const jsPDF = window.jspdf ? window.jspdf.jsPDF : window.jsPDF;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+
+    const pageWidth = doc.internal.pageSize.width;
+    const pageHeight = doc.internal.pageSize.height;
+    const marginLeft = 56;
+    const marginRight = 56;
+    const marginTop = 40;
+    const marginBottom = 56;
+    const usableWidth = pageWidth - marginLeft - marginRight;
+
+    let y = marginTop;
+
+    const renderPDF = (logoImg) => {
+      if (logoImg) {
+        const logoWidth = 120;
+        const proporcao = logoImg.naturalHeight / logoImg.naturalWidth;
+        const logoHeight = logoWidth * proporcao;
+        const logoX = (pageWidth - logoWidth) / 2;
+        doc.addImage(logoImg, 'PNG', logoX, y, logoWidth, logoHeight);
+        y += logoHeight + 8;
+      }
+
+      // "Master Educação"
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.setTextColor(40, 40, 40);
+      doc.text('Master Educação', pageWidth / 2, y, { align: 'center' });
+      y += 20;
+
+      // Linha divisória
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(1);
+      doc.line(marginLeft, y, pageWidth - marginRight, y);
+      y += 20;
+
+      // Título
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(18);
+      doc.setTextColor(30, 30, 30);
+      doc.text('Relatório de Pagamento', pageWidth / 2, y, { align: 'center' });
+      y += 14;
+
+      // Subtítulo
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(11);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`${nomeProfessor} — ${nomeMes}/${ano}`, pageWidth / 2, y, { align: 'center' });
+      y += 24;
+
+      // Tabela
+      const colWidths = [80, usableWidth - 80 - 60 - 90 - 10, 60, 90];
+      const headers = ['Data', 'Cliente / Descrição', 'Duração', 'Valor'];
+      const cellHeight = 20;
+      const fontSize = 9;
+      const headerFontSize = 9;
+
+      // Cabeçalho
+      let x = marginLeft;
+      doc.setFontSize(headerFontSize);
+      doc.setFont('helvetica', 'bold');
+      headers.forEach((h, i) => {
+        doc.setFillColor(234, 88, 12);
+        doc.setDrawColor(200, 200, 200);
+        doc.rect(x, y, colWidths[i], cellHeight, 'FD');
+        doc.setTextColor(255, 255, 255);
+        doc.text(h, x + 5, y + 14);
+        x += colWidths[i];
+      });
+      y += cellHeight;
+
+      // Linhas
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(fontSize);
+      let totalGeral = 0;
+
+      todasLinhas.forEach((linha, idx) => {
+        if (y + cellHeight > pageHeight - marginBottom - 40) {
+          doc.addPage();
+          y = marginTop;
+          let xh = marginLeft;
+          doc.setFontSize(headerFontSize);
+          doc.setFont('helvetica', 'bold');
+          headers.forEach((h, i) => {
+            doc.setFillColor(234, 88, 12);
+            doc.setDrawColor(200, 200, 200);
+            doc.rect(xh, y, colWidths[i], cellHeight, 'FD');
+            doc.setTextColor(255, 255, 255);
+            doc.text(h, xh + 5, y + 14);
+            xh += colWidths[i];
+          });
+          y += cellHeight;
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(fontSize);
+        }
+
+        const isSaida = linha.tipo === 'saida';
+        const valorExibido = isSaida ? -linha.valor : linha.valor;
+        totalGeral += valorExibido;
+
+        const valorFmt = (isSaida ? '- R$ ' : 'R$ ') + Math.abs(linha.valor).toFixed(2).replace('.', ',');
+
+        if (idx % 2 === 0) {
+          doc.setFillColor(249, 250, 251);
+          doc.rect(marginLeft, y, usableWidth, cellHeight, 'F');
+        }
+
+        x = marginLeft;
+        const valores = [
+          linha.data || '—',
+          linha.descricao || '—',
+          linha.duracao || '',
+          valorFmt
+        ];
+
+        valores.forEach((val, i) => {
+          doc.setDrawColor(230, 230, 230);
+          doc.rect(x, y, colWidths[i], cellHeight, 'D');
+
+          if (i === 3 && isSaida) {
+            doc.setTextColor(220, 38, 38);
+          } else {
+            doc.setTextColor(50, 50, 50);
+          }
+
+          let textoFinal = val;
+          const maxTextWidth = colWidths[i] - 10;
+          if (doc.getTextWidth(textoFinal) > maxTextWidth) {
+            while (doc.getTextWidth(textoFinal + '…') > maxTextWidth && textoFinal.length > 0) {
+              textoFinal = textoFinal.slice(0, -1);
+            }
+            textoFinal += '…';
+          }
+
+          doc.text(textoFinal, x + 5, y + 14);
+          x += colWidths[i];
+        });
+        y += cellHeight;
+      });
+
+      // Linha de total
+      y += 6;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(30, 30, 30);
+      const totalFmt = 'R$ ' + totalGeral.toFixed(2).replace('.', ',');
+      doc.text('Total:', marginLeft, y + 14);
+      doc.text(totalFmt, pageWidth - marginRight - 5, y + 14, { align: 'right' });
+      y += 28;
+
+      // Linha horizontal final
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(1);
+      doc.line(marginLeft, y, pageWidth - marginRight, y);
+
+      // Salvar
+      doc.save(`Relatório Pagamento - ${nomeProfessor} - ${nomeMes} ${ano}.pdf`);
+      resolve();
+    };
+
+    // Carregar logo
+    const img = new window.Image();
+    img.onload = function () { renderPDF(img); };
+    img.onerror = function () { renderPDF(null); };
+    img.src = 'img/logo.png';
+  });
+}
+
+// ─── Gráfico de barras horizontal — Pagamento em Grupo ───
+
+let _chartPagamentoGrupo = null;
+let _chartGrupoCanvasHandlers = null;
+
+function renderizarGraficoPagamentoGrupo() {
+  const canvas = document.getElementById('grafico-pagamento-grupo');
+  if (!canvas) return;
+
+  const mes = parseInt(document.getElementById('pag-mes')?.value);
+  const ano = parseInt(document.getElementById('pag-ano')?.value);
+  if (!mes || !ano) return;
+
+  const professores = window._pagProfessoresFiltrados || [];
+  const todasAulas = window._pagTodasAulas || [];
+
+  // Calcular total de pagamento por professor no mês/ano
+  const dadosProfessores = professores.map(p => {
+    const aulasDoProfessor = todasAulas.filter(aula => {
+      if (aula.idProfessor !== p.cpf) return false;
+      const match = (aula.data || '').match(/(\d{2})\/(\d{2})\/(\d{4})/);
+      if (!match) return false;
+      return parseInt(match[2], 10) === mes && parseInt(match[3], 10) === ano;
+    });
+    const total = aulasDoProfessor.reduce((acc, a) => acc + (parseFloat(a.ValorAula) || 0), 0);
+    return { nome: p.nome || 'Sem nome', cpf: p.cpf, total };
+  }).filter(d => d.total > 0);
+
+  // Ordenar do maior para o menor
+  dadosProfessores.sort((a, b) => b.total - a.total);
+
+  const nomes = dadosProfessores.map(d => d.nome);
+  const valores = dadosProfessores.map(d => d.total);
+
+  // Destruir gráfico anterior e remover listeners
+  if (_chartPagamentoGrupo) {
+    _chartPagamentoGrupo.destroy();
+    _chartPagamentoGrupo = null;
+  }
+  if (_chartGrupoCanvasHandlers) {
+    canvas.removeEventListener('click', _chartGrupoCanvasHandlers.click);
+    canvas.removeEventListener('mousemove', _chartGrupoCanvasHandlers.mousemove);
+    _chartGrupoCanvasHandlers = null;
+  }
+
+  // Guardar referência dos dados para o click handler
+  window._pagGraficoDadosProfessores = dadosProfessores;
+
+  if (dadosProfessores.length === 0) {
+    const ctx = canvas.getContext('2d');
+    canvas.height = 120;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.font = '14px Comfortaa, sans-serif';
+    ctx.fillStyle = '#9ca3af';
+    ctx.textAlign = 'center';
+    ctx.fillText('Nenhum professor com aulas neste período.', canvas.width / 2, 60);
+    canvas.parentElement.style.height = '';
+    return;
+  }
+
+  // Altura dinâmica baseada na quantidade de professores + scroll no wrapper
+  const alturaPorBarra = 44;
+  const alturaMinima = 300;
+  const alturaCalculada = Math.max(alturaMinima, dadosProfessores.length * alturaPorBarra + 60);
+  const wrapper = document.getElementById('pag-grafico-grupo-wrapper');
+  if (wrapper) {
+    // Ocupar espaço vertical disponível na viewport, com scroll se exceder
+    const wrapperTop = wrapper.getBoundingClientRect().top;
+    const alturaDisponivel = window.innerHeight - wrapperTop - 32;
+    wrapper.style.height = Math.max(300, alturaDisponivel) + 'px';
+  }
+  canvas.parentElement.style.minHeight = alturaCalculada + 'px';
+  canvas.style.height = alturaCalculada + 'px';
+
+  const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const nomeMes = meses[mes - 1] || '';
+
+  _chartPagamentoGrupo = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: nomes,
+      datasets: [{
+        label: `Pagamento ${nomeMes}/${ano}`,
+        data: valores,
+        backgroundColor: 'rgba(242, 135, 5, 0.85)',
+        borderColor: 'rgba(234, 88, 12, 1)',
+        borderWidth: 1,
+        borderRadius: 4,
+        barPercentage: 0.7,
+        categoryPercentage: 0.8
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      layout: {
+        padding: { right: 60 }
+      },
+      scales: {
+        x: {
+          beginAtZero: true,
+          ticks: {
+            callback: function(value) {
+              return 'R$ ' + value.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+            },
+            font: { family: 'Comfortaa, sans-serif', size: 11 },
+            color: '#6b7280'
+          },
+          grid: { color: 'rgba(0,0,0,0.05)' }
+        },
+        y: {
+          ticks: {
+            font: { family: 'Comfortaa, sans-serif', size: 12, weight: 'bold' },
+            color: '#374151'
+          },
+          grid: { display: false }
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              return 'R$ ' + ctx.raw.toFixed(2).replace('.', ',');
+            }
+          },
+          titleFont: { family: 'Lexend, sans-serif' },
+          bodyFont: { family: 'Comfortaa, sans-serif' }
+        },
+        datalabels: {
+          anchor: 'end',
+          align: 'right',
+          formatter: function(value) {
+            return 'R$ ' + value.toFixed(2).replace('.', ',');
+          },
+          font: { family: 'Comfortaa, sans-serif', size: 11, weight: 'bold' },
+          color: '#374151'
+        }
+      },
+      onClick: function(evt, elements, chart) {
+        // Clique na barra
+        if (elements.length > 0) {
+          const idx = elements[0].index;
+          const dados = window._pagGraficoDadosProfessores;
+          if (dados && dados[idx]) {
+            consultarPixProfessor(dados[idx].cpf, dados[idx].nome);
+          }
+        }
+      }
+    },
+    plugins: [ChartDataLabels]
+  });
+
+  // Handler nativo no canvas para cliques nos labels Y + cursor pointer
+  const canvasClickHandler = function(evt) {
+    if (!_chartPagamentoGrupo) return;
+    const idxLabel = _getYAxisLabelIndex(_chartPagamentoGrupo, evt);
+    if (idxLabel !== -1) {
+      const dados = window._pagGraficoDadosProfessores;
+      if (dados && dados[idxLabel]) {
+        consultarPixProfessor(dados[idxLabel].cpf, dados[idxLabel].nome);
+      }
+    }
+  };
+  const canvasMoveHandler = function(evt) {
+    if (!_chartPagamentoGrupo) return;
+    const points = _chartPagamentoGrupo.getElementsAtEventForMode(evt, 'nearest', { intersect: true, axis: 'y' }, false);
+    if (points.length > 0) {
+      canvas.style.cursor = 'pointer';
+      return;
+    }
+    const idxLabel = _getYAxisLabelIndex(_chartPagamentoGrupo, evt);
+    canvas.style.cursor = idxLabel !== -1 ? 'pointer' : 'default';
+  };
+  canvas.addEventListener('click', canvasClickHandler);
+  canvas.addEventListener('mousemove', canvasMoveHandler);
+  canvas.style.cursor = 'default';
+  _chartGrupoCanvasHandlers = { click: canvasClickHandler, mousemove: canvasMoveHandler };
+}
+
+// Detecta em qual label do eixo Y o evento ocorreu
+function _getYAxisLabelIndex(chart, evt) {
+  const yScale = chart.scales.y;
+  if (!yScale) return -1;
+  const rect = chart.canvas.getBoundingClientRect();
+  const x = evt.clientX !== undefined ? evt.clientX - rect.left : (evt.x || 0);
+  const y = evt.clientY !== undefined ? evt.clientY - rect.top : (evt.y || 0);
+  // Verifica se o clique está na área do eixo Y (à esquerda das barras)
+  if (x > yScale.right) return -1;
+  for (let i = 0; i < yScale.ticks.length; i++) {
+    const tickY = yScale.getPixelForTick(i);
+    const halfBar = (yScale.height / yScale.ticks.length) / 2;
+    if (y >= tickY - halfBar && y <= tickY + halfBar) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+// ─── Resumo Geral de Pagamentos (popup com todos os professores do mês) ───
+
+function abrirResumoGeralPagamentos() {
+  const mes = parseInt(document.getElementById('pag-mes')?.value);
+  const ano = parseInt(document.getElementById('pag-ano')?.value);
+
+  if (!mes || !ano) {
+    showToast('Selecione mês e ano.', 'error');
+    return;
+  }
+
+  const professores = window._pagProfessoresFiltrados || window._pagProfessoresAtivos || [];
+  const todasAulas = window._pagTodasAulas || [];
+
+  const dadosProfessores = professores.map(p => {
+    const aulasDoProfessor = todasAulas.filter(aula => {
+      if (aula.idProfessor !== p.cpf) return false;
+      const match = (aula.data || '').match(/(\d{2})\/(\d{2})\/(\d{4})/);
+      if (!match) return false;
+      return parseInt(match[2], 10) === mes && parseInt(match[3], 10) === ano;
+    });
+    const total = aulasDoProfessor.reduce((acc, a) => acc + (parseFloat(a.ValorAula) || 0), 0);
+    return { nome: p.nome || 'Sem nome', cpf: p.cpf, pix: p.pix || '', total };
+  }).filter(d => d.total > 0);
+
+  dadosProfessores.sort((a, b) => a.nome.localeCompare(b.nome));
+
+  const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const nomeMes = meses[mes - 1] || '';
+
+  let linhasHTML = '';
+  if (dadosProfessores.length === 0) {
+    linhasHTML = '<tr><td colspan="3" class="text-center py-4 text-gray-400 font-comfortaa text-sm">Nenhum professor com aulas neste período.</td></tr>';
+  } else {
+    dadosProfessores.forEach(d => {
+      const valorFmt = 'R$ ' + d.total.toFixed(2).replace('.', ',');
+      const pixExibido = d.pix
+        ? `<span class="font-comfortaa text-xs" style="user-select:all; word-break:break-all;">${d.pix}</span>`
+        : `<span class="font-comfortaa text-xs text-gray-400">Não cadastrado</span>`;
+      linhasHTML += `
+        <tr>
+          <td class="font-comfortaa text-sm text-gray-800">${d.nome}</td>
+          <td class="font-lexend text-sm font-bold text-green-600 text-right">${valorFmt}</td>
+          <td>${pixExibido}</td>
+        </tr>`;
+    });
+  }
+
+  const totalGeral = dadosProfessores.reduce((acc, d) => acc + d.total, 0);
+  const totalFmt = 'R$ ' + totalGeral.toFixed(2).replace('.', ',');
+
+  const { modal, closeModal } = createModal(
+    `Resumo de Pagamentos — ${nomeMes} ${ano}`,
+    `<div class="p-4" style="max-height:60vh; overflow-y:auto;">
+      <table class="table-details" style="width:100%;">
+        <colgroup>
+          <col style="width:auto;">
+          <col style="width:160px;">
+          <col style="width:auto;">
+        </colgroup>
+        <thead>
+          <tr>
+            <th class="text-left">Professor</th>
+            <th class="text-right">Valor a Receber</th>
+            <th class="text-left">Chave PIX</th>
+          </tr>
+        </thead>
+        <tbody>${linhasHTML}</tbody>
+        ${dadosProfessores.length > 0 ? `
+        <tfoot>
+          <tr style="border-top:2px solid #e5e7eb;">
+            <td class="font-lexend text-sm font-bold text-gray-800">Total</td>
+            <td class="font-lexend text-sm font-bold text-orange-500 text-right">${totalFmt}</td>
+            <td></td>
+          </tr>
+        </tfoot>` : ''}
+      </table>
+    </div>`,
+    [
+      { text: 'Fechar', classes: 'btn-primary btn-compact', attributes: 'id="btn-fechar-resumo-geral"' }
+    ]
+  );
+
+  // Expandir modal para caber todo o conteúdo sem scroll horizontal
+  const modalBox = modal.querySelector('.modal-container');
+  if (modalBox) {
+    modalBox.classList.remove('max-w-2xl');
+    modalBox.style.maxWidth = '90vw';
+    modalBox.style.width = 'fit-content';
+    modalBox.style.minWidth = '500px';
+  }
+
+  modal.querySelector('#btn-fechar-resumo-geral').addEventListener('click', closeModal);
+}
+
+// ─── Consultar PIX do professor ───
+
+async function consultarPixProfessor(cpf, nome) {
+  try {
+    const professores = window._pagProfessoresAtivos || [];
+    const professor = professores.find(p => p.cpf === cpf);
+    const pix = professor?.pix || '';
+
+    const pixExibido = pix
+      ? `<span class="font-comfortaa text-base font-bold text-gray-800" style="user-select:all; word-break:break-all;">${pix}</span>`
+      : `<span class="font-comfortaa text-sm text-gray-400">Nenhum PIX cadastrado.</span>`;
+
+    const { modal, closeModal } = createModal(
+      'Consulta PIX',
+      `<div class="p-5" style="text-align:center;">
+        <div style="font-size:2.5rem; margin-bottom:12px;">🔑</div>
+        <p class="font-comfortaa text-sm text-gray-600 mb-3">O PIX do professor <strong class="text-gray-800">${nome}</strong> é:</p>
+        <div class="bg-gray-50 rounded-lg border border-gray-200 p-4 mt-2">
+          ${pixExibido}
+        </div>
+      </div>`,
+      [
+        { text: 'Fechar', classes: 'btn-primary btn-compact', attributes: 'id="btn-fechar-pix"' }
+      ]
+    );
+
+    modal.querySelector('#btn-fechar-pix').addEventListener('click', closeModal);
+  } catch (error) {
+    console.error('Erro ao consultar PIX:', error);
+    showToast('Erro ao consultar PIX do professor.', 'error');
+  }
 }
