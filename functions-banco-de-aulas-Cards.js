@@ -646,7 +646,27 @@ const BancoDeAulasCards = (function() {
           };
           await BANCO.updateAula(aula.id, dadosCliente);
 
-          // (b) Salvar alterações pendentes nas aulas em BancoDeAulas-Lista
+          // (b) Garantir que todos os inputs de ValorAula estão capturados
+          // (o evento 'change' só dispara com blur; se o usuário clicar direto
+          // em Salvar sem sair do campo, o valor ainda não estaria em _pendingAulaChanges)
+          const tbody = document.getElementById('tbody-aulas-detalhadas');
+          if (tbody) {
+            tbody.querySelectorAll('.edit-valor-aula').forEach(input => {
+              const idAula = input.dataset.idAula;
+              if (!idAula) return;
+              const novoValor = parseFloat(input.value);
+              if (!isFinite(novoValor)) return;
+              const entry = _pendingAulaChanges.get(idAula) || {};
+              // Só rastreia se o valor realmente mudou (compara com o data-original)
+              const original = parseFloat(input.dataset.originalValor);
+              if (!isFinite(original) || novoValor !== original) {
+                entry.ValorAula = novoValor;
+                _pendingAulaChanges.set(idAula, entry);
+              }
+            });
+          }
+
+          // Salvar alterações pendentes nas aulas em BancoDeAulas-Lista
           if (_pendingAulaChanges.size > 0) {
             const promises = [];
             _pendingAulaChanges.forEach((changes, idAula) => {
@@ -2027,10 +2047,12 @@ const BancoDeAulasCards = (function() {
                     valorFinal = Number((totalHoursDecimal * valorHoraContratoAtual).toFixed(2));
                   }
                   somaValorAulas += isFinite(valorFinal) ? valorFinal : 0;
+                  const v = isFinite(valorFinal) ? valorFinal : 0;
                   return `<input type="number" min="0" step="0.01"
                     class="edit-valor-aula w-20 border border-gray-200 rounded px-1 py-0.5 text-right text-sm focus:outline-none focus:ring-1 focus:ring-orange-500"
                     data-id-aula="${aula['id-Aula']}"
-                    value="${isFinite(valorFinal) ? valorFinal : 0}" />`;
+                    data-original-valor="${v}"
+                    value="${v}" />`;
                 } catch (e) { return formatCurrencyBR(0); }
               })()}
             </td>
