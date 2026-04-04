@@ -5,6 +5,9 @@ const BancoDeAulasCards = (function() {
   // Variáveis privadas
   let aulasData = [];
   let currentFilters = {};
+  // Mapa de alterações pendentes das aulas (BancoDeAulas-Lista): idAula → { campo: valor }
+  // Populado pelo modal viewAulaDetails e consumido pelo btn-salvar-alteracoes
+  let _pendingAulaChanges = null;
   
   // Função para renderizar cards de aulas
   function renderAulasCards(aulas, filters = {}) {
@@ -387,62 +390,75 @@ const BancoDeAulasCards = (function() {
                   </div>
                 </div>
                 
-                <!-- Coluna 2: Status do contrato -->
+                <!-- Coluna 2: Status do contrato (editável) -->
                 <div class="space-y-3">
                   <div>
                     <div class="text-xs font-medium text-gray-500 mb-1">Status do Contrato</div>
-                    <div class="text-sm">
-                      <span class="status-badge ${getStatusBadgeClass(aula.statusContrato)} text-xs px-2 py-1">
-                        ${aula.statusContrato || '--'}
-                      </span>
-                    </div>
+                    <select id="edit-status-contrato" class="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500">
+                      <option value="Pendente de assinatura" ${(aula.statusContrato || '') === 'Pendente de assinatura' ? 'selected' : ''}>Pendente de assinatura</option>
+                      <option value="Contrato assinado" ${(aula.statusContrato || '') === 'Contrato assinado' ? 'selected' : ''}>Contrato assinado</option>
+                    </select>
                   </div>
                   <div>
                     <div class="text-xs font-medium text-gray-500 mb-1">Assinatura do Contrato</div>
-                    <div class="text-sm text-gray-800">${formatDate(aula.dataAssinaturaContrato) || '--'}</div>
+                    <input id="edit-data-assinatura" type="text" maxlength="10" placeholder="dd/mm/aaaa"
+                      value="${formatDate(aula.dataAssinaturaContrato) || ''}"
+                      class="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500" />
                   </div>
                   <div>
-                    <div class="text-xs font-medium text-gray-500 mb-1">Método de pagamento</div>
-                    <div class="text-sm text-gray-800">${aula.modoPagamento || '--'}</div>
+                    <div class="text-xs font-medium text-gray-500 mb-1">Método de Pagamento</div>
+                    <select id="edit-modo-pagamento" class="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500">
+                      <option value="">Selecione...</option>
+                      <option value="Cartão de crédito" ${(aula.modoPagamento || '') === 'Cartão de crédito' ? 'selected' : ''}>Cartão de crédito</option>
+                      <option value="Pix completo" ${(aula.modoPagamento || '') === 'Pix completo' ? 'selected' : ''}>Pix completo</option>
+                      <option value="Pix dividido" ${(aula.modoPagamento || '') === 'Pix dividido' ? 'selected' : ''}>Pix dividido</option>
+                    </select>
                   </div>
                   <div>
                     <div class="text-xs font-medium text-gray-500 mb-1">Código da Contratação</div>
                     <div class="text-sm text-gray-800 font-mono">${aula.codigoContratacao || '--'}</div>
                   </div>
                 </div>
-                
-                <!-- Coluna 3: Status do pagamento -->
+
+                <!-- Coluna 3: Status do pagamento (editável) -->
                 <div class="space-y-3">
                   <div>
                     <div class="text-xs font-medium text-gray-500 mb-1">Status do Pagamento</div>
-                    <div class="text-sm">
-                      <span class="status-badge ${getStatusBadgeClass(aula.statusPagamento)} text-xs px-2 py-1">
-                        ${aula.statusPagamento || '--'}
-                      </span>
+                    <div id="container-edit-status-pagamento">
+                      ${(aula.modoPagamento || '') === 'Pix dividido' ? `
+                        <select id="edit-status-pagamento" class="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500">
+                          <option value="Aguardando 1º Pagamento" ${(aula.statusPagamento || '') === 'Aguardando 1º Pagamento' ? 'selected' : ''}>Aguardando 1º Pagamento</option>
+                          <option value="Aguardando 2º Pagamento" ${(aula.statusPagamento || '') === 'Aguardando 2º Pagamento' ? 'selected' : ''}>Aguardando 2º Pagamento</option>
+                          <option value="Pagamento completo" ${(aula.statusPagamento || '') === 'Pagamento completo' ? 'selected' : ''}>Pagamento completo</option>
+                        </select>
+                      ` : `
+                        <input id="edit-status-pagamento" type="text" value="Pagamento completo" readonly
+                          class="w-full border border-gray-200 rounded px-2 py-1 text-sm bg-gray-100 text-gray-500" />
+                      `}
                     </div>
                   </div>
                   <div>
                     <div class="text-xs font-medium text-gray-500 mb-1">Data da primeira parcela</div>
-                    <div class="text-sm text-gray-800">${formatDate(aula.dataPrimeiraParcela) || '--'}</div>
+                    <input id="edit-data-primeira-parcela" type="text" maxlength="10" placeholder="dd/mm/aaaa"
+                      value="${formatDate(aula.dataPrimeiraParcela) || ''}"
+                      class="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500" />
                   </div>
                   <div>
                     <div class="text-xs font-medium text-gray-500 mb-1">Data da segunda parcela</div>
-                    <div class="text-sm text-gray-800">${formatDate(aula.dataSegundaParcela) || '--'}</div>
+                    <input id="edit-data-segunda-parcela" type="text" maxlength="10" placeholder="dd/mm/aaaa"
+                      value="${formatDate(aula.dataSegundaParcela) || ''}"
+                      class="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500" />
                   </div>
                   <div>
                     <div class="text-xs font-medium text-gray-500 mb-1">Tipo de Equipe</div>
                     <div class="text-sm text-gray-800">${aula.equipe || '--'}</div>
                   </div>
                 </div>
-                
+
                 <!-- Coluna 4: Botões de ação -->
                 <div class="space-y-3">
                   <div class="text-xs font-medium text-gray-500 mb-1">Ações</div>
                   <div class="space-y-1.5">
-                    <button id="btn-editar-contratacao" class="btn-secondary text-xs py-1.5 px-2 w-full">
-                      <i class="fas fa-edit mr-1 text-xs"></i>
-                      <span class="text-xs">Editar</span>
-                    </button>
                     <button id="btn-gerar-contrato" class="btn-primary text-xs py-1.5 px-2 w-full" disabled>
                       <i class="fas fa-file-pdf mr-1 text-xs"></i>
                       <span class="text-xs">Contrato</span>
@@ -534,11 +550,18 @@ const BancoDeAulasCards = (function() {
             <button id="btn-fechar-modal" class="btn-secondary btn-compact">
               Fechar
             </button>
+            <button id="btn-salvar-alteracoes" class="btn-primary btn-compact ml-2">
+              <i class="fas fa-save mr-1"></i>
+              Salvar Alterações
+            </button>
           </div>
         </div>
       </div>
     `;
-    
+
+    // Inicializar mapa de alterações pendentes para este modal
+    _pendingAulaChanges = new Map();
+
     // Adicionar modal ao body
     const modalContainer = document.createElement('div');
     modalContainer.innerHTML = modalHtml;
@@ -550,24 +573,105 @@ const BancoDeAulasCards = (function() {
     const fecharBtn = modal.querySelector('#btn-fechar-modal');
     
     const closeModal = () => {
+      _pendingAulaChanges = null;
       modalContainer.remove();
     };
-    
+
     closeBtn.addEventListener('click', closeModal);
     fecharBtn.addEventListener('click', closeModal);
-    
+
     modal.addEventListener('click', (e) => {
       if (e.target === modal) {
         closeModal();
       }
     });
-    
+
     // Fechar com ESC
     const escHandler = (e) => {
       if (e.key === 'Escape') closeModal();
     };
     document.addEventListener('keydown', escHandler);
-    
+
+    // Atualizar status pagamento quando método de pagamento muda
+    const editModoPagamento = modal.querySelector('#edit-modo-pagamento');
+    if (editModoPagamento) {
+      editModoPagamento.addEventListener('change', function() {
+        const container = modal.querySelector('#container-edit-status-pagamento');
+        if (!container) return;
+        if (this.value === 'Pix dividido') {
+          container.innerHTML = `
+            <select id="edit-status-pagamento" class="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500">
+              <option value="Aguardando 1º Pagamento">Aguardando 1º Pagamento</option>
+              <option value="Aguardando 2º Pagamento">Aguardando 2º Pagamento</option>
+              <option value="Pagamento completo">Pagamento completo</option>
+            </select>`;
+        } else {
+          container.innerHTML = `
+            <input id="edit-status-pagamento" type="text" value="Pagamento completo" readonly
+              class="w-full border border-gray-200 rounded px-2 py-1 text-sm bg-gray-100 text-gray-500" />`;
+        }
+      });
+    }
+
+    // Máscara de data nos campos de data inline
+    ['edit-data-assinatura', 'edit-data-primeira-parcela', 'edit-data-segunda-parcela'].forEach(id => {
+      const input = modal.querySelector(`#${id}`);
+      if (!input) return;
+      input.addEventListener('input', function() {
+        let v = this.value.replace(/\D/g, '');
+        if (v.length > 4) v = v.replace(/(\d{2})(\d{2})(\d{0,4})/, '$1/$2/$3');
+        else if (v.length > 2) v = v.replace(/(\d{2})(\d{0,2})/, '$1/$2');
+        this.value = v.substring(0, 10);
+      });
+    });
+
+    // Handler do botão Salvar Alterações
+    const btnSalvarAlteracoes = modal.querySelector('#btn-salvar-alteracoes');
+    if (btnSalvarAlteracoes) {
+      btnSalvarAlteracoes.addEventListener('click', async () => {
+        const originalHTML = btnSalvarAlteracoes.innerHTML;
+        btnSalvarAlteracoes.disabled = true;
+        btnSalvarAlteracoes.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Salvando...';
+
+        try {
+          // (a) Salvar Informações do Cliente em BancoDeAulas
+          const dadosCliente = {
+            statusContrato:          (modal.querySelector('#edit-status-contrato')?.value || aula.statusContrato || ''),
+            dataAssinaturaContrato:  (modal.querySelector('#edit-data-assinatura')?.value || ''),
+            modoPagamento:           (modal.querySelector('#edit-modo-pagamento')?.value || aula.modoPagamento || ''),
+            statusPagamento:         (modal.querySelector('#edit-status-pagamento')?.value || 'Pagamento completo'),
+            dataPrimeiraParcela:     (modal.querySelector('#edit-data-primeira-parcela')?.value || ''),
+            dataSegundaParcela:      (modal.querySelector('#edit-data-segunda-parcela')?.value || ''),
+            timestamp:               firebase.firestore.FieldValue.serverTimestamp()
+          };
+          await BANCO.updateAula(aula.id, dadosCliente);
+
+          // (b) Salvar alterações pendentes nas aulas em BancoDeAulas-Lista
+          if (_pendingAulaChanges.size > 0) {
+            const promises = [];
+            _pendingAulaChanges.forEach((changes, idAula) => {
+              if (Object.keys(changes).length > 0) {
+                promises.push(BANCO.updateAulaLista(idAula, changes));
+              }
+            });
+            await Promise.all(promises);
+            _pendingAulaChanges.clear();
+          }
+
+          showToast('✅ Alterações salvas com sucesso!', 'success');
+          // Recarregar a tabela para refletir os dados salvos
+          if (aula.codigoContratacao) loadAulasDetalhadas(aula.codigoContratacao);
+
+        } catch (err) {
+          console.error('❌ Erro ao salvar alterações:', err);
+          showToast('❌ Erro ao salvar alterações: ' + (err.message || ''), 'error');
+        } finally {
+          btnSalvarAlteracoes.disabled = false;
+          btnSalvarAlteracoes.innerHTML = originalHTML;
+        }
+      });
+    }
+
     // Carregar aulas detalhadas da BancoDeAulas-Lista
     const codigoContratacao = aula.codigoContratacao;
     if (codigoContratacao) {
@@ -623,12 +727,7 @@ const BancoDeAulasCards = (function() {
       document.removeEventListener('keydown', escHandler);
     });
     
-    // Configurar botão de editar contratação (abre modal de edição)
-    const btnEditarContratacao = modal.querySelector('#btn-editar-contratacao');
-    btnEditarContratacao.addEventListener('click', () => {
-      closeModal();
-      openEditModal(aula);
-    });
+    // Nota: btn-editar-contratacao foi removido — edição agora é feita inline no modal principal
 
     // Atualizar display do Valor Hora/Aula se o contrato já contém o campo
     try {
@@ -1916,13 +2015,22 @@ const BancoDeAulasCards = (function() {
             <td class="text-right font-mono text-sm">
               ${(() => {
                 try {
-                  const mm = (aula.duracao && typeof aula.duracao === 'string') ? aula.duracao.match(/(\d+)h(?:([0-5]\d))?/) : null;
-                  const hours = mm ? parseInt(mm[1], 10) : 0;
-                  const minutes = (mm && mm[2]) ? parseInt(mm[2], 10) : 0;
-                  const totalHoursDecimal = (hours * 60 + minutes) / 60;
-                  const computed = Number((totalHoursDecimal * valorHoraContratoAtual).toFixed(2));
-                  somaValorAulas += isFinite(computed) ? computed : 0;
-                  return formatCurrencyBR(computed);
+                  // Se existe ValorAula salvo, usa ele; senão calcula
+                  let valorFinal = 0;
+                  if (aula.ValorAula !== undefined && aula.ValorAula !== null && aula.ValorAula !== '') {
+                    valorFinal = Number(aula.ValorAula);
+                  } else {
+                    const mm = (aula.duracao && typeof aula.duracao === 'string') ? aula.duracao.match(/(\d+)h(?:([0-5]\d))?/) : null;
+                    const hours = mm ? parseInt(mm[1], 10) : 0;
+                    const minutes = (mm && mm[2]) ? parseInt(mm[2], 10) : 0;
+                    const totalHoursDecimal = (hours * 60 + minutes) / 60;
+                    valorFinal = Number((totalHoursDecimal * valorHoraContratoAtual).toFixed(2));
+                  }
+                  somaValorAulas += isFinite(valorFinal) ? valorFinal : 0;
+                  return `<input type="number" min="0" step="0.01"
+                    class="edit-valor-aula w-20 border border-gray-200 rounded px-1 py-0.5 text-right text-sm focus:outline-none focus:ring-1 focus:ring-orange-500"
+                    data-id-aula="${aula['id-Aula']}"
+                    value="${isFinite(valorFinal) ? valorFinal : 0}" />`;
                 } catch (e) { return formatCurrencyBR(0); }
               })()}
             </td>
@@ -1938,7 +2046,7 @@ const BancoDeAulasCards = (function() {
             </td>
             <td class="text-center">
               <div class="inline-flex items-center justify-center">
-                <div class="switch-toggle ${confirmada ? 'switch-active' : 'switch-inactive'}">
+                <div class="switch-toggle ${confirmada ? 'switch-active' : 'switch-inactive'}" data-id-aula="${aula['id-Aula']}" data-confirmada="${confirmada}" title="Aula concluída pelo professor">
                   <div class="switch-slider"></div>
                 </div>
               </div>
@@ -2060,7 +2168,38 @@ const BancoDeAulasCards = (function() {
       });
     });
     
-    // Botões de status
+    // Toggle de confirmação (ConfirmacaoProfessorAula) → rastreia mudança pendente
+    document.querySelectorAll('.switch-toggle').forEach(toggle => {
+      toggle.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const idAula = this.dataset.idAula;
+        if (!idAula || !_pendingAulaChanges) return;
+        const atualConfirmado = this.dataset.confirmada === 'true';
+        const novoValor = !atualConfirmado;
+        // Atualizar visual
+        this.classList.toggle('switch-active', novoValor);
+        this.classList.toggle('switch-inactive', !novoValor);
+        this.dataset.confirmada = String(novoValor);
+        // Rastrear alteração pendente
+        const entry = _pendingAulaChanges.get(idAula) || {};
+        entry.ConfirmacaoProfessorAula = novoValor;
+        _pendingAulaChanges.set(idAula, entry);
+      });
+    });
+
+    // ValorAula editável → rastreia mudança pendente
+    document.querySelectorAll('.edit-valor-aula').forEach(input => {
+      input.addEventListener('change', function() {
+        const idAula = this.dataset.idAula;
+        if (!idAula || !_pendingAulaChanges) return;
+        const novoValor = parseFloat(this.value) || 0;
+        const entry = _pendingAulaChanges.get(idAula) || {};
+        entry.ValorAula = novoValor;
+        _pendingAulaChanges.set(idAula, entry);
+      });
+    });
+
+    // Botões de status → rastreia mudança pendente (sem salvar imediato)
     document.querySelectorAll('.btn-status-aula').forEach(btn => {
       btn.addEventListener('click', function(e) {
         e.stopPropagation();
@@ -3818,13 +3957,31 @@ const BancoDeAulasCards = (function() {
       
       btnSalvar.addEventListener('click', async () => {
         const novaObservacao = textarea.value.trim();
-        
+
         const originalHTML = btnSalvar.innerHTML;
         btnSalvar.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Salvando...';
         btnSalvar.disabled = true;
         textarea.disabled = true;
-        
+
         try {
+          if (_pendingAulaChanges) {
+            // Rastrear como alteração pendente
+            const entry = _pendingAulaChanges.get(idAula) || {};
+            entry.ObservacoesAula = novaObservacao;
+            _pendingAulaChanges.set(idAula, entry);
+
+            // Atualizar ícone da observação na tabela para verde
+            const btnObs = document.querySelector(`.btn-observacao-aula[data-id-aula="${idAula}"]`);
+            if (btnObs) {
+              btnObs.dataset.observacao = encodeURIComponent(novaObservacao);
+              const icon = btnObs.querySelector('i');
+              if (icon) { icon.className = 'fas fa-clipboard-list text-lg text-green-500'; }
+            }
+
+            showToast('Observação registrada — clique em Salvar Alterações para confirmar', 'info');
+            closeModal();
+            return;
+          }
           await BANCO.updateObservacoesAula(idAula, novaObservacao);
           showToast('✅ Observações atualizadas com sucesso!', 'success');
           closeModal();
@@ -3970,57 +4127,53 @@ const BancoDeAulasCards = (function() {
           return;
         }
         
-        // Desabilitar todos os botões e mostrar loading
-        statusButtons.forEach(b => b.disabled = true);
-        this.innerHTML = '<div class="flex items-center justify-center"><i class="fas fa-spinner fa-spin mr-2"></i> Atualizando...</div>';
-        
-        try {
-          // Atualizar no Firebase
-          await BANCO.updateStatusAula(idAula, novoStatus);
-          
-          showToast(`✅ Status atualizado para "${novoStatus}"`, 'success');
-          closeModal();
-          
-          // Recarregar a tabela
-          const tbody = document.getElementById('tbody-aulas-detalhadas');
-          if (tbody) {
-            tbody.innerHTML = `
-              <tr>
-                <td colspan="9" class="text-center py-8">
-                  <div class="flex flex-col items-center justify-center">
-                    <div class="loading-spinner-large mb-3"></div>
-                    <p class="text-orange-500 font-comfortaa font-bold">Atualizando dados...</p>
-                  </div>
-                </td>
-              </tr>
-            `;
+        // Rastrear mudança pendente e atualizar botão na tabela visualmente
+        if (_pendingAulaChanges) {
+          const entry = _pendingAulaChanges.get(idAula) || {};
+          entry.StatusAula = novoStatus;
+          _pendingAulaChanges.set(idAula, entry);
+
+          // Atualizar visual do botão de status na tabela
+          const btnStatusTabela = document.querySelector(`.btn-status-aula[data-id-aula="${idAula}"]`);
+          if (btnStatusTabela) {
+            const statusOptions = [
+              { nome: 'Pendente',    cor: '#9CA3AF', bgColor: '#F3F4F6', borderColor: '#D1D5DB' },
+              { nome: 'Reagendada', cor: '#F59E0B', bgColor: '#FEF3C7', borderColor: '#FCD34D' },
+              { nome: 'Concluída',  cor: '#10B981', bgColor: '#D1FAE5', borderColor: '#6EE7B7' },
+              { nome: 'Reposição',  cor: '#3B82F6', bgColor: '#DBEAFE', borderColor: '#93C5FD' },
+              { nome: 'Cancelada',  cor: '#EF4444', bgColor: '#FEE2E2', borderColor: '#FCA5A5' }
+            ];
+            const opt = statusOptions.find(o => o.nome === novoStatus) || statusOptions[0];
+            btnStatusTabela.textContent = novoStatus;
+            btnStatusTabela.dataset.status = novoStatus;
+            btnStatusTabela.style.backgroundColor = opt.bgColor;
+            btnStatusTabela.style.color = opt.cor;
+            btnStatusTabela.style.borderColor = opt.borderColor;
           }
-          
-          // Buscar o código de contratação do modal aberto
-          const modalOverlay = document.querySelector('.modal-overlay');
-          if (modalOverlay) {
-            const codigoElement = modalOverlay.querySelector('h3');
-            if (codigoElement) {
-              const match = codigoElement.textContent.match(/\d{4}/);
-              if (match) {
-                const codigoContratacao = match[0];
-                await loadAulasDetalhadas(codigoContratacao);
+
+          showToast(`Status marcado como "${novoStatus}" — clique em Salvar Alterações para confirmar`, 'info');
+          closeModal();
+        } else {
+          // Fora do contexto do modal principal: salvar imediatamente (compatibilidade)
+          statusButtons.forEach(b => b.disabled = true);
+          this.innerHTML = '<div class="flex items-center justify-center"><i class="fas fa-spinner fa-spin mr-2"></i> Atualizando...</div>';
+          try {
+            await BANCO.updateStatusAula(idAula, novoStatus);
+            showToast(`✅ Status atualizado para "${novoStatus}"`, 'success');
+            closeModal();
+            const modalOverlay = document.querySelector('.modal-overlay');
+            if (modalOverlay) {
+              const codigoElement = modalOverlay.querySelector('h3');
+              if (codigoElement) {
+                const match = codigoElement.textContent.match(/\d{4}/);
+                if (match) await loadAulasDetalhadas(match[0]);
               }
             }
+          } catch (error) {
+            console.error('❌ Erro ao atualizar status:', error);
+            showToast('❌ Erro ao atualizar status', 'error');
+            statusButtons.forEach(b => b.disabled = false);
           }
-          
-        } catch (error) {
-          console.error('❌ Erro ao atualizar status:', error);
-          showToast('❌ Erro ao atualizar status', 'error');
-          statusButtons.forEach(b => b.disabled = false);
-          this.innerHTML = `
-            <div class="flex items-center justify-between">
-              <div class="flex items-center">
-                <div class="w-4 h-4 rounded-full mr-3" style="background-color: ${this.dataset.color};"></div>
-                <span class="font-medium" style="color: ${this.dataset.color};">${novoStatus}</span>
-              </div>
-            </div>
-          `;
         }
       });
     });
@@ -4502,29 +4655,40 @@ const BancoDeAulasCards = (function() {
     
     const relatorioFormatado = `Descrição da Aula\n${descricao}\n\n---\n\nComportamento do estudante\n${comportamento}\n\n---\n\nRecomendações\n${recomendacoes}\n\n---\n\nEnviado em: ${dataFormatada}`;
     
+    const btnEnviar = modalContainer.querySelector('#btnEnviarRelatorio');
     try {
-      const btnEnviar = modalContainer.querySelector('#btnEnviarRelatorio');
       btnEnviar.disabled = true;
       btnEnviar.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Salvando...';
-      
-      await BANCO.updateRelatorioAula(idAula, relatorioFormatado);
-      
-      console.log('✅ Relatório salvo:', relatorioFormatado);
-      
-      const codigoContratacao = document.querySelector('.info-value-small.font-mono')?.textContent.trim();
-      if (codigoContratacao) {
-        await loadAulasDetalhadas(codigoContratacao);
+
+      if (_pendingAulaChanges) {
+        // Rastrear como alteração pendente — será salvo no "Salvar Alterações"
+        const entry = _pendingAulaChanges.get(idAula) || {};
+        entry.RelatorioAula = relatorioFormatado;
+        _pendingAulaChanges.set(idAula, entry);
+
+        // Atualizar ícone do relatório na tabela para verde
+        const btnRel = document.querySelector(`.btn-relatorio-aula[data-id-aula="${idAula}"]`);
+        if (btnRel) {
+          btnRel.dataset.relatorio = encodeURIComponent(relatorioFormatado);
+          const icon = btnRel.querySelector('i');
+          if (icon) { icon.className = 'fas fa-comment-dots text-lg text-green-500'; }
+        }
+
+        showToast('Relatório registrado — clique em Salvar Alterações para confirmar', 'info');
+      } else {
+        // Salvar imediatamente (fora do modal principal)
+        await BANCO.updateRelatorioAula(idAula, relatorioFormatado);
+        const codigoContratacao = document.querySelector('.info-value-small.font-mono')?.textContent.trim();
+        if (codigoContratacao) await loadAulasDetalhadas(codigoContratacao);
+        showToast('✅ Relatório salvo com sucesso!', 'success');
       }
-      
-      showToast('✅ Relatório salvo com sucesso!', 'success');
+
       modalContainer.remove();
       aulaSelecionada = null;
-      
+
     } catch (error) {
       console.error('❌ Erro ao salvar relatório:', error);
       showToast('❌ Erro ao salvar relatório. Tente novamente.', 'error');
-      
-      const btnEnviar = modalContainer.querySelector('#btnEnviarRelatorio');
       btnEnviar.disabled = false;
       btnEnviar.innerHTML = '<i class="fas fa-paper-plane mr-2"></i>Enviar Relatório';
     }

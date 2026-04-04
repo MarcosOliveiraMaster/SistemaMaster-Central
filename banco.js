@@ -271,6 +271,23 @@ async function updateObservacoesAula(idAula, novasObservacoes) {
   }
 }
 
+// Função genérica para atualizar múltiplos campos de um documento em BancoDeAulas-Lista
+async function updateAulaLista(idAula, dadosAtualizados) {
+  try {
+    const querySnapshot = await db.collection("BancoDeAulas-Lista")
+      .where("id-Aula", "==", idAula).get();
+    if (querySnapshot.empty) throw new Error(`Aula ${idAula} não encontrada em BancoDeAulas-Lista`);
+    await querySnapshot.docs[0].ref.update({
+      ...dadosAtualizados,
+      ultimaAtualizacao: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    return true;
+  } catch (error) {
+    console.error('❌ Erro ao atualizar aula em BancoDeAulas-Lista:', error.message);
+    throw error;
+  }
+}
+
 // Função para atualizar data de uma aula
 async function updateDataAula(idAula, novaData) {
   try {
@@ -501,6 +518,7 @@ if (typeof window !== 'undefined') {
     updateMateriaAula,
     updateProfessorAula,
     updateEstudanteAula,
+    updateAulaLista,
     addNovaAulaLista,
     deleteAulasLista,
     forceCacheRefresh,
