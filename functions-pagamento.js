@@ -635,18 +635,25 @@ async function carregarInfoAdicionaisDoFirebase(professorId, mes, ano) {
   if (!container) return;
   container.innerHTML = '';
 
+  const mesNum = Number(mes);
+  const anoNum = Number(ano);
+
   try {
+    // Query apenas por idProfessor (usa índice automático de campo único)
+    // e filtra mes/ano no client-side para evitar necessidade de índice composto
     const snapshot = await db.collection('informacoesPagamento')
       .where('idProfessor', '==', professorId)
-      .where('mes', '==', mes)
-      .where('ano', '==', ano)
       .get();
 
     snapshot.forEach(doc => {
-      renderInfoAdicionalSalva(doc);
+      const d = doc.data();
+      if (Number(d.mes) === mesNum && Number(d.ano) === anoNum) {
+        renderInfoAdicionalSalva(doc);
+      }
     });
   } catch (error) {
     console.error('Erro ao carregar informações adicionais:', error);
+    if (typeof showToast === 'function') showToast('Erro ao carregar informações adicionais.', 'error');
   }
 }
 
@@ -1203,21 +1210,22 @@ async function gerarRelatoriosGrupo() {
       // 3. Buscar informações adicionais do Firebase
       const linhasAdicionais = [];
       try {
+        // Query apenas por idProfessor (índice automático) + filtro client-side
         const snapshot = await db.collection('informacoesPagamento')
           .where('idProfessor', '==', professorId)
-          .where('mes', '==', mes)
-          .where('ano', '==', ano)
           .get();
 
         snapshot.forEach(docSnap => {
           const d = docSnap.data();
-          linhasAdicionais.push({
-            data: d.data || '',
-            descricao: d.descricao || '',
-            duracao: '',
-            valor: d.valor || 0,
-            tipo: d.tipo || 'entrada'
-          });
+          if (Number(d.mes) === Number(mes) && Number(d.ano) === Number(ano)) {
+            linhasAdicionais.push({
+              data: d.data || '',
+              descricao: d.descricao || '',
+              duracao: '',
+              valor: d.valor || 0,
+              tipo: d.tipo || 'entrada'
+            });
+          }
         });
       } catch (err) {
         console.warn(`Erro ao buscar info adicionais de ${nomeProfessor}:`, err);
