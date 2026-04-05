@@ -448,8 +448,13 @@ async function carregarInfoAdicionaisFirestore() {
 
   try {
     const data = await fetchInformacoesPagamento(cpf, mes, ano);
-    if (data && Array.isArray(data.infos) && data.infos.length > 0) {
-      data.infos.forEach(info => adicionarInfoAdicional(info));
+    console.log('[carregarInfoAdicionais] data retornado:', data);
+    if (data) {
+      // Aceitar diferentes nomes de campo para o array de informações
+      const infos = data.infos || data.informacoes || data.informacoesAdicionais || data.items || [];
+      if (Array.isArray(infos) && infos.length > 0) {
+        infos.forEach(info => adicionarInfoAdicional(info));
+      }
     }
   } catch (e) {
     console.error('Erro ao carregar informações adicionais:', e);

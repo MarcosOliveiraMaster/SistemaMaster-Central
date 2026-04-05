@@ -525,9 +525,33 @@ function forceCacheRefresh() {
 
 async function fetchInformacoesPagamento(cpfProfessor, mes, ano) {
   try {
+    // Tentativa 1: ID construído {cpf}_{ano}_{mes}
     const docId = `${cpfProfessor}_${ano}_${mes}`;
     const docSnap = await db.collection('informacoesPagamento').doc(docId).get();
-    return docSnap.exists ? docSnap.data() : null;
+    if (docSnap.exists) {
+      console.log('[informacoesPagamento] encontrado por docId:', docId, docSnap.data());
+      return docSnap.data();
+    }
+
+    // Tentativa 2: varrer todos os documentos e filtrar client-side
+    console.log('[informacoesPagamento] docId não encontrado, buscando por campos...');
+    const querySnap = await db.collection('informacoesPagamento').get();
+    console.log('[informacoesPagamento] total de docs na coleção:', querySnap.size);
+    querySnap.forEach(d => console.log('  doc:', d.id, d.data()));
+
+    for (const d of querySnap.docs) {
+      const data = d.data();
+      const matchCpf = data.cpfProfessor === cpfProfessor;
+      const matchMes = Number(data.mes) === mes;
+      const matchAno = Number(data.ano) === ano;
+      if (matchCpf && matchMes && matchAno) {
+        console.log('[informacoesPagamento] encontrado por campos:', d.id, data);
+        return data;
+      }
+    }
+
+    console.log('[informacoesPagamento] nenhum documento encontrado para', cpfProfessor, mes, ano);
+    return null;
   } catch (error) {
     console.error('❌ Erro ao buscar informacoesPagamento:', error.message);
     throw error;
