@@ -1,4 +1,4 @@
-// functions-pagamento.js — Área Pagamento
+﻿// functions-pagamento.js — Área Pagamento
 
 function loadAreaPagamento() {
   const section = document.getElementById('area-pagamento');
@@ -251,8 +251,10 @@ function filtrarProfessoresPorMesAno() {
   }
 
   // Filtrar aulas pelo mês/ano — formato do campo data: "seg - 23/02/2026"
+  const statusValidos = ['Concluída', 'Reposição'];
   const idsProfessoresComAula = new Set();
   todasAulas.forEach(aula => {
+    if (!statusValidos.includes(aula.StatusAula)) return;
     const data = aula.data || '';
     const match = data.match(/(\d{2})\/(\d{2})\/(\d{4})/);
     if (!match) return;
@@ -1009,8 +1011,10 @@ async function analisarPagamentoIndividual() {
 
   const todasAulas = window._pagTodasAulas || [];
 
-  // Filtrar aulas do professor no mês/ano selecionado
+  // Filtrar aulas do professor no mês/ano selecionado (apenas Concluída ou Reposição)
+  const statusValidos = ['Concluída', 'Reposição'];
   const aulasFiltradas = todasAulas.filter(aula => {
+    if (!statusValidos.includes(aula.StatusAula)) return false;
     if (aula.idProfessor !== professorId) return false;
     const match = (aula.data || '').match(/(\d{2})\/(\d{2})\/(\d{4})/);
     if (!match) return false;
@@ -1184,8 +1188,10 @@ async function gerarRelatoriosGrupo() {
       progressBar.style.width = `${((numeroAtual - 0.5) / total) * 100}%`;
       await new Promise(r => setTimeout(r, 100));
 
-      // 1. Filtrar aulas do professor no mês/ano
+      // 1. Filtrar aulas do professor no mês/ano (apenas Concluída ou Reposição)
+      const statusValidos = ['Concluída', 'Reposição'];
       const aulasFiltradas = todasAulas.filter(aula => {
+        if (!statusValidos.includes(aula.StatusAula)) return false;
         if (aula.idProfessor !== professorId) return false;
         const match = (aula.data || '').match(/(\d{2})\/(\d{2})\/(\d{4})/);
         if (!match) return false;
@@ -1466,9 +1472,11 @@ function renderizarGraficoPagamentoGrupo() {
   const professores = window._pagProfessoresFiltrados || [];
   const todasAulas = window._pagTodasAulas || [];
 
-  // Calcular total de pagamento por professor no mês/ano
+  // Calcular total de pagamento por professor no mês/ano (apenas Concluída ou Reposição)
+  const statusValidos = ['Concluída', 'Reposição'];
   const dadosProfessores = professores.map(p => {
     const aulasDoProfessor = todasAulas.filter(aula => {
+      if (!statusValidos.includes(aula.StatusAula)) return false;
       if (aula.idProfessor !== p.cpf) return false;
       const match = (aula.data || '').match(/(\d{2})\/(\d{2})\/(\d{4})/);
       if (!match) return false;
@@ -1664,8 +1672,10 @@ function abrirResumoGeralPagamentos() {
   const professores = window._pagProfessoresFiltrados || window._pagProfessoresAtivos || [];
   const todasAulas = window._pagTodasAulas || [];
 
+  const statusValidos = ['Concluída', 'Reposição'];
   const dadosProfessores = professores.map(p => {
     const aulasDoProfessor = todasAulas.filter(aula => {
+      if (!statusValidos.includes(aula.StatusAula)) return false;
       if (aula.idProfessor !== p.cpf) return false;
       const match = (aula.data || '').match(/(\d{2})\/(\d{2})\/(\d{4})/);
       if (!match) return false;
