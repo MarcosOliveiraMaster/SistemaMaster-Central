@@ -389,11 +389,76 @@ function alternarSecoesPagamento(colecao) {
   }, 300);
 }
 
+// ─── Contexto atual de análise ───
+// Armazena professor/mês/ano analisados para persistência no Firestore
+
+window._pagCurrentCpf    = null;
+window._pagCurrentMes    = null;
+window._pagCurrentAno    = null;
+window._pagCurrentUid    = null;
+window._pagCurrentTotal  = 0;
+
 // ─── Informações Adicionais: adicionar/remover linhas ───
 
 let _infoAdicionalCounter = 0;
+let _infoSaveTimer = null;
 
-function adicionarInfoAdicional() {
+function agendarSalvarInfoAdicionais() {
+  clearTimeout(_infoSaveTimer);
+  _infoSaveTimer = setTimeout(salvarInfoAdicionaisFirestore, 800);
+}
+
+async function salvarInfoAdicionaisFirestore() {
+  const cpf = window._pagCurrentCpf;
+  const mes = window._pagCurrentMes;
+  const ano = window._pagCurrentAno;
+  const uid = window._pagCurrentUid || '';
+  if (!cpf || !mes || !ano) return;
+
+  const rows = document.querySelectorAll('[id^="info-row-"]');
+  const infos = [];
+  rows.forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    const select = row.querySelector('select');
+    if (!inputs[0] || !select) return;
+    infos.push({
+      descricao: inputs[0].value || '',
+      data: inputs[1]?.value || '',
+      valor: inputs[2]?.value || '',
+      tipo: select.value
+    });
+  });
+
+  try {
+    await saveInformacoesPagamento(cpf, mes, ano, infos, uid);
+  } catch (e) {
+    console.error('Erro ao salvar informações adicionais:', e);
+  }
+}
+
+async function carregarInfoAdicionaisFirestore() {
+  const cpf = window._pagCurrentCpf;
+  const mes = window._pagCurrentMes;
+  const ano = window._pagCurrentAno;
+  if (!cpf || !mes || !ano) return;
+
+  const container = document.getElementById('info-adicional-rows');
+  if (container) container.innerHTML = '';
+  _infoAdicionalCounter = 0;
+
+  try {
+    const data = await fetchInformacoesPagamento(cpf, mes, ano);
+    if (data && Array.isArray(data.infos) && data.infos.length > 0) {
+      data.infos.forEach(info => adicionarInfoAdicional(info));
+    }
+  } catch (e) {
+    console.error('Erro ao carregar informações adicionais:', e);
+  }
+
+  atualizarResumoPagamento(window._pagCurrentTotal || 0);
+}
+
+function adicionarInfoAdicional(dadosIniciais = null) {
   const container = document.getElementById('info-adicional-rows');
   if (!container) return;
   _infoAdicionalCounter++;
@@ -402,12 +467,12 @@ function adicionarInfoAdicional() {
   row.id = 'info-row-' + id;
   row.style.cssText = 'display:grid; grid-template-columns:1fr 130px 130px 110px 40px; gap:8px; align-items:center; margin-bottom:6px;';
   row.innerHTML = `
-    <input type="text" class="filter-input filter-compact font-comfortaa" placeholder="Descrição..." style="width:100%;">
-    <input type="text" class="filter-input filter-compact font-comfortaa" placeholder="dd/mm/aaaa" maxlength="10" oninput="mascaraDataInfoAdicional(this)" style="width:100%;">
-    <input type="text" class="filter-input filter-compact font-comfortaa" placeholder="R$ 0,00" oninput="mascaraValorInfoAdicional(this)" style="width:100%;">
-    <select class="filter-select filter-compact font-comfortaa" style="width:100%;" onchange="atualizarCorBordaInfoAdicional(this)">
-      <option value="entrada">Entrada</option>
-      <option value="saida">Saída</option>
+    <input type="text" class="filter-input filter-compact font-comfortaa" placeholder="Descrição..." style="width:100%;" value="${dadosIniciais?.descricao || ''}">
+    <input type="text" class="filter-input filter-compact font-comfortaa" placeholder="dd/mm/aaaa" maxlength="10" oninput="mascaraDataInfoAdicional(this)" style="width:100%;" value="${dadosIniciais?.data || ''}">
+    <input type="text" class="filter-input filter-compact font-comfortaa" placeholder="R$ 0,00" oninput="mascaraValorInfoAdicional(this)" style="width:100%;" value="${dadosIniciais?.valor || ''}">
+    <select class="filter-select filter-compact font-comfortaa" style="width:100%;" onchange="atualizarCorBordaInfoAdicional(this); atualizarResumoPagamento(window._pagCurrentTotal||0); agendarSalvarInfoAdicionais();">
+      <option value="entrada" ${dadosIniciais?.tipo === 'entrada' || !dadosIniciais ? 'selected' : ''}>Entrada</option>
+      <option value="saida" ${dadosIniciais?.tipo === 'saida' ? 'selected' : ''}>Saída</option>
     </select>
     <button type="button" onclick="removerInfoAdicional(${id})" style="background:none; border:none; cursor:pointer; color:#ef4444; font-size:16px;" title="Remover">
       <i class="fas fa-trash-alt"></i>
@@ -416,6 +481,17 @@ function adicionarInfoAdicional() {
   container.appendChild(row);
   const select = row.querySelector('select');
   if (select) atualizarCorBordaInfoAdicional(select);
+
+  // Auto-save ao alterar qualquer campo de texto
+  row.querySelectorAll('input').forEach(input => {
+    input.addEventListener('input', () => {
+      atualizarResumoPagamento(window._pagCurrentTotal || 0);
+      agendarSalvarInfoAdicionais();
+    });
+  });
+
+  // Se não veio de carga do Firestore (interação manual), agenda salvar
+  if (!dadosIniciais) agendarSalvarInfoAdicionais();
 }
 
 function atualizarCorBordaInfoAdicional(select) {
@@ -430,6 +506,8 @@ function atualizarCorBordaInfoAdicional(select) {
 function removerInfoAdicional(id) {
   const row = document.getElementById('info-row-' + id);
   if (row) row.remove();
+  atualizarResumoPagamento(window._pagCurrentTotal || 0);
+  agendarSalvarInfoAdicionais();
 }
 
 function mascaraDataInfoAdicional(input) {
@@ -510,7 +588,7 @@ function analisarPagamentos() {
   analisarPagamentoIndividual();
 }
 
-function analisarPagamentoIndividual() {
+async function analisarPagamentoIndividual() {
   const mes = parseInt(document.getElementById('pag-mes')?.value);
   const ano = parseInt(document.getElementById('pag-ano')?.value);
   const professorId = document.getElementById('pag-professor-select')?.value;
@@ -523,6 +601,13 @@ function analisarPagamentoIndividual() {
     showToast('Selecione um professor.', 'error');
     return;
   }
+
+  // Salvar contexto para persistência das informações adicionais
+  const professor = (window._pagProfessoresAtivos || []).find(p => p.cpf === professorId);
+  window._pagCurrentCpf   = professorId;
+  window._pagCurrentMes   = mes;
+  window._pagCurrentAno   = ano;
+  window._pagCurrentUid   = professor?.uid || '';
 
   const todasAulas = window._pagTodasAulas || [];
 
@@ -544,8 +629,6 @@ function analisarPagamentoIndividual() {
   const secao = document.getElementById('pag-secao-individual');
   if (!secao) return;
 
-  // Nome do professor selecionado
-  const professor = (window._pagProfessoresAtivos || []).find(p => p.cpf === professorId);
   const nomeProfessor = professor?.nome || 'Professor';
 
   const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -568,7 +651,8 @@ function analisarPagamentoIndividual() {
     // Limpar tfoot
     const tfoot = document.querySelector('#tabela-pagamento-individual tfoot');
     if (tfoot) tfoot.innerHTML = '';
-    atualizarResumoPagamento(0);
+    window._pagCurrentTotal = 0;
+    await carregarInfoAdicionaisFirestore();
     return;
   }
 
@@ -614,5 +698,6 @@ function analisarPagamentoIndividual() {
       </tr>`;
   }
 
-  atualizarResumoPagamento(totalValor);
+  window._pagCurrentTotal = totalValor;
+  await carregarInfoAdicionaisFirestore();
 }

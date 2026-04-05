@@ -521,6 +521,35 @@ function forceCacheRefresh() {
   CACHE.dataBaseProfessores.timestamp = null;
 }
 
+// ── Informações de Pagamento ──────────────────────────────────────────────────
+
+async function fetchInformacoesPagamento(cpfProfessor, mes, ano) {
+  try {
+    const docId = `${cpfProfessor}_${ano}_${mes}`;
+    const docSnap = await db.collection('informacoesPagamento').doc(docId).get();
+    return docSnap.exists ? docSnap.data() : null;
+  } catch (error) {
+    console.error('❌ Erro ao buscar informacoesPagamento:', error.message);
+    throw error;
+  }
+}
+
+async function saveInformacoesPagamento(cpfProfessor, mes, ano, infos, uidProfessor = '') {
+  try {
+    const docId = `${cpfProfessor}_${ano}_${mes}`;
+    await db.collection('informacoesPagamento').doc(docId).set({
+      uidProfessor,
+      cpfProfessor,
+      mes,
+      ano,
+      infos
+    });
+  } catch (error) {
+    console.error('❌ Erro ao salvar informacoesPagamento:', error.message);
+    throw error;
+  }
+}
+
 // Exportar funções para uso global
 if (typeof window !== 'undefined') {
   window.BANCO = {
@@ -548,6 +577,8 @@ if (typeof window !== 'undefined') {
     addNovaAulaLista,
     deleteAulasLista,
     forceCacheRefresh,
-    isCacheValid
+    isCacheValid,
+    fetchInformacoesPagamento,
+    saveInformacoesPagamento
   };
 }
