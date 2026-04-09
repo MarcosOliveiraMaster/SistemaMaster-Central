@@ -2143,7 +2143,7 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password: senha, returnSecureToken: false })
+      body: JSON.stringify({ email, password: senha, returnSecureToken: true })
     });
     const data = await res.json();
     if (!res.ok) {
