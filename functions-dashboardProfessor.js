@@ -158,6 +158,27 @@ window.DashboardProfessores = (function () {
   }
 
   // ─────────────────────────────────────────────────────────────
+  // 1.3.1  CRIAÇÃO DE CONTA AUTH (instância secundária isolada)
+  // ─────────────────────────────────────────────────────────────
+  async function criarContaAuthProfessor(email, cpf) {
+    const cpfDigits = (cpf || '').replace(/\D/g, '');
+    if (!email)              throw new Error('E-mail ausente.');
+    if (cpfDigits.length < 11) throw new Error('CPF inválido (mínimo 11 dígitos).');
+    // Usa app secundária para não derrubar a sessão do admin
+    const nomeApp = 'dp_promocao_' + Date.now();
+    const appSec  = firebase.initializeApp(CFG.firebase, nomeApp);
+    try {
+      const { user } = await appSec.auth().createUserWithEmailAndPassword(
+        email.trim().toLowerCase(),
+        cpfDigits
+      );
+      return user.uid;
+    } finally {
+      await appSec.delete();
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
   // 1.4  UTILS
   // ─────────────────────────────────────────────────────────────
   function debounce(fn, ms = 160) {
@@ -446,6 +467,7 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
 /* ── POPUP overlay ── */
 .dp-popup-overlay { position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; z-index:8888; animation:dpFadeIn .15s ease; }
 @keyframes dpFadeIn { from{opacity:0} to{opacity:1} }
+@keyframes dpSpin   { to { transform:rotate(360deg); } }
 .dp-popup-box { background:white; border-radius:.9rem; box-shadow:0 20px 48px rgba(0,0,0,.18); padding:1.5rem; max-width:26rem; width:90%; }
 .dp-popup-box h3 { font-size:1rem; font-weight:700; text-align:center; margin:.5rem 0 .4rem; }
 .dp-popup-box p  { font-size:.82rem; text-align:center; color:var(--dp-gray-600); margin-bottom:1.2rem; }
@@ -2139,24 +2161,75 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
   async function promoverProfessor() {
     if (!S.candidatoAtual) { toast('Selecione um candidato.', 'error'); return; }
     const cand = S.candidatoAtual;
+
+    // Valida campos obrigatórios antes de abrir o popup
+    const email = (getField(cand, 'email') || '').trim().toLowerCase();
+    const cpf   = (getField(cand, 'cpf')   || '').replace(/\D/g, '');
+
+    if (!email)            { toast('Candidato sem e-mail cadastrado. Preencha antes de promover.', 'error'); return; }
+    if (cpf.length < 11)   { toast('CPF inválido ou ausente. Verifique antes de promover.', 'error'); return; }
+
     popup({
-      titulo: 'Promover a Professor?',
-      corpo: `<strong>${cand.nome || 'Candidato'}</strong> será adicionado à coleção de professores e removido dos candidatos.`,
-      labelOk: 'Promover', tipoOk: 'success',
+      titulo  : 'Promover a Professor?',
+      corpo   : `<strong>${cand.nome || 'Candidato'}</strong> será promovido a Professor e já terá sua área de login na plataforma.<br>
+                 <small style="color:var(--dp-gray-400);margin-top:.4rem;display:block">Login: ${email} &nbsp;·&nbsp; Senha inicial: CPF</small>`,
+      labelOk : 'Promover', tipoOk: 'success',
       onOk: async () => {
+        // ── Exibe loading enquanto processa ──
+        const overlay = $id('dp-popupOverlay');
+        if (overlay) {
+          overlay.innerHTML = `
+            <div class="dp-popup-box" style="text-align:center;padding:2.5rem 2rem;min-width:22rem">
+              <div style="font-size:2.8rem;margin-bottom:1rem">
+                <span style="display:inline-block;animation:dpSpin 1s linear infinite">🎓</span>
+              </div>
+              <h3 style="margin-bottom:.4rem">Estamos preparando a área do Professor</h3>
+              <p style="color:var(--dp-gray-500);font-size:.85rem;margin-bottom:0">Aguarde um pouco…</p>
+            </div>`;
+          overlay.style.display = 'flex';
+        }
+
         try {
           const { id, dataEntrevista, horaEntrevista, linkEntrevista, impressoesCandidato, ...profData } = cand;
-          profData.status = 'Ativo';
+          profData.status       = 'Ativo';
           profData.dataAtivacao = Date.now();
-          await addDoc(CFG.colProfessores, profData);
+
+          // 1. Cria documento em dataBaseProfessores
+          const docRef = await addDoc(CFG.colProfessores, profData);
+
+          // 2. Cria conta Firebase Auth com senha inicial = CPF
+          let authOk     = false;
+          let authErrMsg = '';
+          try {
+            const uid = await criarContaAuthProfessor(email, cpf);
+            await S.db.collection(CFG.colProfessores).doc(docRef.id).update({ uid, senhaInicial: 'cpf' });
+            authOk = true;
+          } catch (authErr) {
+            authErrMsg = authErr.code === 'auth/email-already-in-use'
+              ? 'E-mail já possui conta ativa na plataforma.'
+              : authErr.message;
+            console.warn('⚠️ Auth:', authErr.code, authErr.message);
+          }
+
+          // 3. Remove da coleção de candidatos
           await deleteDoc(CFG.colCandidatos, cand.id);
-          S.candidatos = S.candidatos.filter(c => c.id !== cand.id);
+          S.candidatos     = S.candidatos.filter(c => c.id !== cand.id);
           S.candidatoAtual = null;
-          S.t2Loaded = false; // forçar reload na próxima abertura da Tab2
+          S.t2Loaded       = false; // forçar reload na Tab2
           limparPainelCandidato();
           renderListaCandidatos();
-          toast(`${profData.nome || 'Professor'} promovido com sucesso!`, 'success');
-        } catch (e) { toast('Erro ao promover: ' + e.message, 'error'); }
+
+          if (authOk) {
+            toast(`${profData.nome || 'Professor'} promovido! Área de login criada com sucesso.`, 'success');
+          } else {
+            toast(`${profData.nome || 'Professor'} promovido com sucesso!`, 'success');
+            toast('Acesso à plataforma não criado: ' + authErrMsg, 'error');
+          }
+        } catch (e) {
+          toast('Erro ao promover: ' + e.message, 'error');
+        } finally {
+          if (overlay) overlay.style.display = 'none';
+        }
       }
     });
   }
