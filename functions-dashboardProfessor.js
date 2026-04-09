@@ -1,3 +1,20 @@
+  // ===== Limite de largura das colunas da tabela de professores =====
+  // Aplica CSS global para limitar largura máxima das colunas e permitir quebra de linha
+  (function() {
+    const style = document.createElement('style');
+    style.innerHTML = `
+      #dp-tabela th, #dp-tabela td {
+        max-width: 250px !important;
+        white-space: normal !important;
+        word-break: break-word !important;
+      }
+      #dp-candDados {
+        max-height: 70vh;
+        overflow-y: auto;
+      }
+    `;
+    document.head.appendChild(style);
+  })();
 // ============================================================
 // functions-dashboardProfessor.js
 // Dashboard de Professores — módulo autocontido
@@ -30,7 +47,7 @@ window.DashboardProfessores = (function () {
     },
     colProfessores: 'dataBaseProfessores',
     colCandidatos: 'candidatos',
-    colunasOcultas: ['id', 'expAulas', 'expNeuro', 'expTdics', 'foto', 'fotoPerfil', 'dataEnvio', 'timeStamp', 'timestamp'],
+    colunasOcultas: ['id', 'expAulas', 'expNeuro', 'expTdics', 'foto', 'fotoPerfil', 'dataEnvio', 'timeStamp', 'timestamp', 'Migradoem', 'senhainicial', 'dataenviolegivel', 'uid', 'dataAtivacao', 'DATAENVIOLEGIVEL', 'MIGRADOEM'],
     colunasDiasTurnos: [
       'segManha','segTarde','terManha','terTarde',
       'quaManha','quaTarde','quiManha','quiTarde',
@@ -680,14 +697,17 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
             <option value="Candidato">Candidato</option>
             <option value="Reprovado">Reprovado</option>
             <option value="Aprovado">Aprovado</option>
+            <option value="Desistente">Desistente</option>
           </select>
         </div>
         <button id="dp-btnSalvarAval" class="dp-btn dp-btn--primary" style="width:100%">💾 Salvar Alterações</button>
         <button id="dp-btnCopiarRelatorio" class="dp-btn dp-btn--ghost" style="width:100%">📋 Copiar Relatório</button>
         <div style="display:flex;flex-direction:column;gap:.35rem;margin-top:.25rem">
+          <!--
           <button id="dp-btnAprovado"   class="dp-btn" style="width:100%;background:var(--dp-green-light);color:var(--dp-green);border-color:var(--dp-green)">✅ Candidato Aprovado</button>
           <button id="dp-btnReprovado"  class="dp-btn" style="width:100%;background:var(--dp-red-light);color:var(--dp-red);border-color:var(--dp-red)">❌ Candidato Reprovado</button>
           <button id="dp-btnDesistente" class="dp-btn" style="width:100%;background:var(--dp-gray-100);color:var(--dp-gray-600);border-color:var(--dp-gray-200)">🚫 Candidato Desistente</button>
+          -->
         </div>
         <hr style="margin:.4rem 0;border-color:var(--dp-gray-200)">
         <button id="dp-btnExcluirCand"  class="dp-btn dp-btn--danger"  style="width:100%">🗑 Excluir Candidato</button>
@@ -1099,7 +1119,16 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
         .filter(c => !CFG.colunasOcultas.includes(c) && !CFG.colunasDiasTurnos.includes(c))
         .concat(['Disponibilidade']);
 
-      if (!S.colunasSelecionadas.length) S.colunasSelecionadas = [...S.colunasDisponiveis];
+      // Ordem e seleção inicial fixa
+      if (!S.colunasSelecionadas.length) {
+        // Mapeamento para garantir nomes corretos
+        const colStatus = 'status';
+        const colNome = todas.find(c => c.toLowerCase() === 'nome') || 'nome';
+        const colEmail = todas.find(c => c.toLowerCase().includes('email')) || 'email';
+        const colContato = todas.find(c => ['contato','telefone','celular','whatsapp'].includes(c.toLowerCase())) || 'contato';
+        S.colunasSelecionadas = [colStatus, colNome, colEmail, colContato];
+        S.colunasOrdem = [colStatus, colNome, colEmail, colContato];
+      }
       S.colunasSelecionadas = aplicarOrdem(S.colunasSelecionadas);
 
       montarDropdownColunas();
@@ -1152,7 +1181,7 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
   ];
 
   // Campos a serem excluídos do dropdown
-  const CAMPOS_EXCLUIDOS = ['expAulas', 'expNeuro', 'expTdics', 'foto', 'fotoPerfil', 'dataEnvio', 'timeStamp', 'timestamp', 'dataenviolegivel'];
+  const CAMPOS_EXCLUIDOS = ['expAulas', 'expNeuro', 'expTdics', 'foto', 'fotoPerfil', 'dataEnvio', 'timeStamp', 'timestamp', 'dataenviolegivel', 'dataAtivacao', 'Migradoem', 'senhainicial', 'uid', 'DATAENVIOLEGIVEL', 'MIGRADOEM'];
 
   function montarDropdownColunas() {
     const list = $id('dp-colunasList');
@@ -1391,9 +1420,67 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
 
     if (!dados.length) { tabelaVazia('Nenhum resultado encontrado.'); return; }
 
+    // Função para fechar menu de contexto
+    function closeContextMenu() {
+      const menu = document.getElementById('dp-context-menu');
+      if (menu) menu.remove();
+      document.removeEventListener('click', closeContextMenu);
+    }
+
     dados.forEach((item, idx) => {
       const tr = document.createElement('tr');
       tr.dataset.rowId = item.id || idx;
+
+      // Adiciona menu de contexto ao botão direito
+      tr.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+        closeContextMenu();
+        const menu = document.createElement('div');
+        menu.id = 'dp-context-menu';
+        menu.style.position = 'fixed';
+        menu.style.zIndex = 9999;
+        menu.style.top = e.clientY + 'px';
+        menu.style.left = e.clientX + 'px';
+        menu.style.background = '#fff';
+        menu.style.border = '1px solid #ccc';
+        menu.style.borderRadius = '6px';
+        menu.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+        menu.style.padding = '0.5rem 0';
+        menu.style.minWidth = '180px';
+        menu.style.fontSize = '0.92rem';
+        menu.innerHTML = `
+          <div style=\"padding:.4rem 1rem;cursor:pointer;color:#d32f2f;font-weight:500;\" id=\"dp-desligar\">Desligar Professor</div>
+          <div style=\"padding:.4rem 1rem;cursor:pointer;color:#fbc02d;font-weight:500;\" id=\"dp-suspender\">Suspender Professor</div>
+          <div style=\"padding:.4rem 1rem;cursor:pointer;color:#388e3c;font-weight:500;\" id=\"dp-ativar\">Ativar Professor</div>
+        `;
+        document.body.appendChild(menu);
+        document.addEventListener('click', closeContextMenu);
+
+        document.getElementById('dp-desligar').onclick = async function(ev) {
+          ev.stopPropagation();
+          closeContextMenu();
+          await updateDoc(CFG.colProfessores, item.id, { status: 'Desligado' });
+          item.status = 'Desligado';
+          aplicarFiltros();
+          toast('Professor desligado!', 'info');
+        };
+        document.getElementById('dp-suspender').onclick = async function(ev) {
+          ev.stopPropagation();
+          closeContextMenu();
+          await updateDoc(CFG.colProfessores, item.id, { status: 'Suspenso' });
+          item.status = 'Suspenso';
+          aplicarFiltros();
+          toast('Professor suspenso!', 'info');
+        };
+        document.getElementById('dp-ativar').onclick = async function(ev) {
+          ev.stopPropagation();
+          closeContextMenu();
+          await updateDoc(CFG.colProfessores, item.id, { status: 'Ativo' });
+          item.status = 'Ativo';
+          aplicarFiltros();
+          toast('Professor ativado!', 'success');
+        };
+      });
 
       cols.forEach(col => {
         const td = document.createElement('td');
@@ -1403,8 +1490,14 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
           td.textContent = formatarDisponibilidade(item);
         } else if (col === 'status') {
           const badge = document.createElement('span');
-          badge.className = `dp-badge dp-badge--${(item.status || 'candidato').toLowerCase().replace('é','e')}`;
+          let statusClass = (item.status || 'candidato').toLowerCase().replace('é','e');
+          if (item.status === 'Desligado') statusClass = 'desligado';
+          if (item.status === 'Suspenso') statusClass = 'suspenso';
+          badge.className = `dp-badge dp-badge--${statusClass}`;
           badge.textContent = item.status || '—';
+          // Cores customizadas
+          if (item.status === 'Desligado') badge.style.background = '#d32f2f', badge.style.color = '#fff';
+          if (item.status === 'Suspenso') badge.style.background = '#fbc02d', badge.style.color = '#222';
           td.appendChild(badge);
         } else if (col.toLowerCase() === 'cpf') {
           td.textContent = formatCPF(getField(item, col) || '');
@@ -1689,9 +1782,48 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
   }
 
   function criarCampoEdicao(chave, valor) {
-    const wrap = document.createElement('div'); wrap.className = 'dp-field';
-    const label = document.createElement('label'); label.className = 'dp-field-label';
-    label.htmlFor = `dp-campo-${chave}`; label.textContent = labelDeChave(chave);
+
+
+    // Lista de campos de informação para exibir como card
+    const infoKeys = ['nome','cpf','email','contato','endereco','nivel','curso','pix','bairros','dataNascimento'];
+    if (infoKeys.includes(chave)) {
+      // Card visual: label + valor juntos
+      const card = document.createElement('div');
+      card.className = 'dp-info-card';
+      // Label
+      const label = document.createElement('div');
+      label.className = 'dp-info-card-label';
+      label.textContent = labelDeChave(chave) + ':';
+      // Valor
+      const value = document.createElement('div');
+      value.className = 'dp-info-card-value';
+      value.textContent = safe(valor);
+      card.appendChild(label);
+      card.appendChild(value);
+      return card;
+    }
+    // ...existente para outros campos...
+    const wrap = document.createElement('div');
+    wrap.className = 'dp-field';
+
+    // Adiciona linha divisória antes de certas seções
+    const dividerKeys = ['disponibilidade', 'disciplinas', 'descricaoExpAulas', 'descricaoExpNeuro', 'descricaoTdics'];
+    // Disponibilidade: qualquer chave de CFG.colunasDiasTurnos
+    const isDisponibilidade = CFG.colunasDiasTurnos.includes(chave);
+    // Disciplinas
+    const isDisciplinas = chave === 'disciplinas';
+    // Experiências
+    const isExperiencias = chave === 'descricaoExpAulas' || chave === 'descricaoExpNeuro' || chave === 'descricaoTdics';
+    if (isDisponibilidade || isDisciplinas || isExperiencias) {
+      const divider = document.createElement('div');
+      divider.style.cssText = 'border-top:2px solid #444;margin:1.5rem 0 .5rem 0;width:100%';
+      wrap.appendChild(divider);
+    }
+
+    const label = document.createElement('label');
+    label.className = 'dp-field-label';
+    label.htmlFor = `dp-campo-${chave}`;
+    label.textContent = labelDeChave(chave);
     wrap.appendChild(label);
 
     let inp;
@@ -1969,14 +2101,24 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
     set('dp-impressoesCandidato', getField(c,'impressoesCandidato'));
     const sel = $id('dp-statusCandidato');
     if (sel) sel.value = getField(c,'status') || 'Candidato';
-    // resetar destaques dos botões de status
-    ['dp-btnAprovado','dp-btnReprovado','dp-btnDesistente'].forEach(id => {
-      const btn = $id(id);
-      if (btn) { btn.classList.remove('dp-btn-active-success','dp-btn-active-danger'); }
-    });
-    const st = getField(c,'status');
-    if (st === 'Aprovado')  { const b=$id('dp-btnAprovado');  if(b) b.classList.add('dp-btn-active-success'); }
-    if (st === 'Reprovado') { const b=$id('dp-btnReprovado'); if(b) b.classList.add('dp-btn-active-danger');  }
+    // resetar destaques dos botões de status (comentado)
+    //['dp-btnAprovado','dp-btnReprovado','dp-btnDesistente'].forEach(id => {
+    //  const btn = $id(id);
+    //  if (btn) { btn.classList.remove('dp-btn-active-success','dp-btn-active-danger'); }
+    //});
+    //const st = getField(c,'status');
+    //if (st === 'Aprovado')  { const b=$id('dp-btnAprovado');  if(b) b.classList.add('dp-btn-active-success'); }
+    //if (st === 'Reprovado') { const b=$id('dp-btnReprovado'); if(b) b.classList.add('dp-btn-active-danger');  }
+      // Adiciona listener para selecionar "Desistente" no select
+      const selStatus = $id('dp-statusCandidato');
+      if (selStatus && !selStatus._desistenteListener) {
+        selStatus.addEventListener('change', function() {
+          if (this.value === 'Desistente') {
+            setBotaoStatus('Desistente', CFG.msgDesistente);
+          }
+        });
+        selStatus._desistenteListener = true;
+      }
   }
 
   async function salvarAvaliacaoCandidato() {

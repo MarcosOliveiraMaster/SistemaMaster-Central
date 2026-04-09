@@ -1,3 +1,84 @@
+/* Card para campos de informação (título + valor juntos) */
+.dp-info-card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px 0 #e5e7eb;
+  padding: 0.7rem 1.2rem 0.7rem 1.2rem;
+  margin-bottom: 1.2rem;
+  border: 1px solid #ececec;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.dp-info-card-label {
+  font-weight: normal;
+  color: #222;
+  margin-bottom: 0.1rem;
+}
+.dp-info-card-value {
+  color: #444;
+  word-break: break-word;
+}
+/* Campos de informações do painel de edição de professor */
+.dp-field-info {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px 0 #e5e7eb;
+  padding: 1rem 1.2rem 0.7rem 1.2rem;
+  margin-bottom: 1.2rem;
+  border: 1px solid #ececec;
+}
+
+/* Oculta a barra de rolagem do menu lateral, mas mantém a rolagem funcional */
+#menu-lateral {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE 10+ */
+}
+#menu-lateral::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+/* Ajustes para área do usuário e botão logout no menu lateral */
+#menu-lateral .user-area {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 0 16px 0;
+  margin-top: auto;
+}
+
+#user-email-display {
+  max-width: 90%;
+  font-size: 0.85rem;
+  text-align: center;
+  margin-bottom: 8px;
+  word-break: break-all;
+}
+
+#btn-logout {
+  width: 50% !important;
+  min-width: 120px;
+  max-width: 180px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 0 !important;
+  font-size: 0.9rem !important;
+  border-radius: 8px;
+}
+/* Scroll vertical para menu lateral em telas pequenas */
+#menu-lateral {
+  overflow-y: auto;
+  max-height: 100vh;
+}
+
+@media (max-width: 1024px) {
+  #menu-lateral {
+    max-height: 100vh;
+    min-height: 0;
+  }
+}
 /* Botão contrato: UX igual aos demais botões */
 #btn-gerar-contrato.btn-primary {
   background: #fff;
