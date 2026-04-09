@@ -1782,48 +1782,9 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
   }
 
   function criarCampoEdicao(chave, valor) {
-
-
-    // Lista de campos de informação para exibir como card
-    const infoKeys = ['nome','cpf','email','contato','endereco','nivel','curso','pix','bairros','dataNascimento'];
-    if (infoKeys.includes(chave)) {
-      // Card visual: label + valor juntos
-      const card = document.createElement('div');
-      card.className = 'dp-info-card';
-      // Label
-      const label = document.createElement('div');
-      label.className = 'dp-info-card-label';
-      label.textContent = labelDeChave(chave) + ':';
-      // Valor
-      const value = document.createElement('div');
-      value.className = 'dp-info-card-value';
-      value.textContent = safe(valor);
-      card.appendChild(label);
-      card.appendChild(value);
-      return card;
-    }
-    // ...existente para outros campos...
-    const wrap = document.createElement('div');
-    wrap.className = 'dp-field';
-
-    // Adiciona linha divisória antes de certas seções
-    const dividerKeys = ['disponibilidade', 'disciplinas', 'descricaoExpAulas', 'descricaoExpNeuro', 'descricaoTdics'];
-    // Disponibilidade: qualquer chave de CFG.colunasDiasTurnos
-    const isDisponibilidade = CFG.colunasDiasTurnos.includes(chave);
-    // Disciplinas
-    const isDisciplinas = chave === 'disciplinas';
-    // Experiências
-    const isExperiencias = chave === 'descricaoExpAulas' || chave === 'descricaoExpNeuro' || chave === 'descricaoTdics';
-    if (isDisponibilidade || isDisciplinas || isExperiencias) {
-      const divider = document.createElement('div');
-      divider.style.cssText = 'border-top:2px solid #444;margin:1.5rem 0 .5rem 0;width:100%';
-      wrap.appendChild(divider);
-    }
-
-    const label = document.createElement('label');
-    label.className = 'dp-field-label';
-    label.htmlFor = `dp-campo-${chave}`;
-    label.textContent = labelDeChave(chave);
+    const wrap = document.createElement('div'); wrap.className = 'dp-field';
+    const label = document.createElement('label'); label.className = 'dp-field-label';
+    label.htmlFor = `dp-campo-${chave}`; label.textContent = labelDeChave(chave);
     wrap.appendChild(label);
 
     let inp;
