@@ -2136,6 +2136,23 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
     });
   }
 
+  // Cria conta no Firebase Auth via REST API (não afeta a sessão do admin).
+  // Retorna o uid do novo usuário, ou null se o e-mail já tiver conta cadastrada.
+  async function criarContaAuth(email, senha) {
+    const url = `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${CFG.firebase.apiKey}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: senha, returnSecureToken: false })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      if (data?.error?.message === 'EMAIL_EXISTS') return null; // conta já existe — ok
+      throw new Error(data?.error?.message || 'Erro ao criar conta de autenticação.');
+    }
+    return data.localId || null;
+  }
+
   async function promoverProfessor() {
     if (!S.candidatoAtual) { toast('Selecione um candidato.', 'error'); return; }
     const cand = S.candidatoAtual;
@@ -2148,6 +2165,13 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
           const { id, dataEntrevista, horaEntrevista, linkEntrevista, impressoesCandidato, ...profData } = cand;
           profData.status = 'Ativo';
           profData.dataAtivacao = Date.now();
+
+          // Cria conta no Firebase Auth: login = email, senha inicial = CPF (só dígitos)
+          const emailLogin = String(profData.email || '').trim().toLowerCase();
+          const cpfSenha   = String(profData.cpf   || '').replace(/\D/g, '');
+          const uid = await criarContaAuth(emailLogin, cpfSenha);
+          if (uid) profData.uid = uid;
+
           await addDoc(CFG.colProfessores, profData);
           await deleteDoc(CFG.colCandidatos, cand.id);
           S.candidatos = S.candidatos.filter(c => c.id !== cand.id);
