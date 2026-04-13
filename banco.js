@@ -351,7 +351,7 @@ async function updateMateriaAula(idAula, novaMateria) {
 }
 
 // Função para atualizar professor de uma aula
-async function updateProfessorAula(idAula, nomeProfessor, cpfProfessor) {
+async function updateProfessorAula(idAula, nomeProfessor, cpfProfessor, uidProfessor) {
   try {
     const querySnapshot = await db.collection("BancoDeAulas-Lista")
       .where("id-Aula", "==", idAula).get();
@@ -359,6 +359,7 @@ async function updateProfessorAula(idAula, nomeProfessor, cpfProfessor) {
     await querySnapshot.docs[0].ref.update({
       professor: nomeProfessor,
       idProfessor: cpfProfessor,
+      professorUid: uidProfessor || '',
       timestamp: firebase.firestore.FieldValue.serverTimestamp()
     });
     return true;
@@ -445,6 +446,7 @@ async function addNovaAulaLista(codigoContratacao, valorHoraContrato = 35) {
       horario: "",
       "id-Aula": novoIdAula,
       idProfessor: "",
+      professorUid: "",
       materia: "",
       metodoPagamento: ultimaAula.metodoPagamento || "",
       nomeCliente: ultimaAula.nomeCliente || "",
