@@ -278,6 +278,40 @@ window.AuthProfessores = (function () {
 .ap-empty strong { display:block; font-size:.88rem; color:#374151; margin-bottom:.3rem; }
 .ap-empty p { font-size:.76rem; color:#9ca3af; margin:0; line-height:1.5; }
 
+/* ── Filtro de busca ───────────────────────────────────────── */
+.ap-search-wrap {
+  margin-bottom:.85rem;
+  position:relative;
+}
+.ap-search-wrap i {
+  position:absolute;
+  left:.65rem;
+  top:50%;
+  transform:translateY(-50%);
+  color:#9ca3af;
+  font-size:.8rem;
+  pointer-events:none;
+}
+.ap-search-input {
+  width:100%;
+  padding:.5rem .75rem .5rem 2rem;
+  border:1px solid #e5e7eb;
+  border-radius:.5rem;
+  font-family:'Lexend',sans-serif;
+  font-size:.8rem;
+  color:#1f2937;
+  background:#f9fafb;
+  transition:border-color .18s, box-shadow .18s;
+  box-sizing:border-box;
+  outline:none;
+}
+.ap-search-input:focus {
+  border-color:#f28705;
+  box-shadow:0 0 0 2px rgba(242,135,5,.18);
+  background:#fff;
+}
+.ap-search-input::placeholder { color:#9ca3af; }
+
 /* ── Resultado ─────────────────────────────────────────────── */
 .ap-summary { display:flex; gap:.4rem; flex-wrap:wrap; margin-bottom:.75rem; }
 .ap-summary-chip { font-size:.72rem; font-family:'Comfortaa',cursive; padding:.22rem .65rem; border-radius:999px; }
@@ -564,6 +598,15 @@ window.AuthProfessores = (function () {
         if (!ativo && temAcesso)  perderao.push(p);
       });
 
+      // Ordenação alfabética por nome
+      const sortByName = arr => arr.sort((a, b) => {
+        const na = (a.nome || a.Nome || '').toLowerCase();
+        const nb = (b.nome || b.Nome || '').toLowerCase();
+        return na.localeCompare(nb, 'pt-BR');
+      });
+      sortByName(receberao);
+      sortByName(perderao);
+
       if (!receberao.length && !perderao.length) {
         body.innerHTML = `
           <div class="ap-empty">
@@ -575,7 +618,12 @@ window.AuthProfessores = (function () {
         return;
       }
 
-      let html = '';
+      let html = `
+        <div class="ap-search-wrap">
+          <i class="fas fa-search"></i>
+          <input type="text" class="ap-search-input" id="ap-searchInput"
+            placeholder="Filtrar professor pelo nome…" autocomplete="off">
+        </div>`;
 
       if (receberao.length) {
         html += `
@@ -610,6 +658,18 @@ window.AuthProfessores = (function () {
       }
 
       body.innerHTML = html;
+
+      // Filtro de busca por nome (todos os grupos ao mesmo tempo)
+      const searchInput = document.getElementById('ap-searchInput');
+      if (searchInput) {
+        searchInput.addEventListener('input', () => {
+          const termo = searchInput.value.toLowerCase();
+          document.querySelectorAll('.ap-perm-item').forEach(item => {
+            const nome = (item.querySelector('.ap-perm-nome')?.textContent || '').toLowerCase();
+            item.style.display = nome.includes(termo) ? '' : 'none';
+          });
+        });
+      }
 
       // "Selecionar todos" — grant
       const saGrant = document.getElementById('ap-saGrant');
