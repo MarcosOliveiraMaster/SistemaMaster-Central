@@ -1107,6 +1107,7 @@ const BancoDeAulasCards = (function() {
                 materia: btnMateria ? (btnMateria.dataset.materia || '') : '',
                 professor: btnProfessor ? (btnProfessor.dataset.professor || '') : '',
                 idProfessor: btnProfessor ? (btnProfessor.dataset.idProfessor || '') : '',
+                professorUid: btnProfessor ? (btnProfessor.dataset.professorUid || '') : '',
                 estudante: btnEstudante ? (btnEstudante.dataset.estudante || '') : '',
                 StatusAula: btnStatus ? (btnStatus.dataset.status || '') : '',
                 RelatorioAula: (btnRelatorio && btnRelatorio.dataset.relatorio) ? decodeURIComponent(btnRelatorio.dataset.relatorio) : '',
@@ -2133,7 +2134,7 @@ const BancoDeAulasCards = (function() {
               </button>
             </td>
             <td>
-              <button type="button" class="btn-professor-aula text-sm px-2 py-1 cursor-pointer hover:bg-orange-50 rounded transition-colors ${!aula.professor || aula.professor === 'A definir' ? 'text-orange-500 font-semibold' : ''}" data-id-aula="${aula['id-Aula']}" data-professor="${aula.professor || 'A definir'}" data-id-professor="${aula.idProfessor || ''}" title="Clique para alterar o professor">
+              <button type="button" class="btn-professor-aula text-sm px-2 py-1 cursor-pointer hover:bg-orange-50 rounded transition-colors ${!aula.professor || aula.professor === 'A definir' ? 'text-orange-500 font-semibold' : ''}" data-id-aula="${aula['id-Aula']}" data-professor="${aula.professor || 'A definir'}" data-id-professor="${aula.idProfessor || ''}" data-professor-uid="${aula.professorUid || ''}" title="Clique para alterar o professor">
                 ${aula.professor || 'A definir'}
               </button>
             </td>
@@ -2350,7 +2351,8 @@ const BancoDeAulasCards = (function() {
         const idAula = this.dataset.idAula;
         const professorAtual = this.dataset.professor;
         const idProfessorAtual = this.dataset.idProfessor;
-        showProfessorModal(idAula, professorAtual, idProfessorAtual);
+        const professorUidAtual = this.dataset.professorUid;
+        showProfessorModal(idAula, professorAtual, idProfessorAtual, professorUidAtual);
       });
     });
     
@@ -3248,7 +3250,7 @@ const BancoDeAulasCards = (function() {
   }
   
   // Função para mostrar modal de seleção de professor
-  async function showProfessorModal(idAula, professorAtual, idProfessorAtual) {
+  async function showProfessorModal(idAula, professorAtual, idProfessorAtual, professorUidAtual) {
     try {
       // Buscar professores do banco de dados
       const professores = await BANCO.fetchDataBaseProfessores();
@@ -3311,7 +3313,7 @@ const BancoDeAulasCards = (function() {
                   >
                     <option value="|A definir" style="padding: 8px; font-weight: 500; color: #f97316;">A definir</option>
                     ${professoresOrdenados.map(prof => `
-                      <option value="${prof.cpf}|${prof.nome}" ${prof.nome === professorAtual ? 'selected' : ''} style="padding: 8px;">
+                      <option value="${prof.cpf}|${prof.nome}|${prof.uid || ''}" ${prof.nome === professorAtual ? 'selected' : ''} style="padding: 8px;">
                         ${prof.nome}
                       </option>
                     `).join('')}
@@ -3380,8 +3382,8 @@ const BancoDeAulasCards = (function() {
           return;
         }
         
-        // Separar CPF e nome
-        const [cpf, nome] = selectedOption.split('|');
+        // Separar CPF, nome e uid
+        const [cpf, nome, uid] = selectedOption.split('|');
         
         if (nome === professorAtual) {
           showToast('ℹ️ Este já é o professor atual da aula', 'info');
@@ -3430,7 +3432,7 @@ const BancoDeAulasCards = (function() {
           closeConfirm();
           
           try {
-            await BANCO.updateProfessorAula(idAula, nome, cpf);
+            await BANCO.updateProfessorAula(idAula, nome, cpf, uid);
             showToast(`✅ Professor alterado para ${nome}`, 'success');
             closeModal();
             
