@@ -4886,34 +4886,10 @@ const BancoDeAulasCards = (function() {
       let linhasHtml = '';
       aulas.forEach((aula, index) => {
         const statusClass = getStatusBadgeClass(aula.StatusAula || 'Pendente');
-        // Buscar valor da aula diretamente do DOM da tabela 'Aulas Agendadas'
-        let valorAulaHtml = '--';
-        try {
-          // Procura a tabela de aulas agendadas já renderizada
-          const tabelaAgendadas = document.querySelector('.table-details');
-          if (tabelaAgendadas) {
-            // Busca todas as linhas da tabela
-            const linhas = tabelaAgendadas.querySelectorAll('tbody tr');
-            // Procura a linha que corresponde à aula pelo id ou data/horário/matéria
-            for (const linha of linhas) {
-              // Pega as células da linha
-              const tds = linha.querySelectorAll('td');
-              // Checa se a linha corresponde (por data, horário, matéria, estudante)
-              if (
-                tds.length > 5 &&
-                tds[0].textContent.trim() === (aula.data || '--') &&
-                tds[1].textContent.trim() === (aula.horario || '--') &&
-                tds[3].textContent.trim() === (aula.materia || '--') &&
-                tds[6].textContent.trim() === (aula.estudante || '--')
-              ) {
-                valorAulaHtml = tds[5].textContent.trim();
-                break;
-              }
-            }
-          }
-        } catch (err) {
-          valorAulaHtml = '--';
-        }
+        // Usar ValorAula diretamente do objeto da aula (campo persistido no Firestore)
+        const rawValor = aula.ValorAula !== undefined ? aula.ValorAula : (aula.valorAula !== undefined ? aula.valorAula : null);
+        const valorAulaNum = (rawValor !== null && rawValor !== '' && isFinite(Number(rawValor))) ? Number(rawValor) : 0;
+        const valorAulaHtml = formatCurrencyBR(valorAulaNum);
         linhasHtml += `
           <tr class="aula-row-solicitacao" data-id-aula="${aula['id-Aula']}" data-doc-id="${aula.id}">
             <td class="py-2 px-3 text-center">
@@ -4926,7 +4902,7 @@ const BancoDeAulasCards = (function() {
                      data-materia="${aula.materia || '--'}"
                      data-professor="${aula.professor || 'A definir'}"
                      data-estudante="${aula.estudante || '--'}"
-                     data-valor-aula="${valorAulaHtml}">
+                     data-valor-aula="${valorAulaNum}">
             </td>
             <td class="py-2 px-3 text-sm">${aula.data || '--'}</td>
             <td class="py-2 px-3 text-sm text-center">${aula.horario || '--'}</td>
@@ -5082,7 +5058,8 @@ const BancoDeAulasCards = (function() {
           duracao: cb.dataset.duracao,
           materia: cb.dataset.materia,
           professor: cb.dataset.professor,
-          estudante: cb.dataset.estudante
+          estudante: cb.dataset.estudante,
+          valorAula: parseFloat(cb.dataset.valorAula) || 0
         }));
         
         // Fechar modal de seleção
@@ -5252,40 +5229,14 @@ const BancoDeAulasCards = (function() {
       });
     }
     
-    // Capturar os valores diretamente dos checkboxes selecionados no DOM, sempre tratando o formato
+    // Calcular totalReceber a partir das aulas selecionadas passadas como parâmetro
+    // (os checkboxes já foram removidos do DOM neste ponto)
     let totalReceber = 0;
-    let valoresAulasSelecionadas = [];
-    const checkboxesSelecionados = document.querySelectorAll('.checkbox-solicitacao-aula:checked');
-    checkboxesSelecionados.forEach(checkbox => {
-        let valorStr = checkbox.getAttribute('data-valor-aula') || '0';
-        // Corrigir extração do valor: remover R$, espaços, trocar vírgula por ponto
-        valorStr = valorStr.replace(/[^0-9,.-]+/g, '').replace(',', '.');
-        let valor = parseFloat(valorStr);
-        if (!isNaN(valor)) {
-            totalReceber += valor;
-            valoresAulasSelecionadas.push(valor);
-        } else {
-            valoresAulasSelecionadas.push(0);
-        }
-    });
-    // Atualizar os valores em aulasSelecionadas para garantir exibição correta
-    // Faz correspondência por data, horário, matéria e estudante
     aulasSelecionadas.forEach(aula => {
-        let valor = 0;
-        checkboxesSelecionados.forEach(checkbox => {
-            if (
-                checkbox.getAttribute('data-data') === (aula.data || '--') &&
-                checkbox.getAttribute('data-horario') === (aula.horario || '--') &&
-                checkbox.getAttribute('data-materia') === (aula.materia || '--') &&
-                checkbox.getAttribute('data-estudante') === (aula.estudante || '--')
-            ) {
-                let valorStr = checkbox.getAttribute('data-valor-aula') || '0';
-                valorStr = valorStr.replace(/[^0-9,.-]+/g, '').replace(',', '.');
-                valor = parseFloat(valorStr);
-                if (isNaN(valor)) valor = 0;
-            }
-        });
-        aula.valorAula = !isNaN(valor) ? valor : 0;
+        const v = typeof aula.valorAula === 'string'
+            ? parseFloat(aula.valorAula.replace(/[^0-9,.-]+/g, '').replace(',', '.'))
+            : Number(aula.valorAula);
+        if (!isNaN(v) && isFinite(v)) totalReceber += v;
     });
     
     // Criar linhas da tabela de aulas
@@ -5308,7 +5259,7 @@ const BancoDeAulasCards = (function() {
           <td class="py-2 px-3 text-sm border-r border-gray-200">${aula.materia}</td>
           <td class="py-2 px-3 text-sm border-r border-gray-200">${aula.professor}</td>
           <td class="py-2 px-3 text-sm border-r border-gray-200">${aula.estudante}</td>
-          <td class="py-2 px-3 text-sm text-right">R$ ${!isNaN(valorAula) ? valorAula.toFixed(2) : '--'}</td>
+          <td class="py-2 px-3 text-sm text-right">${(!isNaN(valorAula) && isFinite(valorAula)) ? formatCurrencyBR(valorAula) : '--'}</td>
         </tr>
       `;
     });
