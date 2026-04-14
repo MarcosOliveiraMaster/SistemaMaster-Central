@@ -1062,7 +1062,7 @@ const BancoDeAulasCards = (function() {
             const docsMap = {};
             snapshotLista.forEach(doc => {
               const idAula = doc.data()['id-Aula'];
-              if (idAula) docsMap[idAula] = doc.ref;
+              if (idAula) docsMap[idAula] = { ref: doc.ref, data: doc.data() };
             });
 
             // Usar batch para eficiência (máx. 500 por batch)
@@ -1097,6 +1097,10 @@ const BancoDeAulasCards = (function() {
                 if (Number.isFinite(numVal)) valorAulaCelula = numVal;
               }
 
+              const entry = docsMap[idAula];
+              const docRef = entry ? entry.ref : null;
+              const docData = entry ? (entry.data || {}) : {};
+
               // Montar objeto para atualizar apenas os campos visíveis na tabela
               const dadosAula = {
                 codigoContratacao: codigoDoc,
@@ -1107,7 +1111,11 @@ const BancoDeAulasCards = (function() {
                 materia: btnMateria ? (btnMateria.dataset.materia || '') : '',
                 professor: btnProfessor ? (btnProfessor.dataset.professor || '') : '',
                 idProfessor: btnProfessor ? (btnProfessor.dataset.idProfessor || '') : '',
-                professorUid: btnProfessor ? (btnProfessor.dataset.professorUid || '') : '',
+                professorUid: (btnProfessor && btnProfessor.dataset.professorUid)
+                  ? btnProfessor.dataset.professorUid
+                  : (docData.professorUid || ''),
+                clienteUid: docData.clienteUid || '',
+                clientUid:  docData.clientUid  || '',
                 estudante: btnEstudante ? (btnEstudante.dataset.estudante || '') : '',
                 StatusAula: btnStatus ? (btnStatus.dataset.status || '') : '',
                 RelatorioAula: (btnRelatorio && btnRelatorio.dataset.relatorio) ? decodeURIComponent(btnRelatorio.dataset.relatorio) : '',
@@ -1118,7 +1126,6 @@ const BancoDeAulasCards = (function() {
 
               if (valorAulaCelula !== undefined) dadosAula.ValorAula = valorAulaCelula;
 
-              const docRef = docsMap[idAula];
               if (docRef) {
                 // update() preserva campos existentes no documento (nomeCliente, cpf, codigoContratacao, etc.)
                 batch.update(docRef, dadosAula);

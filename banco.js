@@ -351,8 +351,17 @@ async function updateMateriaAula(idAula, novaMateria) {
 }
 
 // Função para atualizar professor de uma aula
+// FIX: se uidProfessor não for fornecido, busca por CPF em dataBaseProfessores
 async function updateProfessorAula(idAula, nomeProfessor, cpfProfessor, uidProfessor) {
   try {
+    // Fallback: se o UID não chegou (dataset vazio), busca por CPF no banco
+    if (!uidProfessor && cpfProfessor) {
+      const profSnap = await db.collection('dataBaseProfessores')
+        .where('cpf', '==', cpfProfessor).limit(1).get();
+      if (!profSnap.empty) {
+        uidProfessor = profSnap.docs[0].data().uid || '';
+      }
+    }
     const querySnapshot = await db.collection("BancoDeAulas-Lista")
       .where("id-Aula", "==", idAula).get();
     if (querySnapshot.empty) throw new Error(`Aula ${idAula} não encontrada`);
@@ -403,6 +412,8 @@ function incrementarIdAula(idAulaAtual) {
 }
 
 // Função para adicionar nova aula a um cronograma
+// FIX: herda professor/professorUid/idProfessor da última aula e
+//      inclui clienteUid/clientUid para as Firestore Security Rules
 async function addNovaAulaLista(codigoContratacao, valorHoraContrato = 35) {
   try {
     const querySnapshot = await db.collection("BancoDeAulas-Lista")
@@ -438,6 +449,10 @@ async function addNovaAulaLista(codigoContratacao, valorHoraContrato = 35) {
       RelatorioAula: "",
       StatusAula: "Pendente",
       ValorAula: valorAulaCalculado,
+      // FIX: clienteUid e clientUid herdados da última aula para
+      // que as Firestore Rules permitam leitura pelo cliente no login
+      clienteUid:   ultimaAula.clienteUid   || "",
+      clientUid:    ultimaAula.clientUid    || "",
       codigoContratacao: ultimaAula.codigoContratacao || "",
       cpf: ultimaAula.cpf || "",
       data: dataAtual,
@@ -445,12 +460,14 @@ async function addNovaAulaLista(codigoContratacao, valorHoraContrato = 35) {
       estudante: ultimaAula.estudante || "",
       horario: "",
       "id-Aula": novoIdAula,
-      idProfessor: "",
-      professorUid: "",
+      // FIX: professor, idProfessor e professorUid herdados da última aula
+      // para que o professor visualize a nova aula no sistema de login
+      idProfessor:  ultimaAula.idProfessor  || "",
+      professorUid: ultimaAula.professorUid || "",
       materia: "",
       metodoPagamento: ultimaAula.metodoPagamento || "",
       nomeCliente: ultimaAula.nomeCliente || "",
-      professor: "",
+      professor:    ultimaAula.professor    || "",
       timestamp: firebase.firestore.FieldValue.serverTimestamp()
     };
 
