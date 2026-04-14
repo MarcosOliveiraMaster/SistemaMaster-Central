@@ -4941,11 +4941,42 @@ const BancoDeAulasCards = (function() {
             </div>
             
             <div class="modal-body">
-              <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-start">
-                <i class="fas fa-info-circle text-blue-600 mr-3 mt-1"></i>
-                <div>
-                  <p class="text-sm text-blue-800 font-medium">Informação</p>
-                  <p class="text-xs text-blue-700 mt-1">Selecione as aulas que deseja incluir na solicitação de aula.</p>
+              <div class="mb-4 flex items-center gap-4 flex-wrap">
+                <p class="text-sm font-bold text-gray-700">Selecione as aulas que deseja incluir na solicitação de aula.</p>
+                <div class="relative" id="multiselect-colunas-wrapper">
+                  <button type="button" id="btn-multiselect-colunas" class="flex items-center gap-2 border border-gray-300 rounded px-3 py-2 text-sm bg-white hover:bg-gray-50 cursor-pointer whitespace-nowrap">
+                    <i class="fas fa-columns text-gray-500"></i>
+                    <span>Colunas visíveis</span>
+                    <i class="fas fa-chevron-down text-gray-400 ml-1"></i>
+                  </button>
+                  <div id="multiselect-colunas-dropdown" class="hidden absolute left-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-max">
+                    <div class="p-2 space-y-1">
+                      <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
+                        <input type="checkbox" class="col-visivel w-4 h-4" data-col="data" checked> Data da Aula
+                      </label>
+                      <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
+                        <input type="checkbox" class="col-visivel w-4 h-4" data-col="horario" checked> Horário
+                      </label>
+                      <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
+                        <input type="checkbox" class="col-visivel w-4 h-4" data-col="duracao" checked> Duração
+                      </label>
+                      <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
+                        <input type="checkbox" class="col-visivel w-4 h-4" data-col="materia" checked> Matéria
+                      </label>
+                      <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
+                        <input type="checkbox" class="col-visivel w-4 h-4" data-col="professor" checked> Professor
+                      </label>
+                      <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
+                        <input type="checkbox" class="col-visivel w-4 h-4" data-col="estudante" checked> Estudante
+                      </label>
+                      <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
+                        <input type="checkbox" class="col-visivel w-4 h-4" data-col="valorAula" checked> Valor da Aula
+                      </label>
+                      <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
+                        <input type="checkbox" class="col-visivel w-4 h-4" data-col="status" checked> Status
+                      </label>
+                    </div>
+                  </div>
                 </div>
               </div>
               
@@ -5000,6 +5031,14 @@ const BancoDeAulasCards = (function() {
       const selectAll = document.getElementById('select-all-aulas-solicitacao');
       const checkboxes = modal.querySelectorAll('.checkbox-solicitacao-aula');
       const countSelected = document.getElementById('count-selected-solicitacao');
+      const btnMultiselect = document.getElementById('btn-multiselect-colunas');
+      const dropdownColunas = document.getElementById('multiselect-colunas-dropdown');
+
+      // Toggle dropdown de colunas
+      btnMultiselect.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dropdownColunas.classList.toggle('hidden');
+      });
       
       // Função para atualizar contador e estado do botão
       function updateSelection() {
@@ -5052,12 +5091,15 @@ const BancoDeAulasCards = (function() {
       // Botão gerar solicitação
       btnGerar.addEventListener('click', () => {
         const selected = modal.querySelectorAll('.checkbox-solicitacao-aula:checked');
-        
+
         if (selected.length === 0) {
           showToast('⚠️ Selecione pelo menos uma aula para a solicitação', 'warning');
           return;
         }
-        
+
+        // Coletar colunas visíveis selecionadas no dropdown
+        const colunasVisiveis = Array.from(modal.querySelectorAll('.col-visivel:checked')).map(cb => cb.dataset.col);
+
         // Coletar dados das aulas selecionadas
         const aulasSelecionadas = Array.from(selected).map(cb => ({
           data: cb.dataset.data,
@@ -5068,21 +5110,25 @@ const BancoDeAulasCards = (function() {
           estudante: cb.dataset.estudante,
           valorAula: parseFloat(cb.dataset.valorAula) || 0
         }));
-        
+
         // Fechar modal de seleção
         modal.remove();
-        
-        // Abrir modal final com a solicitação
-        showModalSolicitacaoFinal(aulaContratacao, aulasSelecionadas);
+
+        // Abrir modal final com a solicitação e as colunas visíveis
+        showModalSolicitacaoFinal(aulaContratacao, aulasSelecionadas, colunasVisiveis);
       });
       
-      // Fechar ao clicar fora
+      // Fechar dropdown ao clicar fora dele; fechar modal ao clicar no overlay
       modal.addEventListener('click', (e) => {
+        const wrapper = document.getElementById('multiselect-colunas-wrapper');
+        if (wrapper && !wrapper.contains(e.target)) {
+          dropdownColunas.classList.add('hidden');
+        }
         if (e.target === modal) {
           modal.remove();
         }
       });
-      
+
       // Fechar com ESC
       const escHandler = (e) => {
         if (e.key === 'Escape') {
@@ -5091,7 +5137,7 @@ const BancoDeAulasCards = (function() {
         }
       };
       document.addEventListener('keydown', escHandler);
-      
+
     } catch (error) {
       console.error('❌ Erro ao carregar aulas:', error);
       showToast('❌ Erro ao carregar aulas. Tente novamente.', 'error');
@@ -5099,7 +5145,7 @@ const BancoDeAulasCards = (function() {
   }
   
   // Função para mostrar modal final com a solicitação formatada
-  async function showModalSolicitacaoFinal(aulaContratacao, aulasSelecionadas) {
+  async function showModalSolicitacaoFinal(aulaContratacao, aulasSelecionadas, colunasVisiveis = ['data', 'horario', 'duracao', 'materia', 'professor', 'estudante', 'valorAula', 'status']) {
     console.log('📄 Gerando solicitação final');
     
     // Mostrar loading
@@ -5260,13 +5306,13 @@ const BancoDeAulasCards = (function() {
       }
       linhasAulasHtml += `
         <tr class="${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}">
-          <td class="py-2 px-3 text-sm border-r border-gray-200">${aula.data}</td>
-          <td class="py-2 px-3 text-sm text-center border-r border-gray-200">${aula.horario}</td>
-          <td class="py-2 px-3 text-sm text-center border-r border-gray-200">${aula.duracao}</td>
-          <td class="py-2 px-3 text-sm border-r border-gray-200">${aula.materia}</td>
-          <td class="py-2 px-3 text-sm border-r border-gray-200">${aula.professor}</td>
-          <td class="py-2 px-3 text-sm border-r border-gray-200">${aula.estudante}</td>
-          <td class="py-2 px-3 text-sm text-right">${(!isNaN(valorAula) && isFinite(valorAula)) ? formatCurrencyBR(valorAula) : '--'}</td>
+          ${colunasVisiveis.includes('data') ? `<td class="py-2 px-3 text-sm border-r border-gray-200">${aula.data}</td>` : ''}
+          ${colunasVisiveis.includes('horario') ? `<td class="py-2 px-3 text-sm text-center border-r border-gray-200">${aula.horario}</td>` : ''}
+          ${colunasVisiveis.includes('duracao') ? `<td class="py-2 px-3 text-sm text-center border-r border-gray-200">${aula.duracao}</td>` : ''}
+          ${colunasVisiveis.includes('materia') ? `<td class="py-2 px-3 text-sm border-r border-gray-200">${aula.materia}</td>` : ''}
+          ${colunasVisiveis.includes('professor') ? `<td class="py-2 px-3 text-sm border-r border-gray-200">${aula.professor}</td>` : ''}
+          ${colunasVisiveis.includes('estudante') ? `<td class="py-2 px-3 text-sm border-r border-gray-200">${aula.estudante}</td>` : ''}
+          ${colunasVisiveis.includes('valorAula') ? `<td class="py-2 px-3 text-sm text-right">${(!isNaN(valorAula) && isFinite(valorAula)) ? formatCurrencyBR(valorAula) : '--'}</td>` : ''}
         </tr>
       `;
     });
@@ -5345,13 +5391,13 @@ const BancoDeAulasCards = (function() {
                 <table class="w-full text-left border-collapse">
                   <thead>
                     <tr class="bg-gradient-to-r from-orange-500 to-orange-600 text-white">
-                      <th class="py-3 px-3 text-xs font-semibold border-r border-orange-400">Data da Aula</th>
-                      <th class="py-3 px-3 text-xs font-semibold text-center border-r border-orange-400">Horário de Início</th>
-                      <th class="py-3 px-3 text-xs font-semibold text-center border-r border-orange-400">Duração</th>
-                      <th class="py-3 px-3 text-xs font-semibold border-r border-orange-400">Matéria</th>
-                      <th class="py-3 px-3 text-xs font-semibold border-r border-orange-400">Professor</th>
-                      <th class="py-3 px-3 text-xs font-semibold border-r border-orange-400">Estudante</th>
-                      <th class="py-3 px-3 text-xs font-semibold text-right">Valor da Aula</th>
+                      ${colunasVisiveis.includes('data') ? `<th class="py-3 px-3 text-xs font-semibold border-r border-orange-400">Data da Aula</th>` : ''}
+                      ${colunasVisiveis.includes('horario') ? `<th class="py-3 px-3 text-xs font-semibold text-center border-r border-orange-400">Horário de Início</th>` : ''}
+                      ${colunasVisiveis.includes('duracao') ? `<th class="py-3 px-3 text-xs font-semibold text-center border-r border-orange-400">Duração</th>` : ''}
+                      ${colunasVisiveis.includes('materia') ? `<th class="py-3 px-3 text-xs font-semibold border-r border-orange-400">Matéria</th>` : ''}
+                      ${colunasVisiveis.includes('professor') ? `<th class="py-3 px-3 text-xs font-semibold border-r border-orange-400">Professor</th>` : ''}
+                      ${colunasVisiveis.includes('estudante') ? `<th class="py-3 px-3 text-xs font-semibold border-r border-orange-400">Estudante</th>` : ''}
+                      ${colunasVisiveis.includes('valorAula') ? `<th class="py-3 px-3 text-xs font-semibold text-right">Valor da Aula</th>` : ''}
                     </tr>
                   </thead>
                   <tbody>
