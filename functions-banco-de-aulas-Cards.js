@@ -4950,31 +4950,54 @@ const BancoDeAulasCards = (function() {
                     <i class="fas fa-chevron-down text-gray-400 ml-1"></i>
                   </button>
                   <div id="multiselect-colunas-dropdown" class="hidden absolute left-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-max">
-                    <div class="p-2 space-y-1">
-                      <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
-                        <input type="checkbox" class="col-visivel w-4 h-4" data-col="data" checked> Data da Aula
-                      </label>
-                      <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
-                        <input type="checkbox" class="col-visivel w-4 h-4" data-col="horario" checked> Horário
-                      </label>
-                      <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
-                        <input type="checkbox" class="col-visivel w-4 h-4" data-col="duracao" checked> Duração
-                      </label>
-                      <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
-                        <input type="checkbox" class="col-visivel w-4 h-4" data-col="materia" checked> Matéria
-                      </label>
-                      <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
-                        <input type="checkbox" class="col-visivel w-4 h-4" data-col="professor" checked> Professor
-                      </label>
-                      <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
-                        <input type="checkbox" class="col-visivel w-4 h-4" data-col="estudante" checked> Estudante
-                      </label>
-                      <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
-                        <input type="checkbox" class="col-visivel w-4 h-4" data-col="valorAula" checked> Valor da Aula
-                      </label>
-                      <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
-                        <input type="checkbox" class="col-visivel w-4 h-4" data-col="status" checked> Status
-                      </label>
+                    <div class="p-2">
+                      <div class="px-2 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wide">Dados do cliente</div>
+                      <div class="space-y-1 mb-1">
+                        <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
+                          <input type="checkbox" class="col-visivel w-4 h-4" data-col="nomeCliente" checked> Nome do cliente
+                        </label>
+                        <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
+                          <input type="checkbox" class="col-visivel w-4 h-4" data-col="endereco" checked> Endereço
+                        </label>
+                        <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
+                          <input type="checkbox" class="col-visivel w-4 h-4" data-col="referencia" checked> Referência
+                        </label>
+                        <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
+                          <input type="checkbox" class="col-visivel w-4 h-4" data-col="totalReceber" checked> Total a receber
+                        </label>
+                        <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
+                          <input type="checkbox" class="col-visivel w-4 h-4" data-col="estudantes" checked> Estudantes
+                        </label>
+                      </div>
+                      <div class="border-t border-gray-100 pt-2">
+                        <div class="px-2 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wide">Cabeçalhos</div>
+                        <div class="space-y-1">
+                          <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
+                            <input type="checkbox" class="col-visivel w-4 h-4" data-col="data" checked> Data da Aula
+                          </label>
+                          <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
+                            <input type="checkbox" class="col-visivel w-4 h-4" data-col="horario" checked> Horário
+                          </label>
+                          <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
+                            <input type="checkbox" class="col-visivel w-4 h-4" data-col="duracao" checked> Duração
+                          </label>
+                          <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
+                            <input type="checkbox" class="col-visivel w-4 h-4" data-col="materia" checked> Matéria
+                          </label>
+                          <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
+                            <input type="checkbox" class="col-visivel w-4 h-4" data-col="professor" checked> Professor
+                          </label>
+                          <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
+                            <input type="checkbox" class="col-visivel w-4 h-4" data-col="estudante" checked> Estudante
+                          </label>
+                          <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
+                            <input type="checkbox" class="col-visivel w-4 h-4" data-col="valorAula" checked> Valor da Aula
+                          </label>
+                          <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
+                            <input type="checkbox" class="col-visivel w-4 h-4" data-col="status" checked> Status
+                          </label>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -5145,7 +5168,7 @@ const BancoDeAulasCards = (function() {
   }
   
   // Função para mostrar modal final com a solicitação formatada
-  async function showModalSolicitacaoFinal(aulaContratacao, aulasSelecionadas, colunasVisiveis = ['data', 'horario', 'duracao', 'materia', 'professor', 'estudante', 'valorAula', 'status']) {
+  async function showModalSolicitacaoFinal(aulaContratacao, aulasSelecionadas, colunasVisiveis = ['nomeCliente', 'endereco', 'referencia', 'totalReceber', 'estudantes', 'data', 'horario', 'duracao', 'materia', 'professor', 'estudante', 'valorAula', 'status']) {
     console.log('📄 Gerando solicitação final');
     
     // Mostrar loading
@@ -5332,53 +5355,59 @@ const BancoDeAulasCards = (function() {
           
           <div class="modal-body">
             <!-- Informações do Cliente -->
+            ${['nomeCliente', 'endereco', 'referencia', 'totalReceber', 'estudantes'].some(k => colunasVisiveis.includes(k)) ? `
             <div class="bg-gradient-to-r from-orange-50 to-yellow-50 border-l-4 border-orange-500 rounded-lg p-4 mb-5 shadow-sm">
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                ${colunasVisiveis.includes('nomeCliente') ? `
                 <div>
                   <p class="text-xs font-medium text-gray-500 mb-1">
                     <i class="fas fa-user text-orange-500 mr-2"></i>Nome do Cliente
                   </p>
                   <p class="text-sm font-semibold text-gray-800">${aulaContratacao.nome || aulaContratacao.nomeCliente || '--'}</p>
-                </div>
+                </div>` : ''}
+                ${colunasVisiveis.includes('endereco') ? `
                 <div>
                   <p class="text-xs font-medium text-gray-500 mb-1">
                     <i class="fas fa-map-marker-alt text-orange-500 mr-2"></i>Endereço
                   </p>
                   <p class="text-sm font-semibold text-gray-800">${enderecoAulas}</p>
-                </div>
+                </div>` : ''}
+                ${colunasVisiveis.includes('totalReceber') ? `
                 <div>
                   <p class="text-xs font-medium text-gray-500 mb-1">
                     <i class="fas fa-dollar-sign text-green-600 mr-2"></i>Total a Receber (Valor Equipe)
                   </p>
                   <p class="text-lg font-bold text-green-600">R$ ${totalReceber.toFixed(2)}</p>
-                </div>
+                </div>` : ''}
+                ${colunasVisiveis.includes('referencia') ? `
                 <div>
                   <p class="text-xs font-medium text-gray-500 mb-1">
                     <i class="fas fa-map-signs text-orange-500 mr-2"></i>Referência
                   </p>
                   <p class="text-sm font-semibold text-gray-800">${complementoAulas}</p>
-                </div>
+                </div>` : ''}
               </div>
-              
+
               <!-- Estudantes com Escolas -->
+              ${colunasVisiveis.includes('estudantes') ? `
               <div class="mt-4 pt-4 border-t border-orange-200">
                 <p class="text-xs font-medium text-gray-500 mb-2">
                   <i class="fas fa-users text-orange-500 mr-2"></i>Estudantes
                 </p>
                 <div class="text-sm text-gray-800 space-y-1">
-                  ${estudantesComEscola.length > 0 ? 
+                  ${estudantesComEscola.length > 0 ?
                     estudantesComEscola.map(est => `
                       <div class="flex items-center">
                         <span class="font-medium">${est.nome}</span>
                         <span class="text-gray-500 ml-2">• Escola: ${est.escola}</span>
                         <span class="text-gray-500 ml-2">• Série: ${est.serie}</span>
                       </div>
-                    `).join('') 
+                    `).join('')
                     : '<div class="text-gray-400">Nenhum estudante registrado</div>'
                   }
                 </div>
-              </div>
-            </div>
+              </div>` : ''}
+            </div>` : ''}
             
             <!-- Tabela de Aulas -->
             <div class="mb-4">
