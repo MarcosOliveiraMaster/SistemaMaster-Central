@@ -1199,8 +1199,8 @@ const BancoDeAulasCards = (function() {
               const data = doc.data() || {};
               if (Array.isArray(data.estudantes)) {
                 data.estudantes.forEach(est => {
-                  const nome = est && est.nome ? String(est.nome).trim() : '';
-                  const serie = est && est.serie ? String(est.serie).trim() : '';
+                  const nome = est && est.nomeEstudante ? String(est.nomeEstudante).trim() : '';
+                  const serie = est && est.serieEstudante ? String(est.serieEstudante).trim() : '';
                   if (nome) nomes.push(nome);
                   if (serie) series.push(serie);
                   console.log('Estudante encontrado (cadastroClientes):', { docId: doc.id, nome, serie });
@@ -1213,8 +1213,8 @@ const BancoDeAulasCards = (function() {
             // fallback para dados presentes em `aula`
             if (Array.isArray(aula.estudantes) && aula.estudantes.length > 0) {
               aula.estudantes.forEach(est => {
-                const nome = est && est.nome ? String(est.nome).trim() : '';
-                const serie = est && est.serie ? String(est.serie).trim() : '';
+                const nome = est && est.nomeEstudante ? String(est.nomeEstudante).trim() : '';
+                const serie = est && est.serieEstudante ? String(est.serieEstudante).trim() : '';
                 if (nome) nomes.push(nome);
                 if (serie) series.push(serie);
                 console.log('Estudante encontrado (aula):', { nome, serie });
@@ -1229,8 +1229,8 @@ const BancoDeAulasCards = (function() {
           // tentar fallback local
           if (Array.isArray(aula.estudantes) && aula.estudantes.length > 0) {
             aula.estudantes.forEach(est => {
-              const nome = est && est.nome ? String(est.nome).trim() : '';
-              const serie = est && est.serie ? String(est.serie).trim() : '';
+              const nome = est && est.nomeEstudante ? String(est.nomeEstudante).trim() : '';
+              const serie = est && est.serieEstudante ? String(est.serieEstudante).trim() : '';
               if (nome) nomes.push(nome);
               if (serie) series.push(serie);
               console.log('Estudante encontrado (aula - fallback):', { nome, serie });
@@ -1244,8 +1244,8 @@ const BancoDeAulasCards = (function() {
         // Sem CPF: usar diretamente `aula.estudantes` quando disponível
         if (Array.isArray(aula.estudantes) && aula.estudantes.length > 0) {
           aula.estudantes.forEach(est => {
-            const nome = est && est.nome ? String(est.nome).trim() : '';
-            const serie = est && est.serie ? String(est.serie).trim() : '';
+            const nome = est && est.nomeEstudante ? String(est.nomeEstudante).trim() : '';
+            const serie = est && est.serieEstudante ? String(est.serieEstudante).trim() : '';
             if (nome) nomes.push(nome);
             if (serie) series.push(serie);
             console.log('Estudante encontrado (aula - sem CPF):', { nome, serie });
@@ -3527,8 +3527,8 @@ const BancoDeAulasCards = (function() {
             // Verificar se existe array de estudantes
             if (clienteData.estudantes && Array.isArray(clienteData.estudantes)) {
               clienteEstudantes = clienteData.estudantes
-                .filter(est => est.nome && est.nome.trim() !== '')
-                .map(est => est.nome)
+                .filter(est => est.nomeEstudante && est.nomeEstudante.trim() !== '')
+                .map(est => est.nomeEstudante)
                 .sort();
             }
           }
@@ -5220,17 +5220,17 @@ const BancoDeAulasCards = (function() {
           console.log('📋 Array estudantes do cadastroClientes:', arrayEstudantes);
           
           estudantesUnicos.forEach(nomeEstudante => {
-            // Procurar o estudante no array: comparar campo "nome" com case-insensitive
+            // Procurar o estudante no array: comparar campo "nomeEstudante" com case-insensitive
             const estudanteData = arrayEstudantes.find(e => {
-              if (!e || !e.nome) return false;
-              const nomeNormalized = e.nome.trim().toLowerCase();
+              if (!e || !e.nomeEstudante) return false;
+              const nomeNormalized = e.nomeEstudante.trim().toLowerCase();
               const procurandoNormalized = nomeEstudante.trim().toLowerCase();
               return nomeNormalized === procurandoNormalized;
             });
-            
+
             if (estudanteData) {
-              const escola = estudanteData.escola && estudanteData.escola.trim() ? estudanteData.escola.trim() : 'Escola não informada';
-              const serie = estudanteData.serie && estudanteData.serie.trim() ? estudanteData.serie.trim() : 'Série não informada';
+              const escola = estudanteData.escolaEstudante && estudanteData.escolaEstudante.trim() ? estudanteData.escolaEstudante.trim() : 'Escola não informada';
+              const serie = estudanteData.serieEstudante && estudanteData.serieEstudante.trim() ? estudanteData.serieEstudante.trim() : 'Série não informada';
               estudantesComEscola.push({
                 nome: nomeEstudante,
                 escola: escola,
