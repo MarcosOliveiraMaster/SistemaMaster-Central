@@ -3002,6 +3002,7 @@ const Simulacoes = (function() {
       const selectCliente = document.getElementById('select-cliente');
       let nomeCliente = '';
       let cpf = '';
+      let clientUid = '';
       
       if (selectCliente.value === '__temp__') {
         nomeCliente = selectCliente.options[selectCliente.selectedIndex].text;
@@ -3011,6 +3012,7 @@ const Simulacoes = (function() {
         if (cliente) {
           nomeCliente = cliente.nome || '';
           cpf = cliente. cpf || '';
+          clientUid = cliente.uid || '';
         }
       }
       
@@ -3081,6 +3083,8 @@ const Simulacoes = (function() {
         codigoContratacao: novoCodigoContratacao,
         nomeCliente: nomeCliente,
         cpf: cpf,
+        clientUid: clientUid,
+        clienteUid: clientUid,
         alunos: aulasComIds.map(a => a.estudante).filter((v, i, a) => a.indexOf(v) === i).join(', '),
         aulaEmergencial: aulaEmergencial,
         statusContrato: '',
@@ -3108,6 +3112,10 @@ const Simulacoes = (function() {
       
       // 8. Salvar cada aula em BancoDeAulas-Lista
       for (const aula of aulasComIds) {
+        const prof = professoresData.find(p =>
+          (p.cpf || '').replace(/\D/g, '') === (aula.idProfessor || '').replace(/\D/g, '')
+        );
+        const professorUid = prof ? (prof.uid || '') : '';
         const aulaListaData = {
           ... aula,
           // incluir o valor hora/aula aplicado no momento da aprovação
@@ -3115,6 +3123,9 @@ const Simulacoes = (function() {
           codigoContratacao: novoCodigoContratacao,
           nomeCliente: nomeCliente,
           cpf: cpf,
+          clientUid: clientUid,
+          clienteUid: clientUid,
+          professorUid: professorUid,
           metodoPagamento: metodoPagamento,
           timestamp: firebase.firestore.FieldValue.serverTimestamp()
         };
