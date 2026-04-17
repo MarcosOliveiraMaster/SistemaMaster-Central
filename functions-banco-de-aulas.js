@@ -27,9 +27,10 @@ async function carregarAulasBatch() {
     let validosCount = 0;
     
     aulasLista.forEach((aula, index) => {
-      // Extrair prefixo dos primeiros 4 dígitos do ID do documento
-      const docId = aula.id || '';
-      const prefixo = docId.substring(0, 4);
+      // FIX: usar campo id-Aula (ex: "0001A") em vez de aula.id (Firestore auto-ID)
+      // Firestore auto-IDs são alfanuméricos e falham na validação !/^\d{4}/
+      const idAulaField = aula['id-Aula'] || aula.codigoContratacao || '';
+      const prefixo = idAulaField.substring(0, 4);
       const statusAula = aula.StatusAula || 'Não informado';
       const professor = aula.professor || 'A definir';
       // Verificar se StatusAula = "Concluída" (case-insensitive)
@@ -37,7 +38,7 @@ async function carregarAulasBatch() {
       
       // Validações aprimoradas
       if (!prefixo || prefixo.length < 4 || !/^\d{4}/.test(prefixo)) {
-        console.warn(`⚠️ [${index}] Documento com prefixo inválido:`, {docId, prefixo: prefixo || 'vazio', StatusAula: statusAula});
+        console.warn(`⚠️ [${index}] Documento com prefixo inválido:`, {idAula: idAulaField, prefixo: prefixo || 'vazio', StatusAula: statusAula});
         invalidosCount++;
         return;
       }
@@ -49,7 +50,7 @@ async function carregarAulasBatch() {
       
       // Adicionar aula ao grupo
       agrupadas[prefixo].push({
-        id: docId,
+        id: aula.id,
         statusAula: statusAula,
         concluida: concluida,
         professor: professor
