@@ -454,6 +454,7 @@ async function addNovaAulaLista(codigoContratacao, valorHoraContrato = 35) {
       clienteUid:   ultimaAula.clienteUid   || "",
       clientUid:    ultimaAula.clientUid    || "",
       codigoContratacao: ultimaAula.codigoContratacao || "",
+      idContratacao: codigoContratacao,
       cpf: ultimaAula.cpf || "",
       data: dataAtual,
       duracao: duracaoPadrao,
