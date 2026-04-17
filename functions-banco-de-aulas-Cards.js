@@ -1123,6 +1123,7 @@ const BancoDeAulasCards = (function() {
               // Montar objeto para atualizar apenas os campos visíveis na tabela
               const dadosAula = {
                 codigoContratacao: codigoDoc,
+                idContratacao: codigoDoc,
                 nomeCliente: aula.nome || aula.nomeCliente || '',
                 data: btnData.dataset.data || '',
                 horario: btnHorario ? (btnHorario.dataset.horario || '') : '',
