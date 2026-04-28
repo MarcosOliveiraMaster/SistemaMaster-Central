@@ -1974,7 +1974,12 @@ window.copiarRelatorio = async function (id) {
   }
 
   const nomeClienteFormatado = getDoisNomes(currentAulaInfo.nomeCliente);
-  const nomeProfessorFormatado = currentAulaInfo.professor;
+  // Função para pegar só o primeiro nome
+  const getPrimeiroNome = (nome) => {
+    if (!nome) return '';
+    return nome.trim().split(' ')[0];
+  };
+  const nomeProfessorFormatado = getPrimeiroNome(currentAulaInfo.professor);
 
   // Montar mensagem no novo formato
   const desc = document.getElementById(`relatorio-descricao-${id}`)?.value || '';
@@ -1982,7 +1987,7 @@ window.copiarRelatorio = async function (id) {
   const rec = document.getElementById(`relatorio-recomendacoes-${id}`)?.value || '';
 
   const mensagem = `${saudacao} ${nomeClienteFormatado}!
-segue o relatório da aula de ${dataTexto} com o professor: ${nomeProfessorFormatado}
+segue o relatório da aula de ${dataTexto} com: ${nomeProfessorFormatado}
 
 Descrição da aula:
 ${desc}
