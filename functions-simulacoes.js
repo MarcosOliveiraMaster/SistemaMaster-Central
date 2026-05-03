@@ -344,9 +344,12 @@ const Simulacoes = (function() {
     const valorPacote = (simulacao && typeof simulacao.ValorPacote === 'number')
       ? Number(simulacao.ValorPacote)
       : valores.ValorPacote;
-    
+
+    const isEspecial = (simulacao.tituloSimulacao || '').trimStart().toUpperCase().startsWith('ESPECIAL');
+    const especialClass = isEspecial ? ' card-especial' : '';
+
     return `
-      <div class="card cursor-pointer hover:shadow-lg transition-shadow" data-simulacao-id="${simulacao.idSimulacao}">
+      <div class="card${especialClass} cursor-pointer hover:shadow-lg transition-shadow" data-simulacao-id="${simulacao.idSimulacao}">
         <div class="p-4">
           <h3 class="font-lexend font-bold text-base text-gray-800 mb-2 line-clamp-2">
             ${escapeHtml(simulacao.tituloSimulacao || 'Sem título')}

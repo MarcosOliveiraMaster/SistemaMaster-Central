@@ -4929,7 +4929,8 @@ const BancoDeAulasCards = (function() {
                      data-materia="${aula.materia || '--'}"
                      data-professor="${aula.professor || 'A definir'}"
                      data-estudante="${aula.estudante || '--'}"
-                     data-valor-aula="${valorAulaNum}">
+                     data-valor-aula="${valorAulaNum}"
+                     data-status="${aula.StatusAula || 'Pendente'}">
             </td>
             <td class="py-2 px-3 text-sm">${aula.data || '--'}</td>
             <td class="py-2 px-3 text-sm text-center">${aula.horario || '--'}</td>
@@ -5151,7 +5152,8 @@ const BancoDeAulasCards = (function() {
           materia: cb.dataset.materia,
           professor: cb.dataset.professor,
           estudante: cb.dataset.estudante,
-          valorAula: parseFloat(cb.dataset.valorAula) || 0
+          valorAula: parseFloat(cb.dataset.valorAula) || 0,
+          status: cb.dataset.status || 'Pendente'
         }));
 
         // Fechar modal de seleção
@@ -5195,7 +5197,9 @@ const BancoDeAulasCards = (function() {
     showToast('⏳ Carregando dados do cliente...', 'info');
     
     // Buscar dados do cliente na coleção cadastroClientes
-    let enderecoAulas = aulaContratacao.endereco || '--';
+    const _rawEndereco = aulaContratacao.enderecoAulas || aulaContratacao.endereco || '';
+    const _enderecoValido = _rawEndereco && _rawEndereco.split(',').some(p => p.trim() && p.trim().toLowerCase() !== 'null');
+    let enderecoAulas = _enderecoValido ? _rawEndereco : '--';
     let complementoAulas = aulaContratacao.referencia || '--';
     let estudantesComEscola = [];
     
@@ -5214,20 +5218,26 @@ const BancoDeAulasCards = (function() {
           
           console.log('✅ Cliente encontrado:', clienteData);
           
-          // Atualizar com os dados do cadastro do cliente
-          if (clienteData.enderecoAulas) {
-            enderecoAulas = clienteData.enderecoAulas;
-          }
-          if (clienteData.complementoAulas) {
-            complementoAulas = clienteData.complementoAulas;
+          // Atualizar endereço respeitando o flag mesmoEndereco (mesmo padrão do dashboardCliente)
+          if (clienteData.mesmoEndereco) {
+            const end = clienteData.endereco || '';
+            const cep = clienteData.cep ? ', CEP: ' + clienteData.cep : '';
+            const cid = clienteData.cidadeUF ? '. ' + clienteData.cidadeUF : '';
+            if (end) enderecoAulas = end + cep + cid;
+            if (clienteData.complemento) complementoAulas = clienteData.complemento;
+          } else {
+            const end = clienteData.enderecoAulas || '';
+            const cep = clienteData.cepAulas ? ', CEP: ' + clienteData.cepAulas : '';
+            const cid = clienteData.cidadeUFAulas ? '. ' + clienteData.cidadeUFAulas : '';
+            if (end) enderecoAulas = end + cep + cid;
+            if (clienteData.complementoAulas) complementoAulas = clienteData.complementoAulas;
           }
           
           // Extrair estudantes únicos de aulasSelecionadas
           const estudantesUnicos = new Set();
           aulasSelecionadas.forEach(aula => {
             if (aula.estudante && aula.estudante.trim()) {
-              // Dividir por vírgula e adicionar cada um ao Set (remove duplicatas)
-              const nomes = aula.estudante.split(',').map(n => n.trim()).filter(n => n);
+              const nomes = aula.estudante.split(',').map(n => n.trim()).filter(n => n && n !== '--');
               nomes.forEach(nome => estudantesUnicos.add(nome));
             }
           });
@@ -5274,7 +5284,7 @@ const BancoDeAulasCards = (function() {
           const estudantesUnicos = new Set();
           aulasSelecionadas.forEach(aula => {
             if (aula.estudante && aula.estudante.trim()) {
-              const nomes = aula.estudante.split(',').map(n => n.trim()).filter(n => n);
+              const nomes = aula.estudante.split(',').map(n => n.trim()).filter(n => n && n !== '--');
               nomes.forEach(nome => estudantesUnicos.add(nome));
             }
           });
@@ -5292,7 +5302,7 @@ const BancoDeAulasCards = (function() {
         const estudantesUnicos = new Set();
         aulasSelecionadas.forEach(aula => {
           if (aula.estudante && aula.estudante.trim()) {
-            const nomes = aula.estudante.split(',').map(n => n.trim()).filter(n => n);
+            const nomes = aula.estudante.split(',').map(n => n.trim()).filter(n => n && n !== '--');
             nomes.forEach(nome => estudantesUnicos.add(nome));
           }
         });
@@ -5312,7 +5322,7 @@ const BancoDeAulasCards = (function() {
       const estudantesUnicos = new Set();
       aulasSelecionadas.forEach(aula => {
         if (aula.estudante && aula.estudante.trim()) {
-          const nomes = aula.estudante.split(',').map(n => n.trim()).filter(n => n);
+          const nomes = aula.estudante.split(',').map(n => n.trim()).filter(n => n && n !== '--');
           nomes.forEach(nome => estudantesUnicos.add(nome));
         }
       });
@@ -5355,7 +5365,8 @@ const BancoDeAulasCards = (function() {
           ${colunasVisiveis.includes('materia') ? `<td class="py-2 px-3 text-sm border-r border-gray-200">${aula.materia}</td>` : ''}
           ${colunasVisiveis.includes('professor') ? `<td class="py-2 px-3 text-sm border-r border-gray-200">${aula.professor}</td>` : ''}
           ${colunasVisiveis.includes('estudante') ? `<td class="py-2 px-3 text-sm border-r border-gray-200">${aula.estudante}</td>` : ''}
-          ${colunasVisiveis.includes('valorAula') ? `<td class="py-2 px-3 text-sm text-right">${(!isNaN(valorAula) && isFinite(valorAula)) ? formatCurrencyBR(valorAula) : '--'}</td>` : ''}
+          ${colunasVisiveis.includes('valorAula') ? `<td class="py-2 px-3 text-sm text-right border-r border-gray-200">${(!isNaN(valorAula) && isFinite(valorAula)) ? formatCurrencyBR(valorAula) : '--'}</td>` : ''}
+          ${colunasVisiveis.includes('status') ? `<td class="py-2 px-3 text-sm text-center"><span class="status-badge ${getStatusBadgeClass(aula.status || 'Pendente')} text-xs px-2 py-1">${aula.status || 'Pendente'}</span></td>` : ''}
         </tr>
       `;
     });
@@ -5446,7 +5457,8 @@ const BancoDeAulasCards = (function() {
                       ${colunasVisiveis.includes('materia') ? `<th class="py-3 px-3 text-xs font-semibold border-r border-orange-400">Matéria</th>` : ''}
                       ${colunasVisiveis.includes('professor') ? `<th class="py-3 px-3 text-xs font-semibold border-r border-orange-400">Professor</th>` : ''}
                       ${colunasVisiveis.includes('estudante') ? `<th class="py-3 px-3 text-xs font-semibold border-r border-orange-400">Estudante</th>` : ''}
-                      ${colunasVisiveis.includes('valorAula') ? `<th class="py-3 px-3 text-xs font-semibold text-right">Valor da Aula</th>` : ''}
+                      ${colunasVisiveis.includes('valorAula') ? `<th class="py-3 px-3 text-xs font-semibold border-r border-orange-400 text-right">Valor da Aula</th>` : ''}
+                      ${colunasVisiveis.includes('status') ? `<th class="py-3 px-3 text-xs font-semibold text-center">Status</th>` : ''}
                     </tr>
                   </thead>
                   <tbody>

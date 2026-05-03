@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(findstr /r /i \"especial\" *.html *.js *.css)",
+      "Bash(findstr /i \"card\" *.html)",
+      "Bash(findstr /n \"badge\\\\|tag\\\\|label\\\\|tipo\" functions-simulacoes.js)",
+      "Bash(powershell -Command \"Select-String -Path functions-simulacoes.js -Pattern 'badge|Badge|span class|div class' | Select-Object -First 50 LineNumber,Line\")",
+      "Bash(powershell -Command \"Select-String -Path 'functions-simulacoes.js' -Pattern '\\(badge|tag|especial|special|ESPECIAL\\)' -AllMatches | Select-Object -First 20\")",
+      "Bash(findstr /i \"especial\\\\|ESPECIAL\" functions-PainelCentral.js)",
+      "Bash(Get-Content functions-PainelCentral.js)",
+      "Bash(Select-String -Pattern \"simulacoes|ESPECIAL|especial\")"
+    ]
+  }
+}

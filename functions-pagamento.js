@@ -1456,12 +1456,48 @@ function gerarPDFRelatorioGrupo(nomeProfessor, nomeMes, ano, todasLinhas) {
   });
 }
 
+// ─── Loading overlay — Modo Grupo ───
+
+function mostrarLoadingGrupo() {
+  const existente = document.getElementById('loading-grupo-overlay');
+  if (existente) existente.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'loading-grupo-overlay';
+  overlay.style.cssText = [
+    'position:fixed;top:0;left:0;width:100vw;height:100vh;',
+    'backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);',
+    'background:rgba(0,0,0,0.30);',
+    'display:flex;align-items:center;justify-content:center;',
+    'z-index:9999;transition:opacity 0.2s;'
+  ].join('');
+  overlay.innerHTML = `
+    <div style="
+      background:white;padding:32px 48px;border-radius:16px;
+      box-shadow:0 8px 32px rgba(0,0,0,0.18);text-align:center;
+      min-width:280px;
+    ">
+      <div class="loading-spinner-large" style="margin:0 auto 16px;"></div>
+      <p style="margin:0;color:#4b5563;font-size:0.95rem;font-family:'Comfortaa',sans-serif;">
+        Calculando pagamentos...
+      </p>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
+function ocultarLoadingGrupo() {
+  const overlay = document.getElementById('loading-grupo-overlay');
+  if (!overlay) return;
+  overlay.style.opacity = '0';
+  setTimeout(() => overlay.remove(), 220);
+}
+
 // ─── Gráfico de barras horizontal — Pagamento em Grupo ───
 
 let _chartPagamentoGrupo = null;
 let _chartGrupoCanvasHandlers = null;
 
-function renderizarGraficoPagamentoGrupo() {
+async function renderizarGraficoPagamentoGrupo() {
   const canvas = document.getElementById('grafico-pagamento-grupo');
   if (!canvas) return;
 
@@ -1469,10 +1505,38 @@ function renderizarGraficoPagamentoGrupo() {
   const ano = parseInt(document.getElementById('pag-ano')?.value);
   if (!mes || !ano) return;
 
+  mostrarLoadingGrupo();
+
+  // Buscar informações adicionais do mês/ano em uma única query
+  // Requer composite index no Firestore: informacoesPagamento (mes ASC, ano ASC)
+  // Se o índice não existir ainda, o catch ignora e segue apenas com os valores de aulas
+  const infoAdicionaisPorProfessor = {};
+  try {
+    const snapshot = await db.collection('informacoesPagamento')
+      .where('mes', '==', mes)
+      .where('ano', '==', ano)
+      .get();
+    snapshot.forEach(doc => {
+      const d = doc.data();
+      const id = d.idProfessor || '';
+      if (!id) return;
+      if (!infoAdicionaisPorProfessor[id]) {
+        infoAdicionaisPorProfessor[id] = { entradas: 0, saidas: 0 };
+      }
+      if (d.tipo === 'entrada') {
+        infoAdicionaisPorProfessor[id].entradas += (d.valor || 0);
+      } else {
+        infoAdicionaisPorProfessor[id].saidas += (d.valor || 0);
+      }
+    });
+  } catch (err) {
+    console.warn('⚠️ informacoesPagamento — falha na query composta (composite index necessário?):', err.message);
+  }
+
   const professores = window._pagProfessoresFiltrados || [];
   const todasAulas = window._pagTodasAulas || [];
 
-  // Calcular total de pagamento por professor no mês/ano (apenas Concluída ou Reposição)
+  // Calcular total por professor: valorAulas + entradas − saídas
   const statusValidos = ['Concluída', 'Reposição'];
   const dadosProfessores = professores.map(p => {
     const aulasDoProfessor = todasAulas.filter(aula => {
@@ -1482,7 +1546,9 @@ function renderizarGraficoPagamentoGrupo() {
       if (!match) return false;
       return parseInt(match[2], 10) === mes && parseInt(match[3], 10) === ano;
     });
-    const total = aulasDoProfessor.reduce((acc, a) => acc + (parseFloat(a.ValorAula) || 0), 0);
+    const valorAulas = aulasDoProfessor.reduce((acc, a) => acc + (parseFloat(a.ValorAula) || 0), 0);
+    const info = infoAdicionaisPorProfessor[p.cpf] || { entradas: 0, saidas: 0 };
+    const total = valorAulas + info.entradas - info.saidas;
     return { nome: p.nome || 'Sem nome', cpf: p.cpf, total };
   }).filter(d => d.total > 0);
 
@@ -1515,6 +1581,7 @@ function renderizarGraficoPagamentoGrupo() {
     ctx.textAlign = 'center';
     ctx.fillText('Nenhum professor com aulas neste período.', canvas.width / 2, 60);
     canvas.parentElement.style.height = '';
+    ocultarLoadingGrupo();
     return;
   }
 
@@ -1524,7 +1591,6 @@ function renderizarGraficoPagamentoGrupo() {
   const alturaCalculada = Math.max(alturaMinima, dadosProfessores.length * alturaPorBarra + 60);
   const wrapper = document.getElementById('pag-grafico-grupo-wrapper');
   if (wrapper) {
-    // Ocupar espaço vertical disponível na viewport, com scroll se exceder
     const wrapperTop = wrapper.getBoundingClientRect().top;
     const alturaDisponivel = window.innerHeight - wrapperTop - 32;
     wrapper.style.height = Math.max(300, alturaDisponivel) + 'px';
@@ -1599,7 +1665,6 @@ function renderizarGraficoPagamentoGrupo() {
         }
       },
       onClick: function(evt, elements, chart) {
-        // Clique na barra
         if (elements.length > 0) {
           const idx = elements[0].index;
           const dados = window._pagGraficoDadosProfessores;
@@ -1637,6 +1702,8 @@ function renderizarGraficoPagamentoGrupo() {
   canvas.addEventListener('mousemove', canvasMoveHandler);
   canvas.style.cursor = 'default';
   _chartGrupoCanvasHandlers = { click: canvasClickHandler, mousemove: canvasMoveHandler };
+
+  ocultarLoadingGrupo();
 }
 
 // Detecta em qual label do eixo Y o evento ocorreu

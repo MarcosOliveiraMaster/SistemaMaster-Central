@@ -333,6 +333,16 @@
   border-color: var(--orange);
 }
 
+.card-especial {
+  border-color: #e53e3e !important;
+  box-shadow: 0 0 0 1px #e53e3e, 0 4px 16px rgba(229, 62, 62, 0.25) !important;
+}
+
+.card-especial:hover {
+  border-color: #c53030 !important;
+  box-shadow: 0 0 0 1px #c53030, 0 8px 24px rgba(229, 62, 62, 0.35) !important;
+}
+
 .card-header {
   font-family: 'Lexend', sans-serif;
   font-weight: 700;
