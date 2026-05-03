@@ -520,7 +520,7 @@ function renderInfoAdicionalSalva(doc) {
   const d = doc.data ? doc.data() : doc;
   const docId = doc.id || doc.docId;
   const cor = d.tipo === 'entrada' ? '#22c55e' : '#ef4444';
-  const valorFmt = 'R$ ' + (d.valor || 0).toFixed(2).replace('.', ',');
+  const valorFmt = 'R$ ' + (parseFloat(d.valor) || 0).toFixed(2).replace('.', ',');
 
   const row = document.createElement('div');
   row.id = 'info-row-' + id;
@@ -601,32 +601,42 @@ function confirmarRemoverInfoAdicional(id) {
   const row = document.getElementById('info-row-' + id);
   if (!row) return;
   const docId = row.dataset.docId;
-  if (!docId) { row.remove(); return; }
+
+  // Linha ainda não salva no banco — apenas remove da UI
+  if (!docId || row.dataset.modo !== 'salvo') {
+    row.remove();
+    return;
+  }
 
   const { modal, closeModal } = createModal(
-    'Certeza que gostaria de excluir?',
+    'Excluir informação adicional',
     `<div class="p-4">
-      <p class="text-sm text-gray-600">
+      <p class="text-sm text-gray-600 mb-3">
         <i class="fas fa-exclamation-triangle text-orange-500 mr-2"></i>
-        Uma vez apagada, a informação não poderá ser restaurada.
+        Tem certeza que deseja excluir esta informação?
       </p>
+      <p class="text-sm text-gray-500">Esta ação não poderá ser desfeita.</p>
     </div>`,
     [
-      { text: 'Cancelar', classes: 'btn-secondary btn-compact', attributes: 'id="btn-cancelar-excluir-info"' },
-      { text: 'Excluir', classes: 'btn-primary btn-compact', attributes: 'id="btn-confirmar-excluir-info" style="background:#ef4444; border-color:#ef4444;"' }
+      { text: 'Cancelar', classes: 'btn-secondary btn-compact', attributes: '' },
+      { text: 'Excluir', classes: 'btn-primary btn-compact', attributes: 'style="background:#ef4444; border-color:#ef4444;"' }
     ]
   );
 
-  modal.querySelector('#btn-cancelar-excluir-info').addEventListener('click', closeModal);
-  modal.querySelector('#btn-confirmar-excluir-info').addEventListener('click', async () => {
-    closeModal();
+  const [btnCancelar, btnExcluir] = modal.querySelectorAll('.modal-footer button');
+  btnCancelar.addEventListener('click', closeModal);
+  btnExcluir.addEventListener('click', async () => {
+    btnExcluir.disabled = true;
+    btnExcluir.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Excluindo...';
     try {
       await db.collection('informacoesPagamento').doc(docId).delete();
+      closeModal();
       row.remove();
       showToast('Informação excluída com sucesso.', 'success');
       atualizarResumoSeNecessario();
     } catch (error) {
       console.error('Erro ao excluir informação adicional:', error);
+      closeModal();
       showToast('Erro ao excluir informação.', 'error');
     }
   });
@@ -649,8 +659,13 @@ async function carregarInfoAdicionaisDoFirebase(professorId, mes, ano) {
 
     snapshot.forEach(doc => {
       const d = doc.data();
-      if (Number(d.mes) === mesNum && Number(d.ano) === anoNum) {
-        renderInfoAdicionalSalva(doc);
+      const match = (d.data || '').match(/(\d{2})\/(\d{2})\/(\d{4})/);
+      if (match && parseInt(match[2], 10) === mesNum && parseInt(match[3], 10) === anoNum) {
+        try {
+          renderInfoAdicionalSalva(doc);
+        } catch (err) {
+          console.error('Erro ao renderizar informação adicional:', doc.id, err);
+        }
       }
     });
   } catch (error) {
@@ -1223,7 +1238,8 @@ async function gerarRelatoriosGrupo() {
 
         snapshot.forEach(docSnap => {
           const d = docSnap.data();
-          if (Number(d.mes) === Number(mes) && Number(d.ano) === Number(ano)) {
+          const match = (d.data || '').match(/(\d{2})\/(\d{2})\/(\d{4})/);
+          if (match && parseInt(match[2], 10) === Number(mes) && parseInt(match[3], 10) === Number(ano)) {
             linhasAdicionais.push({
               data: d.data || '',
               descricao: d.descricao || '',
@@ -1507,19 +1523,17 @@ async function renderizarGraficoPagamentoGrupo() {
 
   mostrarLoadingGrupo();
 
-  // Buscar informações adicionais do mês/ano em uma única query
-  // Requer composite index no Firestore: informacoesPagamento (mes ASC, ano ASC)
-  // Se o índice não existir ainda, o catch ignora e segue apenas com os valores de aulas
   const infoAdicionaisPorProfessor = {};
   try {
     const snapshot = await db.collection('informacoesPagamento')
-      .where('mes', '==', mes)
       .where('ano', '==', ano)
       .get();
     snapshot.forEach(doc => {
       const d = doc.data();
       const id = d.idProfessor || '';
       if (!id) return;
+      const match = (d.data || '').match(/(\d{2})\/(\d{2})\/(\d{4})/);
+      if (!match || parseInt(match[2], 10) !== mes || parseInt(match[3], 10) !== ano) return;
       if (!infoAdicionaisPorProfessor[id]) {
         infoAdicionaisPorProfessor[id] = { entradas: 0, saidas: 0 };
       }
@@ -1530,7 +1544,7 @@ async function renderizarGraficoPagamentoGrupo() {
       }
     });
   } catch (err) {
-    console.warn('⚠️ informacoesPagamento — falha na query composta (composite index necessário?):', err.message);
+    console.warn('⚠️ informacoesPagamento — falha na query por ano:', err.message);
   }
 
   const professores = window._pagProfessoresFiltrados || [];
