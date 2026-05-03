@@ -51,9 +51,27 @@ document.addEventListener('DOMContentLoaded', () => {
 function initializeApp() {
   setupMenuNavigation();
   setupDashboardSubmenu();
+  setupSidebarToggle();
   setupGlobalListeners();
   loadSection('painel-central');
   checkFirebaseConnection();
+}
+
+function setupSidebarToggle() {
+  const logoBtn = document.getElementById('sidebar-logo-btn');
+  const sidebar = document.getElementById('menu-lateral');
+  if (!logoBtn || !sidebar) return;
+
+  logoBtn.addEventListener('click', () => {
+    sidebar.classList.toggle('collapsed');
+
+    if (sidebar.classList.contains('collapsed')) {
+      const submenu = document.getElementById('submenu-dashboard');
+      const chevron = document.getElementById('icon-dashboard-expand');
+      if (submenu) submenu.classList.add('hidden');
+      if (chevron) chevron.classList.remove('rotate');
+    }
+  });
 }
 
 function setupMenuNavigation() {

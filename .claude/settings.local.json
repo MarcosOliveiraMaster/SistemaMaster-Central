@@ -8,7 +8,10 @@
       "Bash(powershell -Command \"Select-String -Path 'functions-simulacoes.js' -Pattern '\\(badge|tag|especial|special|ESPECIAL\\)' -AllMatches | Select-Object -First 20\")",
       "Bash(findstr /i \"especial\\\\|ESPECIAL\" functions-PainelCentral.js)",
       "Bash(Get-Content functions-PainelCentral.js)",
-      "Bash(Select-String -Pattern \"simulacoes|ESPECIAL|especial\")"
+      "Bash(Select-String -Pattern \"simulacoes|ESPECIAL|especial\")",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\marco\\\\OneDrive\\\\Documentos\\\\GitHub\\\\SistemaMaster-Central\" -Force)",
+      "Bash(Select-Object Name, Mode)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\marco\\\\OneDrive\\\\Documentos\\\\GitHub\\\\SistemaMaster-Central\" -File | Where-Object { -not $_.Name.StartsWith\\('.'\\) } | Select-Object Name)"
     ]
   }
 }

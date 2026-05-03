@@ -33,6 +33,7 @@
 #menu-lateral {
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE 10+ */
+  transition: width 0.3s ease;
 }
 #menu-lateral::-webkit-scrollbar {
   display: none; /* Chrome, Safari, Opera */
@@ -71,6 +72,60 @@
 #menu-lateral {
   overflow-y: auto;
   max-height: 100vh;
+}
+
+/* ── Sidebar colapsada ── */
+#menu-lateral.collapsed {
+  width: 5vw !important;
+  min-width: 60px;
+}
+
+#menu-lateral.collapsed .sidebar-logo-text {
+  display: none;
+}
+
+#menu-lateral.collapsed #sidebar-logo-btn {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+#menu-lateral.collapsed #sidebar-logo-btn img {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+#menu-lateral.collapsed .menu-item span,
+#menu-lateral.collapsed .menu-item-submenu span {
+  display: none;
+}
+
+#menu-lateral.collapsed .menu-item i,
+#menu-lateral.collapsed .menu-item-submenu i {
+  margin-right: 0 !important;
+}
+
+#menu-lateral.collapsed .menu-item,
+#menu-lateral.collapsed .menu-item-submenu {
+  justify-content: center;
+  padding: 12px 8px;
+}
+
+#menu-lateral.collapsed #icon-dashboard-expand {
+  display: none;
+}
+
+#menu-lateral.collapsed #user-email-display {
+  display: none;
+}
+
+#menu-lateral.collapsed .logout-text {
+  display: none;
+}
+
+#menu-lateral.collapsed #btn-logout {
+  min-width: unset !important;
+  width: auto !important;
+  padding: 6px 10px !important;
 }
 
 @media (max-width: 1024px) {
