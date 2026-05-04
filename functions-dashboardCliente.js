@@ -124,12 +124,12 @@ class DashboardCliente {
         mesmoEndereco: true,
         estudantes: [
           {
-            nomeEstudante: 'Lucas Silva',
-            escolaEstudante: 'Colégio Master',
-            serieEstudante: '5º Ano',
-            aniversarioEstudante: '10/05/2015',
+            nome: 'Lucas Silva',
+            escola: 'Colégio Master',
+            serie: '5º Ano',
+            aniversario: '10/05/2015',
             atendimentoEspecializado: false,
-            atipicidadeEstudante: '',
+            atipicidade: '',
             LinkLaudo: ''
           }
         ],
@@ -789,14 +789,14 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
              </a>`
           : '—';
         const atip = e.atendimentoEspecializado
-          ? `<span class="dc-badge dc-badge-potencial">${this.escapeHTML(e.atipicidadeEstudante) || 'Sim'}</span>`
+          ? `<span class="dc-badge dc-badge-potencial">${this.escapeHTML(e.atipicidade) || 'Sim'}</span>`
           : 'Não';
         return `<tr>
           <td>${i + 1}</td>
-          <td>${this.escapeHTML(e.nomeEstudante)}</td>
-          <td>${this.escapeHTML(e.escolaEstudante)}</td>
-          <td>${this.escapeHTML(e.serieEstudante)}</td>
-          <td>${this.escapeHTML(e.aniversarioEstudante)}</td>
+          <td>${this.escapeHTML(e.nome)}</td>
+          <td>${this.escapeHTML(e.escola)}</td>
+          <td>${this.escapeHTML(e.serie)}</td>
+          <td>${this.escapeHTML(e.aniversario)}</td>
           <td>${atip}</td>
           <td>${laudoBtn}</td>
         </tr>`;
@@ -1017,7 +1017,7 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
     const series = ['Maternal', 'Jardim I', 'Jardim II', '1º Ano', '2º Ano', '3º Ano',
       '4º Ano', '5º Ano', '6º Ano', '7º Ano', '8º Ano', '9º Ano', '1ª Série EM', '2ª Série EM', '3ª Série EM'];
     const opts = series.map(s =>
-      `<option value="${s}" ${(e.serieEstudante || '') === s ? 'selected' : ''}>${s}</option>`
+      `<option value="${s}" ${(e.serie || '') === s ? 'selected' : ''}>${s}</option>`
     ).join('');
 
     return `
@@ -1031,19 +1031,19 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
       <div class="dc-form-row">
         <div class="dc-form-group">
           <label class="dc-form-label">Nome</label>
-          <input class="dc-form-input" name="estudante_nomeEstudante[]" value="${this.escapeHTMLForInput(e.nomeEstudante || '')}">
+          <input class="dc-form-input" name="estudante_nome[]" value="${this.escapeHTMLForInput(e.nome || '')}">
         </div>
         <div class="dc-form-group">
           <label class="dc-form-label">Escola</label>
-          <input class="dc-form-input" name="estudante_escolaEstudante[]" value="${this.escapeHTMLForInput(e.escolaEstudante || '')}">
+          <input class="dc-form-input" name="estudante_escola[]" value="${this.escapeHTMLForInput(e.escola || '')}">
         </div>
         <div class="dc-form-group">
           <label class="dc-form-label">Série</label>
-          <select class="dc-form-select" name="estudante_serieEstudante[]">${opts}</select>
+          <select class="dc-form-select" name="estudante_serie[]">${opts}</select>
         </div>
         <div class="dc-form-group">
           <label class="dc-form-label">Aniversário</label>
-          <input class="dc-form-input dc-mask-date" name="estudante_aniversarioEstudante[]" value="${this.escapeHTMLForInput(e.aniversarioEstudante || '')}">
+          <input class="dc-form-input dc-mask-date" name="estudante_aniversario[]" value="${this.escapeHTMLForInput(e.aniversario || '')}">
         </div>
         <div class="dc-form-group" style="grid-column:1/-1">
           <label class="dc-checkbox-label">
@@ -1054,7 +1054,7 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
         </div>
         <div class="dc-form-group dc-atip-fields" style="display:${e.atendimentoEspecializado ? 'block' : 'none'}">
           <label class="dc-form-label">Atipicidade</label>
-          <input class="dc-form-input" name="estudante_atipicidadeEstudante[]" value="${this.escapeHTMLForInput(e.atipicidadeEstudante || '')}">
+          <input class="dc-form-input" name="estudante_atipicidade[]" value="${this.escapeHTMLForInput(e.atipicidade || '')}">
         </div>
         <div class="dc-form-group dc-atip-fields" style="display:${e.atendimentoEspecializado ? 'block' : 'none'}">
           <label class="dc-form-label">Link do Laudo</label>
@@ -1076,7 +1076,7 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
 
   async removeStudentField(btn) {
     const card = btn.closest('.dc-student-card');
-    const studentName = card.querySelector('[name="estudante_nomeEstudante[]"]')?.value || 'este estudante';
+    const studentName = card.querySelector('[name="estudante_nome[]"]')?.value || 'este estudante';
 
     const confirmed = await this.showConfirmModal({
       title: 'Remover Estudante',
@@ -1286,21 +1286,21 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
     };
 
     // Coletar estudantes
-    const nomes = [...form.querySelectorAll('[name="estudante_nomeEstudante[]"]')].map(e => e.value.trim());
-    const escolas = [...form.querySelectorAll('[name="estudante_escolaEstudante[]"]')].map(e => e.value.trim());
-    const series = [...form.querySelectorAll('[name="estudante_serieEstudante[]"]')].map(e => e.value);
-    const anivs = [...form.querySelectorAll('[name="estudante_aniversarioEstudante[]"]')].map(e => e.value.trim());
+    const nomes = [...form.querySelectorAll('[name="estudante_nome[]"]')].map(e => e.value.trim());
+    const escolas = [...form.querySelectorAll('[name="estudante_escola[]"]')].map(e => e.value.trim());
+    const series = [...form.querySelectorAll('[name="estudante_serie[]"]')].map(e => e.value);
+    const anivs = [...form.querySelectorAll('[name="estudante_aniversario[]"]')].map(e => e.value.trim());
     const atendeEsp = [...form.querySelectorAll('[name="estudante_atendimentoEspecializado[]"]')].map(e => e.checked);
-    const atipics = [...form.querySelectorAll('[name="estudante_atipicidadeEstudante[]"]')].map(e => e.value.trim());
+    const atipics = [...form.querySelectorAll('[name="estudante_atipicidade[]"]')].map(e => e.value.trim());
     const laudos = [...form.querySelectorAll('[name="estudante_LinkLaudo[]"]')].map(e => e.value.trim());
 
     const estudantes = nomes.map((_, i) => ({
-      nomeEstudante: nomes[i],
-      escolaEstudante: escolas[i] || '',
-      serieEstudante: series[i] || '',
-      aniversarioEstudante: anivs[i] || '',
+      nome: nomes[i],
+      escola: escolas[i] || '',
+      serie: series[i] || '',
+      aniversario: anivs[i] || '',
       atendimentoEspecializado: atendeEsp[i] || false,
-      atipicidadeEstudante: atipics[i] || '',
+      atipicidade: atipics[i] || '',
       LinkLaudo: laudos[i] || ''
     }));
 
@@ -1404,7 +1404,7 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
 
       // Estudantes
       const estudantes = Array.isArray(c.estudantes) ? c.estudantes : [];
-      const nomesEstudantes = estudantes.map(e => e.nomeEstudante || '').filter(n => n).join(', ');
+      const nomesEstudantes = estudantes.map(e => e.nome || '').filter(n => n).join(', ');
 
       return [
         // Dados Básicos

@@ -11,7 +11,8 @@
       "Bash(Select-String -Pattern \"simulacoes|ESPECIAL|especial\")",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\marco\\\\OneDrive\\\\Documentos\\\\GitHub\\\\SistemaMaster-Central\" -Force)",
       "Bash(Select-Object Name, Mode)",
-      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\marco\\\\OneDrive\\\\Documentos\\\\GitHub\\\\SistemaMaster-Central\" -File | Where-Object { -not $_.Name.StartsWith\\('.'\\) } | Select-Object Name)"
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\marco\\\\OneDrive\\\\Documentos\\\\GitHub\\\\SistemaMaster-Central\" -File | Where-Object { -not $_.Name.StartsWith\\('.'\\) } | Select-Object Name)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\marco\\\\OneDrive\\\\Documentos\\\\GitHub\\\\SistemaMaster-Central\" -Recurse -File -Name | Where-Object {$_ -notmatch \"node_modules|\\\\.git\"} | Sort-Object)"
     ]
   }
 }
