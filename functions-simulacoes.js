@@ -8,6 +8,7 @@ const Simulacoes = (function() {
   let professoresData = [];
   let currentFilters = {};
   let editingSimulacao = null;
+  let isNovaSimulacao = false;
   
   // ==================== GERAÇÃO DE ID ====================
   
@@ -551,6 +552,7 @@ const Simulacoes = (function() {
   // Função para abrir modal de simulação (nova ou editar)
   function abrirModalSimulacao(simulacao, isNova = false) {
     editingSimulacao = simulacao;
+    isNovaSimulacao = isNova;
 
     // Importar valores persistidos (se houver) para garantir que a UI mostre o que foi salvo no DB
     // Observação: no banco a propriedade persistida é `lucroMaster` (campo salvo em `salvarSimulacao`).
@@ -851,10 +853,17 @@ const Simulacoes = (function() {
               <i class="fas fa-save mr-2"></i>
               ${isNova ? 'Salvar Simulação' : 'Atualizar Simulação'}
             </button>
+
+            <button id="btn-gerar-solicitacao-simulacao" class="btn-secondary btn-compact">
+              <i class="fas fa-calendar-plus mr-2"></i>
+              Solicitação Professor
+            </button>
+
             <button id="btn-enviar-simulacao" class="btn-primary btn-compact">
               <i class="fas fa-paper-plane mr-2"></i>
-              Enviar simulação
+              Enviar solicitação Cliente
             </button>
+
             <button id="btn-aprovar-simulacao" class="btn-primary btn-compact">
               <i class="fas fa-check-circle mr-2"></i>
               Aprovar Simulação
@@ -1191,8 +1200,339 @@ const Simulacoes = (function() {
     `).join('');
   }
   
+  // ==================== AUTO-SAVE ====================
+
+  async function autoSalvarSimulacao() {
+    if (!editingSimulacao || !editingSimulacao.idSimulacao) return;
+
+    const tituloEl = document.getElementById('titulo-simulacao');
+    const selectCliente = document.getElementById('select-cliente');
+    const metodoPagamentoEl = document.getElementById('metodo-pagamento');
+    const dataPrimeiraEl = document.getElementById('data-primeira-parcela');
+    const dataSegundaEl = document.getElementById('data-segunda-parcela');
+    const tipoEquipeEl = document.getElementById('tipo-equipe');
+
+    let nomeCliente = '';
+    let cpf = '';
+    if (selectCliente) {
+      if (selectCliente.value === '__temp__') {
+        nomeCliente = selectCliente.options[selectCliente.selectedIndex]?.text || '';
+      } else if (selectCliente.value) {
+        const cliente = clientesData.find(c => c.id === selectCliente.value);
+        if (cliente) { nomeCliente = cliente.nome || ''; cpf = cliente.cpf || ''; }
+      }
+    }
+
+    const valores = calcularValoresSimulacao(editingSimulacao.aulas || []);
+    const horasTotais = valores.SomatorioDuracaoAulas || 0;
+    const valorEquipeFinal = (editingSimulacao.valorHoraProfessor && editingSimulacao.valorHoraProfessor > 0)
+      ? editingSimulacao.valorHoraProfessor * horasTotais
+      : (valores.ValorEquipe || 0);
+    let valorPacoteFinal = 0;
+    if (editingSimulacao.valorPacoteAplicado && editingSimulacao.valorPacoteAplicado > 0) {
+      valorPacoteFinal = editingSimulacao.valorPacoteAplicado;
+    } else if (editingSimulacao.valorLucroMaster && editingSimulacao.valorLucroMaster > 0) {
+      valorPacoteFinal = valorEquipeFinal + editingSimulacao.valorLucroMaster;
+    } else {
+      valorPacoteFinal = valores.ValorPacote || 0;
+    }
+    const lucroFinal = (editingSimulacao.valorLucroMaster && editingSimulacao.valorLucroMaster > 0)
+      ? editingSimulacao.valorLucroMaster
+      : (valorPacoteFinal - valorEquipeFinal);
+
+    const data = {
+      idSimulacao: editingSimulacao.idSimulacao,
+      tituloSimulacao: tituloEl ? tituloEl.value.trim() : (editingSimulacao.tituloSimulacao || ''),
+      nomeCliente,
+      cpf,
+      metodoPagamento: metodoPagamentoEl ? metodoPagamentoEl.value : (editingSimulacao.metodoPagamento || ''),
+      dataPrimeiraParcela: dataPrimeiraEl ? dataPrimeiraEl.value : (editingSimulacao.dataPrimeiraParcela || ''),
+      dataSegundaParcela: dataSegundaEl ? dataSegundaEl.value : (editingSimulacao.dataSegundaParcela || ''),
+      tipoEquipe: tipoEquipeEl ? tipoEquipeEl.value : (editingSimulacao.tipoEquipe || ''),
+      aulas: editingSimulacao.aulas || [],
+      SomatorioDuracaoAulas: valores.SomatorioDuracaoAulas,
+      ValorPacote: valorPacoteFinal,
+      ValorEquipe: valorEquipeFinal,
+      lucroMaster: lucroFinal,
+      valorHoraProfessor: editingSimulacao.valorHoraProfessor || null,
+      valorPacoteAplicado: editingSimulacao.valorPacoteAplicado || null,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    try {
+      await db.collection('simulacoes').doc(data.idSimulacao).set(data);
+      const btnSalvar = document.getElementById('btn-salvar-simulacao');
+      if (btnSalvar) {
+        const htmlOriginal = btnSalvar.innerHTML;
+        btnSalvar.innerHTML = '<i class="fas fa-check mr-2"></i>Salvo';
+        setTimeout(() => { btnSalvar.innerHTML = htmlOriginal; }, 1500);
+      }
+    } catch (error) {
+      console.error('❌ Erro no auto-save:', error);
+    }
+  }
+
+  // ==================== SOLICITAÇÃO DA SIMULAÇÃO ====================
+
+  async function showModalSolicitacaoSimulacao() {
+    const aulas = (editingSimulacao && editingSimulacao.aulas) ? editingSimulacao.aulas : [];
+
+    if (aulas.length === 0) {
+      showToast('❌ Nenhuma aula no cronograma para gerar solicitação', 'error');
+      return;
+    }
+
+    // Ordenar aulas por data
+    const aulasOrdenadas = [...aulas].sort((a, b) => {
+      const parseData = (dataStr) => {
+        if (!dataStr) return new Date(0);
+        const match = dataStr.match(/\w{3} - (\d{2})\/(\d{2})\/(\d{4})/);
+        if (!match) {
+          const match2 = dataStr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+          if (match2) return new Date(parseInt(match2[3]), parseInt(match2[2]) - 1, parseInt(match2[1]));
+          return new Date(0);
+        }
+        return new Date(parseInt(match[3]), parseInt(match[2]) - 1, parseInt(match[1]));
+      };
+      return parseData(a.data).getTime() - parseData(b.data).getTime();
+    });
+
+    let linhasHtml = '';
+    aulasOrdenadas.forEach((aula, index) => {
+      const valorAulaNum = calcularValorAula(aula.duracao || '0h');
+      const valorAulaFmt = 'R$ ' + Number(valorAulaNum).toFixed(2);
+      linhasHtml += `
+        <tr class="aula-row-solicitacao-sim">
+          <td class="py-2 px-3 text-center">
+            <input type="checkbox" class="checkbox-solicitacao-sim w-4 h-4 cursor-pointer"
+                   data-index="${index}"
+                   data-data="${aula.data || '--'}"
+                   data-horario="${aula.horario || '--'}"
+                   data-duracao="${aula.duracao || '--'}"
+                   data-materia="${aula.materia || '--'}"
+                   data-professor="${aula.professor || 'A definir'}"
+                   data-estudante="${aula.estudante || '--'}"
+                   data-valor-aula="${valorAulaNum}">
+          </td>
+          <td class="py-2 px-3 text-sm">${aula.data || '--'}</td>
+          <td class="py-2 px-3 text-sm text-center">${aula.horario || '--'}</td>
+          <td class="py-2 px-3 text-sm text-center">${aula.duracao || '--'}</td>
+          <td class="py-2 px-3 text-sm">${aula.materia || '--'}</td>
+          <td class="py-2 px-3 text-sm">${aula.estudante || '--'}</td>
+          <td class="py-2 px-3 text-sm">${aula.professor || 'A definir'}</td>
+          <td class="py-2 px-3 text-sm text-right">${valorAulaFmt}</td>
+        </tr>
+      `;
+    });
+
+    const modalHtml = `
+      <div class="modal-overlay" id="modal-solicitacao-simulacao" style="z-index: 10000;">
+        <div class="modal-container max-w-6xl">
+          <div class="modal-header">
+            <h3 class="font-lexend font-bold text-lg text-gray-800">
+              <i class="fas fa-calendar-plus text-orange-500 mr-2"></i>
+              Selecione as aulas para a solicitação
+            </h3>
+            <button class="modal-close text-gray-400 hover:text-gray-600">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+
+          <div class="modal-body">
+            <div class="mb-4 flex items-center gap-4 flex-wrap">
+              <p class="text-sm font-bold text-gray-700">Selecione as aulas que deseja incluir na solicitação de aula.</p>
+              <div class="relative" id="multiselect-colunas-sim-wrapper">
+                <button type="button" id="btn-multiselect-colunas-sim" class="flex items-center gap-2 border border-gray-300 rounded px-3 py-2 text-sm bg-white hover:bg-gray-50 cursor-pointer whitespace-nowrap">
+                  <i class="fas fa-columns text-gray-500"></i>
+                  <span>Colunas visíveis</span>
+                  <i class="fas fa-chevron-down text-gray-400 ml-1"></i>
+                </button>
+                <div id="multiselect-colunas-sim-dropdown" class="hidden absolute left-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-max">
+                  <div class="p-2">
+                    <div class="px-2 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wide">Dados do cliente</div>
+                    <div class="space-y-1 mb-1">
+                      <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
+                        <input type="checkbox" class="col-visivel-sim w-4 h-4" data-col="nomeCliente" checked> Nome do cliente
+                      </label>
+                      <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
+                        <input type="checkbox" class="col-visivel-sim w-4 h-4" data-col="endereco" checked> Endereço
+                      </label>
+                      <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
+                        <input type="checkbox" class="col-visivel-sim w-4 h-4" data-col="referencia" checked> Referência
+                      </label>
+                      <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
+                        <input type="checkbox" class="col-visivel-sim w-4 h-4" data-col="totalReceber" checked> Total a receber
+                      </label>
+                      <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
+                        <input type="checkbox" class="col-visivel-sim w-4 h-4" data-col="estudantes" checked> Estudantes
+                      </label>
+                    </div>
+                    <div class="border-t border-gray-100 pt-2">
+                      <div class="px-2 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wide">Cabeçalhos</div>
+                      <div class="space-y-1">
+                        <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
+                          <input type="checkbox" class="col-visivel-sim w-4 h-4" data-col="data" checked> Data da Aula
+                        </label>
+                        <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
+                          <input type="checkbox" class="col-visivel-sim w-4 h-4" data-col="horario" checked> Horário
+                        </label>
+                        <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
+                          <input type="checkbox" class="col-visivel-sim w-4 h-4" data-col="duracao" checked> Duração
+                        </label>
+                        <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
+                          <input type="checkbox" class="col-visivel-sim w-4 h-4" data-col="materia" checked> Matéria
+                        </label>
+                        <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
+                          <input type="checkbox" class="col-visivel-sim w-4 h-4" data-col="estudante" checked> Estudante
+                        </label>
+                        <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
+                          <input type="checkbox" class="col-visivel-sim w-4 h-4" data-col="professor" checked> Professor
+                        </label>
+                        <label class="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer text-sm select-none">
+                          <input type="checkbox" class="col-visivel-sim w-4 h-4" data-col="valorAula" checked> Valor da Aula
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="bg-gray-100 border-b border-gray-200">
+                    <th class="py-3 px-3 text-xs font-semibold text-gray-600 text-center">
+                      <input type="checkbox" id="select-all-aulas-solicitacao-sim" class="w-4 h-4 cursor-pointer" title="Selecionar todas">
+                    </th>
+                    <th class="py-3 px-3 text-xs font-semibold text-gray-600">Data da Aula</th>
+                    <th class="py-3 px-3 text-xs font-semibold text-gray-600 text-center">Horário</th>
+                    <th class="py-3 px-3 text-xs font-semibold text-gray-600 text-center">Duração</th>
+                    <th class="py-3 px-3 text-xs font-semibold text-gray-600">Matéria</th>
+                    <th class="py-3 px-3 text-xs font-semibold text-gray-600">Estudante</th>
+                    <th class="py-3 px-3 text-xs font-semibold text-gray-600">Professor</th>
+                    <th class="py-3 px-3 text-xs font-semibold text-gray-600 text-right">Valor da Aula</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-solicitacao-simulacao">
+                  ${linhasHtml}
+                </tbody>
+              </table>
+            </div>
+
+            <div class="mt-4 text-sm text-gray-600">
+              <span id="count-selected-solicitacao-sim">0</span> aula(s) selecionada(s)
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button id="btn-cancelar-solicitacao-sim" class="btn-secondary">
+              <i class="fas fa-times mr-2"></i>
+              Cancelar
+            </button>
+            <button id="btn-gerar-solicitacao-sim-final" class="btn-primary" disabled>
+              <i class="fas fa-file-alt mr-2"></i>
+              Gerar Solicitação
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    const modalSol = document.getElementById('modal-solicitacao-simulacao');
+    const btnCancelar = document.getElementById('btn-cancelar-solicitacao-sim');
+    const btnGerar = document.getElementById('btn-gerar-solicitacao-sim-final');
+    const selectAll = document.getElementById('select-all-aulas-solicitacao-sim');
+    const checkboxes = modalSol.querySelectorAll('.checkbox-solicitacao-sim');
+    const countSelected = document.getElementById('count-selected-solicitacao-sim');
+    const btnMultiselect = document.getElementById('btn-multiselect-colunas-sim');
+    const dropdownColunas = document.getElementById('multiselect-colunas-sim-dropdown');
+
+    btnMultiselect.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdownColunas.classList.toggle('hidden');
+    });
+
+    function updateSelectionSim() {
+      const selected = modalSol.querySelectorAll('.checkbox-solicitacao-sim:checked');
+      countSelected.textContent = selected.length;
+      btnGerar.disabled = selected.length === 0;
+      selectAll.checked = selected.length === checkboxes.length && checkboxes.length > 0;
+      selectAll.indeterminate = selected.length > 0 && selected.length < checkboxes.length;
+    }
+
+    selectAll.addEventListener('change', function() {
+      checkboxes.forEach(cb => {
+        cb.checked = this.checked;
+        const row = cb.closest('tr');
+        row.classList.toggle('bg-orange-50', this.checked);
+      });
+      updateSelectionSim();
+    });
+
+    checkboxes.forEach(checkbox => {
+      checkbox.addEventListener('change', function() {
+        this.closest('tr').classList.toggle('bg-orange-50', this.checked);
+        updateSelectionSim();
+      });
+    });
+
+    btnCancelar.addEventListener('click', () => modalSol.remove());
+    modalSol.querySelector('.modal-close').addEventListener('click', () => modalSol.remove());
+
+    btnGerar.addEventListener('click', () => {
+      const selected = modalSol.querySelectorAll('.checkbox-solicitacao-sim:checked');
+      if (selected.length === 0) {
+        showToast('⚠️ Selecione pelo menos uma aula para a solicitação', 'warning');
+        return;
+      }
+
+      const colunasVisiveis = Array.from(modalSol.querySelectorAll('.col-visivel-sim:checked')).map(cb => cb.dataset.col);
+
+      const aulasSelecionadas = Array.from(selected).map(cb => ({
+        data: cb.dataset.data,
+        horario: cb.dataset.horario,
+        duracao: cb.dataset.duracao,
+        materia: cb.dataset.materia,
+        professor: cb.dataset.professor,
+        estudante: cb.dataset.estudante,
+        valorAula: parseFloat(cb.dataset.valorAula) || 0
+      }));
+
+      const aulaContratacao = {
+        nomeCliente: editingSimulacao.nomeCliente || '--',
+        cpf: editingSimulacao.cpf || '--',
+        enderecoAulas: '',
+        referencia: ''
+      };
+
+      modalSol.remove();
+      BancoDeAulasCards.showModalSolicitacaoFinal(aulaContratacao, aulasSelecionadas, colunasVisiveis);
+    });
+
+    modalSol.addEventListener('click', (e) => {
+      const wrapper = document.getElementById('multiselect-colunas-sim-wrapper');
+      if (wrapper && !wrapper.contains(e.target)) {
+        dropdownColunas.classList.add('hidden');
+      }
+      if (e.target === modalSol) {
+        modalSol.remove();
+      }
+    });
+
+    const escHandlerSim = (e) => {
+      if (e.key === 'Escape') {
+        modalSol.remove();
+        document.removeEventListener('keydown', escHandlerSim);
+      }
+    };
+    document.addEventListener('keydown', escHandlerSim);
+  }
+
   // ==================== EVENTOS DO MODAL ====================
-  
+
   // Função para configurar eventos do modal
   function setupModalEvents(modal, isNova) {
       const btnEnviar = modal.querySelector('#btn-enviar-simulacao');
@@ -1200,6 +1540,14 @@ const Simulacoes = (function() {
         btnEnviar.addEventListener('click', () => {
           abrirModalEnviarSimulacao();
         });
+
+      // Solicitação de simulação
+      const btnSolicitacaoSim = modal.querySelector('#btn-gerar-solicitacao-simulacao');
+      if (btnSolicitacaoSim) {
+        btnSolicitacaoSim.addEventListener('click', () => {
+          showModalSolicitacaoSimulacao();
+        });
+      }
     // Modal de Enviar Simulação
     function abrirModalEnviarSimulacao() {
       // Obter dados da simulação atual
@@ -1435,11 +1783,13 @@ const Simulacoes = (function() {
         if (cliente) {
           document.getElementById('cpf-cliente').value = cliente.cpf || '';
         }
+        autoSalvarSimulacao();
       } else {
         document.getElementById('cpf-cliente').value = '';
+        autoSalvarSimulacao();
       }
     });
-    
+
     // Adicionar novo cliente
     btnAdicionarCliente.addEventListener('click', () => {
       const nomeNovoCliente = inputNovoCliente.value.trim();
@@ -1448,19 +1798,27 @@ const Simulacoes = (function() {
         selectCliente.classList.remove('hidden');
         inputNovoCliente.classList.add('hidden');
         btnAdicionarCliente.classList. add('hidden');
-        
+
         // Adicionar opção temporária
         const option = document.createElement('option');
         option.value = '__temp__';
         option.textContent = nomeNovoCliente;
         option.selected = true;
         selectCliente.appendChild(option);
-        
+
         // Limpar CPF
         document.getElementById('cpf-cliente').value = '';
-        
+
         inputNovoCliente.value = '';
+        autoSalvarSimulacao();
       }
+    });
+
+    // Auto-save nos campos de texto e selects restantes
+    const camposAutoSave = ['titulo-simulacao', 'metodo-pagamento', 'data-primeira-parcela', 'data-segunda-parcela', 'tipo-equipe'];
+    camposAutoSave.forEach(id => {
+      const el = modal.querySelector(`#${id}`);
+      if (el) el.addEventListener('change', () => autoSalvarSimulacao());
     });
     
     // Eventos de alteração nos inputs das aulas
@@ -1584,13 +1942,14 @@ const Simulacoes = (function() {
     
     // Reaplicar eventos
     setupAulasInputEvents();
-    
+
     // Aplicar máscara nas datas
     aplicarMascarasModal();
-    
+
     recalcularValores();
+    autoSalvarSimulacao();
   }
-  
+
   // ==================== MODAIS DE EDIÇÃO DE AULAS ====================
   
   // Função para abrir modal de data (simulação)
@@ -1750,7 +2109,7 @@ const Simulacoes = (function() {
           const tbody = document.getElementById('tbody-aulas-simulacao');
           tbody.innerHTML = renderAulasSimulacao(editingSimulacao.aulas);
           setupAulasInputEvents();
-          
+          autoSalvarSimulacao();
           showToast(`✅ Data alterada para ${newDateFormatted}`, 'success');
           closeModal();
         });
@@ -1899,7 +2258,7 @@ const Simulacoes = (function() {
       const tbody = document.getElementById('tbody-aulas-simulacao');
       tbody.innerHTML = renderAulasSimulacao(editingSimulacao.aulas);
       setupAulasInputEvents();
-      
+      autoSalvarSimulacao();
       showToast(`✅ Horário alterado para ${novoHorario}`, 'success');
       closeModal();
     });
@@ -2014,7 +2373,7 @@ const Simulacoes = (function() {
         tbody.innerHTML = renderAulasSimulacao(editingSimulacao.aulas);
         setupAulasInputEvents();
         recalcularValores();
-        
+        autoSalvarSimulacao();
         showToast(`✅ Duração alterada para ${novaDuracao}`, 'success');
         closeModal();
       });
@@ -2129,7 +2488,7 @@ const Simulacoes = (function() {
         const tbody = document.getElementById('tbody-aulas-simulacao');
         tbody.innerHTML = renderAulasSimulacao(editingSimulacao.aulas);
         setupAulasInputEvents();
-        
+        autoSalvarSimulacao();
         showToast(`✅ Matéria alterada para ${novaMateria}`, 'success');
         closeModal();
       });
@@ -2298,6 +2657,7 @@ const Simulacoes = (function() {
         const tbody = document.getElementById('tbody-aulas-simulacao');
         tbody.innerHTML = renderAulasSimulacao(editingSimulacao.aulas);
         setupAulasInputEvents();
+        autoSalvarSimulacao();
         showToast(`✅ Estudante alterado para ${selectedOption}`, 'success');
         closeModal();
       });
@@ -2406,7 +2766,7 @@ const Simulacoes = (function() {
         const tbody = document.getElementById('tbody-aulas-simulacao');
         tbody.innerHTML = renderAulasSimulacao(editingSimulacao.aulas);
         setupAulasInputEvents();
-        
+        autoSalvarSimulacao();
         showToast(`✅ Estudante ${nomeEstudante ? 'alterado para ' + nomeEstudante : 'removido'}`, 'success');
         closeModal();
       });
@@ -2571,7 +2931,7 @@ const Simulacoes = (function() {
         const tbody = document.getElementById('tbody-aulas-simulacao');
         tbody.innerHTML = renderAulasSimulacao(editingSimulacao.aulas);
         setupAulasInputEvents();
-        
+        autoSalvarSimulacao();
         showToast(`✅ Professor alterado para ${nome}`, 'success');
         closeModal();
       });
@@ -2606,31 +2966,33 @@ const Simulacoes = (function() {
     
     // Inserir a cópia logo abaixo da aula original
     editingSimulacao.aulas.splice(index + 1, 0, aulaCopia);
-    
+
     // Re-renderizar tabela
     const tbody = document.getElementById('tbody-aulas-simulacao');
     tbody.innerHTML = renderAulasSimulacao(editingSimulacao.aulas);
-    
+
     // Reaplicar eventos
     setupAulasInputEvents();
-    
+
     recalcularValores();
+    autoSalvarSimulacao();
   }
   
   // Função para excluir aula
   function excluirAula(index) {
     if (!editingSimulacao.aulas) return;
-    
+
     editingSimulacao.aulas.splice(index, 1);
-    
+
     // Re-renderizar tabela
     const tbody = document.getElementById('tbody-aulas-simulacao');
     tbody.innerHTML = renderAulasSimulacao(editingSimulacao.aulas);
-    
+
     // Reaplicar eventos
     setupAulasInputEvents();
-    
+
     recalcularValores();
+    autoSalvarSimulacao();
   }
   
   // Função para abrir modal de remoção de aulas (simulação)
@@ -2797,15 +3159,16 @@ const Simulacoes = (function() {
       // Re-renderizar tabela principal
       const tbody = document.getElementById('tbody-aulas-simulacao');
       tbody.innerHTML = renderAulasSimulacao(editingSimulacao.aulas);
-      
+
       // Reaplicar eventos
       setupAulasInputEvents();
-      
+
       // Recalcular valores
       recalcularValores();
-      
+      autoSalvarSimulacao();
+
       showToast(`✅ ${selected.length} aula(s) removida(s) com sucesso`, 'success');
-      
+
       // Fechar modal
       modalRem.remove();
     });

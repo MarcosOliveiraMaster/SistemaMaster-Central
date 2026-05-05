@@ -5844,7 +5844,8 @@ const BancoDeAulasCards = (function() {
     confirmDeleteAula,
     openEditModal,
     clearFilters,
-    loadAulasDetalhadas
+    loadAulasDetalhadas,
+    showModalSolicitacaoFinal
   };
 })();
 
