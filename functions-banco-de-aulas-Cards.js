@@ -2180,7 +2180,7 @@ const BancoDeAulasCards = (function() {
             </td>
             <td class="text-center">
               <div class="inline-flex items-center justify-center">
-                <div class="switch-toggle ${confirmada ? 'switch-active' : 'switch-inactive'}">
+                <div class="switch-toggle ${confirmada ? 'switch-active' : 'switch-inactive'}" data-id-aula="${aula['id-Aula']}" style="cursor:pointer;">
                   <div class="switch-slider"></div>
                 </div>
               </div>
@@ -2383,6 +2383,28 @@ const BancoDeAulasCards = (function() {
       });
     });
     
+    // Toggle de confirmação do professor
+    document.querySelectorAll('.switch-toggle').forEach(toggle => {
+      toggle.addEventListener('click', async function(e) {
+        e.stopPropagation();
+        const idAula = this.dataset.idAula;
+        if (!idAula) return;
+
+        const novoValor = !this.classList.contains('switch-active');
+        this.classList.toggle('switch-active', novoValor);
+        this.classList.toggle('switch-inactive', !novoValor);
+
+        try {
+          await BANCO.updateConfirmacaoProfessorAula(idAula, novoValor);
+        } catch (err) {
+          // Reverter visualmente em caso de erro
+          this.classList.toggle('switch-active', !novoValor);
+          this.classList.toggle('switch-inactive', novoValor);
+          showToast('Erro ao atualizar confirmação do professor.', 'error');
+        }
+      });
+    });
+
     // Botão de adicionar aula
     const btnAdicionarAula = document.getElementById('btnAdicionarAula');
     if (btnAdicionarAula) {

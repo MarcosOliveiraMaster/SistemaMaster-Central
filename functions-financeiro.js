@@ -16,6 +16,7 @@ let totalPagamentoEquipeMesAtual = 0;
 
 // Variáveis para controlar sincronização de indicadores
 let faturamentoValue = 0;
+let lucroMasterValue = 0;
 let indicadorFaturamentoCarregado = false;
 let indicadorInvestimentosCarregado = false;
 let indicadorPagamentoEquipeCarregado = false;
@@ -42,11 +43,14 @@ window.loadPainelFinanceiro = function() {
             <button id="btn-vendas-lucro-atual" class="py-1.5 px-4 text-sm font-medium rounded-l-lg transition-all bg-gray-100 text-gray-700 hover:bg-gray-200" data-metrica="lucro-atual" title="Lucro Atual">
               Lucro Atual
             </button>
-            <button id="btn-vendas-meta-lucro" class="py-1.5 px-4 text-sm font-medium transition-all bg-gray-100 text-gray-700 hover:bg-gray-200" data-metrica="meta-lucro" title="Meta de Lucro">
-              Meta de Lucro
+            <button id="btn-vendas-faturamento" class="py-1.5 px-4 text-sm font-medium transition-all bg-gray-100 text-gray-700 hover:bg-gray-200" data-metrica="faturamento" title="Faturamento">
+              Faturamento
             </button>
-            <button id="btn-vendas-despesas" class="py-1.5 px-4 text-sm font-medium rounded-r-lg transition-all bg-gray-100 text-gray-700 hover:bg-gray-200" data-metrica="despesas" title="Total de Despesas">
-              Total de Despesas
+            <button id="btn-vendas-despesas" class="py-1.5 px-4 text-sm font-medium transition-all bg-gray-100 text-gray-700 hover:bg-gray-200" data-metrica="despesas" title="Despesas">
+              Despesas
+            </button>
+            <button id="btn-vendas-meta-lucro" class="py-1.5 px-4 text-sm font-medium rounded-r-lg transition-all bg-gray-100 text-gray-700 hover:bg-gray-200" data-metrica="meta-lucro" title="Meta de Lucro">
+              Meta de Lucro
             </button>
           </div>
 
@@ -481,8 +485,9 @@ function initBotoesVendas() {
   
   // Botões de métricas anuais
   const btnLucroAtual = document.getElementById('btn-vendas-lucro-atual');
-  const btnMetaLucro = document.getElementById('btn-vendas-meta-lucro');
+  const btnFaturamento = document.getElementById('btn-vendas-faturamento');
   const btnDespesas = document.getElementById('btn-vendas-despesas');
+  const btnMetaLucro = document.getElementById('btn-vendas-meta-lucro');
   
   // Botões de métricas mensais
   const btnEntradas = document.getElementById('btn-vendas-entradas');
@@ -507,12 +512,16 @@ function initBotoesVendas() {
     btnLucroAtual.addEventListener('click', (e) => handleToggleBotoesVendas(e));
   }
 
-  if (btnMetaLucro) {
-    btnMetaLucro.addEventListener('click', (e) => handleToggleBotoesVendas(e));
+  if (btnFaturamento) {
+    btnFaturamento.addEventListener('click', (e) => handleToggleBotoesVendas(e));
   }
 
   if (btnDespesas) {
     btnDespesas.addEventListener('click', (e) => handleToggleBotoesVendas(e));
+  }
+
+  if (btnMetaLucro) {
+    btnMetaLucro.addEventListener('click', (e) => handleToggleBotoesVendas(e));
   }
 
   // Event listeners para os botões de múltipla seleção MENSAIS
@@ -1144,22 +1153,11 @@ function carregarEntradas() {
   console.log('✅ Firebase disponível');
   console.log('Buscando coleção "BancoDeAulas"...');
 
-  // Calcular o range de datas para o mês selecionado
-  const dataInicio = new Date(anoSelecionado, mesSelecionado, 1);
-  const dataFim = new Date(anoSelecionado, mesSelecionado + 1, 1);
-  
-  const timestampInicio = dataInicio.getTime();
-  const timestampFim = dataFim.getTime();
-  
-  console.log(`📅 Range de timestamps:`);
-  console.log(`  Início: ${dataInicio.toLocaleDateString('pt-BR')} (${timestampInicio})`);
-  console.log(`  Fim: ${dataFim.toLocaleDateString('pt-BR')} (${timestampFim})`);
-
   window.BANCO.db.collection('BancoDeAulas')
     .get()
     .then((snapshot) => {
       console.log(`📊 Total de documentos encontrados: ${snapshot.size}`);
-      
+
       const tbody = document.getElementById('tabelaControleCaixaBody');
       if (!tbody) {
         console.error('❌ tbody tabelaControleCaixaBody não encontrado no DOM');
@@ -1174,86 +1172,34 @@ function carregarEntradas() {
         const dados = doc.data();
         console.log(`📄 Documento: ${doc.id}`);
         console.log(`  Campos:`, Object.keys(dados).join(', '));
-        
-        // Tentar encontrar o campo de data
-        let dataStr = null;
-        if (dados.timestamp) {
-          console.log(`  ✓ Encontrado: timestamp = ${dados.timestamp}`);
-        }
-        if (dados.data || dados.Data) {
-          dataStr = dados.data || dados.Data;
-          console.log(`  ✓ Encontrado: data = ${dataStr}`);
-        }
-        if (dados.dataContratacao || dados.DataContratacao) {
-          dataStr = dados.dataContratacao || dados.DataContratacao;
-          console.log(`  ✓ Encontrado: dataContratacao = ${dataStr}`);
-        }
-        if (dados.dataCriacao || dados.DataCriacao) {
-          dataStr = dados.dataCriacao || dados.DataCriacao;
-          console.log(`  ✓ Encontrado: dataCriacao = ${dataStr}`);
-        }
-        
+
         let entraNoMes = false;
-        
-        // Estratégia 1: Usar timestamp se existir (converter de Firestore Timestamp para milliseconds)
-        if (dados.timestamp) {
-          let timestampMs = null;
-          
-          // Se for objeto Timestamp do Firestore (com propriedade seconds)
-          if (dados.timestamp && dados.timestamp.seconds !== undefined) {
-            timestampMs = dados.timestamp.seconds * 1000;
-            console.log(`    ✓ Convertendo Timestamp Firestore: ${dados.timestamp.seconds}s → ${timestampMs}ms`);
-          }
-          // Se for número direto (milliseconds)
-          else if (typeof dados.timestamp === 'number') {
-            timestampMs = dados.timestamp;
-            console.log(`    ✓ Timestamp é número: ${timestampMs}ms`);
-          }
-          
-          if (timestampMs) {
-            console.log(`    Comparando: ${timestampMs} >= ${timestampInicio} && < ${timestampFim} ?`);
-            if (timestampMs >= timestampInicio && timestampMs < timestampFim) {
-              console.log(`      ✅ DENTRO DO RANGE!`);
+
+        // Filtrar pelo mês/ano da data da primeira parcela (formato DD/MM/YYYY)
+        if (dados.dataPrimeiraParcela) {
+          console.log(`  ✓ dataPrimeiraParcela = ${dados.dataPrimeiraParcela}`);
+          const partes = dados.dataPrimeiraParcela.split('/');
+          if (partes.length === 3) {
+            const mes = parseInt(partes[1]) - 1; // 0-indexed
+            const ano = parseInt(partes[2]);
+            console.log(`    Comparando: mes=${mes} vs ${mesSelecionado}, ano=${ano} vs ${anoSelecionado}`);
+            if (mes === mesSelecionado && ano === anoSelecionado) {
+              console.log(`    ✅ DENTRO DO MÊS!`);
               entraNoMes = true;
             } else {
-              console.log(`      ❌ Fora do range`);
-            }
-          }
-        }
-        // Estratégia 2: Tentar parsestring de data em português
-        else if (dataStr) {
-          // Formato: "13 de fevereiro de 2026 às 18:45:28 UTC-3"
-          console.log(`    Analisando string: "${dataStr}"`);
-          const matches = dataStr.match(/(\d+)\s+de\s+(\w+)\s+de\s+(\d{4})/);
-          if (matches) {
-            const dia = parseInt(matches[1]);
-            const mesPortugues = matches[2].toLowerCase();
-            const ano = parseInt(matches[3]);
-            
-            // Encontrar índice do mês português
-            const indicesMeses = {
-              'janeiro': 0, 'fevereiro': 1, 'março': 2, 'abril': 3,
-              'maio': 4, 'junho': 5, 'julho': 6, 'agosto': 7,
-              'setembro': 8, 'outubro': 9, 'novembro': 10, 'dezembro': 11
-            };
-            
-            const mesParsed = indicesMeses[mesPortugues];
-            console.log(`      Extrado: dia=${dia}, mês=${mesPortugues}(${mesParsed}), ano=${ano}`);
-            
-            if (mesParsed === mesSelecionado && ano === anoSelecionado) {
-              console.log(`      ✅ DENTRO DO MÊS SELECIONADO!`);
-              entraNoMes = true;
-            } else {
-              console.log(`      ❌ Fora do mês. Esperado: ${mesSelecionado}/${anoSelecionado}, Encontrado: ${mesParsed}/${ano}`);
+              console.log(`    ❌ Fora do mês`);
             }
           } else {
-            console.log(`      ❌ Não conseguiu fazer parse da data`);
+            console.log(`    ❌ Formato inválido de dataPrimeiraParcela`);
           }
+        } else {
+          console.log(`  ⚠️ Sem dataPrimeiraParcela — documento ignorado`);
         }
-        
+
         if (entraNoMes) {
           console.log(`    ✅ ADICIONADO À LISTA`);
-          entradasDoMes.push(dados);
+          // Preservar o doc.id como codigoContratacao para abrir o modal ao clicar
+          entradasDoMes.push({ ...dados, _docId: doc.id });
         }
       });
 
@@ -1270,38 +1216,15 @@ function carregarEntradas() {
       let html = '';
       entradasDoMes.forEach((dados, index) => {
         console.log(`Renderizando entrada ${index + 1}:`, dados.nomeCliente);
-        
-        // Tentar converter data
-        let dataFormatada = '-';
-        if (dados.timestamp) {
-          let timestampMs = null;
-          // Se for objeto Timestamp do Firestore
-          if (dados.timestamp && dados.timestamp.seconds !== undefined) {
-            timestampMs = dados.timestamp.seconds * 1000;
-          }
-          // Se for número direto
-          else if (typeof dados.timestamp === 'number') {
-            timestampMs = dados.timestamp;
-          }
-          
-          if (timestampMs) {
-            const dataObj = new Date(timestampMs);
-            dataFormatada = dataObj.toLocaleDateString('pt-BR');
-          }
-        } else if (dados.data || dados.Data || dados.dataContratacao || dados.DataContratacao) {
-          const dataStr = dados.data || dados.Data || dados.dataContratacao || dados.DataContratacao;
-          // Tentar extrair data no formato português
-          const matches = dataStr.match(/(\d+)\s+de\s+(\w+)\s+de\s+(\d{4})/);
-          if (matches) {
-            dataFormatada = `${matches[1]}/${obterMesNumero(matches[2])}/${matches[3]}`;
-          } else {
-            dataFormatada = dataStr;
-          }
-        }
-        
+
+        const codigo = dados.codigoContratacao || dados._docId || '';
+        const dataFormatada = dados.dataPrimeiraParcela || '-';
+
         html += `
-          <tr class="border-b border-gray-200 hover:bg-gray-50">
-            <td class="px-4 py-3 text-sm text-gray-800">${dataFormatada || '-'}</td>
+          <tr class="border-b border-gray-200 hover:bg-orange-50 cursor-pointer transition-colors"
+              data-codigo="${codigo}"
+              title="Clique para ver detalhes da contratação">
+            <td class="px-4 py-3 text-sm text-gray-800">${dataFormatada}</td>
             <td class="px-4 py-3 text-sm text-gray-800">${dados.nomeCliente || '-'}</td>
             <td class="px-4 py-3 text-sm text-gray-800">${dados.SomatorioDuracaoAulas || '-'}</td>
             <td class="px-4 py-3 text-sm text-gray-800">${dados.metodoPagamento || '-'}</td>
@@ -1314,7 +1237,20 @@ function carregarEntradas() {
 
       tbody.innerHTML = html;
       console.log(`✅ Tabela atualizada com ${entradasDoMes.length} entradas`);
-      
+
+      // Clique na linha abre o modal de detalhes da contratação
+      tbody.querySelectorAll('tr[data-codigo]').forEach(tr => {
+        tr.addEventListener('click', () => {
+          const codigo = tr.dataset.codigo;
+          if (!codigo) return;
+          if (typeof abrirDetalhesContratacaoPagamento === 'function') {
+            abrirDetalhesContratacaoPagamento(codigo);
+          } else {
+            console.warn('abrirDetalhesContratacaoPagamento não está disponível');
+          }
+        });
+      });
+
       // Atualizar indicadores
       atualizarIndicadores(entradasDoMes);
     })
@@ -1336,16 +1272,17 @@ function obterMesNumero(mesPorExtenso) {
 function atualizarIndicadores(entradasDoMes) {
   console.log('=== ATUALIZANDO INDICADORES (FATURAMENTO) ===');
   
-  // Calcular Faturamento (somatório de ValorPacote)
+  // Calcular Faturamento (somatório de ValorPacote = "Valor Contratação")
   let faturamento = 0;
+  let lucroMaster = 0;
   entradasDoMes.forEach((entrada) => {
-    if (entrada.ValorPacote) {
-      faturamento += entrada.ValorPacote;
-    }
+    if (entrada.ValorPacote) faturamento += entrada.ValorPacote;
+    if (entrada.lucroMaster) lucroMaster += entrada.lucroMaster;
   });
-  
-  // Armazenar globalmente para cálculo do lucro
+
+  // Armazenar globalmente
   faturamentoValue = faturamento;
+  lucroMasterValue = lucroMaster;
   
   console.log(`📊 Faturamento calculado: R$ ${faturamento.toFixed(2)}`);
   
@@ -1563,160 +1500,115 @@ function salvarEdicaoInvestimento() {
     });
 }
 
-function carregarPagamentoEquipe() {
+async function carregarPagamentoEquipe() {
   console.log('=== CARREGANDO PAGAMENTO EQUIPE ===');
   console.log('Mês selecionado:', mesSelecionado + 1, '/', anoSelecionado);
-  console.log('Mês nome:', meses[mesSelecionado]);
-  
+
   if (!window.BANCO || !window.BANCO.db) {
     console.warn('⚠️ Firebase ainda não está disponível. Tentando novamente em 1s...');
     setTimeout(() => carregarPagamentoEquipe(), 1000);
     return;
   }
 
-  console.log('✅ Firebase disponível');
-  console.log('Buscando coleção "BancoDeAulas-Lista"...');
+  const tbody = document.getElementById('tabelaPagamentoEquipeBody');
+  if (!tbody) {
+    console.error('❌ tbody tabelaPagamentoEquipeBody não encontrado no DOM');
+    return;
+  }
 
-  window.BANCO.db.collection('BancoDeAulas-Lista')
-    .get()
-    .then((snapshot) => {
-      console.log(`📊 Total de documentos encontrados: ${snapshot.size}`);
-      
-      const tbody = document.getElementById('tabelaPagamentoEquipeBody');
-      if (!tbody) {
-        console.error('❌ tbody tabelaPagamentoEquipeBody não encontrado no DOM');
-        return;
-      }
+  // mes 1-indexed — igual ao campo pag-mes da Área de Pagamento
+  const mesComparar = mesSelecionado + 1;
+  const anoComparar = anoSelecionado;
+  const statusValidos = ['Concluída', 'Reposição'];
+  const db = window.BANCO.db;
 
-      console.log('✅ tbody encontrado no DOM');
+  try {
+    // ── Buscar as duas coleções em paralelo (igual a renderizarGraficoPagamentoGrupo) ──
+    const [snapshotAulas, snapshotInfo] = await Promise.all([
+      db.collection('BancoDeAulas-Lista').get(),
+      db.collection('informacoesPagamento').where('ano', '==', anoComparar).get()
+    ]);
 
-      let registrosDoMes = [];
-
-      snapshot.forEach((doc) => {
-        const dados = doc.data();
-        console.log(`📄 Documento: ${doc.id}`);
-        
-        if (dados.data) {
-          console.log(`  ✓ Encontrado: data = "${dados.data}"`);
-          
-          // Parse da data no formato "ddd - dd/mm/yyyy"
-          // Exemplo: "qui - 12/02/2026"
-          const matches = dados.data.match(/\w+\s*-\s*(\d{2})\/(\d{2})\/(\d{4})/);
-          
-          if (matches) {
-            const dia = parseInt(matches[1]);
-            const mes = parseInt(matches[2]) - 1; // JavaScript months são 0-11
-            const ano = parseInt(matches[3]);
-            
-            console.log(`  Extraído: dia=${dia}, mês=${mes}, ano=${ano}`);
-            console.log(`  Comparando com: mes=${mesSelecionado}, ano=${anoSelecionado}`);
-            
-            // Verificar se é do mês selecionado
-            if (mes === mesSelecionado && ano === anoSelecionado) {
-              console.log(`    ✅ DENTRO DO MÊS SELECIONADO!`);
-              registrosDoMes.push(dados);
-            } else {
-              console.log(`    ❌ Fora do mês`);
-            }
-          } else {
-            console.log(`  ❌ Não conseguiu fazer parse da data`);
-          }
-        } else {
-          console.log(`  ⚠️ Campo "data" não encontrado`);
-        }
-      });
-
-      console.log(`\n📈 Total de registros do mês (bruto): ${registrosDoMes.length}`);
-
-      // ============================================
-      // AGRUPAR POR PROFESSOR (APENAS)
-      // ============================================
-      console.log('🔄 Agrupando registros por professor...');
-      
-      const registrosAgrupados = {};
-
-      registrosDoMes.forEach((dados) => {
-        // Chave para agrupar: apenas o nome do professor
-        const chave = (dados.professor || 'N/A').trim();
-        
-        console.log(`  Professor: "${chave}", Valor: ${dados.ValorAula}`);
-        
-        if (!registrosAgrupados[chave]) {
-          registrosAgrupados[chave] = {
-            professor: dados.professor || '-',
-            nomeCliente: dados.nomeCliente || '-',
-            codigoContratacao: dados.codigoContratacao || '-',
-            valorTotal: 0
-          };
-          console.log(`    → Criando novo registro para: ${chave}`);
-        }
-
-        // Somar valores
-        if (dados.ValorAula) {
-          registrosAgrupados[chave].valorTotal += dados.ValorAula;
-          console.log(`    → Acumulando: ${dados.ValorAula} → Total agora: ${registrosAgrupados[chave].valorTotal}`);
-        }
-      });
-
-      // Converter objeto em array
-      const registrosComSoma = Object.values(registrosAgrupados);
-      
-      // Ordenar alfabeticamente pelo nome do professor
-      registrosComSoma.sort((a, b) => {
-        const nomeA = (a.professor || '').toLowerCase();
-        const nomeB = (b.professor || '').toLowerCase();
-        return nomeA.localeCompare(nomeB, 'pt-BR');
-      });
-      
-      console.log(`\n📊 Total de registros após agrupamento: ${registrosComSoma.length}`);
-      console.log(`📋 Professores em ordem: ${registrosComSoma.map(r => r.professor).join(', ')}`);
-
-      if (registrosComSoma.length === 0) {
-        console.warn('⚠️ Nenhum registro encontrado para este mês');
-        tbody.innerHTML = `<tr><td colspan="2" class="px-4 py-8 text-center text-gray-500 text-sm">Nenhum registro encontrado para este mês</td></tr>`;
-        return;
-      }
-
-      let html = '';
-      totalPagamentoEquipeMesAtual = 0;
-      
-      registrosComSoma.forEach((registro, index) => {
-        console.log(`Renderizando registro agrupado ${index + 1}:`, registro.professor);
-        
-        // Formatar valor total
-        const valorTotal = formatarMoedaBrasileira(registro.valorTotal);
-        
-        html += `
-          <tr class="border-b border-gray-200 hover:bg-gray-50">
-            <td class="px-4 py-3 text-sm text-gray-800">${registro.professor}</td>
-            <td class="px-4 py-3 text-sm text-gray-800" style="display: none;">${registro.nomeCliente}</td>
-            <td class="px-4 py-3 text-sm text-gray-800 font-semibold text-orange-600">${valorTotal}</td>
-            <td class="px-4 py-3 text-sm text-gray-800" style="display: none;">${registro.codigoContratacao}</td>
-          </tr>
-        `;
-        
-        // Accumular total
-        if (registro.valorTotal) {
-          totalPagamentoEquipeMesAtual += registro.valorTotal;
-        }
-      });
-
-      tbody.innerHTML = html;
-      console.log(`✅ Tabela atualizada com ${registrosComSoma.length} registros agrupados`);
-      
-      // Atualizar total no título
-      const totalElement = document.getElementById('total-pagamento-equipe');
-      if (totalElement) {
-        totalElement.textContent = `Total: ${formatarMoedaBrasileira(totalPagamentoEquipeMesAtual)}`;
-      }
-      
-      console.log(`💰 Total de Pagamento de Equipe do mês: R$ ${totalPagamentoEquipeMesAtual.toFixed(2)}`);
-      atualizarIndicadorDespesas();
-    })
-    .catch((error) => {
-      console.error('❌ ERRO ao carregar pagamento de equipe:', error);
-      console.error('Stack:', error.stack);
+    // ── 1. Construir mapa de informações adicionais por professor ────────
+    // Estrutura: { [idProfessor]: { entradas: number, saidas: number } }
+    const infoAdicionais = {};
+    snapshotInfo.forEach(doc => {
+      const d = doc.data();
+      const id = d.idProfessor || '';
+      if (!id) return;
+      const match = (d.data || '').match(/(\d{2})\/(\d{2})\/(\d{4})/);
+      if (!match) return;
+      if (parseInt(match[2], 10) !== mesComparar || parseInt(match[3], 10) !== anoComparar) return;
+      if (!infoAdicionais[id]) infoAdicionais[id] = { entradas: 0, saidas: 0 };
+      if (d.tipo === 'entrada') infoAdicionais[id].entradas += (d.valor || 0);
+      else                      infoAdicionais[id].saidas   += (d.valor || 0);
     });
+    console.log(`📋 Professores com info adicional: ${Object.keys(infoAdicionais).length}`);
+
+    // ── 2. Agrupar aulas do mês por idProfessor ───────────────────────────
+    const agrupado = {}; // { [idProfessor]: { professor: string, valorAulas: number } }
+    snapshotAulas.forEach(doc => {
+      const d = doc.data();
+      if (!statusValidos.includes(d.StatusAula)) return;
+      const match = (d.data || '').match(/(\d{2})\/(\d{2})\/(\d{4})/);
+      if (!match) return;
+      if (parseInt(match[2], 10) !== mesComparar || parseInt(match[3], 10) !== anoComparar) return;
+
+      const chave = (d.idProfessor || d.professor || 'N/A').trim();
+      if (!agrupado[chave]) {
+        agrupado[chave] = { professor: d.professor || d.idProfessor || '-', valorAulas: 0 };
+      }
+      agrupado[chave].valorAulas += parseFloat(d.ValorAula) || 0;
+    });
+
+    // Garantir que professores com apenas info adicional também entrem
+    Object.keys(infoAdicionais).forEach(cpf => {
+      if (!agrupado[cpf]) agrupado[cpf] = { professor: cpf, valorAulas: 0 };
+    });
+
+    // ── 3. Calcular total = valorAulas + entradas − saídas ─────────────────
+    // Mesma fórmula de renderizarGraficoPagamentoGrupo
+    const registros = Object.entries(agrupado).map(([cpf, r]) => {
+      const info = infoAdicionais[cpf] || { entradas: 0, saidas: 0 };
+      const total = r.valorAulas + info.entradas - info.saidas;
+      return { professor: r.professor, total };
+    })
+    .filter(r => r.total > 0)
+    .sort((a, b) => (a.professor || '').localeCompare(b.professor || '', 'pt-BR'));
+
+    console.log(`📊 Professores no mês: ${registros.length}`);
+
+    if (registros.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="2" class="px-4 py-8 text-center text-gray-500 text-sm">Nenhum registro encontrado para este mês</td></tr>`;
+      totalPagamentoEquipeMesAtual = 0;
+      atualizarIndicadorDespesas();
+      return;
+    }
+
+    let html = '';
+    totalPagamentoEquipeMesAtual = 0;
+    registros.forEach(r => {
+      totalPagamentoEquipeMesAtual += r.total;
+      html += `
+        <tr class="border-b border-gray-200 hover:bg-gray-50">
+          <td class="px-4 py-3 text-sm text-gray-800">${r.professor}</td>
+          <td class="px-4 py-3 text-sm text-gray-800 font-semibold text-orange-600">${formatarMoedaBrasileira(r.total)}</td>
+        </tr>`;
+    });
+
+    tbody.innerHTML = html;
+
+    const totalElement = document.getElementById('total-pagamento-equipe');
+    if (totalElement) {
+      totalElement.textContent = `Total: ${formatarMoedaBrasileira(totalPagamentoEquipeMesAtual)}`;
+    }
+
+    console.log(`💰 Total Pagamento Equipe: R$ ${totalPagamentoEquipeMesAtual.toFixed(2)}`);
+    atualizarIndicadorDespesas();
+
+  } catch (error) {
+    console.error('❌ ERRO ao carregar pagamento de equipe:', error);
+  }
 }
 
 function atualizarIndicadorDespesas() {
@@ -1749,14 +1641,14 @@ function verificarAndExibirIndicadores() {
     
     // Calcular total de despesas
     const totalDespesas = totalInvestimentosMesAtual + totalPagamentoEquipeMesAtual;
-    
-    // Calcular Lucro Bruto
-    const lucroBruto = faturamentoValue - totalDespesas;
-    
+
+    // Lucro Atual = somatório da coluna "Lucro Atual" (lucroMaster) da tabelaControleCaixa
+    const lucroBruto = lucroMasterValue;
+
     console.log('📊 RESUMO FINAL:');
     console.log(`  Faturamento: R$ ${faturamentoValue.toFixed(2)}`);
     console.log(`  Despesas: R$ ${totalDespesas.toFixed(2)}`);
-    console.log(`  Lucro Bruto: R$ ${lucroBruto.toFixed(2)}`);
+    console.log(`  Lucro Atual (lucroMaster): R$ ${lucroBruto.toFixed(2)}`);
     
     // Atualizar os 3 indicadores simultaneamente
     const indicadorFaturamento = document.getElementById('indicador-faturamento');
@@ -2071,8 +1963,9 @@ function handleToggleBotoesVendas(event) {
   let metrica = '';
 
   if (btnId === 'btn-vendas-lucro-atual') metrica = 'lucro-atual';
-  if (btnId === 'btn-vendas-meta-lucro') metrica = 'meta-lucro';
+  if (btnId === 'btn-vendas-faturamento') metrica = 'faturamento';
   if (btnId === 'btn-vendas-despesas') metrica = 'despesas';
+  if (btnId === 'btn-vendas-meta-lucro') metrica = 'meta-lucro';
 
   if (!metrica) return;
 
@@ -2094,7 +1987,7 @@ function handleToggleBotoesVendas(event) {
   let radiusClass = '';
   if (btnId === 'btn-vendas-lucro-atual') {
     radiusClass = 'rounded-l-lg';
-  } else if (btnId === 'btn-vendas-despesas') {
+  } else if (btnId === 'btn-vendas-meta-lucro') {
     radiusClass = 'rounded-r-lg';
   }
 
@@ -2118,8 +2011,9 @@ async function carregarDadosVendas() {
     // Inicializar com "lucro-atual" ativo por padrão
     metricasAtivasVendas = {
       'lucro-atual': true,
-      'meta-lucro': false,
-      'despesas': false
+      'faturamento': false,
+      'despesas': false,
+      'meta-lucro': false
     };
 
     // Atualizar estilos dos botões
@@ -2137,6 +2031,7 @@ async function carregarDadosVendas() {
     const dadosMeses = {};
     for (let mes = 0; mes < 12; mes++) {
       dadosMeses[mes] = {
+        faturamento: 0,
         lucro_liquido: 0,
         despesas_totais: 0
       };
@@ -2174,14 +2069,17 @@ async function carregarDadosVendas() {
             console.log(`  🎯 Mês encontrado! Índice: ${mesIndex} (${meses[mesIndex]})`);
 
             // Extrair valores
+            const faturamento = docData.faturamento || 0;
             const lucroLiquido = docData.lucro_liquido || 0;
             const despesasTotais = docData.despesas_totais || 0;
 
+            console.log(`  🟠 Faturamento: ${faturamento}`);
             console.log(`  💰 Lucro Líquido: ${lucroLiquido}`);
             console.log(`  💸 Despesas Totais: ${despesasTotais}`);
 
             // Adicionar os dados ao índice do mês
             dadosMeses[mesIndex] = {
+              faturamento: faturamento,
               lucro_liquido: lucroLiquido,
               despesas_totais: despesasTotais
             };
@@ -2249,52 +2147,58 @@ function renderizarGraficoVendas(dadosMeses) {
   // Preparar datasets
   const datasets = [];
 
-  // Dataset Lucro Atual (Laranja)
+  // Dataset Faturamento (Laranja) — index 0
   datasets.push({
-    label: 'Lucro Atual',
-    data: Object.values(dadosMeses).map(d => d.lucro_liquido),
+    label: 'Faturamento',
+    data: Object.values(dadosMeses).map(d => d.faturamento),
     backgroundColor: '#f28705', // Orange-500
     borderColor: '#d97804', // Orange-600
     borderWidth: 1,
     borderRadius: 4,
-    datalabels: {
-      display: true
-    },
+    datalabels: { display: true },
+    hidden: !metricasAtivasVendas['faturamento']
+  });
+
+  // Dataset Lucro Atual (Verde) — index 1
+  datasets.push({
+    label: 'Lucro Atual',
+    data: Object.values(dadosMeses).map(d => d.lucro_liquido),
+    backgroundColor: '#22c55e', // Green-500
+    borderColor: '#16a34a', // Green-600
+    borderWidth: 1,
+    borderRadius: 4,
+    datalabels: { display: true },
     hidden: !metricasAtivasVendas['lucro-atual']
   });
 
-  // Dataset Despesas Totais (Vermelho)
+  // Dataset Despesas (Vermelho) — index 2
   datasets.push({
-    label: 'Total de Despesas',
+    label: 'Despesas',
     data: Object.values(dadosMeses).map(d => d.despesas_totais),
     backgroundColor: '#ef4444', // Red-500
     borderColor: '#dc2626', // Red-600
     borderWidth: 1,
     borderRadius: 4,
-    datalabels: {
-      display: true
-    },
+    datalabels: { display: true },
     hidden: !metricasAtivasVendas['despesas']
   });
 
-  // Dataset Meta de Lucro (Verde - linha constante)
+  // Dataset Meta de Lucro (linha tracejada) — index 3
   datasets.push({
     label: 'Meta de Lucro',
-    data: Array(12).fill(4000), // Meta fixa de R$ 4.000
+    data: Array(12).fill(4000),
     type: 'line',
-    borderColor: '#22c55e', // Green-500
+    borderColor: '#6366f1', // Indigo-500
     backgroundColor: 'transparent',
     borderWidth: 2,
-    borderDash: [5, 5], // Linha tracejada
-    pointBackgroundColor: '#22c55e',
+    borderDash: [5, 5],
+    pointBackgroundColor: '#6366f1',
     pointBorderColor: '#fff',
     pointBorderWidth: 1,
     pointRadius: 3,
     tension: 0,
     fill: false,
-    datalabels: {
-      display: false // Sem rótulos para meta de lucro
-    },
+    datalabels: { display: false },
     hidden: !metricasAtivasVendas['meta-lucro']
   });
 
@@ -2393,11 +2297,13 @@ function atualizarGraficoVendas() {
   if (chartVendas && chartVendas.data) {
     // Atualizar hidden de cada dataset
     chartVendas.data.datasets.forEach((dataset, index) => {
-      if (index === 0) { // Lucro Atual
+      if (index === 0) { // Faturamento
+        dataset.hidden = !metricasAtivasVendas['faturamento'];
+      } else if (index === 1) { // Lucro Atual
         dataset.hidden = !metricasAtivasVendas['lucro-atual'];
-      } else if (index === 1) { // Despesas
+      } else if (index === 2) { // Despesas
         dataset.hidden = !metricasAtivasVendas['despesas'];
-      } else if (index === 2) { // Meta de Lucro
+      } else if (index === 3) { // Meta de Lucro
         dataset.hidden = !metricasAtivasVendas['meta-lucro'];
       }
     });

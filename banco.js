@@ -395,6 +395,22 @@ async function updateEstudanteAula(idAula, nomeEstudante) {
   }
 }
 
+async function updateConfirmacaoProfessorAula(idAula, novoValor) {
+  try {
+    const querySnapshot = await db.collection("BancoDeAulas-Lista")
+      .where("id-Aula", "==", idAula).get();
+    if (querySnapshot.empty) throw new Error(`Aula ${idAula} não encontrada`);
+    await querySnapshot.docs[0].ref.update({
+      ConfirmacaoProfessorAula: novoValor,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    return true;
+  } catch (error) {
+    console.error('❌ Erro ao atualizar ConfirmacaoProfessorAula:', error.message);
+    throw error;
+  }
+}
+
 // Incrementar id-Aula alfabeticamente
 function incrementarIdAula(idAulaAtual) {
   const match = idAulaAtual.match(/^(\d{4})([A-Z]+)$/);
@@ -567,6 +583,7 @@ if (typeof window !== 'undefined') {
     updateMateriaAula,
     updateProfessorAula,
     updateEstudanteAula,
+    updateConfirmacaoProfessorAula,
     updateValorAulaLista,
     addNovaAulaLista,
     deleteAulasLista,
