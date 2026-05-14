@@ -577,7 +577,7 @@ const BancoDeAulasCards = (function() {
     if (codigoContratacao) {
       loadAulasDetalhadas(codigoContratacao);
 
-      // Preencher os valores de contrato (ValorPacote, ValorEquipe, lucroMaster)
+      // Preencher os valores de contrato do Firestore
       (async function() {
         try {
           const docRef = db.collection('BancoDeAulas').doc(codigoContratacao);
@@ -585,6 +585,8 @@ const BancoDeAulasCards = (function() {
           const elPacote = modal.querySelector('#display-valor-pacote-contrato');
           const elEquipe = modal.querySelector('#display-valor-equipe-contrato');
           const elLucro = modal.querySelector('#display-lucro-master-contrato');
+          const elHoraAula = modal.querySelector('#display-hora-aula-contrato');
+          const elTotalHoras = modal.querySelector('#display-total-horas-contrato');
 
           const formatBR = (v) => {
             if (v === undefined || v === null || v === '') return '--';
@@ -598,6 +600,12 @@ const BancoDeAulasCards = (function() {
             elPacote.textContent = formatBR(data.ValorPacote);
             elEquipe.textContent = formatBR(data.ValorEquipe);
             elLucro.textContent = formatBR(data.lucroMaster);
+            if (data.horaAulaProfessor !== undefined && data.horaAulaProfessor !== null && data.horaAulaProfessor !== '') {
+              elHoraAula.textContent = formatBR(data.horaAulaProfessor);
+            }
+            if (data.SomatorioDuracaoAulas) {
+              elTotalHoras.textContent = data.SomatorioDuracaoAulas;
+            }
           } else {
             elPacote.textContent = '--';
             elEquipe.textContent = '--';
@@ -783,6 +791,7 @@ const BancoDeAulasCards = (function() {
         const elPacote = modal.querySelector('#display-valor-pacote-contrato');
         const elEquipe = modal.querySelector('#display-valor-equipe-contrato');
         const elLucro = modal.querySelector('#display-lucro-master-contrato');
+        const elHoraAulaModal = modal.querySelector('#display-hora-aula-contrato');
 
         const parseBR = (str) => {
           if (!str) return 0;
@@ -793,7 +802,7 @@ const BancoDeAulasCards = (function() {
           } catch (e) { return 0; }
         };
 
-        const initialEquipe = parseBR(elEquipe.textContent || elEquipe.innerText);
+        const initialHoraAula = parseBR(elHoraAulaModal ? (elHoraAulaModal.textContent || elHoraAulaModal.innerText) : '0');
         const initialLucro = parseBR(elLucro.textContent || elLucro.innerText);
 
         const modalHtml = `
@@ -806,16 +815,12 @@ const BancoDeAulasCards = (function() {
               <div class="modal-body">
                 <div class="space-y-4">
                   <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Valor para Equipe</label>
-                    <input type="text" id="input-valor-equipe-editar" value="${initialEquipe.toFixed(2).replace('.',',')}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none" />
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Valor Hora/Aula</label>
+                    <input type="text" id="input-valor-equipe-editar" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none" />
                   </div>
                   <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Lucro Master</label>
-                    <input type="text" id="input-lucro-master-editar" value="${initialLucro.toFixed(2).replace('.',',')}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none" />
-                  </div>
-                  <div>
-                    <div class="text-xs text-gray-500">Valor do pacote será calculado como soma dos dois campos</div>
-                    <div class="text-lg font-bold text-orange-600 mt-2" id="preview-valor-pacote-editar">R$ 0,00</div>
+                    <input type="text" id="input-lucro-master-editar" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none" />
                   </div>
                 </div>
               </div>
@@ -837,7 +842,6 @@ const BancoDeAulasCards = (function() {
         const btnAplicar = m.querySelector('#btn-aplicar-editar-valores');
         const inputEquipe = m.querySelector('#input-valor-equipe-editar');
         const inputLucro = m.querySelector('#input-lucro-master-editar');
-        const previewPacote = m.querySelector('#preview-valor-pacote-editar');
 
         const formatBR = (v) => {
           if (v === undefined || v === null || v === '') return '--';
@@ -863,15 +867,12 @@ const BancoDeAulasCards = (function() {
             return formatter.format(n);
           };
 
-          // Ao focar, deixar apenas número (opcional) — manter moeda por consistência
           inputEl.addEventListener('input', (e) => {
             const caret = inputEl.selectionStart;
             const raw = inputEl.value;
             const formatted = formatFromDigits(raw);
             inputEl.value = formatted;
             try { inputEl.selectionStart = inputEl.selectionEnd = inputEl.value.length - (formatted.length - (caret || 0)); } catch (err) { /* ignore caret issues */ }
-            // disparar input para atualizar preview
-            inputEl.dispatchEvent(new Event('input'));
           });
 
           // On blur, ensure well formatted
@@ -887,26 +888,14 @@ const BancoDeAulasCards = (function() {
           return Number.isFinite(n) ? n : 0;
         };
 
-        const updatePreview = () => {
-          const e = parseInput(inputEquipe.value);
-          const l = parseInput(inputLucro.value);
-          previewPacote.textContent = formatBR(e + l);
-        };
-
         // Aplicar máscara e inicializar valores formatados
         try {
-          inputEquipe.value = formatBR(initialEquipe);
+          inputEquipe.value = formatBR(initialHoraAula);
           inputLucro.value = formatBR(initialLucro);
         } catch (e) { /* ignore */ }
 
         attachCurrencyMask(inputEquipe);
         attachCurrencyMask(inputLucro);
-
-        inputEquipe.addEventListener('input', updatePreview);
-        inputLucro.addEventListener('input', updatePreview);
-
-        // init preview
-        updatePreview();
 
         const closeModal = () => {
           try {
@@ -929,34 +918,33 @@ const BancoDeAulasCards = (function() {
             btnAplicar.disabled = true;
             btnAplicar.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Aplicando...';
 
-            const valEquipe = parseInput(inputEquipe.value);
+            const valHoraAula = parseInput(inputEquipe.value);
             const valLucro = parseInput(inputLucro.value);
-            const valPacote = Number((valEquipe + valLucro).toFixed(2));
 
-            // Atualizar no banco (document id = codigoContratacao)
             await BANCO.updateAula(codigoContratacao, {
-              ValorEquipe: valEquipe,
               lucroMaster: valLucro,
-              ValorPacote: valPacote,
-              horaAulaProfessor: valEquipe,
+              horaAulaProfessor: valHoraAula,
               timestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
 
             // Atualizar UI
-            elEquipe.textContent = formatBR(valEquipe);
             elLucro.textContent = formatBR(valLucro);
-            elPacote.textContent = formatBR(valPacote);
-            // Valor Hora/Aula definido pelo input-valor-equipe-editar (conforme regra)
             try {
-              const elHoraAula = document.getElementById('display-hora-aula-contrato');
-              if (elHoraAula) elHoraAula.textContent = formatBR(valEquipe);
+              const elHoraAula = modal.querySelector('#display-hora-aula-contrato');
+              if (elHoraAula) elHoraAula.textContent = formatBR(valHoraAula);
             } catch (e) { /* ignore */ }
 
             showToast('✅ Valores atualizados com sucesso', 'success');
             closeModal();
 
-            // Recarregar detalhes se estiver visível
+            // Recarregar tabela com novo valor hora/aula (recalcula ValorAula por linha e atualiza ValorEquipe)
             try { await loadAulasDetalhadas(codigoContratacao); } catch (e) { /* ignore */ }
+
+            // Atualizar Valor do Pacote = ValorEquipe (recalculado pela tabela) + LucroMaster
+            try {
+              const novoValorEquipe = parseBR(elEquipe.textContent || elEquipe.innerText);
+              elPacote.textContent = formatBR(Number((novoValorEquipe + valLucro).toFixed(2)));
+            } catch (e) { /* ignore */ }
           } catch (err) {
             console.error('Erro ao aplicar valores', err);
             showToast('❌ Erro ao aplicar valores: ' + (err && err.message ? err.message : ''), 'error');
@@ -1030,7 +1018,7 @@ const BancoDeAulasCards = (function() {
           if (valorPacote !== undefined) dadosContratacao.ValorPacote = valorPacote;
           if (valorEquipe !== undefined) dadosContratacao.ValorEquipe = valorEquipe;
           if (lucroMaster !== undefined) dadosContratacao.lucroMaster = lucroMaster;
-          if (valorHoraAula !== undefined) dadosContratacao.valorHoraAula = valorHoraAula;
+          if (valorHoraAula !== undefined) dadosContratacao.horaAulaProfessor = valorHoraAula;
           if (totalHoras && totalHoras.textContent.trim() !== '0h 0m') {
             dadosContratacao.SomatorioDuracaoAulas = totalHoras.textContent.trim();
           }
