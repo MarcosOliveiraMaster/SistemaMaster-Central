@@ -343,7 +343,9 @@ const BancoDeAulasCards = (function() {
   // Função para abrir os detalhes da aula (modal)
   function viewAulaDetails(aula) {
     console.log('🔍 Visualizando detalhes da aula:', aula.id);
-    
+
+    const fmtData = v => { const r = formatDate(v); return r === '--/--/----' ? '' : r; };
+
     // Criar modal HTML
     const modalHtml = `
       <div class="modal-overlay">
@@ -399,7 +401,7 @@ const BancoDeAulasCards = (function() {
                   </div>
                   <div>
                     <div class="text-xs font-medium text-gray-500 mb-1">Assinatura do Contrato</div>
-                    <div class="text-sm text-gray-800">${formatDate(aula.dataAssinaturaContrato) || '--'}</div>
+                    <div class="text-sm text-gray-800">${fmtData(aula.dataAssinaturaContrato)}</div>
                   </div>
                   <div>
                     <div class="text-xs font-medium text-gray-500 mb-1">Método de pagamento</div>
@@ -423,11 +425,11 @@ const BancoDeAulasCards = (function() {
                   </div>
                   <div>
                     <div class="text-xs font-medium text-gray-500 mb-1">Data da primeira parcela</div>
-                    <div class="text-sm text-gray-800">${formatDate(aula.dataPrimeiraParcela) || '--'}</div>
+                    <div class="text-sm text-gray-800">${fmtData(aula.dataPrimeiraParcela)}</div>
                   </div>
                   <div>
                     <div class="text-xs font-medium text-gray-500 mb-1">Data da segunda parcela</div>
-                    <div class="text-sm text-gray-800">${formatDate(aula.dataSegundaParcela) || '--'}</div>
+                    <div class="text-sm text-gray-800">${fmtData(aula.dataSegundaParcela)}</div>
                   </div>
                   <div>
                     <div class="text-xs font-medium text-gray-500 mb-1">Tipo de Equipe</div>
@@ -1817,21 +1819,23 @@ const BancoDeAulasCards = (function() {
     
     // Evento para salvar alterações
     btnSalvar.addEventListener('click', async () => {
+      const dataRegexValida = /^\d{2}\/\d{2}\/\d{4}$/;
+      const sanitizarData = v => (v && dataRegexValida.test(v.trim())) ? v.trim() : '';
+
       // Coletar dados do formulário (não bloqueamos por validações; apenas coletamos avisos)
       const dadosAtualizados = {
         statusContrato: modal.querySelector('#status-contrato').value,
-        dataAssinaturaContrato: modal.querySelector('#data-assinatura-contrato').value,
+        dataAssinaturaContrato: sanitizarData(modal.querySelector('#data-assinatura-contrato').value),
         modoPagamento: metodoPagamentoSelect.value,
         statusPagamento: modal.querySelector('#status-pagamento').value || 'Pagamento completo',
-        dataPrimeiraParcela: modal.querySelector('#data-primeira-parcela').value,
-        dataSegundaParcela: modal.querySelector('#data-segunda-parcela').value,
+        dataPrimeiraParcela: sanitizarData(modal.querySelector('#data-primeira-parcela').value),
+        dataSegundaParcela: sanitizarData(modal.querySelector('#data-segunda-parcela').value),
         ObservacaoContratacao: modal.querySelector('#observacoes-contratacao').value,
         timestamp: firebase.firestore.FieldValue.serverTimestamp()
       };
 
       // Coletar possíveis erros/avisos (sem impedir o salvamento)
       const errors = [];
-      const dataRegex = /^\d{2}\/\d{2}\/\d{4}$/;
       const camposData = [
         { campo: 'dataAssinaturaContrato', nome: 'Assinatura do Contrato' },
         { campo: 'dataPrimeiraParcela', nome: 'Data da primeira parcela' },
@@ -1840,7 +1844,7 @@ const BancoDeAulasCards = (function() {
 
       for (const { campo, nome } of camposData) {
         if (dadosAtualizados[campo] && dadosAtualizados[campo].trim() !== '') {
-          if (!dataRegex.test(dadosAtualizados[campo])) {
+          if (!dataRegexValida.test(dadosAtualizados[campo])) {
             errors.push(`${nome} incompleta ou inválida`);
           }
         }

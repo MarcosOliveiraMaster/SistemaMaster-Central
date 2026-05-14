@@ -150,7 +150,7 @@ async function fetchAulasByDate(dateString) {
 // Função para atualizar uma aula
 async function updateAula(aulaId, updatedData) {
   try {
-    await db.collection("BancoDeAulas").doc(aulaId).update(updatedData);
+    await db.collection("BancoDeAulas").doc(aulaId).set(updatedData, { merge: true });
     CACHE.bancoDeAulas.timestamp = null;
     return true;
   } catch (error) {

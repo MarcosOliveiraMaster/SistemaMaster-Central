@@ -7,7 +7,7 @@ const CONFIG = {
   sections: [
     'painel-central', 'banco-aulas', 'simulacoes', 'mensagens',
     'calendario', 'fluxo-processos', 'clientes', 'professores',
-    'area-pagamento', 'exportar-dados'
+    'area-pagamento', 'exportar-dados', 'previsao-financeira'
   ]
 };
 
@@ -150,7 +150,7 @@ function showSection(sectionId) {
   section.innerHTML = '';
   section.classList.add('active');
 
-  if (sectionId === 'mensagens') {
+  if (sectionId === 'mensagens' || sectionId === 'previsao-financeira') {
     loadSectionContent(sectionId);
   } else {
     setTimeout(() => loadSectionContent(sectionId), 500);
@@ -185,6 +185,9 @@ function loadSectionContent(sectionId) {
       break;
     case 'area-pagamento':
       if (typeof loadAreaPagamento === 'function') loadAreaPagamento();
+      break;
+    case 'previsao-financeira':
+      if (typeof loadPrevisaoFinanceira === 'function') loadPrevisaoFinanceira();
       break;
   }
 }
