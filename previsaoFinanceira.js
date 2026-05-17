@@ -171,6 +171,7 @@ window.loadPrevisaoFinanceira = function () {
   setupPrevisaoListeners();
   atualizarLabelMes();
   carregarEntradasPrevistas(prevMesAtual, prevAnoAtual);
+  carregarSaidasPrevistas(prevMesAtual, prevAnoAtual);
 };
 
 // ─── Gráfico ──────────────────────────────────────────────────────────────────
@@ -337,7 +338,7 @@ function carregarEntradasPrevistas(mes, ano) {
         return `
           <tr class="border-b border-gray-100 hover:bg-orange-50 cursor-pointer transition-colors" data-entrada-idx="${i}">
             <td class="px-3 py-2.5 text-sm text-gray-800">${e.descricao}</td>
-            <td class="px-3 py-2.5 text-sm font-medium text-green-600">${formatarMoeda(e.valor)}</td>
+            <td class="px-3 py-2.5 text-sm font-medium text-green-600 whitespace-nowrap">${formatarMoeda(e.valor)}</td>
             <td class="px-3 py-2.5 text-sm text-gray-500">${e.data}</td>
           </tr>`;
       }).join('');
@@ -473,6 +474,7 @@ function setupPrevisaoListeners() {
     if (prevMesAtual < 0) { prevMesAtual = 11; prevAnoAtual--; }
     atualizarLabelMes();
     carregarEntradasPrevistas(prevMesAtual, prevAnoAtual);
+    carregarSaidasPrevistas(prevMesAtual, prevAnoAtual);
   });
 
   document.getElementById('btn-prev-mes-proximo')?.addEventListener('click', () => {
@@ -480,6 +482,7 @@ function setupPrevisaoListeners() {
     if (prevMesAtual > 11) { prevMesAtual = 0; prevAnoAtual++; }
     atualizarLabelMes();
     carregarEntradasPrevistas(prevMesAtual, prevAnoAtual);
+    carregarSaidasPrevistas(prevMesAtual, prevAnoAtual);
   });
 
   document.getElementById('btn-prev-entradas')?.addEventListener('click', () => setMetricaBtns('entradas'));
@@ -522,11 +525,266 @@ function setupPrevisaoListeners() {
       window.BANCO.forceCacheRefresh();
     }
 
-    carregarEntradasPrevistas(prevMesAtual, prevAnoAtual).finally(() => {
+    Promise.all([
+      carregarEntradasPrevistas(prevMesAtual, prevAnoAtual),
+      carregarSaidasPrevistas(prevMesAtual, prevAnoAtual)
+    ]).finally(() => {
       btn.innerHTML = originalHTML;
       btn.disabled = false;
       btn.style.opacity = '';
     });
+  });
+}
+
+// ─── Saídas previstas ────────────────────────────────────────────────────────
+
+function carregarSaidasPrevistas(mes, ano) {
+  const tbody   = document.getElementById('tbody-saidas-previstas');
+  const totalEl = document.getElementById('total-saidas-previstas');
+  if (!tbody) return Promise.resolve();
+
+  tbody.innerHTML = `
+    <tr>
+      <td colspan="3" class="px-3 py-8 text-center text-gray-400 text-sm">
+        <div class="loading-spinner-small mx-auto mb-2"></div>
+        Carregando...
+      </td>
+    </tr>`;
+
+  if (!window.BANCO || !window.BANCO.db) {
+    tbody.innerHTML = estadoVazioSaidas('Firebase não disponível');
+    if (totalEl) totalEl.textContent = 'R$ 0,00';
+    return Promise.resolve();
+  }
+
+  const promInvest = window.BANCO.db.collection('investimentos').get();
+  const promAulas  = window.BANCO.db.collection('BancoDeAulas-Lista').get();
+
+  return Promise.all([promInvest, promAulas])
+    .then(([snapInvest, snapAulas]) => {
+      const saidas = [];
+
+      snapInvest.forEach(doc => {
+        const d = doc.data();
+        if (!d.data) return;
+        const partes = d.data.split('/');
+        if (partes.length !== 3) return;
+        const docMes = parseInt(partes[1]) - 1;
+        const docAno = parseInt(partes[2]);
+        if (docMes === mes && docAno === ano) {
+          saidas.push({
+            descricao: d.descricao || '-',
+            valor: parseFloat(d.valor) || 0,
+            data: d.data
+          });
+        }
+      });
+
+      saidas.sort((a, b) => parseDateBR(a.data) - parseDateBR(b.data));
+
+      let totalProfessores = 0;
+      snapAulas.forEach(doc => {
+        const d = doc.data();
+        if (!d.data) return;
+        // Formato: "ddd - dd/mm/yyyy"
+        const match = d.data.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+        if (!match) return;
+        const docMes = parseInt(match[2]) - 1;
+        const docAno = parseInt(match[3]);
+        if (docMes === mes && docAno === ano) {
+          totalProfessores += parseFloat(d.ValorAula) || 0;
+        }
+      });
+
+      let total = 0;
+      let html  = '';
+
+      saidas.forEach(s => {
+        total += s.valor;
+        html  += `
+          <tr class="border-b border-gray-100 hover:bg-red-50 transition-colors">
+            <td class="px-3 py-2.5 text-sm text-gray-800">${s.descricao}</td>
+            <td class="px-3 py-2.5 text-sm font-medium text-red-600 whitespace-nowrap">${formatarMoeda(s.valor)}</td>
+            <td class="px-3 py-2.5 text-sm text-gray-500">${s.data}</td>
+          </tr>`;
+      });
+
+      total += totalProfessores;
+      html  += `
+        <tr class="border-b border-gray-100 bg-orange-50 hover:bg-orange-100 cursor-pointer transition-colors" data-prof="1">
+          <td class="px-3 py-2.5 text-sm font-semibold text-gray-800">Pagamento de professores</td>
+          <td class="px-3 py-2.5 text-sm font-medium text-red-600 whitespace-nowrap">${formatarMoeda(totalProfessores)}</td>
+          <td class="px-3 py-2.5 text-sm text-gray-500">-</td>
+        </tr>`;
+
+      tbody.innerHTML = html;
+      if (totalEl) totalEl.textContent = formatarMoeda(total);
+
+      const rowProf = tbody.querySelector('tr[data-prof]');
+      if (rowProf) {
+        rowProf.addEventListener('click', () => abrirModalPagamentoProfessores(mes, ano));
+      }
+    })
+    .catch(err => {
+      console.error('Erro ao carregar saídas previstas:', err);
+      tbody.innerHTML = estadoVazioSaidas('Erro ao carregar dados');
+      if (totalEl) totalEl.textContent = 'R$ 0,00';
+    });
+}
+
+function estadoVazioSaidas(msg) {
+  return `
+    <tr>
+      <td colspan="3" class="px-3 py-8 text-center text-gray-400 text-sm">
+        <i class="fas fa-arrow-up text-2xl text-gray-300 mb-2 block"></i>
+        ${msg || 'Nenhuma saída prevista'}
+      </td>
+    </tr>`;
+}
+
+// ─── Modal Pagamento de Professores ──────────────────────────────────────────
+
+function abrirModalPagamentoProfessores(mes, ano) {
+  const existing = document.getElementById('modal-pagamento-professores');
+  if (existing) existing.remove();
+
+  const modalEl = document.createElement('div');
+  modalEl.id = 'modal-pagamento-professores';
+  modalEl.className = 'modal-overlay';
+  modalEl.style.zIndex = '1000';
+  modalEl.innerHTML = `
+    <div class="modal-container" style="max-width: 680px;">
+      <div class="modal-header">
+        <div>
+          <h3 class="text-lg font-lexend font-bold text-gray-800">Pagamento de Professores</h3>
+          <p class="text-sm text-gray-500 mt-0.5">${PREV_MESES[mes]} ${ano}</p>
+        </div>
+        <button id="btn-fechar-modal-prof" class="text-gray-400 hover:text-gray-600 transition-colors p-1">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body" style="padding: 0;">
+        <div id="modal-prof-loading" class="px-6 py-10 text-center text-gray-400 text-sm">
+          <div class="loading-spinner-small mx-auto mb-2"></div>
+          Carregando...
+        </div>
+        <div id="modal-prof-content" class="hidden overflow-y-auto" style="max-height: 460px;">
+          <table class="w-full">
+            <thead class="sticky top-0 bg-gray-50">
+              <tr class="border-b border-gray-200">
+                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Nome Cliente</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Duração do Pacote</th>
+                <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600">Aulas no Mês</th>
+                <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600">Valor Direcionado</th>
+              </tr>
+            </thead>
+            <tbody id="modal-prof-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer" style="justify-content: space-between; align-items: center;">
+        <p class="text-xs text-gray-400">Clique em um cliente para ver os detalhes da contratação</p>
+        <button id="btn-fechar-modal-prof-footer" class="py-2 px-4 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all">
+          Fechar
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modalEl);
+
+  const fecharModal = () => modalEl.remove();
+  document.getElementById('btn-fechar-modal-prof').addEventListener('click', fecharModal);
+  document.getElementById('btn-fechar-modal-prof-footer').addEventListener('click', fecharModal);
+  modalEl.addEventListener('click', e => { if (e.target === modalEl) fecharModal(); });
+
+  if (!window.BANCO || !window.BANCO.db) {
+    document.getElementById('modal-prof-loading').innerHTML =
+      '<p class="text-red-500 text-sm">Firebase não disponível</p>';
+    return;
+  }
+
+  Promise.all([
+    window.BANCO.db.collection('BancoDeAulas-Lista').get(),
+    window.BANCO.db.collection('BancoDeAulas').get()
+  ]).then(([snapLista, snapBanco]) => {
+    const mapPacotes = {};
+    snapBanco.forEach(doc => { mapPacotes[doc.id] = doc.data(); });
+
+    const grupos = {};
+    snapLista.forEach(doc => {
+      const d = doc.data();
+      if (!d.data) return;
+      const match = d.data.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+      if (!match) return;
+      if (parseInt(match[2]) - 1 !== mes || parseInt(match[3]) !== ano) return;
+
+      const codigo = d.codigoContratacao || (d['id-Aula'] || '').substring(0, 4);
+      if (!codigo) return;
+
+      if (!grupos[codigo]) {
+        grupos[codigo] = { nomeCliente: d.nomeCliente || '', quantidade: 0, totalValor: 0 };
+      }
+      grupos[codigo].quantidade++;
+      grupos[codigo].totalValor += parseFloat(d.ValorAula) || 0;
+    });
+
+    const loading = document.getElementById('modal-prof-loading');
+    const content = document.getElementById('modal-prof-content');
+    const tbody   = document.getElementById('modal-prof-tbody');
+
+    const codigos = Object.keys(grupos);
+    if (codigos.length === 0) {
+      loading.innerHTML = '<p class="text-gray-400 text-sm">Nenhum professor encontrado para este mês</p>';
+      return;
+    }
+
+    let totalGeral = 0;
+    let html = '';
+
+    codigos.forEach(codigo => {
+      const g      = grupos[codigo];
+      const pacote = mapPacotes[codigo] || {};
+      const nome   = (g.nomeCliente || '').trim().split(/\s+/).slice(0, 2).join(' ') || '-';
+      const duracao = pacote.SomatorioDuracaoAulas || '-';
+      totalGeral += g.totalValor;
+
+      html += `
+        <tr class="border-b border-gray-100 hover:bg-orange-50 cursor-pointer transition-colors" data-codigo="${codigo}">
+          <td class="px-4 py-3 text-sm font-medium text-gray-800">${nome}</td>
+          <td class="px-4 py-3 text-sm text-gray-600">${duracao}</td>
+          <td class="px-4 py-3 text-sm text-gray-600 text-center">${g.quantidade}</td>
+          <td class="px-4 py-3 text-sm font-semibold text-red-600 text-right">${formatarMoeda(g.totalValor)}</td>
+        </tr>`;
+    });
+
+    html += `
+      <tr class="bg-gray-50 border-t-2 border-gray-300">
+        <td class="px-4 py-3 text-sm font-bold text-gray-800" colspan="3">Total</td>
+        <td class="px-4 py-3 text-sm font-bold text-red-600 text-right">${formatarMoeda(totalGeral)}</td>
+      </tr>`;
+
+    tbody.innerHTML = html;
+
+    tbody.querySelectorAll('tr[data-codigo]').forEach(tr => {
+      tr.addEventListener('click', () => {
+        const codigo = tr.dataset.codigo;
+        fecharModal();
+        if (typeof abrirDetalhesContratacaoPagamento === 'function') {
+          abrirDetalhesContratacaoPagamento(codigo);
+        } else {
+          console.warn('abrirDetalhesContratacaoPagamento não disponível');
+        }
+      });
+    });
+
+    loading.classList.add('hidden');
+    content.classList.remove('hidden');
+  }).catch(err => {
+    console.error('Erro ao carregar modal de professores:', err);
+    document.getElementById('modal-prof-loading').innerHTML =
+      '<p class="text-red-500 text-sm">Erro ao carregar dados</p>';
   });
 }
 

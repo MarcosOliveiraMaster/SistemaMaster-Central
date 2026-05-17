@@ -16,7 +16,8 @@
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\marco\\\\OneDrive\\\\Documentos\\\\GitHub\\\\SistemaMaster-Central\" -Filter \"*.ico\" -Recurse)",
       "Bash(Select-Object FullName)",
       "WebFetch(domain:central.mastereducacao.app.br)",
-      "Bash(git check-ignore *)"
+      "Bash(git check-ignore *)",
+      "Bash(git checkout *)"
     ]
   }
 }
