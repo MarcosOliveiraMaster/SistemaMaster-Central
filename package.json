@@ -3,9 +3,17 @@
   "version": "1.0.0",
   "description": "Scripts administrativos para SistemaMaster Central",
   "scripts": {
-    "query-firebase": "node firebase-query.js"
+    "query-firebase": "node firebase-query.js",
+    "audit": "npm audit --audit-level=high",
+    "audit:fix": "npm audit fix",
+    "lint": "eslint --ext .js .",
+    "lint:fix": "eslint --ext .js . --fix"
   },
   "dependencies": {
     "firebase-admin": "^12.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.1",
+    "eslint-plugin-security": "^2.1.1"
   }
 }

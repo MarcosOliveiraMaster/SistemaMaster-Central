@@ -2,3 +2,8 @@ node_modules/
 serviceAccountKey.json
 *.json.key
 .env
+
+# Logs de debug — nunca versionar (podem conter dados sensíveis)
+*.log
+firebase-debug.log
+firestore-debug.log
