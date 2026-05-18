@@ -11,6 +11,8 @@ let prevChartInstance = null;
 let prevShowMedia     = false;
 let prevShowMeta      = false;
 let prevEntradasCache = [];
+let prevSaidasCache   = [];
+let prevMetricaAtual  = 'entradas'; // 'entradas' | 'saidas' | 'saldo'
 
 // ─── Entrada principal ────────────────────────────────────────────────────────
 
@@ -25,6 +27,8 @@ window.loadPrevisaoFinanceira = function () {
   prevShowMedia     = false;
   prevShowMeta      = false;
   prevEntradasCache = [];
+  prevSaidasCache   = [];
+  prevMetricaAtual  = 'entradas';
 
   section.innerHTML = `
     <!-- Gráfico -->
@@ -87,19 +91,6 @@ window.loadPrevisaoFinanceira = function () {
       <div style="position: relative; height: 200px; width: 100%;">
         <canvas id="canvas-previsao"></canvas>
       </div>
-    </div>
-
-    <!-- Botões de navegação das tabelas -->
-    <div class="flex gap-0 mb-4">
-      <button class="py-1.5 px-4 text-sm font-medium rounded-l-lg transition-all bg-orange-500 text-white hover:bg-orange-600" id="btn-tabela-entradas">
-        Entradas
-      </button>
-      <button class="py-1.5 px-4 text-sm font-medium transition-all bg-gray-100 text-gray-700 hover:bg-gray-200" id="btn-tabela-saidas">
-        Saídas
-      </button>
-      <button class="py-1.5 px-4 text-sm font-medium rounded-r-lg transition-all bg-gray-100 text-gray-700 hover:bg-gray-200" id="btn-tabela-saldo">
-        Saldo
-      </button>
     </div>
 
     <!-- Entradas e Saídas previstas: lado a lado -->
@@ -170,13 +161,15 @@ window.loadPrevisaoFinanceira = function () {
 
   setupPrevisaoListeners();
   atualizarLabelMes();
-  carregarEntradasPrevistas(prevMesAtual, prevAnoAtual);
-  carregarSaidasPrevistas(prevMesAtual, prevAnoAtual);
+  Promise.all([
+    carregarEntradasPrevistas(prevMesAtual, prevAnoAtual),
+    carregarSaidasPrevistas(prevMesAtual, prevAnoAtual)
+  ]).then(() => atualizarGraficoAtual());
 };
 
 // ─── Gráfico ──────────────────────────────────────────────────────────────────
 
-function atualizarGrafico(entradas) {
+function atualizarGrafico(entradas, tipo = 'entradas') {
   const canvas = document.getElementById('canvas-previsao');
   if (!canvas || typeof Chart === 'undefined') return;
 
@@ -188,6 +181,9 @@ function atualizarGrafico(entradas) {
   const fontBase = { family: 'Lexend', size: 11 };
   const tickColor = '#6b7280';
   const moedaFmt  = v => 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+  const corBorda  = tipo === 'saidas' ? 'rgba(239,68,68,1)'    : tipo === 'saldo' ? 'rgba(34,197,94,1)'    : 'rgba(249,115,22,1)';
+  const corFundo  = tipo === 'saidas' ? 'rgba(239,68,68,0.08)' : tipo === 'saldo' ? 'rgba(34,197,94,0.08)' : 'rgba(249,115,22,0.08)';
+  const corFill   = tipo === 'saidas' ? 'rgba(239,68,68,0.12)' : tipo === 'saldo' ? 'rgba(34,197,94,0.12)' : 'rgba(249,115,22,0.12)';
 
   const linhaConstante = (labels, valor, cor, label) => ({
     label,
@@ -202,7 +198,7 @@ function atualizarGrafico(entradas) {
     fill: false
   });
 
-  const options = (tooltipLabel) => ({
+  const options = () => ({
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
@@ -232,17 +228,17 @@ function atualizarGrafico(entradas) {
 
     const datasets = [{
       data: valores,
-      borderColor: 'rgba(249, 115, 22, 1)',
-      backgroundColor: 'rgba(249, 115, 22, 0.08)',
-      pointBackgroundColor: 'rgba(249, 115, 22, 1)',
+      borderColor: corBorda,
+      backgroundColor: corFundo,
+      pointBackgroundColor: corBorda,
       pointRadius: 5,
       pointHoverRadius: 7,
       tension: 0.4,
       fill: false
     }];
 
-    if (prevShowMedia) datasets.push(linhaConstante(labels, media,  'rgba(139, 92, 246, 1)', 'Média'));
-    if (prevShowMeta)  datasets.push(linhaConstante(labels, 4000,   'rgba(34, 197, 94, 1)',  'Meta'));
+    if (prevShowMedia) datasets.push(linhaConstante(labels, media, 'rgba(139,92,246,1)', 'Média'));
+    if (prevShowMeta)  datasets.push(linhaConstante(labels, 4000,  'rgba(34,197,94,1)',  'Meta'));
 
     prevChartInstance = new Chart(canvas, { type: 'line', data: { labels, datasets }, options: options() });
 
@@ -256,17 +252,17 @@ function atualizarGrafico(entradas) {
 
     const datasets = [{
       data: valores,
-      borderColor: 'rgba(249, 115, 22, 1)',
-      backgroundColor: 'rgba(249, 115, 22, 0.12)',
-      pointBackgroundColor: 'rgba(249, 115, 22, 1)',
+      borderColor: corBorda,
+      backgroundColor: corFill,
+      pointBackgroundColor: corBorda,
       pointRadius: 4,
       pointHoverRadius: 6,
       tension: 0.4,
       fill: true
     }];
 
-    if (prevShowMedia) datasets.push(linhaConstante(datas, mediaAcum, 'rgba(139, 92, 246, 1)', 'Média'));
-    if (prevShowMeta)  datasets.push(linhaConstante(datas, 4000,      'rgba(34, 197, 94, 1)',  'Meta'));
+    if (prevShowMedia) datasets.push(linhaConstante(datas, mediaAcum, 'rgba(139,92,246,1)', 'Média'));
+    if (prevShowMeta)  datasets.push(linhaConstante(datas, 4000,      'rgba(34,197,94,1)',  'Meta'));
 
     prevChartInstance = new Chart(canvas, { type: 'line', data: { labels: datas, datasets }, options: options() });
   }
@@ -289,7 +285,7 @@ function carregarEntradasPrevistas(mes, ano) {
 
   if (!window.BANCO || !window.BANCO.db) {
     tbody.innerHTML = estadoVazioEntradas('Firebase não disponível');
-    atualizarGrafico([]);
+    prevEntradasCache = [];
     return Promise.resolve();
   }
 
@@ -328,7 +324,6 @@ function carregarEntradasPrevistas(mes, ano) {
         tbody.innerHTML = estadoVazioEntradas();
         if (totalEl) totalEl.textContent = 'R$ 0,00';
         prevEntradasCache = [];
-        atualizarGrafico([]);
         return;
       }
 
@@ -354,12 +349,11 @@ function carregarEntradasPrevistas(mes, ano) {
 
       if (totalEl) totalEl.textContent = formatarMoeda(total);
       prevEntradasCache = entradas;
-      atualizarGrafico(entradas);
     })
     .catch(err => {
       console.error('Erro ao carregar entradas previstas:', err);
       tbody.innerHTML = estadoVazioEntradas('Erro ao carregar dados');
-      atualizarGrafico([]);
+      prevEntradasCache = [];
     });
 }
 
@@ -424,13 +418,6 @@ function atualizarBotaoAnterior() {
 
 // ─── Estados dos botões ───────────────────────────────────────────────────────
 
-function setTabelaBtns(aba) {
-  const ativo   = 'py-1.5 px-4 text-sm font-medium transition-all bg-orange-500 text-white hover:bg-orange-600';
-  const inativo = 'py-1.5 px-4 text-sm font-medium transition-all bg-gray-100 text-gray-700 hover:bg-gray-200';
-  document.getElementById('btn-tabela-entradas').className = (aba === 'entradas' ? ativo : inativo) + ' rounded-l-lg';
-  document.getElementById('btn-tabela-saidas').className   = (aba === 'saidas'   ? ativo : inativo);
-  document.getElementById('btn-tabela-saldo').className    = (aba === 'saldo'    ? ativo : inativo) + ' rounded-r-lg';
-}
 
 function setMetricaBtns(metrica) {
   const ativo   = 'py-1.5 px-4 text-sm font-medium transition-all bg-orange-500 text-white hover:bg-orange-600';
@@ -464,53 +451,62 @@ function setToggleBtnEstado(id, ativo, cor) {
 // ─── Listeners ────────────────────────────────────────────────────────────────
 
 function setupPrevisaoListeners() {
-  document.getElementById('btn-tabela-entradas')?.addEventListener('click', () => setTabelaBtns('entradas'));
-  document.getElementById('btn-tabela-saidas')?.addEventListener('click',   () => setTabelaBtns('saidas'));
-  document.getElementById('btn-tabela-saldo')?.addEventListener('click',    () => setTabelaBtns('saldo'));
 
   document.getElementById('btn-prev-mes-anterior')?.addEventListener('click', () => {
     if (prevMesAtual === PREV_MES_MIN && prevAnoAtual === PREV_ANO_MIN) return;
     prevMesAtual--;
     if (prevMesAtual < 0) { prevMesAtual = 11; prevAnoAtual--; }
     atualizarLabelMes();
-    carregarEntradasPrevistas(prevMesAtual, prevAnoAtual);
-    carregarSaidasPrevistas(prevMesAtual, prevAnoAtual);
+    recarregarDadosMes();
   });
 
   document.getElementById('btn-prev-mes-proximo')?.addEventListener('click', () => {
     prevMesAtual++;
     if (prevMesAtual > 11) { prevMesAtual = 0; prevAnoAtual++; }
     atualizarLabelMes();
-    carregarEntradasPrevistas(prevMesAtual, prevAnoAtual);
-    carregarSaidasPrevistas(prevMesAtual, prevAnoAtual);
+    recarregarDadosMes();
   });
 
-  document.getElementById('btn-prev-entradas')?.addEventListener('click', () => setMetricaBtns('entradas'));
-  document.getElementById('btn-prev-saidas')?.addEventListener('click',   () => setMetricaBtns('saidas'));
-  document.getElementById('btn-prev-saldo')?.addEventListener('click',    () => setMetricaBtns('saldo'));
+  document.getElementById('btn-prev-entradas')?.addEventListener('click', () => {
+    prevMetricaAtual = 'entradas';
+    setMetricaBtns('entradas');
+    atualizarGrafico(prevEntradasCache, 'entradas');
+  });
+
+  document.getElementById('btn-prev-saidas')?.addEventListener('click', () => {
+    prevMetricaAtual = 'saidas';
+    setMetricaBtns('saidas');
+    atualizarGrafico(prevSaidasCache, 'saidas');
+  });
+
+  document.getElementById('btn-prev-saldo')?.addEventListener('click', () => {
+    prevMetricaAtual = 'saldo';
+    setMetricaBtns('saldo');
+    atualizarGraficoSaldo();
+  });
 
   document.getElementById('btn-prev-individual')?.addEventListener('click', () => {
     prevModoGrafico = 'individual';
     setModoGraficoBtns('individual');
-    carregarEntradasPrevistas(prevMesAtual, prevAnoAtual);
+    atualizarGraficoAtual();
   });
 
   document.getElementById('btn-prev-montante')?.addEventListener('click', () => {
     prevModoGrafico = 'montante';
     setModoGraficoBtns('montante');
-    carregarEntradasPrevistas(prevMesAtual, prevAnoAtual);
+    atualizarGraficoAtual();
   });
 
   document.getElementById('btn-prev-media')?.addEventListener('click', () => {
     prevShowMedia = !prevShowMedia;
     setToggleBtnEstado('btn-prev-media', prevShowMedia, 'rgba(139, 92, 246, 1)');
-    atualizarGrafico(prevEntradasCache);
+    atualizarGraficoAtual();
   });
 
   document.getElementById('btn-prev-meta')?.addEventListener('click', () => {
     prevShowMeta = !prevShowMeta;
     setToggleBtnEstado('btn-prev-meta', prevShowMeta, 'rgba(34, 197, 94, 1)');
-    atualizarGrafico(prevEntradasCache);
+    atualizarGraficoAtual();
   });
 
   document.getElementById('btn-prev-atualizar')?.addEventListener('click', () => {
@@ -528,12 +524,43 @@ function setupPrevisaoListeners() {
     Promise.all([
       carregarEntradasPrevistas(prevMesAtual, prevAnoAtual),
       carregarSaidasPrevistas(prevMesAtual, prevAnoAtual)
-    ]).finally(() => {
+    ]).then(() => atualizarGraficoAtual()).finally(() => {
       btn.innerHTML = originalHTML;
       btn.disabled = false;
       btn.style.opacity = '';
     });
   });
+}
+
+// ─── Helpers de gráfico ──────────────────────────────────────────────────────
+
+function recarregarDadosMes() {
+  Promise.all([
+    carregarEntradasPrevistas(prevMesAtual, prevAnoAtual),
+    carregarSaidasPrevistas(prevMesAtual, prevAnoAtual)
+  ]).then(() => atualizarGraficoAtual());
+}
+
+function atualizarGraficoAtual() {
+  if (prevMetricaAtual === 'saidas')     atualizarGrafico(prevSaidasCache, 'saidas');
+  else if (prevMetricaAtual === 'saldo') atualizarGraficoSaldo();
+  else                                   atualizarGrafico(prevEntradasCache, 'entradas');
+}
+
+function atualizarGraficoSaldo() {
+  const porDataE = {};
+  prevEntradasCache.forEach(e => { porDataE[e.data] = (porDataE[e.data] || 0) + e.valor; });
+
+  const porDataS = {};
+  prevSaidasCache.forEach(s => { porDataS[s.data] = (porDataS[s.data] || 0) + s.valor; });
+
+  const todasDatas = [...new Set([...Object.keys(porDataE), ...Object.keys(porDataS)])];
+  const saldoEntries = todasDatas.map(d => ({
+    data: d,
+    valor: (porDataE[d] || 0) - (porDataS[d] || 0)
+  }));
+
+  atualizarGrafico(saldoEntries, 'saldo');
 }
 
 // ─── Saídas previstas ────────────────────────────────────────────────────────
@@ -554,6 +581,7 @@ function carregarSaidasPrevistas(mes, ano) {
   if (!window.BANCO || !window.BANCO.db) {
     tbody.innerHTML = estadoVazioSaidas('Firebase não disponível');
     if (totalEl) totalEl.textContent = 'R$ 0,00';
+    prevSaidasCache = [];
     return Promise.resolve();
   }
 
@@ -562,7 +590,8 @@ function carregarSaidasPrevistas(mes, ano) {
 
   return Promise.all([promInvest, promAulas])
     .then(([snapInvest, snapAulas]) => {
-      const saidas = [];
+      const saidas      = [];
+      const saidasChart = [];
 
       snapInvest.forEach(doc => {
         const d = doc.data();
@@ -572,11 +601,9 @@ function carregarSaidasPrevistas(mes, ano) {
         const docMes = parseInt(partes[1]) - 1;
         const docAno = parseInt(partes[2]);
         if (docMes === mes && docAno === ano) {
-          saidas.push({
-            descricao: d.descricao || '-',
-            valor: parseFloat(d.valor) || 0,
-            data: d.data
-          });
+          const entrada = { descricao: d.descricao || '-', valor: parseFloat(d.valor) || 0, data: d.data };
+          saidas.push(entrada);
+          saidasChart.push(entrada);
         }
       });
 
@@ -592,9 +619,15 @@ function carregarSaidasPrevistas(mes, ano) {
         const docMes = parseInt(match[2]) - 1;
         const docAno = parseInt(match[3]);
         if (docMes === mes && docAno === ano) {
-          totalProfessores += parseFloat(d.ValorAula) || 0;
+          const valorAula = parseFloat(d.ValorAula) || 0;
+          totalProfessores += valorAula;
+          const dateStr = `${match[1]}/${match[2]}/${match[3]}`;
+          saidasChart.push({ descricao: `Aula - ${d.nomeCliente || ''}`, valor: valorAula, data: dateStr });
         }
       });
+
+      saidasChart.sort((a, b) => parseDateBR(a.data) - parseDateBR(b.data));
+      prevSaidasCache = saidasChart;
 
       let total = 0;
       let html  = '';
@@ -629,6 +662,7 @@ function carregarSaidasPrevistas(mes, ano) {
       console.error('Erro ao carregar saídas previstas:', err);
       tbody.innerHTML = estadoVazioSaidas('Erro ao carregar dados');
       if (totalEl) totalEl.textContent = 'R$ 0,00';
+      prevSaidasCache = [];
     });
 }
 
