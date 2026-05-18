@@ -18,7 +18,11 @@
       "WebFetch(domain:central.mastereducacao.app.br)",
       "Bash(git check-ignore *)",
       "Bash(git checkout *)",
-      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\marco\\\\OneDrive\\\\Documentos\\\\GitHub\\\\SistemaMaster-Central\" -Recurse -ErrorAction SilentlyContinue)"
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\marco\\\\OneDrive\\\\Documentos\\\\GitHub\\\\SistemaMaster-Central\" -Recurse -ErrorAction SilentlyContinue)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\marco\\\\OneDrive\\\\Documentos\\\\GitHub\\\\SistemaMaster-Central\" -Filter \"*dashboard*\" -Recurse -File)",
+      "Bash(npm install *)",
+      "Bash(firebase deploy *)",
+      "Bash(firebase login:list)"
     ]
   }
 }

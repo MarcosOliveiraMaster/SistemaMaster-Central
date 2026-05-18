@@ -22,6 +22,9 @@ class DashboardCliente {
     // Permissões (sem login — acesso total)
     this.userPermissions = { edit: true, backup: true };
 
+    // Filtros de status ativos (multi-select modal) — padrão: somente Ativos
+    this._activeStatusFilters = ['Ativo'];
+
     // Debounce timers
     this._searchTimer = null;
     this._cidadeTimer = null;
@@ -79,14 +82,13 @@ class DashboardCliente {
           ...d,
           estudantes,
           quantidadeEstudantes: estudantes.length,
-          status: d.status || 'Cliente Potencial',
+          status: this._normalizeStatus(d.status) || 'Potencial',
           dataCadastroLegivel: d.dataCadastroLegivel || '—'
         };
       });
 
       this.filteredClients = null;
-      this._updateCount();
-      this.renderCards();
+      this.applyLocalFilters();
     } catch (err) {
       console.error('[DashboardCliente] Erro ao carregar clientes:', err);
       this.showToast('Erro ao carregar clientes', 'error');
@@ -119,7 +121,7 @@ class DashboardCliente {
         endereco: 'Av. Paulista, 1000',
         cidadeUF: 'São Paulo / SP',
         complemento: 'Apto 42',
-        status: 'Cliente Ativo',
+        status: 'Ativo',
         dataCadastroLegivel: '01/03/2026',
         mesmoEndereco: true,
         estudantes: [
@@ -145,7 +147,7 @@ class DashboardCliente {
         endereco: 'Rua da Assembléia, 200',
         cidadeUF: 'Rio de Janeiro / RJ',
         complemento: '',
-        status: 'Cliente Potencial',
+        status: 'Potencial',
         dataCadastroLegivel: '15/02/2026',
         mesmoEndereco: false,
         enderecoAulas: 'Rua das Flores, 50',
@@ -262,6 +264,15 @@ class DashboardCliente {
     return p.length >= 10 && p.length <= 11;
   }
 
+  _normalizeStatus(raw) {
+    const map = {
+      'cliente ativo': 'Ativo',   'ativo': 'Ativo',
+      'cliente potencial': 'Potencial', 'potencial': 'Potencial',
+      'cliente inativo': 'Inativo',  'inativo': 'Inativo'
+    };
+    return map[(raw || '').toLowerCase().trim()] || raw || '';
+  }
+
   // ============================================================
   // HELPERS PRIVADOS
   // ============================================================
@@ -309,6 +320,7 @@ class DashboardCliente {
   // ============================================================
 
   setupUI() {
+    this._injectACStyles();
     const btnCSV = document.getElementById('dc-btn-csv');
     const btnEditar = document.getElementById('dc-detalhe-btn-editar');
     if (btnCSV) btnCSV.style.display = this.userPermissions.backup ? 'inline-flex' : 'none';
@@ -341,10 +353,16 @@ class DashboardCliente {
     if (refresh) refresh.addEventListener('click', () => this.loadClients().catch(console.error));
     if (csv) csv.addEventListener('click', () => this.downloadCSV());
 
-    // Botão toggle "Cliente em Potencial"
+    // Botão de filtro por status (modal multi-select)
     const btnPotencial = document.getElementById('dc-btn-potencial');
     if (btnPotencial) {
-      btnPotencial.addEventListener('click', () => this.togglePotencialFilter());
+      btnPotencial.addEventListener('click', () => this.openFilterModal());
+    }
+
+    // Botão de configurações
+    const btnConfig = document.getElementById('dc-configuracao');
+    if (btnConfig) {
+      btnConfig.addEventListener('click', () => this.openConfigModal());
     }
 
     // Botões do modal detalhes
@@ -379,6 +397,9 @@ class DashboardCliente {
       if (e.key === 'Escape') {
         ['dc-modal-confirm', 'dc-modal-editar', 'dc-modal-estudante', 'dc-modal-aula', 'dc-modal-nf', 'dc-modal-detalhes']
           .forEach(id => this.closeModal(id));
+        ['dc-overlayFilter', 'dc-overlayStatus', 'dc-overlayConfig', 'dc-overlayPerm', 'dc-overlayPermConfirm']
+          .forEach(id => document.getElementById(id)?.remove());
+        this.closeContextMenu();
       }
     });
   }
@@ -394,7 +415,12 @@ class DashboardCliente {
 
     this.filteredClients = this.clients.filter(c => {
       const nomeOk = !rawSearch || (c.nome || '').toLowerCase().includes(rawSearch);
-      const statusOk = !statusVal || c.status === statusVal;
+      let statusOk;
+      if (this._activeStatusFilters.length > 0) {
+        statusOk = this._activeStatusFilters.includes(c.status);
+      } else {
+        statusOk = !statusVal || c.status === statusVal;
+      }
       const cidadeOk = !cidadeVal || (c.cidadeUF || '').toLowerCase().includes(cidadeVal);
       return nomeOk && statusOk && cidadeOk;
     });
@@ -414,26 +440,74 @@ class DashboardCliente {
     if (btnPotencial) btnPotencial.classList.remove('dc-btn-active');
     this.filteredClients = null;
     this.activeFilters = {};
-    this._potencialFilterActive = false;
+    this._activeStatusFilters = [];
     this._updateCount();
     this.renderCards();
   }
 
-  togglePotencialFilter() {
-    const btn = document.getElementById('dc-btn-potencial');
-    const statusSelect = document.getElementById('dc-filter-status');
-    
-    this._potencialFilterActive = !this._potencialFilterActive;
-    
-    if (this._potencialFilterActive) {
-      btn?.classList.add('dc-btn-active');
-      if (statusSelect) statusSelect.value = 'Cliente Potencial';
-    } else {
-      btn?.classList.remove('dc-btn-active');
+  openFilterModal() {
+    document.getElementById('dc-overlayFilter')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'dc-overlayFilter';
+    overlay.className = 'ap-overlay';
+
+    const pillHtml = (status, label) => {
+      const active = this._activeStatusFilters.includes(status);
+      return `<button class="dc-filter-pill${active ? ' dc-filter-pill--active' : ''}" data-status="${status}">${label}</button>`;
+    };
+
+    overlay.innerHTML = `
+      <div class="ap-modal ap-modal-sm" role="dialog" aria-modal="true">
+        <div class="ap-modal-header">
+          <h2><i class="fas fa-filter" style="color:#f28705"></i> Filtrar Clientes</h2>
+          <button class="ap-modal-close" id="dc-filterClose" aria-label="Fechar">&times;</button>
+        </div>
+        <div class="ap-modal-body">
+          <p style="font-size:.82rem;color:#6b7280;margin-bottom:1rem">
+            Selecione um ou mais status para filtrar:
+          </p>
+          <div class="dc-filter-pills">
+            ${pillHtml('Ativo', 'Ativo')}
+            ${pillHtml('Potencial', 'Potencial')}
+            ${pillHtml('Inativo', 'Inativo')}
+          </div>
+        </div>
+        <div class="ap-modal-footer">
+          <button class="ap-btn ap-btn--ghost" id="dc-filterLimpar">Limpar Filtro</button>
+          <button class="ap-btn ap-btn--primary" id="dc-filterAplicar">
+            <i class="fas fa-check"></i> Aplicar
+          </button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+
+    overlay.querySelectorAll('.dc-filter-pill').forEach(btn => {
+      btn.addEventListener('click', () => btn.classList.toggle('dc-filter-pill--active'));
+    });
+
+    const fechar = () => overlay.remove();
+    document.getElementById('dc-filterClose').addEventListener('click', fechar);
+    overlay.addEventListener('click', e => { if (e.target === overlay) fechar(); });
+
+    document.getElementById('dc-filterLimpar').addEventListener('click', () => {
+      this._activeStatusFilters = [];
+      document.getElementById('dc-btn-potencial')?.classList.remove('dc-btn-active');
+      this.applyLocalFilters();
+      fechar();
+    });
+
+    document.getElementById('dc-filterAplicar').addEventListener('click', () => {
+      const selected = [...overlay.querySelectorAll('.dc-filter-pill--active')].map(b => b.dataset.status);
+      this._activeStatusFilters = selected;
+      const btn = document.getElementById('dc-btn-potencial');
+      btn?.classList.toggle('dc-btn-active', selected.length > 0);
+      const statusSelect = document.getElementById('dc-filter-status');
       if (statusSelect) statusSelect.value = '';
-    }
-    
-    this.applyLocalFilters();
+      this.applyLocalFilters();
+      fechar();
+    });
   }
 
   // ============================================================
@@ -464,9 +538,9 @@ class DashboardCliente {
 
   buildTableRow(client) {
     const badgeMap = {
-      'Cliente Potencial': 'dc-badge-potencial',
-      'Cliente Ativo': 'dc-badge-ativo',
-      'Cliente Inativo': 'dc-badge-inativo'
+      'Potencial': 'dc-badge-potencial',
+      'Ativo': 'dc-badge-ativo',
+      'Inativo': 'dc-badge-inativo'
     };
     const badgeClass = badgeMap[client.status] || 'dc-badge-potencial';
     const qtdEstudantes = client.quantidadeEstudantes || 0;
@@ -550,6 +624,13 @@ class DashboardCliente {
       row.addEventListener('click', () => {
         const clientId = row.dataset.clientId;
         this.openModalDetalhes(clientId);
+      });
+    });
+
+    // Botão direito abre menu de contexto
+    tbody.querySelectorAll('.dc-table-row').forEach(row => {
+      row.addEventListener('contextmenu', e => {
+        this.openContextMenu(e, row.dataset.clientId);
       });
     });
   }
@@ -994,9 +1075,9 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
           <div class="dc-form-group">
             <label class="dc-form-label">Status</label>
             <select class="dc-form-select" name="status">
-              <option value="Cliente Potencial" ${c.status === 'Cliente Potencial' ? 'selected' : ''}>Cliente Potencial</option>
-              <option value="Cliente Ativo" ${c.status === 'Cliente Ativo' ? 'selected' : ''}>Cliente Ativo</option>
-              <option value="Cliente Inativo" ${c.status === 'Cliente Inativo' ? 'selected' : ''}>Cliente Inativo</option>
+              <option value="Potencial" ${c.status === 'Potencial' ? 'selected' : ''}>Potencial</option>
+              <option value="Ativo" ${c.status === 'Ativo' ? 'selected' : ''}>Ativo</option>
+              <option value="Inativo" ${c.status === 'Inativo' ? 'selected' : ''}>Inativo</option>
             </select>
           </div>
         </div>
@@ -1479,6 +1560,699 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
       setTimeout(() => toast.remove(), 400);
     }, 3000);
   }
+
+  // ============================================================
+  // MENU DE CONTEXTO (BOTÃO DIREITO)
+  // ============================================================
+
+  openContextMenu(event, clientId) {
+    event.preventDefault();
+    this.closeContextMenu();
+
+    const menu = document.createElement('div');
+    menu.id = 'dc-context-menu';
+    menu.className = 'dc-context-menu';
+    menu.innerHTML = `
+      <button class="dc-context-item" data-action="status">
+        <i class="fas fa-exchange-alt"></i> Mudar Status
+      </button>
+      <button class="dc-context-item dc-context-item--danger" data-action="delete">
+        <i class="fas fa-trash"></i> Excluir
+      </button>`;
+
+    document.body.appendChild(menu);
+
+    const x = Math.min(event.clientX, window.innerWidth - 180);
+    const y = Math.min(event.clientY, window.innerHeight - 90);
+    menu.style.left = `${x}px`;
+    menu.style.top  = `${y}px`;
+
+    menu.querySelector('[data-action="status"]').addEventListener('click', () => {
+      this.closeContextMenu();
+      this.openChangeStatusModal(clientId);
+    });
+    menu.querySelector('[data-action="delete"]').addEventListener('click', () => {
+      this.closeContextMenu();
+      this.confirmDeleteClient(clientId);
+    });
+
+    setTimeout(() => {
+      document.addEventListener('click', () => this.closeContextMenu(), { once: true });
+    }, 0);
+  }
+
+  closeContextMenu() {
+    document.getElementById('dc-context-menu')?.remove();
+  }
+
+  // ============================================================
+  // MODAL — MUDAR STATUS
+  // ============================================================
+
+  openChangeStatusModal(clientId) {
+    const client = this.getClientData(clientId);
+    if (!client) return;
+
+    document.getElementById('dc-overlayStatus')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'dc-overlayStatus';
+    overlay.className = 'ap-overlay';
+
+    const optHtml = (val, label, icon, color) => `
+      <button class="dc-status-option${client.status === val ? ' dc-status-option--selected' : ''}" data-status="${val}">
+        <i class="fas ${icon}" style="color:${color}"></i> ${label}
+      </button>`;
+
+    overlay.innerHTML = `
+      <div class="ap-modal ap-modal-sm" role="dialog" aria-modal="true">
+        <div class="ap-modal-header">
+          <h2><i class="fas fa-exchange-alt" style="color:#f28705"></i> Mudar Status</h2>
+          <button class="ap-modal-close" id="dc-statusClose">&times;</button>
+        </div>
+        <div class="ap-modal-body">
+          <p style="font-size:.82rem;color:#6b7280;margin-bottom:1rem">
+            Cliente: <strong>${this.escapeHTML(client.nome)}</strong><br>
+            Status atual: <strong>${this.escapeHTML(client.status)}</strong>
+          </p>
+          <div class="dc-status-options">
+            ${optHtml('Ativo',    'Ativo',    'fa-circle-check', '#16a34a')}
+            ${optHtml('Potencial','Potencial','fa-circle',       '#f28705')}
+            ${optHtml('Inativo',  'Inativo',  'fa-circle-xmark', '#9ca3af')}
+          </div>
+        </div>
+        <div class="ap-modal-footer">
+          <button class="ap-btn ap-btn--ghost" id="dc-statusCancelar">Cancelar</button>
+          <button class="ap-btn ap-btn--primary" id="dc-statusConfirmar" disabled>
+            <i class="fas fa-check"></i> Confirmar
+          </button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+
+    let selectedStatus = null;
+
+    overlay.querySelectorAll('.dc-status-option').forEach(btn => {
+      btn.addEventListener('click', () => {
+        overlay.querySelectorAll('.dc-status-option').forEach(b => b.classList.remove('dc-status-option--selected'));
+        btn.classList.add('dc-status-option--selected');
+        selectedStatus = btn.dataset.status;
+        document.getElementById('dc-statusConfirmar').disabled = (selectedStatus === client.status);
+      });
+    });
+
+    const fechar = () => overlay.remove();
+    document.getElementById('dc-statusClose').addEventListener('click', fechar);
+    document.getElementById('dc-statusCancelar').addEventListener('click', fechar);
+    overlay.addEventListener('click', e => { if (e.target === overlay) fechar(); });
+
+    document.getElementById('dc-statusConfirmar').addEventListener('click', async () => {
+      if (!selectedStatus || selectedStatus === client.status) return;
+      fechar();
+      try {
+        await this.updateClient(clientId, { status: selectedStatus });
+        this.showToast(`Status alterado para "${selectedStatus}"!`, 'success');
+      } catch {
+        this.showToast('Erro ao alterar status.', 'error');
+      }
+    });
+  }
+
+  // ============================================================
+  // EXCLUIR CLIENTE
+  // ============================================================
+
+  async confirmDeleteClient(clientId) {
+    const client = this.getClientData(clientId);
+    if (!client) return;
+
+    const confirmed = await this.showConfirmModal({
+      title: 'Excluir Cliente',
+      message: `Deseja excluir permanentemente "${client.nome}"? Esta ação não pode ser desfeita.`,
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar',
+      type: 'danger'
+    });
+
+    if (!confirmed) return;
+
+    try {
+      if (this.firestore) {
+        await this.firestore.collection('cadastroClientes').doc(clientId).delete();
+      }
+      this.clients = this.clients.filter(c => c.id !== clientId);
+      this.applyLocalFilters();
+      this.showToast(`Cliente "${client.nome}" excluído.`, 'success');
+    } catch (err) {
+      console.error('[DashboardCliente] Erro ao excluir:', err);
+      this.showToast('Erro ao excluir cliente.', 'error');
+    }
+  }
+
+  // ============================================================
+  // MODAL — CONFIGURAÇÕES (ENGRENAGEM)
+  // ============================================================
+
+  openConfigModal() {
+    document.getElementById('dc-overlayConfig')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'dc-overlayConfig';
+    overlay.className = 'ap-overlay';
+    overlay.innerHTML = `
+      <div class="ap-modal ap-modal-sm" role="dialog" aria-modal="true">
+        <div class="ap-modal-header">
+          <h2><i class="fas fa-cog" style="color:#f28705"></i> Configurações</h2>
+          <button class="ap-modal-close" id="dc-cfgClose" aria-label="Fechar">&times;</button>
+        </div>
+        <div class="ap-modal-body">
+          <div class="ap-config-list">
+
+            <button class="ap-config-item ap-config-item--disabled" disabled>
+              <div class="ap-config-icon ap-config-icon--orange">
+                <i class="fas fa-users" style="color:#f28705"></i>
+              </div>
+              <div class="ap-config-text">
+                <strong>Exibir Todos os Clientes</strong>
+                <span>Listagem completa com filtros avançados</span>
+              </div>
+              <span class="ap-em-breve">Em breve</span>
+            </button>
+
+            <button class="ap-config-item ap-config-item--disabled" disabled>
+              <div class="ap-config-icon ap-config-icon--blue">
+                <i class="fas fa-code" style="color:#2563eb"></i>
+              </div>
+              <div class="ap-config-text">
+                <strong>Visualização de Desenvolvedor</strong>
+                <span>Dados brutos, IDs e logs do sistema</span>
+              </div>
+              <span class="ap-em-breve">Em breve</span>
+            </button>
+
+            <button class="ap-config-item" id="dc-cfgPermissoes">
+              <div class="ap-config-icon ap-config-icon--green">
+                <i class="fas fa-shield-alt" style="color:#16a34a"></i>
+              </div>
+              <div class="ap-config-text">
+                <strong>Atualizar Informações</strong>
+                <span>Sincronizar acessos com os status atuais</span>
+              </div>
+              <i class="fas fa-chevron-right" style="color:#9ca3af;margin-left:auto;font-size:.72rem"></i>
+            </button>
+
+          </div>
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+
+    const fechar = () => overlay.remove();
+    document.getElementById('dc-cfgClose').addEventListener('click', fechar);
+    overlay.addEventListener('click', e => { if (e.target === overlay) fechar(); });
+    document.getElementById('dc-cfgPermissoes').addEventListener('click', () => {
+      fechar();
+      this.openClientPermModal();
+    });
+  }
+
+  // ============================================================
+  // MODAL — ATUALIZAR INFORMAÇÕES (PERMISSÕES DE ACESSO)
+  // ============================================================
+
+  openClientPermModal() {
+    document.getElementById('dc-overlayPerm')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'dc-overlayPerm';
+    overlay.className = 'ap-overlay';
+    overlay.innerHTML = `
+      <div class="ap-modal ap-modal-lg" role="dialog" aria-modal="true">
+        <div class="ap-modal-header">
+          <h2><i class="fas fa-shield-alt" style="color:#16a34a"></i> Atualizar Informações</h2>
+          <button class="ap-modal-close" id="dc-permClose">&times;</button>
+        </div>
+        <div class="ap-modal-body" id="dc-permBody">
+          <div class="ap-loading"><div class="ap-spinner"></div> Carregando clientes…</div>
+        </div>
+        <div class="ap-modal-footer" id="dc-permFooter" style="display:none">
+          <button class="ap-btn ap-btn--ghost" id="dc-permCancelar">Cancelar</button>
+          <button class="ap-btn ap-btn--primary" id="dc-permAplicar" disabled>
+            <i class="fas fa-check"></i> Aplicar Selecionados
+          </button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+
+    const fechar = () => overlay.remove();
+    document.getElementById('dc-permClose').addEventListener('click', fechar);
+    overlay.addEventListener('click', e => { if (e.target === overlay) fechar(); });
+    document.getElementById('dc-permCancelar').addEventListener('click', fechar);
+
+    this.carregarPermissoesClientes();
+  }
+
+  async carregarPermissoesClientes() {
+    const body   = document.getElementById('dc-permBody');
+    const footer = document.getElementById('dc-permFooter');
+    if (!body || !this.firestore) return;
+
+    const esc = str => (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+    try {
+      const snap = await this.firestore.collection('cadastroClientes').get();
+      const clientes = snap.docs.map(d => ({ _docId: d.id, ...d.data() }));
+
+      const receberao = [];
+      const perderao  = [];
+
+      clientes.forEach(c => {
+        const ativo     = this._normalizeStatus(c.status || '') === 'Ativo';
+        const jaRevogado = c.acessoPlataforma === false;
+        if (ativo && c.acessoPlataforma !== true) receberao.push(c);
+        if (!ativo && !jaRevogado)                perderao.push(c);
+      });
+
+      const sortByName = arr => arr.sort((a, b) =>
+        (a.nome || '').toLowerCase().localeCompare((b.nome || '').toLowerCase(), 'pt-BR')
+      );
+      sortByName(receberao);
+      sortByName(perderao);
+
+      if (!receberao.length && !perderao.length) {
+        body.innerHTML = `
+          <div class="ap-empty">
+            <span class="ap-empty-icon">✅</span>
+            <strong>Tudo sincronizado!</strong>
+            <p>Todos os acessos já estão de acordo com os status atuais.<br>Nenhuma ação necessária.</p>
+          </div>`;
+        return;
+      }
+
+      const itemHtml = (c, tipo) => {
+        const status = this._normalizeStatus(c.status || '') || '—';
+        const sKey   = status.toLowerCase().replace(/[^a-z]/g, '');
+        const badgeAcesso = tipo === 'grant'
+          ? `<span class="ap-badge ap-badge--semacesso">Sem acesso</span>`
+          : `<span class="ap-badge ap-badge--acesso">Com acesso</span>`;
+        return `
+          <label class="ap-perm-item">
+            <input type="checkbox" class="ap-cb" data-tipo="${tipo}" data-id="${esc(c._docId)}" checked>
+            <div class="ap-perm-info">
+              <div class="ap-perm-nome">${esc(c.nome || '(sem nome)')}</div>
+              <div class="ap-perm-sub">${esc(c.email || '—')}</div>
+            </div>
+            <div class="ap-perm-badges">
+              <span class="ap-badge ap-badge--${sKey}">${esc(status)}</span>
+              ${badgeAcesso}
+            </div>
+          </label>`;
+      };
+
+      let html = `
+        <div class="ap-search-wrap">
+          <i class="fas fa-search"></i>
+          <input type="text" class="ap-search-input" id="dc-searchPerm"
+            placeholder="Filtrar cliente pelo nome…" autocomplete="off">
+        </div>`;
+
+      if (receberao.length) {
+        html += `
+          <div class="ap-perm-group">
+            <div class="ap-perm-group-title ap-perm-group-title--grant">
+              <i class="fas fa-user-check"></i> Receberão acesso (${receberao.length})
+            </div>
+            <label class="ap-select-all">
+              <input type="checkbox" id="dc-saGrant" checked> Selecionar todos
+            </label>
+            <div class="ap-perm-list">${receberao.map(c => itemHtml(c, 'grant')).join('')}</div>
+          </div>`;
+      }
+
+      if (perderao.length) {
+        html += `
+          <div class="ap-perm-group">
+            <div class="ap-perm-group-title ap-perm-group-title--revoke">
+              <i class="fas fa-user-times"></i> Terão acesso removido (${perderao.length})
+            </div>
+            <label class="ap-select-all">
+              <input type="checkbox" id="dc-saRevoke" checked> Selecionar todos
+            </label>
+            <div class="ap-perm-list">${perderao.map(c => itemHtml(c, 'revoke')).join('')}</div>
+          </div>`;
+      }
+
+      body.innerHTML = html;
+
+      const atualizarBtn = () => {
+        const btn = document.getElementById('dc-permAplicar');
+        if (btn) btn.disabled = document.querySelectorAll('#dc-overlayPerm .ap-cb:checked').length === 0;
+      };
+
+      document.getElementById('dc-searchPerm')?.addEventListener('input', e => {
+        const termo = e.target.value.toLowerCase();
+        document.querySelectorAll('#dc-overlayPerm .ap-perm-item').forEach(item => {
+          const nome = (item.querySelector('.ap-perm-nome')?.textContent || '').toLowerCase();
+          item.style.display = nome.includes(termo) ? '' : 'none';
+        });
+      });
+
+      document.getElementById('dc-saGrant')?.addEventListener('change', function() {
+        document.querySelectorAll('#dc-overlayPerm .ap-cb[data-tipo="grant"]')
+          .forEach(cb => { cb.checked = this.checked; });
+        atualizarBtn();
+      });
+
+      document.getElementById('dc-saRevoke')?.addEventListener('change', function() {
+        document.querySelectorAll('#dc-overlayPerm .ap-cb[data-tipo="revoke"]')
+          .forEach(cb => { cb.checked = this.checked; });
+        atualizarBtn();
+      });
+
+      body.querySelectorAll('.ap-cb').forEach(cb => cb.addEventListener('change', atualizarBtn));
+
+      if (footer) footer.style.display = 'flex';
+      atualizarBtn();
+
+      document.getElementById('dc-permAplicar')?.addEventListener('click', () => {
+        const idsGrant  = [...document.querySelectorAll('#dc-overlayPerm .ap-cb[data-tipo="grant"]:checked')].map(cb => cb.dataset.id);
+        const idsRevoke = [...document.querySelectorAll('#dc-overlayPerm .ap-cb[data-tipo="revoke"]:checked')].map(cb => cb.dataset.id);
+
+        const paraGrant  = receberao.filter(c => idsGrant.includes(c._docId));
+        const paraRevoke = perderao.filter(c => idsRevoke.includes(c._docId));
+
+        if (!paraGrant.length && !paraRevoke.length) {
+          this.showToast('Nenhum cliente selecionado.', 'info');
+          return;
+        }
+        this._abrirConfirmacaoAC(paraGrant, paraRevoke);
+      });
+
+    } catch (e) {
+      console.error('[DashboardCliente] Erro ao carregar permissões:', e);
+      body.innerHTML = `
+        <div class="ap-empty">
+          <span class="ap-empty-icon">❌</span>
+          <strong>Erro ao carregar dados</strong>
+          <p>Verifique sua conexão e tente novamente.</p>
+        </div>`;
+    }
+  }
+
+  _abrirConfirmacaoAC(paraGrant, paraRevoke) {
+    const overlay = document.createElement('div');
+    overlay.id = 'dc-overlayPermConfirm';
+    overlay.className = 'ap-overlay';
+    overlay.style.zIndex = '9600';
+    overlay.innerHTML = `
+      <div class="ap-modal ap-modal-sm" role="dialog" aria-modal="true">
+        <div class="ap-modal-header">
+          <h2><i class="fas fa-exclamation-triangle" style="color:#f28705"></i> Confirmar Operação</h2>
+          <button class="ap-modal-close" id="dc-confAcClose">&times;</button>
+        </div>
+        <div class="ap-modal-body">
+          <p style="font-size:.84rem;color:#374151;margin-bottom:.75rem;line-height:1.5">
+            As seguintes alterações serão realizadas:
+          </p>
+          ${paraGrant.length ? `
+            <div style="display:flex;align-items:center;gap:.5rem;padding:.5rem .75rem;
+                        background:#f0fdf4;border-radius:.5rem;margin-bottom:.4rem;font-size:.82rem;color:#166534">
+              <i class="fas fa-user-check"></i>
+              <strong>${paraGrant.length}</strong>&nbsp;cliente(s) receberão acesso
+            </div>` : ''}
+          ${paraRevoke.length ? `
+            <div style="display:flex;align-items:center;gap:.5rem;padding:.5rem .75rem;
+                        background:#fef2f2;border-radius:.5rem;margin-bottom:.4rem;font-size:.82rem;color:#991b1b">
+              <i class="fas fa-user-times"></i>
+              <strong>${paraRevoke.length}</strong>&nbsp;cliente(s) terão acesso removido
+            </div>` : ''}
+          <p style="font-size:.73rem;color:#6b7280;margin-top:.75rem">
+            <i class="fas fa-info-circle"></i>
+            Nenhuma conta será deletada. Todos os acessos são reversíveis.
+          </p>
+        </div>
+        <div class="ap-modal-footer">
+          <button class="ap-btn ap-btn--ghost" id="dc-confAcCancelar">Cancelar</button>
+          <button class="ap-btn ap-btn--primary" id="dc-confAcOk">
+            <i class="fas fa-check"></i> Confirmar
+          </button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+
+    const fechar = () => overlay.remove();
+    document.getElementById('dc-confAcClose').addEventListener('click', fechar);
+    document.getElementById('dc-confAcCancelar').addEventListener('click', fechar);
+    overlay.addEventListener('click', e => { if (e.target === overlay) fechar(); });
+
+    document.getElementById('dc-confAcOk').addEventListener('click', async () => {
+      fechar();
+      await this._executarAtualizacoesClientes(paraGrant, paraRevoke);
+    });
+  }
+
+  // ============================================================
+  // FIREBASE AUTH — CLIENTES (APP SECUNDÁRIA)
+  // ============================================================
+
+  _getSecondaryAuth() {
+    const APP_NAME = 'dc-cliente-auth';
+    try {
+      return firebase.app(APP_NAME).auth();
+    } catch {
+      const cfg = (typeof FIREBASE_CONFIG !== 'undefined')
+        ? FIREBASE_CONFIG
+        : firebase.app().options;
+      return firebase.initializeApp(cfg, APP_NAME).auth();
+    }
+  }
+
+  async _criarContaCliente(email, cpf) {
+    const senha = (cpf || '').replace(/\D/g, '');
+    if (!email || !email.includes('@')) return { sucesso: false, erro: 'E-mail inválido.' };
+    if (senha.length < 6) return { sucesso: false, erro: 'CPF inválido (mínimo 6 dígitos).' };
+
+    const auth = this._getSecondaryAuth();
+    try {
+      const cred = await auth.createUserWithEmailAndPassword(email, senha);
+      const uid  = cred.user.uid;
+      await auth.signOut();
+      return { sucesso: true, uid, jaExistia: false };
+    } catch (e) {
+      try { await auth.signOut(); } catch { /* ignora */ }
+      if (e.code === 'auth/email-already-in-use') {
+        return { sucesso: true, uid: null, jaExistia: true };
+      }
+      return { sucesso: false, erro: e.message };
+    }
+  }
+
+  async _executarAtualizacoesClientes(paraGrant, paraRevoke) {
+    const body   = document.getElementById('dc-permBody');
+    const footer = document.getElementById('dc-permFooter');
+    if (!body) return;
+
+    body.innerHTML = `<div class="ap-loading"><div class="ap-spinner"></div> Processando permissões, aguarde…</div>`;
+    if (footer) footer.style.display = 'none';
+
+    const resultados = [];
+    const esc = str => (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const db  = firebase.firestore();
+
+    for (const c of paraGrant) {
+      const nome  = c.nome || c._docId;
+      const email = c.email || '';
+      const cpf   = c.cpf   || '';
+
+      if (!email) {
+        resultados.push({ nome, tipo: 'warn', msg: 'E-mail não encontrado — pulado.' });
+        continue;
+      }
+      if (!cpf) {
+        resultados.push({ nome, tipo: 'warn', msg: 'CPF não encontrado — pulado.' });
+        continue;
+      }
+
+      try {
+        const res = await this._criarContaCliente(email, cpf);
+        if (res.sucesso) {
+          const update = { acessoPlataforma: true };
+          if (res.uid) update.uid = res.uid;
+          await db.collection('cadastroClientes').doc(c._docId).update(update);
+          resultados.push({
+            nome, tipo: 'ok',
+            msg: res.jaExistia
+              ? 'Acesso concedido (conta já existia no sistema).'
+              : 'Conta criada e acesso concedido com sucesso.'
+          });
+        } else {
+          resultados.push({ nome, tipo: 'error', msg: `Erro ao criar conta: ${res.erro}` });
+        }
+      } catch (e) {
+        resultados.push({ nome, tipo: 'error', msg: `Erro ao conceder acesso: ${e.message}` });
+      }
+    }
+
+    for (const c of paraRevoke) {
+      const nome = c.nome || c._docId;
+      try {
+        await db.collection('cadastroClientes').doc(c._docId).update({ acessoPlataforma: false });
+        resultados.push({ nome, tipo: 'ok', msg: 'Acesso removido. Conta mantida no sistema.' });
+      } catch (e) {
+        resultados.push({ nome, tipo: 'error', msg: `Erro ao remover acesso: ${e.message}` });
+      }
+    }
+
+    const qtdOk    = resultados.filter(r => r.tipo === 'ok').length;
+    const qtdWarn  = resultados.filter(r => r.tipo === 'warn').length;
+    const qtdError = resultados.filter(r => r.tipo === 'error').length;
+    const icone    = { ok: '✅', warn: '⚠️', error: '❌' };
+
+    body.innerHTML = `
+      <div class="ap-summary">
+        ${qtdOk    ? `<span class="ap-summary-chip ap-summary-chip--ok">✅ ${qtdOk} concluído${qtdOk > 1 ? 's' : ''}</span>` : ''}
+        ${qtdWarn  ? `<span class="ap-summary-chip ap-summary-chip--warn">⚠️ ${qtdWarn} aviso${qtdWarn > 1 ? 's' : ''}</span>` : ''}
+        ${qtdError ? `<span class="ap-summary-chip ap-summary-chip--error">❌ ${qtdError} erro${qtdError > 1 ? 's' : ''}</span>` : ''}
+      </div>
+      <div class="ap-result-list">
+        ${resultados.map(r => `
+          <div class="ap-result-item ap-result-item--${r.tipo}">
+            <span style="flex-shrink:0">${icone[r.tipo]}</span>
+            <div>
+              <div class="ap-result-nome">${esc(r.nome)}</div>
+              <div class="ap-result-msg">${esc(r.msg)}</div>
+            </div>
+          </div>`).join('')}
+      </div>`;
+
+    if (footer) {
+      footer.style.display = 'flex';
+      footer.innerHTML = `<button class="ap-btn ap-btn--ghost" id="dc-permFechar">Fechar</button>`;
+      document.getElementById('dc-permFechar')?.addEventListener('click', () => {
+        document.getElementById('dc-overlayPerm')?.remove();
+      });
+    }
+
+    if (qtdError === 0) {
+      this.showToast('Permissões atualizadas com sucesso!', 'success');
+    } else if (qtdOk > 0) {
+      this.showToast(`${qtdOk} atualizado(s) com ${qtdError} erro(s).`, 'info');
+    } else {
+      this.showToast('Não foi possível atualizar as permissões.', 'error');
+    }
+  }
+
+  // ============================================================
+  // INJEÇÃO DE ESTILOS — NOVOS COMPONENTES
+  // ============================================================
+
+  _injectACStyles() {
+    if (document.getElementById('dc-ac-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'dc-ac-styles';
+    style.textContent = `
+
+/* ── Botão configuração do cliente ──────────────────────── */
+#dc-configuracao {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  color: #f28705;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: .5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background .2s ease, box-shadow .2s ease;
+  flex-shrink: 0;
+}
+#dc-configuracao:hover {
+  background: #fff8f0;
+  box-shadow: 0 0 0 2px rgba(242,135,5,.35);
+}
+
+/* ── Menu de contexto ────────────────────────────────────── */
+.dc-context-menu {
+  position: fixed;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: .5rem;
+  box-shadow: 0 8px 24px rgba(0,0,0,.15);
+  z-index: 9000;
+  min-width: 160px;
+  padding: .3rem 0;
+  animation: apFadeIn .1s ease;
+}
+.dc-context-item {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .5rem .85rem;
+  width: 100%;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: .8rem;
+  font-family: 'Lexend', sans-serif;
+  color: #374151;
+  transition: background .15s;
+}
+.dc-context-item:hover { background: #f9fafb; }
+.dc-context-item--danger { color: #dc2626; }
+.dc-context-item--danger:hover { background: #fef2f2; }
+
+/* ── Pills de filtro (modal multi-select) ────────────────── */
+.dc-filter-pills {
+  display: flex;
+  gap: .5rem;
+  flex-wrap: wrap;
+}
+.dc-filter-pill {
+  padding: .45rem 1.1rem;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 999px;
+  background: #f9fafb;
+  font-family: 'Comfortaa', cursive;
+  font-size: .8rem;
+  color: #374151;
+  cursor: pointer;
+  transition: all .18s;
+}
+.dc-filter-pill:hover { border-color: #f28705; background: #fff8f0; }
+.dc-filter-pill--active { background: #f28705; border-color: #f28705; color: #fff; }
+
+/* ── Opções de status (modal Mudar Status) ───────────────── */
+.dc-status-options { display: flex; flex-direction: column; gap: .4rem; }
+.dc-status-option {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  padding: .65rem .9rem;
+  border: 1.5px solid #e5e7eb;
+  border-radius: .5rem;
+  background: #f9fafb;
+  font-family: 'Lexend', sans-serif;
+  font-size: .82rem;
+  color: #374151;
+  cursor: pointer;
+  transition: all .18s;
+  width: 100%;
+}
+.dc-status-option:hover { border-color: #f28705; background: #fff8f0; }
+.dc-status-option--selected { border-color: #f28705; background: #fff8f0; font-weight: 600; }
+
+/* ── Badges de status para o modal de permissões ─────────── */
+.ap-badge--potencial { background: #fef3e2; color: #c06a0a; }
+.ap-badge--inativo   { background: #f3f4f6; color: #6b7280; }
+
+    `;
+    document.head.appendChild(style);
+  }
 }
 
 // ============================================================
@@ -1509,9 +2283,9 @@ function loadDashboardCliente() {
             <label class="dc-filter-label">Status</label>
             <select id="dc-filter-status" class="dc-form-select dc-input-sm">
               <option value="">Todos</option>
-              <option value="Cliente Potencial">Cliente Potencial</option>
-              <option value="Cliente Ativo">Cliente Ativo</option>
-              <option value="Cliente Inativo">Cliente Inativo</option>
+              <option value="Ativo">Ativo</option>
+              <option value="Potencial">Potencial</option>
+              <option value="Inativo">Inativo</option>
             </select>
           </div>
           <div class="dc-filter-group dc-filter-cidade">
@@ -1532,6 +2306,9 @@ function loadDashboardCliente() {
               </button>
               <button id="dc-btn-csv" class="dc-btn dc-btn-icon dc-btn-secondary" title="Exportar CSV">
                 <i class="fas fa-file-csv"></i>
+              </button>
+              <button id="dc-configuracao" class="dc-btn dc-btn-icon dc-btn-ghost" title="Configurações">
+                <i class="fas fa-cog"></i>
               </button>
               <span id="dc-client-count" class="dc-count-badge">0</span>
             </div>
