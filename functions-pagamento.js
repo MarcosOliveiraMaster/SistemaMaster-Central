@@ -251,7 +251,7 @@ function filtrarProfessoresPorMesAno() {
   }
 
   // Filtrar aulas pelo mês/ano — formato do campo data: "seg - 23/02/2026"
-  const statusValidos = ['Concluída', 'Reposição'];
+  const statusValidos = ['Concluída', 'Reposição', 'Cancelada'];
   const idsProfessoresComAula = new Set();
   todasAulas.forEach(aula => {
     if (!statusValidos.includes(aula.StatusAula)) return;
@@ -1027,7 +1027,7 @@ async function analisarPagamentoIndividual() {
   const todasAulas = window._pagTodasAulas || [];
 
   // Filtrar aulas do professor no mês/ano selecionado (apenas Concluída ou Reposição)
-  const statusValidos = ['Concluída', 'Reposição'];
+  const statusValidos = ['Concluída', 'Reposição', 'Cancelada'];
   const aulasFiltradas = todasAulas.filter(aula => {
     if (!statusValidos.includes(aula.StatusAula)) return false;
     if (aula.idProfessor !== professorId) return false;
@@ -1204,7 +1204,7 @@ async function gerarRelatoriosGrupo() {
       await new Promise(r => setTimeout(r, 100));
 
       // 1. Filtrar aulas do professor no mês/ano (apenas Concluída ou Reposição)
-      const statusValidos = ['Concluída', 'Reposição'];
+      const statusValidos = ['Concluída', 'Reposição', 'Cancelada'];
       const aulasFiltradas = todasAulas.filter(aula => {
         if (!statusValidos.includes(aula.StatusAula)) return false;
         if (aula.idProfessor !== professorId) return false;
@@ -1551,7 +1551,7 @@ async function renderizarGraficoPagamentoGrupo() {
   const todasAulas = window._pagTodasAulas || [];
 
   // Calcular total por professor: valorAulas + entradas − saídas
-  const statusValidos = ['Concluída', 'Reposição'];
+  const statusValidos = ['Concluída', 'Reposição', 'Cancelada'];
   const dadosProfessores = professores.map(p => {
     const aulasDoProfessor = todasAulas.filter(aula => {
       if (!statusValidos.includes(aula.StatusAula)) return false;
@@ -1753,7 +1753,7 @@ function abrirResumoGeralPagamentos() {
   const professores = window._pagProfessoresFiltrados || window._pagProfessoresAtivos || [];
   const todasAulas = window._pagTodasAulas || [];
 
-  const statusValidos = ['Concluída', 'Reposição'];
+  const statusValidos = ['Concluída', 'Reposição', 'Cancelada'];
   const dadosProfessores = professores.map(p => {
     const aulasDoProfessor = todasAulas.filter(aula => {
       if (!statusValidos.includes(aula.StatusAula)) return false;
