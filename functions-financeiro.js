@@ -66,8 +66,16 @@ window.loadPainelFinanceiro = function() {
               Saldos
             </button>
           </div>
-          
-          <!-- Botões de Período (Exclusivos) -->
+
+          <!-- Botão Gerar DRE -->
+          <button id="gerar-dre" class="p-1.5 rounded-lg transition-all bg-gray-100 text-gray-700 hover:bg-orange-500 hover:text-white border border-gray-200" title="Gerar DRE">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </button>
+
+          <!-- Botões de Período (Anual/Mensal) - comentados -->
+          <!--
           <div class="flex gap-0">
             <button id="btn-vendas-anual" class="py-1.5 px-6 text-sm font-medium rounded-l-lg transition-all bg-orange-500 text-white hover:bg-orange-600" data-visualizacao="anual">
               Anual
@@ -76,6 +84,7 @@ window.loadPainelFinanceiro = function() {
               Mensal
             </button>
           </div>
+          -->
         </div>
       </div>
       
@@ -259,6 +268,7 @@ window.loadPainelFinanceiro = function() {
   // Adicionar modal ao documento
   adicionarModalInvestimento();
   adicionarModalEditarInvestimento();
+  adicionarModalDRE();
 
   // Inicializar eventos dos botões
   initBotoesVendas();
@@ -277,6 +287,7 @@ window.loadPainelFinanceiro = function() {
     
     initBotaoAdicionarInvestimento();
     initModalEditarInvestimento();
+    initBotaoDRE();
     carregarInvestimentos();
     carregarEntradas(); // Carregar entradas do mês
     carregarPagamentoEquipe(); // Carregar pagamento de equipe do mês
@@ -494,18 +505,17 @@ function initBotoesVendas() {
   const btnSaidas = document.getElementById('btn-vendas-saidas');
   const btnSaldos = document.getElementById('btn-vendas-saldos');
 
-  if (!btnAnual || !btnMensal) {
-    console.error('Botões de visualização de vendas não encontrados');
-    return;
+  if (btnAnual) {
+    btnAnual.addEventListener('click', () => {
+      mudarVisualizacaoVendas('anual');
+    });
   }
 
-  btnAnual.addEventListener('click', () => {
-    mudarVisualizacaoVendas('anual');
-  });
-
-  btnMensal.addEventListener('click', () => {
-    mudarVisualizacaoVendas('mensal');
-  });
+  if (btnMensal) {
+    btnMensal.addEventListener('click', () => {
+      mudarVisualizacaoVendas('mensal');
+    });
+  }
 
   // Event listeners para os botões de múltipla seleção ANUAIS
   if (btnLucroAtual) {
@@ -2311,4 +2321,879 @@ function atualizarGraficoVendas() {
     chartVendas.update();
     console.log('🔄 Gráfico de vendas atualizado', metricasAtivasVendas);
   }
+}
+
+// ============================================
+// MODAL E GERAÇÃO DE DRE (PDF)
+// ============================================
+
+function adicionarModalDRE() {
+  if (document.getElementById('modal-dre')) return;
+
+  const backdrop = document.createElement('div');
+  backdrop.id = 'backdrop-modal-dre';
+  backdrop.className = 'hidden fixed inset-0 bg-black bg-opacity-50 z-40 transition-opacity duration-300';
+  backdrop.style.display = 'none';
+
+  const modal = document.createElement('div');
+  modal.id = 'modal-dre';
+  modal.className = 'hidden fixed inset-0 flex items-center justify-center z-50';
+  modal.style.display = 'none';
+  modal.innerHTML = `
+    <div class="bg-white rounded-xl shadow-2xl p-6" style="width:460px;max-width:90vw;">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-lexend font-bold text-gray-800">Gerar DRE</h3>
+        <button id="btn-fechar-dre-x" type="button"
+          class="p-1 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <label class="block text-sm font-semibold text-gray-700 mb-2">Quais meses deseja fazer o DRE?</label>
+
+      <div class="relative mb-4" id="dre-dropdown-container">
+        <button id="dre-dropdown-toggle" type="button"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm text-gray-700 bg-white flex justify-between items-center hover:border-orange-500 transition">
+          <span id="dre-dropdown-label">Selecione os meses...</span>
+          <svg class="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </button>
+        <div id="dre-dropdown-menu"
+          class="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto"
+          style="display:none;"></div>
+      </div>
+
+      <div class="flex flex-col gap-2 mb-4">
+        <button id="btn-dre-mes-atual" type="button"
+          class="py-2 px-4 text-sm font-medium rounded-lg bg-gray-50 text-gray-700 hover:bg-orange-50 hover:text-orange-700 border border-gray-200 hover:border-orange-300 transition text-left">
+          Apenas do mês atual
+        </button>
+        <button id="btn-dre-mes-anterior" type="button"
+          class="py-2 px-4 text-sm font-medium rounded-lg bg-gray-50 text-gray-700 hover:bg-orange-50 hover:text-orange-700 border border-gray-200 hover:border-orange-300 transition text-left">
+          Apenas do mês anterior
+        </button>
+        <button id="btn-dre-todos-meses" type="button"
+          class="py-2 px-4 text-sm font-medium rounded-lg bg-gray-50 text-gray-700 hover:bg-orange-50 hover:text-orange-700 border border-gray-200 hover:border-orange-300 transition text-left">
+          Todos os meses até agora (Jan – mês atual)
+        </button>
+      </div>
+
+      <label class="flex items-start gap-3 mb-6 p-3 bg-orange-50 border border-orange-200 rounded-lg cursor-pointer select-none">
+        <input type="checkbox" id="dre-check-completo" checked class="mt-0.5 w-4 h-4 accent-orange-500 cursor-pointer flex-shrink-0">
+        <div>
+          <span class="text-sm font-semibold text-gray-800 block">Criar DRE Completo</span>
+          <span class="text-xs text-gray-500">Inclui todas as tabelas (Entradas, Saídas, Equipe) e gráficos de evolução de indicadores. Desmarcado: apenas gráfico anual e tabela de indicadores estratégicos por mês.</span>
+        </div>
+      </label>
+
+      <div class="flex gap-3">
+        <button id="btn-gerar-dre-excel" type="button"
+          class="flex-1 py-2 px-4 text-sm font-medium rounded-lg bg-green-600 text-white hover:bg-green-700 transition flex items-center justify-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+          Baixar em Planilha
+        </button>
+        <button id="btn-gerar-dre-pdf" type="button"
+          class="flex-1 py-2 px-4 text-sm font-medium rounded-lg bg-orange-500 text-white hover:bg-orange-600 transition flex items-center justify-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+          Imprimir em PDF
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(backdrop);
+  document.body.appendChild(modal);
+}
+
+function abrirModalDRE() {
+  const modal = document.getElementById('modal-dre');
+  const backdrop = document.getElementById('backdrop-modal-dre');
+  if (!modal || !backdrop) return;
+
+  populateDropdownMeses();
+
+  modal.classList.remove('hidden');
+  backdrop.classList.remove('hidden');
+  modal.style.display = 'flex';
+  backdrop.style.display = 'block';
+
+  const toggle = document.getElementById('dre-dropdown-toggle');
+  const menu = document.getElementById('dre-dropdown-menu');
+  if (toggle && menu) {
+    toggle.onclick = () => {
+      menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+    };
+    setTimeout(() => document.addEventListener('click', fecharDropdownDRE), 0);
+  }
+
+  document.getElementById('btn-fechar-dre-x').onclick = fecharModalDRE;
+  backdrop.onclick = fecharModalDRE;
+  document.getElementById('btn-dre-mes-atual').onclick = () => selecionarMesesRapido('atual');
+  document.getElementById('btn-dre-mes-anterior').onclick = () => selecionarMesesRapido('anterior');
+  document.getElementById('btn-dre-todos-meses').onclick = () => selecionarMesesRapido('todos');
+  document.getElementById('btn-gerar-dre-pdf').onclick = gerarDRE;
+  document.getElementById('btn-gerar-dre-excel').onclick = gerarPlanilhaDRE;
+}
+
+function fecharDropdownDRE(e) {
+  const container = document.getElementById('dre-dropdown-container');
+  if (container && !container.contains(e.target)) {
+    const menu = document.getElementById('dre-dropdown-menu');
+    if (menu) menu.style.display = 'none';
+    document.removeEventListener('click', fecharDropdownDRE);
+  }
+}
+
+function fecharModalDRE() {
+  const modal = document.getElementById('modal-dre');
+  const backdrop = document.getElementById('backdrop-modal-dre');
+  if (!modal || !backdrop) return;
+
+  const menu = document.getElementById('dre-dropdown-menu');
+  if (menu) menu.style.display = 'none';
+  document.removeEventListener('click', fecharDropdownDRE);
+
+  modal.classList.add('hidden');
+  backdrop.classList.add('hidden');
+  modal.style.display = 'none';
+  backdrop.style.display = 'none';
+}
+
+function initBotaoDRE() {
+  const btn = document.getElementById('gerar-dre');
+  if (btn) btn.addEventListener('click', abrirModalDRE);
+}
+
+function populateDropdownMeses() {
+  const menu = document.getElementById('dre-dropdown-menu');
+  if (!menu) return;
+
+  const mesAtual = new Date().getMonth();
+  let html = '';
+  for (let i = 0; i <= mesAtual; i++) {
+    html += `
+      <label class="flex items-center gap-2 px-3 py-2 hover:bg-orange-50 cursor-pointer text-sm text-gray-700">
+        <input type="checkbox" value="${i}" class="dre-mes-checkbox accent-orange-500" />
+        ${meses[i]}
+      </label>`;
+  }
+  menu.innerHTML = html;
+
+  menu.querySelectorAll('.dre-mes-checkbox').forEach(cb => {
+    cb.addEventListener('change', atualizarLabelDropdown);
+  });
+}
+
+function selecionarMesesRapido(tipo) {
+  const mesAtual = new Date().getMonth();
+  document.querySelectorAll('.dre-mes-checkbox').forEach(cb => {
+    const val = parseInt(cb.value);
+    if (tipo === 'atual') {
+      cb.checked = (val === mesAtual);
+    } else if (tipo === 'anterior') {
+      const mesAnterior = mesAtual === 0 ? 11 : mesAtual - 1;
+      cb.checked = (val === mesAnterior);
+    } else if (tipo === 'todos') {
+      cb.checked = (val <= mesAtual);
+    }
+  });
+  atualizarLabelDropdown();
+}
+
+function atualizarLabelDropdown() {
+  const selecionados = [];
+  document.querySelectorAll('.dre-mes-checkbox:checked').forEach(cb => {
+    selecionados.push(meses[parseInt(cb.value)]);
+  });
+
+  const label = document.getElementById('dre-dropdown-label');
+  if (!label) return;
+
+  if (selecionados.length === 0) {
+    label.textContent = 'Selecione os meses...';
+  } else if (selecionados.length <= 3) {
+    label.textContent = selecionados.join(', ');
+  } else {
+    label.textContent = `${selecionados.length} meses selecionados`;
+  }
+}
+
+function mostrarLoadingDRE() {
+  const el = document.createElement('div');
+  el.id = 'dre-loading-overlay';
+  el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  el.innerHTML = `
+    <div style="background:#1f2937;padding:36px 44px;border-radius:16px;text-align:center;color:white;font-family:sans-serif;">
+      <div style="width:48px;height:48px;border:3px solid #f28705;border-top-color:transparent;border-radius:50%;animation:dreSpinAnim .8s linear infinite;margin:0 auto 16px;"></div>
+      <p style="font-size:18px;font-weight:700;margin:0 0 6px;">Gerando DRE...</p>
+      <p style="font-size:13px;opacity:.65;margin:0;">Buscando dados e criando o PDF…</p>
+    </div>
+    <style>@keyframes dreSpinAnim{to{transform:rotate(360deg)}}</style>
+  `;
+  document.body.appendChild(el);
+}
+
+function esconderLoadingDRE() {
+  const el = document.getElementById('dre-loading-overlay');
+  if (el) el.remove();
+}
+
+function carregarDadosMesDRE_local(mesIdx, ano, { snapshotEntradas, snapshotInvest, snapshotAulas, snapshotInfo }) {
+  const mesComparar = mesIdx + 1;
+  const statusValidos = ['Concluída', 'Reposição'];
+
+  const entradas = [];
+  snapshotEntradas.forEach(doc => {
+    const d = doc.data();
+    if (d.dataPrimeiraParcela) {
+      const p = d.dataPrimeiraParcela.split('/');
+      if (p.length === 3 && parseInt(p[1]) - 1 === mesIdx && parseInt(p[2]) === ano) {
+        entradas.push({ ...d, _docId: doc.id });
+      }
+    }
+  });
+
+  const investimentos = [];
+  snapshotInvest.forEach(doc => {
+    const d = doc.data();
+    if (d.data) {
+      const p = d.data.split('/');
+      if (p.length === 3 && parseInt(p[1]) - 1 === mesIdx && parseInt(p[2]) === ano) {
+        investimentos.push({ ...d, _docId: doc.id });
+      }
+    }
+  });
+
+  const infoAdicionais = {};
+  snapshotInfo.forEach(doc => {
+    const d = doc.data();
+    const id = d.idProfessor || '';
+    if (!id) return;
+    const match = (d.data || '').match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    if (!match) return;
+    if (parseInt(match[2], 10) !== mesComparar || parseInt(match[3], 10) !== ano) return;
+    if (!infoAdicionais[id]) infoAdicionais[id] = { entradas: 0, saidas: 0 };
+    if (d.tipo === 'entrada') infoAdicionais[id].entradas += (d.valor || 0);
+    else infoAdicionais[id].saidas += (d.valor || 0);
+  });
+
+  const agrupado = {};
+  snapshotAulas.forEach(doc => {
+    const d = doc.data();
+    if (!statusValidos.includes(d.StatusAula)) return;
+    const match = (d.data || '').match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    if (!match) return;
+    if (parseInt(match[2], 10) !== mesComparar || parseInt(match[3], 10) !== ano) return;
+    const chave = (d.idProfessor || d.professor || 'N/A').trim();
+    if (!agrupado[chave]) agrupado[chave] = { professor: d.professor || d.idProfessor || '-', valorAulas: 0 };
+    agrupado[chave].valorAulas += parseFloat(d.ValorAula) || 0;
+  });
+
+  Object.keys(infoAdicionais).forEach(cpf => {
+    if (!agrupado[cpf]) agrupado[cpf] = { professor: cpf, valorAulas: 0 };
+  });
+
+  const equipe = Object.entries(agrupado)
+    .map(([cpf, r]) => {
+      const info = infoAdicionais[cpf] || { entradas: 0, saidas: 0 };
+      return { professor: r.professor, total: r.valorAulas + info.entradas - info.saidas };
+    })
+    .filter(r => r.total > 0)
+    .sort((a, b) => a.professor.localeCompare(b.professor, 'pt-BR'));
+
+  return { entradas, investimentos, equipe };
+}
+
+function calcularIndicadoresDRE(entradas, investimentos, equipe) {
+  const faturamento = entradas.reduce((s, e) => s + (e.ValorPacote || 0), 0);
+  const repasseEquipe = equipe.reduce((s, e) => s + e.total, 0);
+
+  let custosFixos = 0, custosVariaveis = 0, custosExtras = 0;
+  investimentos.forEach(inv => {
+    const tipo = (inv.tipo || '').toLowerCase().trim();
+    if (tipo === 'recorrente_fixa' || tipo === 'recorrente fixa') custosFixos += inv.valor || 0;
+    else if (tipo === 'recorrente_variavel' || tipo === 'recorrente variável' || tipo === 'recorrente_variável') custosVariaveis += inv.valor || 0;
+    else if (tipo === 'extra') custosExtras += inv.valor || 0;
+  });
+
+  const despesasTotais = repasseEquipe + custosFixos + custosVariaveis + custosExtras;
+  const lucroBruto = faturamento - repasseEquipe;
+  const lucroLiquido = faturamento - despesasTotais;
+  const reservaEmergencia = lucroLiquido * 0.10;
+  const metaAlcancada = lucroLiquido - 4000;
+
+  return { faturamento, repasseEquipe, custosFixos, custosVariaveis, custosExtras, despesasTotais, lucroBruto, lucroLiquido, reservaEmergencia, metaAlcancada };
+}
+
+function buildDREHTML(mesesSelecionados, dadosMeses, ano, completo = true) {
+  const fmt = v => formatarMoedaBrasileira(v);
+  const cor = v => v >= 0 ? '#16a34a' : '#dc2626';
+  const th = 'padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:#374151;background:#f9fafb;border-bottom:2px solid #e5e7eb;';
+  const td = 'padding:7px 12px;font-size:11px;color:#374151;border-bottom:1px solid #e5e7eb;';
+
+  let html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#111827;background:white;padding:24px;width:1000px;">`;
+
+  html += `
+    <div style="background:linear-gradient(135deg,#f28705,#d97804);color:white;padding:24px 28px;border-radius:12px;margin-bottom:28px;">
+      <h1 style="font-size:22px;font-weight:700;margin:0 0 4px;">Demonstrativo de Resultado do Exercício (DRE)</h1>
+      <p style="font-size:14px;margin:0;opacity:.9;">${ano} · Meses: ${mesesSelecionados.map(m => meses[m]).join(', ')}</p>
+    </div>
+    <div style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin-bottom:28px;">
+      <h2 style="font-size:16px;font-weight:700;color:#374151;margin:0 0 16px;">Gráfico Anual — Faturamento / Lucro / Despesas por mês</h2>
+      <canvas id="dre-chart-anual" width="940" height="280" style="display:block;"></canvas>
+    </div>
+    <hr style="border:none;border-top:2px solid #e5e7eb;margin:28px 0;">
+  `;
+
+  mesesSelecionados.forEach(mesIdx => {
+    const dm = dadosMeses[mesIdx];
+    const ind = dm.indicadores;
+    const nomeMes = `${meses[mesIdx]} ${ano}`;
+
+    html += `<div style="margin-bottom:32px;">`;
+    html += `
+      <div style="background:#f1f5f9;border-left:4px solid #f28705;padding:14px 18px;border-radius:8px;margin-bottom:18px;">
+        <h2 style="font-size:18px;font-weight:700;color:#111827;margin:0;">${nomeMes}</h2>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:18px;">
+        <div style="background:white;border:1px solid #e5e7eb;border-radius:10px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.08);">
+          <p style="font-size:11px;color:#6b7280;margin:0 0 6px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;">Faturamento</p>
+          <p style="font-size:20px;font-weight:700;color:#f28705;margin:0;">${fmt(ind.faturamento)}</p>
+        </div>
+        <div style="background:white;border:1px solid #e5e7eb;border-radius:10px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.08);">
+          <p style="font-size:11px;color:#6b7280;margin:0 0 6px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;">Lucro Líquido</p>
+          <p style="font-size:20px;font-weight:700;color:${cor(ind.lucroLiquido)};margin:0;">${fmt(ind.lucroLiquido)}</p>
+        </div>
+        <div style="background:white;border:1px solid #e5e7eb;border-radius:10px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.08);">
+          <p style="font-size:11px;color:#6b7280;margin:0 0 6px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;">Despesas e Investimentos</p>
+          <p style="font-size:20px;font-weight:700;color:#dc2626;margin:0;">${fmt(ind.despesasTotais)}</p>
+        </div>
+      </div>
+    `;
+
+    if (completo) {
+      html += `
+        <div style="margin-bottom:16px;">
+          <h3 style="font-size:14px;font-weight:700;color:#374151;margin:0 0 10px;padding-bottom:6px;border-bottom:2px solid #f28705;">Entradas (Contratos)</h3>
+          <table style="width:100%;border-collapse:collapse;">
+            <thead><tr>
+              <th style="${th}">Data</th><th style="${th}">Cliente</th><th style="${th}">Horas</th>
+              <th style="${th}">Pagamento</th><th style="${th}">Status</th><th style="${th}">Valor</th><th style="${th}">Lucro</th>
+            </tr></thead>
+            <tbody>
+              ${dm.entradas.length === 0
+                ? `<tr><td colspan="7" style="${td}text-align:center;color:#9ca3af;">Nenhum registro encontrado</td></tr>`
+                : dm.entradas.map((e, i) => `
+                  <tr style="background:${i % 2 === 0 ? 'white' : '#f9fafb'};">
+                    <td style="${td}">${e.dataPrimeiraParcela || '-'}</td>
+                    <td style="${td}">${e.nomeCliente || '-'}</td>
+                    <td style="${td}">${e.SomatorioDuracaoAulas || '-'}</td>
+                    <td style="${td}">${e.metodoPagamento || '-'}</td>
+                    <td style="${td}">${e.statusPagamento || '-'}</td>
+                    <td style="${td}font-weight:600;">${fmt(e.ValorPacote || 0)}</td>
+                    <td style="${td}font-weight:600;color:#16a34a;">${fmt(e.lucroMaster || 0)}</td>
+                  </tr>`).join('')
+              }
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      html += `
+        <div style="margin-bottom:16px;">
+          <h3 style="font-size:14px;font-weight:700;color:#374151;margin:0 0 10px;padding-bottom:6px;border-bottom:2px solid #f28705;">Saídas — Investimentos e Despesas</h3>
+          <table style="width:100%;border-collapse:collapse;">
+            <thead><tr>
+              <th style="${th}">Data</th><th style="${th}width:50%;">Descrição</th>
+              <th style="${th}">Tipo</th><th style="${th}">Valor</th>
+            </tr></thead>
+            <tbody>
+              ${dm.investimentos.length === 0
+                ? `<tr><td colspan="4" style="${td}text-align:center;color:#9ca3af;">Nenhum registro encontrado</td></tr>`
+                : dm.investimentos.map((inv, i) => `
+                  <tr style="background:${i % 2 === 0 ? 'white' : '#f9fafb'};">
+                    <td style="${td}">${inv.data || '-'}</td>
+                    <td style="${td}word-break:break-word;">${inv.descricao || '-'}</td>
+                    <td style="${td}">${inv.tipo ? inv.tipo.charAt(0).toUpperCase() + inv.tipo.slice(1).replace(/_/g,' ') : '-'}</td>
+                    <td style="${td}font-weight:600;color:#dc2626;">${fmt(inv.valor || 0)}</td>
+                  </tr>`).join('')
+              }
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      html += `
+        <div style="margin-bottom:16px;">
+          <h3 style="font-size:14px;font-weight:700;color:#374151;margin:0 0 10px;padding-bottom:6px;border-bottom:2px solid #f28705;">Saída — Pagamento de Equipe</h3>
+          <table style="width:100%;border-collapse:collapse;">
+            <thead><tr>
+              <th style="${th}">Nome Professor</th><th style="${th}">Valor das Aulas</th>
+            </tr></thead>
+            <tbody>
+              ${dm.equipe.length === 0
+                ? `<tr><td colspan="2" style="${td}text-align:center;color:#9ca3af;">Nenhum registro encontrado</td></tr>`
+                : dm.equipe.map((e, i) => `
+                  <tr style="background:${i % 2 === 0 ? 'white' : '#f9fafb'};">
+                    <td style="${td}">${e.professor}</td>
+                    <td style="${td}font-weight:600;color:#f28705;">${fmt(e.total)}</td>
+                  </tr>`).join('')
+              }
+              ${dm.equipe.length > 0 ? `
+                <tr style="background:#fff7eb;">
+                  <td style="${td}font-weight:700;">Total</td>
+                  <td style="${td}font-weight:700;color:#f28705;">${fmt(ind.repasseEquipe)}</td>
+                </tr>` : ''}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    html += `
+      <div style="margin-bottom:16px;">
+        <h3 style="font-size:14px;font-weight:700;color:#374151;margin:0 0 10px;padding-bottom:6px;border-bottom:2px solid #f28705;">Indicadores Estratégicos</h3>
+        <table style="width:100%;border-collapse:collapse;">
+          <thead><tr>
+            <th style="${th}">Faturamento</th><th style="${th}">Repasse Equipe</th><th style="${th}">C. Fixos</th>
+            <th style="${th}">C. Variáveis</th><th style="${th}">C. Extras</th><th style="${th}">Desp. Totais</th>
+            <th style="${th}">Lucro Bruto</th><th style="${th}">Lucro Líquido</th>
+            <th style="${th}">Reserva 10%</th><th style="${th}">Meta Alcançada</th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td style="${td}">${fmt(ind.faturamento)}</td>
+              <td style="${td}">${fmt(ind.repasseEquipe)}</td>
+              <td style="${td}">${fmt(ind.custosFixos)}</td>
+              <td style="${td}">${fmt(ind.custosVariaveis)}</td>
+              <td style="${td}">${fmt(ind.custosExtras)}</td>
+              <td style="${td}font-weight:600;color:#dc2626;">${fmt(ind.despesasTotais)}</td>
+              <td style="${td}font-weight:600;">${fmt(ind.lucroBruto)}</td>
+              <td style="${td}font-weight:700;color:${cor(ind.lucroLiquido)};">${fmt(ind.lucroLiquido)}</td>
+              <td style="${td}">${fmt(ind.reservaEmergencia)}</td>
+              <td style="${td}font-weight:600;color:${cor(ind.metaAlcancada)};">${fmt(ind.metaAlcancada)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    html += `</div><hr style="border:none;border-top:2px solid #e5e7eb;margin:28px 0;">`;
+  });
+
+  if (completo) {
+    html += `
+      <div style="margin-bottom:32px;">
+        <h2 style="font-size:18px;font-weight:700;color:#374151;margin:0 0 20px;">Acompanhamento de Indicadores Estratégicos</h2>
+        <div style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin-bottom:16px;">
+          <h3 style="font-size:14px;font-weight:700;color:#374151;margin:0 0 14px;">Receita (Faturamento e Repasse)</h3>
+          <canvas id="dre-chart-receita" width="940" height="220" style="display:block;"></canvas>
+        </div>
+        <div style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin-bottom:16px;">
+          <h3 style="font-size:14px;font-weight:700;color:#374151;margin:0 0 14px;">Custos (Fixos, Variáveis, Extras e Total)</h3>
+          <canvas id="dre-chart-custos" width="940" height="220" style="display:block;"></canvas>
+        </div>
+        <div style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin-bottom:16px;">
+          <h3 style="font-size:14px;font-weight:700;color:#374151;margin:0 0 14px;">Lucratividade (Lucro Bruto e Líquido)</h3>
+          <canvas id="dre-chart-lucro" width="940" height="220" style="display:block;"></canvas>
+        </div>
+      </div>
+    `;
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+async function criarGraficosNoPDF(container, mesesSelecionados, dadosMeses) {
+  const labels = mesesSelecionados.map(m => meses[m]);
+  const baseOpts = {
+    animation: false,
+    responsive: false,
+    plugins: {
+      legend: { display: true, position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12 } },
+      datalabels: { display: false }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        ticks: { font: { size: 10 }, callback: v => 'R$ ' + v.toLocaleString('pt-BR') },
+        grid: { color: '#e5e7eb' }
+      },
+      x: { ticks: { font: { size: 10 } }, grid: { display: false } }
+    }
+  };
+
+  const ctxAnual = container.querySelector('#dre-chart-anual');
+  if (ctxAnual) {
+    new Chart(ctxAnual.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Faturamento', data: mesesSelecionados.map(m => dadosMeses[m].indicadores.faturamento), backgroundColor: '#f28705', borderRadius: 4 },
+          { label: 'Lucro Líquido', data: mesesSelecionados.map(m => dadosMeses[m].indicadores.lucroLiquido), backgroundColor: '#22c55e', borderRadius: 4 },
+          { label: 'Despesas', data: mesesSelecionados.map(m => dadosMeses[m].indicadores.despesasTotais), backgroundColor: '#ef4444', borderRadius: 4 }
+        ]
+      },
+      options: {
+        ...baseOpts,
+        plugins: {
+          ...baseOpts.plugins,
+          datalabels: {
+            display: true,
+            anchor: 'end',
+            align: 'top',
+            color: '#374151',
+            font: { weight: 'bold', size: 9 },
+            formatter: v => v > 0 ? 'R$ ' + v.toLocaleString('pt-BR', { maximumFractionDigits: 0 }) : ''
+          }
+        }
+      }
+    });
+  }
+
+  const ctxReceita = container.querySelector('#dre-chart-receita');
+  if (ctxReceita) {
+    new Chart(ctxReceita.getContext('2d'), {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Faturamento', data: mesesSelecionados.map(m => dadosMeses[m].indicadores.faturamento), borderColor: '#f28705', backgroundColor: '#f2870520', tension: 0.3, fill: false, pointRadius: 4 },
+          { label: 'Repasse para Equipe', data: mesesSelecionados.map(m => dadosMeses[m].indicadores.repasseEquipe), borderColor: '#6366f1', backgroundColor: '#6366f120', tension: 0.3, fill: false, pointRadius: 4 }
+        ]
+      },
+      options: baseOpts
+    });
+  }
+
+  const ctxCustos = container.querySelector('#dre-chart-custos');
+  if (ctxCustos) {
+    new Chart(ctxCustos.getContext('2d'), {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Custos Fixos', data: mesesSelecionados.map(m => dadosMeses[m].indicadores.custosFixos), borderColor: '#3b82f6', tension: 0.3, fill: false, pointRadius: 4 },
+          { label: 'Custos Variáveis', data: mesesSelecionados.map(m => dadosMeses[m].indicadores.custosVariaveis), borderColor: '#8b5cf6', tension: 0.3, fill: false, pointRadius: 4 },
+          { label: 'Custos Extras', data: mesesSelecionados.map(m => dadosMeses[m].indicadores.custosExtras), borderColor: '#ec4899', tension: 0.3, fill: false, pointRadius: 4 },
+          { label: 'Despesas Totais', data: mesesSelecionados.map(m => dadosMeses[m].indicadores.despesasTotais), borderColor: '#ef4444', borderWidth: 2.5, borderDash: [6, 3], tension: 0.3, fill: false, pointRadius: 4 }
+        ]
+      },
+      options: baseOpts
+    });
+  }
+
+  const ctxLucro = container.querySelector('#dre-chart-lucro');
+  if (ctxLucro) {
+    new Chart(ctxLucro.getContext('2d'), {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Lucro Bruto', data: mesesSelecionados.map(m => dadosMeses[m].indicadores.lucroBruto), borderColor: '#22c55e', tension: 0.3, fill: false, pointRadius: 4 },
+          { label: 'Lucro Líquido', data: mesesSelecionados.map(m => dadosMeses[m].indicadores.lucroLiquido), borderColor: '#16a34a', borderWidth: 2.5, tension: 0.3, fill: false, pointRadius: 4 }
+        ]
+      },
+      options: { ...baseOpts, scales: { ...baseOpts.scales, y: { ...baseOpts.scales.y, beginAtZero: false } } }
+    });
+  }
+
+  await new Promise(resolve => setTimeout(resolve, 300));
+}
+
+async function gerarDRE() {
+  const checkboxes = document.querySelectorAll('.dre-mes-checkbox:checked');
+  const mesesSelecionados = Array.from(checkboxes).map(cb => parseInt(cb.value)).sort((a, b) => a - b);
+
+  if (mesesSelecionados.length === 0) {
+    alert('Selecione pelo menos um mês para gerar o DRE.');
+    return;
+  }
+
+  fecharModalDRE();
+  mostrarLoadingDRE();
+
+  try {
+    const db = firebase.firestore();
+    const ano = anoSelecionado;
+
+    const [snapshotEntradas, snapshotInvest, snapshotAulas, snapshotInfo] = await Promise.all([
+      db.collection('BancoDeAulas').get(),
+      db.collection('investimentos').get(),
+      db.collection('BancoDeAulas-Lista').get(),
+      db.collection('informacoesPagamento').where('ano', '==', ano).get()
+    ]);
+
+    const snapshots = { snapshotEntradas, snapshotInvest, snapshotAulas, snapshotInfo };
+    const dadosMeses = {};
+    mesesSelecionados.forEach(mesIdx => {
+      const dados = carregarDadosMesDRE_local(mesIdx, ano, snapshots);
+      dados.indicadores = calcularIndicadoresDRE(dados.entradas, dados.investimentos, dados.equipe);
+      dadosMeses[mesIdx] = dados;
+    });
+
+    const completo = document.getElementById('dre-check-completo')?.checked !== false;
+    const container = document.createElement('div');
+    container.style.cssText = 'position:absolute;top:0;left:-9999px;background:white;';
+    container.innerHTML = buildDREHTML(mesesSelecionados, dadosMeses, ano, completo);
+    document.body.appendChild(container);
+
+    await criarGraficosNoPDF(container, mesesSelecionados, dadosMeses);
+
+    const canvas = await html2canvas(container, {
+      scale: 1.5,
+      useCORS: true,
+      allowTaint: true,
+      logging: false,
+      backgroundColor: '#ffffff'
+    });
+
+    document.body.removeChild(container);
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const margin = 10;
+    const pdfW = 210 - 2 * margin;
+    const pdfH = 297 - 2 * margin;
+    const pxPerMm = canvas.width / pdfW;
+    const pageHeightPx = Math.round(pdfH * pxPerMm);
+
+    let yPx = 0;
+    let pageNum = 0;
+
+    while (yPx < canvas.height) {
+      const sliceH = Math.min(pageHeightPx, canvas.height - yPx);
+      const sliceCanvas = document.createElement('canvas');
+      sliceCanvas.width = canvas.width;
+      sliceCanvas.height = sliceH;
+      const ctx = sliceCanvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, sliceCanvas.width, sliceH);
+      ctx.drawImage(canvas, 0, -yPx, canvas.width, canvas.height);
+
+      if (pageNum > 0) pdf.addPage();
+      const imgData = sliceCanvas.toDataURL('image/jpeg', 0.92);
+      pdf.addImage(imgData, 'JPEG', margin, margin, pdfW, sliceH / pxPerMm);
+
+      yPx += pageHeightPx;
+      pageNum++;
+    }
+
+    const nomesStr = mesesSelecionados.length <= 2
+      ? mesesSelecionados.map(m => meses[m]).join('_')
+      : `${mesesSelecionados.length}-meses`;
+    pdf.save(`DRE_${ano}_${nomesStr}.pdf`);
+
+  } catch (error) {
+    console.error('❌ Erro ao gerar DRE:', error);
+    alert('Erro ao gerar DRE: ' + error.message);
+  } finally {
+    esconderLoadingDRE();
+  }
+}
+
+// ============================================
+// GERAÇÃO DE PLANILHA DRE (EXCEL)
+// ============================================
+
+async function gerarPlanilhaDRE() {
+  const checkboxes = document.querySelectorAll('.dre-mes-checkbox:checked');
+  const mesesSelecionados = Array.from(checkboxes).map(cb => parseInt(cb.value)).sort((a, b) => a - b);
+
+  if (mesesSelecionados.length === 0) {
+    alert('Selecione pelo menos um mês para gerar a planilha.');
+    return;
+  }
+
+  if (typeof ExcelJS === 'undefined') {
+    alert('Biblioteca de planilhas não carregada. Recarregue a página e tente novamente.');
+    return;
+  }
+
+  const completo = document.getElementById('dre-check-completo')?.checked !== false;
+
+  fecharModalDRE();
+  mostrarLoadingDRE();
+
+  try {
+    const db = firebase.firestore();
+    const ano = anoSelecionado;
+
+    const [snapshotEntradas, snapshotInvest, snapshotAulas, snapshotInfo] = await Promise.all([
+      db.collection('BancoDeAulas').get(),
+      db.collection('investimentos').get(),
+      db.collection('BancoDeAulas-Lista').get(),
+      db.collection('informacoesPagamento').where('ano', '==', ano).get()
+    ]);
+
+    const snapshots = { snapshotEntradas, snapshotInvest, snapshotAulas, snapshotInfo };
+    const dadosMeses = {};
+    mesesSelecionados.forEach(mesIdx => {
+      const dados = carregarDadosMesDRE_local(mesIdx, ano, snapshots);
+      dados.indicadores = calcularIndicadoresDRE(dados.entradas, dados.investimentos, dados.equipe);
+      dadosMeses[mesIdx] = dados;
+    });
+
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'SistemaMaster';
+    wb.created = new Date();
+
+    mesesSelecionados.forEach(mesIdx => {
+      const nomeMes = meses[mesIdx];
+      const dm = dadosMeses[mesIdx];
+      const ind = dm.indicadores;
+      const n = v => (typeof v === 'number' ? v : 0);
+
+      if (completo) {
+        // ── Aba "Descrições [Mês]" ──────────────────────────────────────
+        const wsDesc = wb.addWorksheet(`Descrições ${nomeMes}`);
+
+        // Entradas
+        _dreSecao(wsDesc, `ENTRADAS (CONTRATOS) — ${nomeMes} ${ano}`, 7);
+        _dreCabecalho(wsDesc, ['Data', 'Nome Cliente', 'Horas Contratadas', 'Forma de Pagamento', 'Status Pagamento', 'Valor Contratação', 'Lucro Atual']);
+        if (dm.entradas.length === 0) {
+          wsDesc.addRow(['Nenhum registro encontrado']);
+        } else {
+          dm.entradas.forEach(e => {
+            const row = wsDesc.addRow([
+              e.dataPrimeiraParcela || '-', e.nomeCliente || '-',
+              e.SomatorioDuracaoAulas || '-', e.metodoPagamento || '-',
+              e.statusPagamento || '-', n(e.ValorPacote), n(e.lucroMaster)
+            ]);
+            row.getCell(6).numFmt = '"R$ "#,##0.00';
+            row.getCell(7).numFmt = '"R$ "#,##0.00';
+          });
+        }
+        wsDesc.addRow([]);
+
+        // Saídas
+        _dreSecao(wsDesc, `SAÍDAS — INVESTIMENTOS E DESPESAS — ${nomeMes} ${ano}`, 4);
+        _dreCabecalho(wsDesc, ['Data', 'Descrição', 'Tipo de Despesa', 'Valor']);
+        if (dm.investimentos.length === 0) {
+          wsDesc.addRow(['Nenhum registro encontrado']);
+        } else {
+          dm.investimentos.forEach(inv => {
+            const row = wsDesc.addRow([
+              inv.data || '-', inv.descricao || '-',
+              inv.tipo ? inv.tipo.charAt(0).toUpperCase() + inv.tipo.slice(1).replace(/_/g, ' ') : '-',
+              n(inv.valor)
+            ]);
+            row.getCell(4).numFmt = '"R$ "#,##0.00';
+          });
+        }
+        wsDesc.addRow([]);
+
+        // Pagamento de Equipe
+        _dreSecao(wsDesc, `SAÍDA — PAGAMENTO DE EQUIPE — ${nomeMes} ${ano}`, 2);
+        _dreCabecalho(wsDesc, ['Nome Professor', 'Valor das Aulas']);
+        if (dm.equipe.length === 0) {
+          wsDesc.addRow(['Nenhum registro encontrado']);
+        } else {
+          dm.equipe.forEach(e => {
+            const row = wsDesc.addRow([e.professor, e.total]);
+            row.getCell(2).numFmt = '"R$ "#,##0.00';
+          });
+          const totalRow = wsDesc.addRow(['TOTAL', ind.repasseEquipe]);
+          totalRow.getCell(2).numFmt = '"R$ "#,##0.00';
+          _dreEstiloTotal(totalRow, 2);
+        }
+
+        _dreAjustarColunas(wsDesc);
+      }
+
+      // ── Aba "Resumo [Mês]" ─────────────────────────────────────────────
+      const wsResumo = wb.addWorksheet(`Resumo ${nomeMes}`);
+      const hdrs = [
+        'Faturamento', 'Repasse para Equipe', 'Custos Fixos', 'Custos Variáveis',
+        'Custos Extras', 'Despesas Totais', 'Lucro Bruto', 'Lucro Líquido',
+        'Reserva de Emergência (10%)', 'Meta Alcançada'
+      ];
+      _dreSecao(wsResumo, `INDICADORES ESTRATÉGICOS — ${nomeMes} ${ano}`, hdrs.length);
+      _dreCabecalho(wsResumo, hdrs);
+      const dataRow = wsResumo.addRow([
+        ind.faturamento, ind.repasseEquipe, ind.custosFixos, ind.custosVariaveis,
+        ind.custosExtras, ind.despesasTotais, ind.lucroBruto, ind.lucroLiquido,
+        ind.reservaEmergencia, ind.metaAlcancada
+      ]);
+      for (let c = 1; c <= hdrs.length; c++) {
+        dataRow.getCell(c).numFmt = '"R$ "#,##0.00';
+      }
+
+      _dreAjustarColunas(wsResumo);
+    });
+
+    const nomesStr = mesesSelecionados.length <= 2
+      ? mesesSelecionados.map(m => meses[m]).join('_')
+      : `${mesesSelecionados.length}-meses`;
+
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `DRE_${ano}_${nomesStr}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+  } catch (error) {
+    console.error('❌ Erro ao gerar planilha:', error);
+    alert('Erro ao gerar planilha: ' + error.message);
+  } finally {
+    esconderLoadingDRE();
+  }
+}
+
+function _dreSecao(ws, titulo, numCols) {
+  const row = ws.addRow([titulo]);
+  row.height = 18;
+  for (let c = 1; c <= numCols; c++) {
+    const cell = row.getCell(c);
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF28705' } };
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+  }
+  if (numCols > 1) ws.mergeCells(row.number, 1, row.number, numCols);
+}
+
+function _dreCabecalho(ws, headers) {
+  const row = ws.addRow(headers);
+  row.height = 16;
+  headers.forEach((_, i) => {
+    const cell = row.getCell(i + 1);
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF374151' } };
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    cell.border = { bottom: { style: 'medium', color: { argb: 'FFE5E7EB' } } };
+  });
+}
+
+function _dreEstiloTotal(row, numCols) {
+  for (let c = 1; c <= numCols; c++) {
+    const cell = row.getCell(c);
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF7EB' } };
+    cell.font = { bold: true, color: { argb: 'FFF28705' } };
+  }
+}
+
+function _dreAjustarColunas(ws) {
+  ws.columns.forEach(col => {
+    let maxLen = 10;
+    col.eachCell({ includeEmpty: false }, cell => {
+      const len = cell.value ? String(cell.value).length : 0;
+      if (len > maxLen) maxLen = len;
+    });
+    col.width = Math.min(maxLen + 2, 55);
+  });
 }
