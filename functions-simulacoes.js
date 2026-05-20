@@ -2392,16 +2392,69 @@ const Simulacoes = (function() {
     });
   }
   
-  // Função para abrir modal de matéria (simulação)
-  function showMateriaModalSimulacao(index, materiaAtual) {
+  // Função helper para formatar múltiplas matérias
+  function formatarMateriasMultiplas(materiasArray) {
+    if (!Array.isArray(materiasArray)) {
+      return materiasArray || '';
+    }
+    
+    const uniqueMaterias = [...new Set(materiasArray)].filter(m => m && m.trim());
+    
+    if (uniqueMaterias.length === 0) return '';
+    if (uniqueMaterias.length === 1) return uniqueMaterias[0];
+    if (uniqueMaterias.length === 2) return `${uniqueMaterias[0]} e ${uniqueMaterias[1]}`;
+    
+    const todasMenosUltima = uniqueMaterias.slice(0, -1).join(', ');
+    return `${todasMenosUltima} e ${uniqueMaterias[uniqueMaterias.length - 1]}`;
+  }
+  
+  // Função para abrir modal de matéria (simulação) - MÚLTIPLAS SELEÇÕES
+  function showMateriaModalSimulacao(index, materiasAtual) {
     const materias = [
       "Biologia", "Ciências", "Filosofia", "Física", "Geografia",
       "História", "Língua Portuguesa", "Língua Inglesa", "Matemática", 
       "Química", "Sociologia", "Pedagogia"
     ].sort();
     
+    // Parsear matérias atuais (pode ser string única ou formatada com ", " e "e" ou "A definir")
+    let materiasArray = [];
+    let temADefinir = false;
+    
+    if (materiasAtual) {
+      if (Array.isArray(materiasAtual)) {
+        materiasArray = materiasAtual;
+      } else {
+        // Verificar se é "A definir"
+        if (materiasAtual.trim().toLowerCase() === 'a definir') {
+          temADefinir = true;
+        } else {
+          // Tentar parsear string ("Mat1, Mat2 e Mat3" ou "Mat1 e Mat2" ou "Mat1")
+          materiasArray = materiasAtual
+            .split(/,\s+|\s+e\s+/)
+            .map(m => m.trim())
+            .filter(m => m && m.toLowerCase() !== 'a definir');
+        }
+      }
+    }
+    
+    // Se não tem matérias e não tem "A definir", então está vazio = "A definir"
+    if (materiasArray.length === 0 && !temADefinir && !materiasAtual) {
+      temADefinir = true;
+    }
+    
+    // Criar opção "A definir" primeiro
+    const btnADefinir = `
+      <button 
+        class="materia-option-btn ${temADefinir ? 'bg-blue-500 text-white border-blue-600 hover:bg-blue-600' : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'} border-2 rounded-lg px-4 py-3 font-medium transition-all duration-200 transform hover:scale-105 text-sm whitespace-nowrap"
+        data-materia="A definir"
+      >
+        A definir
+        ${temADefinir ? '<i class="fas fa-check ml-2"></i>' : ''}
+      </button>
+    `;
+    
     const opcoesHtml = materias.map(materia => {
-      const isAtual = materia === materiaAtual;
+      const isAtual = materiasArray.includes(materia);
       const buttonClass = isAtual 
         ? 'bg-green-500 text-white border-green-600 hover:bg-green-600' 
         : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200';
@@ -2417,13 +2470,15 @@ const Simulacoes = (function() {
       `;
     }).join('');
     
+    const materiaAtualFormatada = temADefinir ? 'A definir' : (formatarMateriasMultiplas(materiasArray) || 'Nenhuma');
+    
     const modalHtml = `
       <div class="modal-overlay" id="modalMateriaSim" style="z-index: 10000;">
         <div class="modal-container" style="max-width: 900px;">
           <div class="modal-header">
             <h3 class="font-lexend font-bold text-lg">
               <i class="fas fa-book text-orange-500 mr-2"></i>
-              Matéria da aula
+              Matérias da aula
             </h3>
             <button class="modal-close text-gray-400 hover:text-gray-600">
               <i class="fas fa-times"></i>
@@ -2435,15 +2490,17 @@ const Simulacoes = (function() {
               <div class="bg-orange-50 border border-orange-200 rounded-lg p-3">
                 <p class="text-sm text-gray-700">
                   <i class="fas fa-info-circle text-orange-500 mr-2"></i>
-                  Matéria atual: <strong class="text-orange-600">${materiaAtual || 'Não definida'}</strong>
+                  Matérias selecionadas: <strong class="text-orange-600" id="materiasFormatadas">${materiaAtualFormatada}</strong>
+                  <span class="text-xs text-gray-500 ml-2" id="contadorMaterias">${temADefinir ? '(especial)' : `(${materiasArray.length}/5)`}</span>
                 </p>
               </div>
               
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-3">
-                  Selecione a nova matéria:
+                  Selecione as matérias (máximo 5):
                 </label>
                 <div class="grid grid-cols-4 gap-3">
+                  ${btnADefinir}
                   ${opcoesHtml}
                 </div>
               </div>
@@ -2451,6 +2508,9 @@ const Simulacoes = (function() {
           </div>
           
           <div class="modal-footer">
+            <button id="btnConfirmarMaterias" class="btn-primary btn-compact">
+              Confirmar
+            </button>
             <button id="btnCancelarMateria" class="btn-secondary btn-compact">
               Cancelar
             </button>
@@ -2464,33 +2524,114 @@ const Simulacoes = (function() {
     document.body.appendChild(modalContainer);
     
     const modal = modalContainer.querySelector('#modalMateriaSim');
+    const btnConfirmar = modal.querySelector('#btnConfirmarMaterias');
     const btnCancelar = modal.querySelector('#btnCancelarMateria');
     const btnClose = modal.querySelector('.modal-close');
     const btnOpcoes = modal.querySelectorAll('.materia-option-btn');
+    const labelFormatadas = modal.querySelector('#materiasFormatadas');
+    const contadorEl = modal.querySelector('#contadorMaterias');
+    
+    let materiasTemp = [...materiasArray];
+    let temADefinirTemp = temADefinir;
+    
+    const atualizarExibicao = () => {
+      if (temADefinirTemp) {
+        labelFormatadas.textContent = 'A definir';
+        contadorEl.textContent = '(especial)';
+      } else {
+        labelFormatadas.textContent = formatarMateriasMultiplas(materiasTemp) || 'Nenhuma';
+        contadorEl.textContent = `(${materiasTemp.length}/5)`;
+      }
+      
+      // Atualizar visual dos botões
+      btnOpcoes.forEach(btn => {
+        const materia = btn.dataset.materia;
+        
+        if (materia === 'A definir') {
+          if (temADefinirTemp) {
+            btn.classList.remove('bg-gray-100', 'text-gray-700', 'border-gray-300', 'hover:bg-gray-200');
+            btn.classList.add('bg-blue-500', 'text-white', 'border-blue-600', 'hover:bg-blue-600');
+            if (!btn.querySelector('i')) {
+              btn.innerHTML = 'A definir<i class="fas fa-check ml-2"></i>';
+            }
+          } else {
+            btn.classList.remove('bg-blue-500', 'text-white', 'border-blue-600', 'hover:bg-blue-600');
+            btn.classList.add('bg-gray-100', 'text-gray-700', 'border-gray-300', 'hover:bg-gray-200');
+            btn.innerHTML = 'A definir';
+          }
+        } else {
+          if (materiasTemp.includes(materia)) {
+            btn.classList.remove('bg-gray-100', 'text-gray-700', 'border-gray-300', 'hover:bg-gray-200');
+            btn.classList.add('bg-green-500', 'text-white', 'border-green-600', 'hover:bg-green-600');
+            if (!btn.querySelector('i')) {
+              btn.innerHTML += '<i class="fas fa-check ml-2"></i>';
+            }
+          } else {
+            btn.classList.remove('bg-green-500', 'text-white', 'border-green-600', 'hover:bg-green-600');
+            btn.classList.add('bg-gray-100', 'text-gray-700', 'border-gray-300', 'hover:bg-gray-200');
+            const icon = btn.querySelector('i');
+            if (icon) icon.remove();
+          }
+        }
+      });
+    };
     
     const closeModal = () => {
       modalContainer.remove();
     };
     
+    btnConfirmar.addEventListener('click', () => {
+      let materiaFormatada;
+      
+      if (temADefinirTemp) {
+        materiaFormatada = 'A definir';
+      } else if (materiasTemp.length === 0) {
+        materiaFormatada = 'A definir';
+      } else {
+        materiaFormatada = formatarMateriasMultiplas(materiasTemp);
+      }
+      
+      editingSimulacao.aulas[index].materia = materiaFormatada;
+      const tbody = document.getElementById('tbody-aulas-simulacao');
+      tbody.innerHTML = renderAulasSimulacao(editingSimulacao.aulas);
+      setupAulasInputEvents();
+      autoSalvarSimulacao();
+      showToast(`✅ Matérias atualizadas para: ${materiaFormatada}`, 'success');
+      closeModal();
+    });
+    
     btnCancelar.addEventListener('click', closeModal);
     btnClose.addEventListener('click', closeModal);
     
     btnOpcoes.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const novaMateria = btn.dataset.materia;
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const materia = btn.dataset.materia;
         
-        if (novaMateria === materiaAtual) {
-          showToast('ℹ️ Esta já é a matéria atual da aula', 'info');
-          return;
+        if (materia === 'A definir') {
+          // Ao clicar em "A definir", desselecionar todas as outras
+          temADefinirTemp = !temADefinirTemp;
+          materiasTemp = [];
+        } else {
+          // Ao clicar em uma matéria normal, desselecionar "A definir"
+          temADefinirTemp = false;
+          
+          const idx = materiasTemp.indexOf(materia);
+          if (idx > -1) {
+            // Remover se já está selecionada
+            materiasTemp.splice(idx, 1);
+          } else {
+            // Adicionar se não exceder limite de 5
+            if (materiasTemp.length < 5) {
+              materiasTemp.push(materia);
+            } else {
+              showToast('⚠️ Máximo de 5 matérias atingido', 'warning');
+              return;
+            }
+          }
         }
         
-        editingSimulacao.aulas[index].materia = novaMateria;
-        const tbody = document.getElementById('tbody-aulas-simulacao');
-        tbody.innerHTML = renderAulasSimulacao(editingSimulacao.aulas);
-        setupAulasInputEvents();
-        autoSalvarSimulacao();
-        showToast(`✅ Matéria alterada para ${novaMateria}`, 'success');
-        closeModal();
+        atualizarExibicao();
       });
     });
     

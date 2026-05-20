@@ -3104,16 +3104,69 @@ const BancoDeAulasCards = (function() {
     });
   }
   
-  // Função para mostrar modal de alteração de matéria da aula
-  function showMateriaModal(idAula, materiaAtual) {
+  // Função helper para formatar múltiplas matérias
+  function formatarMateriasMultiplas(materiasArray) {
+    if (!Array.isArray(materiasArray)) {
+      return materiasArray || '';
+    }
+    
+    const uniqueMaterias = [...new Set(materiasArray)].filter(m => m && m.trim());
+    
+    if (uniqueMaterias.length === 0) return '';
+    if (uniqueMaterias.length === 1) return uniqueMaterias[0];
+    if (uniqueMaterias.length === 2) return `${uniqueMaterias[0]} e ${uniqueMaterias[1]}`;
+    
+    const todasMenosUltima = uniqueMaterias.slice(0, -1).join(', ');
+    return `${todasMenosUltima} e ${uniqueMaterias[uniqueMaterias.length - 1]}`;
+  }
+  
+  // Função para mostrar modal de alteração de matéria da aula - MÚLTIPLAS SELEÇÕES
+  function showMateriaModal(idAula, materiasAtual) {
     const materias = [
       "Biologia", "Ciências", "Filosofia", "Física", "Geografia",
       "História", "Língua Portuguesa", "Língua Inglesa", "Matemática", 
       "Química", "Sociologia", "Pedagogia"
     ].sort();
     
+    // Parsear matérias atuais (pode ser string única ou formatada com ", " e "e" ou "A definir")
+    let materiasArray = [];
+    let temADefinir = false;
+    
+    if (materiasAtual) {
+      if (Array.isArray(materiasAtual)) {
+        materiasArray = materiasAtual;
+      } else {
+        // Verificar se é "A definir"
+        if (materiasAtual.trim().toLowerCase() === 'a definir') {
+          temADefinir = true;
+        } else {
+          // Tentar parsear string ("Mat1, Mat2 e Mat3" ou "Mat1 e Mat2" ou "Mat1")
+          materiasArray = materiasAtual
+            .split(/,\s+|\s+e\s+/)
+            .map(m => m.trim())
+            .filter(m => m && m.toLowerCase() !== 'a definir');
+        }
+      }
+    }
+    
+    // Se não tem matérias e não tem "A definir", então está vazio = "A definir"
+    if (materiasArray.length === 0 && !temADefinir && !materiasAtual) {
+      temADefinir = true;
+    }
+    
+    // Criar opção "A definir" primeiro
+    const btnADefinir = `
+      <button 
+        class="materia-option-btn ${temADefinir ? 'bg-blue-500 text-white border-blue-600 hover:bg-blue-600' : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'} border-2 rounded-lg px-4 py-3 font-medium transition-all duration-200 transform hover:scale-105 text-sm whitespace-nowrap"
+        data-materia="A definir"
+      >
+        A definir
+        ${temADefinir ? '<i class="fas fa-check ml-2"></i>' : ''}
+      </button>
+    `;
+    
     const opcoesHtml = materias.map(materia => {
-      const isAtual = materia === materiaAtual;
+      const isAtual = materiasArray.includes(materia);
       const buttonClass = isAtual 
         ? 'bg-green-500 text-white border-green-600 hover:bg-green-600' 
         : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200';
@@ -3129,13 +3182,15 @@ const BancoDeAulasCards = (function() {
       `;
     }).join('');
     
+    const materiaAtualFormatada = temADefinir ? 'A definir' : (formatarMateriasMultiplas(materiasArray) || 'Nenhuma');
+    
     const modalHtml = `
       <div class="modal-overlay" id="materiaModal" style="z-index: 10000;">
         <div class="modal-container" style="max-width: 900px;">
           <div class="modal-header">
             <h3 class="font-lexend font-bold text-lg">
               <i class="fas fa-book text-orange-500 mr-2"></i>
-              Matéria da aula
+              Matérias da aula
             </h3>
             <button class="modal-close text-gray-400 hover:text-gray-600">
               <i class="fas fa-times"></i>
@@ -3147,15 +3202,17 @@ const BancoDeAulasCards = (function() {
               <div class="bg-orange-50 border border-orange-200 rounded-lg p-3">
                 <p class="text-sm text-gray-700">
                   <i class="fas fa-info-circle text-orange-500 mr-2"></i>
-                  Matéria atual: <strong class="text-orange-600">${materiaAtual || 'Não definida'}</strong>
+                  Matérias selecionadas: <strong class="text-orange-600" id="materiasFormatadas">${materiaAtualFormatada}</strong>
+                  <span class="text-xs text-gray-500 ml-2" id="contadorMaterias">${temADefinir ? '(especial)' : `(${materiasArray.length}/5)`}</span>
                 </p>
               </div>
               
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-3">
-                  Selecione a nova matéria:
+                  Selecione as matérias (máximo 5):
                 </label>
                 <div class="grid grid-cols-4 gap-3">
+                  ${btnADefinir}
                   ${opcoesHtml}
                 </div>
               </div>
@@ -3163,6 +3220,9 @@ const BancoDeAulasCards = (function() {
           </div>
           
           <div class="modal-footer">
+            <button id="btnConfirmarMaterias" class="btn-primary btn-compact">
+              Confirmar
+            </button>
             <button id="btnCancelarMateria" class="btn-secondary btn-compact">
               Cancelar
             </button>
@@ -3176,104 +3236,110 @@ const BancoDeAulasCards = (function() {
     document.body.appendChild(modalContainer);
     
     const modal = modalContainer.querySelector('#materiaModal');
+    const btnConfirmar = modal.querySelector('#btnConfirmarMaterias');
     const btnCancelar = modal.querySelector('#btnCancelarMateria');
     const btnClose = modal.querySelector('.modal-close');
     const btnOpcoes = modal.querySelectorAll('.materia-option-btn');
+    const labelFormatadas = modal.querySelector('#materiasFormatadas');
+    const contadorEl = modal.querySelector('#contadorMaterias');
+    
+    let materiasTemp = [...materiasArray];
+    
+    const atualizarExibicao = () => {
+      labelFormatadas.textContent = formatarMateriasMultiplas(materiasTemp) || 'Nenhuma';
+      contadorEl.textContent = `(${materiasTemp.length}/5)`;
+      
+      // Atualizar visual dos botões
+      btnOpcoes.forEach(btn => {
+        const materia = btn.dataset.materia;
+        if (materiasTemp.includes(materia)) {
+          btn.classList.remove('bg-gray-100', 'text-gray-700', 'border-gray-300', 'hover:bg-gray-200');
+          btn.classList.add('bg-green-500', 'text-white', 'border-green-600', 'hover:bg-green-600');
+          if (!btn.querySelector('i')) {
+            btn.innerHTML += '<i class="fas fa-check ml-2"></i>';
+          }
+        } else {
+          btn.classList.remove('bg-green-500', 'text-white', 'border-green-600', 'hover:bg-green-600');
+          btn.classList.add('bg-gray-100', 'text-gray-700', 'border-gray-300', 'hover:bg-gray-200');
+          const icon = btn.querySelector('i');
+          if (icon) icon.remove();
+        }
+      });
+    };
     
     const closeModal = () => {
       modalContainer.remove();
     };
     
+    btnConfirmar.addEventListener('click', async () => {
+      if (materiasTemp.length === 0) {
+        showToast('⚠️ Selecione ao menos uma matéria', 'warning');
+        return;
+      }
+      
+      const materiaFormatada = formatarMateriasMultiplas(materiasTemp);
+      
+      try {
+        await BANCO.updateMateriaAula(idAula, materiaFormatada);
+        showToast(`✅ Matérias atualizadas para: ${materiaFormatada}`, 'success');
+        closeModal();
+        
+        // Recarregar a tabela
+        const tbody = document.getElementById('tbody-aulas-detalhadas');
+        if (tbody) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="9" class="text-center py-8">
+                <div class="flex flex-col items-center justify-center">
+                  <div class="loading-spinner-large mb-3"></div>
+                  <p class="text-orange-500 font-comfortaa font-bold">Atualizando dados...</p>
+                </div>
+              </td>
+            </tr>
+          `;
+        }
+        
+        // Buscar o código de contratação do modal aberto
+        const modalOverlay = document.querySelector('.modal-overlay');
+        if (modalOverlay && modalOverlay.id !== 'materiaModal') {
+          const codigoElement = modalOverlay.querySelector('h3');
+          if (codigoElement) {
+            const match = codigoElement.textContent.match(/\d{4}/);
+            if (match) {
+              const codigoContratacao = match[0];
+              await loadAulasDetalhadas(codigoContratacao);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('❌ Erro ao alterar matérias:', error);
+        showToast('❌ Erro ao alterar matérias', 'error');
+      }
+    });
+    
     btnCancelar.addEventListener('click', closeModal);
     btnClose.addEventListener('click', closeModal);
     
     btnOpcoes.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const novaMateria = btn.dataset.materia;
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const materia = btn.dataset.materia;
+        const idx = materiasTemp.indexOf(materia);
         
-        if (novaMateria === materiaAtual) {
-          showToast('ℹ️ Esta já é a matéria atual da aula', 'info');
-          return;
+        if (idx > -1) {
+          // Remover se já está selecionada
+          materiasTemp.splice(idx, 1);
+        } else {
+          // Adicionar se não exceder limite de 5
+          if (materiasTemp.length < 5) {
+            materiasTemp.push(materia);
+          } else {
+            showToast('⚠️ Máximo de 5 matérias atingido', 'warning');
+            return;
+          }
         }
         
-        // Popup de confirmação
-        const confirmHtml = `
-          <div class="modal-overlay" id="confirmMateriaModal" style="z-index: 10001;">
-            <div class="modal-container" style="max-width: 400px;">
-              <div class="modal-header">
-                <h3 class="font-lexend font-bold text-lg">Deseja mudar a matéria da aula?</h3>
-              </div>
-              <div class="modal-body">
-                <div class="text-center py-4">
-                  <i class="fas fa-book text-4xl text-orange-500 mb-4"></i>
-                  <p class="text-gray-600 mb-2">Matéria atual:</p>
-                  <p class="text-lg font-bold text-gray-800 mb-4">${materiaAtual || 'Não definida'}</p>
-                  <p class="text-gray-600 mb-2">Nova matéria:</p>
-                  <p class="text-lg font-bold text-orange-500">${novaMateria}</p>
-                </div>
-              </div>
-              <div class="modal-footer">
-                <button id="btnNaoMateria" class="btn-secondary btn-compact">Não</button>
-                <button id="btnSimMateria" class="btn-primary btn-compact">Sim</button>
-              </div>
-            </div>
-          </div>
-        `;
-        
-        const confirmContainer = document.createElement('div');
-        confirmContainer.innerHTML = confirmHtml;
-        document.body.appendChild(confirmContainer);
-        
-        const confirmModal = confirmContainer.querySelector('#confirmMateriaModal');
-        const btnSim = confirmModal.querySelector('#btnSimMateria');
-        const btnNao = confirmModal.querySelector('#btnNaoMateria');
-        
-        const closeConfirm = () => {
-          confirmContainer.remove();
-        };
-        
-        btnNao.addEventListener('click', closeConfirm);
-        
-        btnSim.addEventListener('click', async () => {
-          closeConfirm();
-          
-          try {
-            await BANCO.updateMateriaAula(idAula, novaMateria);
-            showToast(`✅ Matéria alterada para ${novaMateria}`, 'success');
-            closeModal();
-            
-            // Recarregar a tabela
-            const tbody = document.getElementById('tbody-aulas-detalhadas');
-            if (tbody) {
-              tbody.innerHTML = `
-                <tr>
-                  <td colspan="9" class="text-center py-8">
-                    <div class="flex flex-col items-center justify-center">
-                      <div class="loading-spinner-large mb-3"></div>
-                      <p class="text-orange-500 font-comfortaa font-bold">Atualizando dados...</p>
-                    </div>
-                  </td>
-                </tr>
-              `;
-            }
-            
-            // Buscar o código de contratação do modal aberto
-            const modalOverlay = document.querySelector('.modal-overlay');
-            if (modalOverlay && modalOverlay.id !== 'materiaModal') {
-              const codigoElement = modalOverlay.querySelector('h3');
-              if (codigoElement) {
-                const match = codigoElement.textContent.match(/\d{4}/);
-                if (match) {
-                  const codigoContratacao = match[0];
-                  await loadAulasDetalhadas(codigoContratacao);
-                }
-              }
-            }
-          } catch (error) {
-            console.error('❌ Erro ao alterar matéria:', error);
-            showToast('❌ Erro ao alterar matéria', 'error');
-          }
-        });
+        atualizarExibicao();
       });
     });
     
