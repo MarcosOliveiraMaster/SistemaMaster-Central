@@ -395,7 +395,13 @@ async function loadAulasPainel(dataFiltro) {
         ? '<i class="fas fa-check-circle text-green-500" title="Concluída"></i>'
         : '<i class="fas fa-clock text-yellow-500" title="Pendente"></i>';
 
-      const statusClass = getStatusClassMain(aula.StatusAula);
+      const statusClass = getStatusBadgeClass(aula.StatusAula || 'Pendente');
+      
+      // Verificar se o relatório está vazio ou preenchido
+      const temRelatorio = aula.RelatorioAula && aula.RelatorioAula.trim() !== '';
+      const corRelatorio = temRelatorio 
+        ? 'text-green-500 hover:text-green-600 hover:bg-green-50' 
+        : 'text-gray-300 hover:text-gray-400 hover:bg-gray-50';
 
       return `
         <tr class="hover:bg-gray-50 transition-colors border-b border-gray-100">
@@ -408,7 +414,7 @@ async function loadAulasPainel(dataFiltro) {
           <td class="px-4 py-3 text-sm text-center">${statusIcon}</td>
           <td class="px-4 py-3 text-sm">
             <span 
-              class="px-2 py-1 rounded text-xs font-medium status-badge-clickable ${statusClass}"
+              class="px-2 py-1 rounded text-xs font-medium status-badge-clickable cursor-pointer ${statusClass}"
               onclick="openStatusModal('${aula.id}', '${aula.StatusAula || 'Pendente'}')"
               title="Clique para alterar"
             >
@@ -418,8 +424,8 @@ async function loadAulasPainel(dataFiltro) {
           <td class="px-4 py-3 text-sm text-center">
             <button 
               onclick="verRelatorioAula('${aula.id}')"
-              class="text-orange-500 hover:text-orange-600 transition-colors p-1 rounded-full hover:bg-orange-50"
-              title="Ver/Editar Relatório"
+              class="${corRelatorio} transition-colors p-1 rounded-full"
+              title="${temRelatorio ? 'Ver/Editar Relatório' : 'Adicionar Relatório'}"
             >
               <i class="fas fa-comment-alt text-lg"></i>
             </button>
