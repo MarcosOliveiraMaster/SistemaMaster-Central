@@ -2413,7 +2413,7 @@ const Simulacoes = (function() {
     const materias = [
       "Biologia", "Ciências", "Filosofia", "Física", "Geografia",
       "História", "Língua Portuguesa", "Língua Inglesa", "Matemática", 
-      "Química", "Sociologia", "Pedagogia"
+      "Química", "Redação","Sociologia", "Pedagogia"
     ].sort();
     
     // Parsear matérias atuais (pode ser string única ou formatada com ", " e "e" ou "A definir")
