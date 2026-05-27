@@ -432,9 +432,9 @@ async function loadAulasPainel(dataFiltro) {
           </td>
           <td class="px-4 py-3 text-sm text-center" onclick="event.stopPropagation()">
             <button
-              onclick="verRelatorioAula('${aula.id}')"
+              onclick="handleRelatorioClick('${aula.id}', '${escapeHtml(aula.data || '')}', '${escapeHtml(aula.nomeCliente || '')}', ${temRelatorio})"
               class="${corRelatorio} transition-colors p-1 rounded-full"
-              title="${temRelatorio ? 'Ver/Editar Relatório' : 'Adicionar Relatório'}"
+              title="${temRelatorio ? 'Ver/Editar Relatório' : (isDataAnteriorHoje(aula.data) ? 'Copiar lembrete de relatório' : 'Adicionar Relatório')}"
             >
               <i class="fas fa-comment-alt text-lg"></i>
             </button>
@@ -507,6 +507,57 @@ async function abrirDetalhesContratacaoPainelCentral(codigoContratacao) {
   } catch (error) {
     console.error('❌ Erro ao abrir detalhes da contratação:', error);
     showToast('Erro ao carregar detalhes da contratação.', 'error');
+  }
+}
+
+// ===== BOTÃO DE RELATÓRIO COM LEMBRETE =====
+
+/**
+ * Verifica se a data da aula (formato "seg - 27/05/25") é anterior a hoje.
+ */
+function isDataAnteriorHoje(dataStr) {
+  if (!dataStr) return false;
+  try {
+    const match = dataStr.match(/(\d{2})\/(\d{2})\/(\d{2})/);
+    if (!match) return false;
+    const [, dia, mes, ano] = match;
+    const dataAula = new Date(2000 + parseInt(ano), parseInt(mes) - 1, parseInt(dia));
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    return dataAula < hoje;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Formata a data da aula para o formato curto "ddd - dd/mm".
+ * Ex: "seg - 27/05/25" → "seg - 27/05"
+ */
+function formatarDataCurta(dataStr) {
+  if (!dataStr) return dataStr || '';
+  return dataStr.replace(/\/\d{2}$/, '');
+}
+
+/**
+ * Gerencia o clique no botão de relatório da tabelaConsultaAulas.
+ * - Se a aula for de data anterior a hoje E o relatório estiver vazio:
+ *   copia mensagem de lembrete para a área de transferência e exibe toast.
+ * - Caso contrário, abre o modal padrão de relatório.
+ */
+function handleRelatorioClick(aulaId, aulaData, nomeCliente, temRelatorio) {
+  const aulaAnterior = isDataAnteriorHoje(aulaData);
+
+  if (!temRelatorio && aulaAnterior) {
+    const primeiroNome = (nomeCliente || 'cliente').split(' ')[0];
+    const dataFormatada = formatarDataCurta(aulaData);
+    const mensagem = `🚗💨 Carro do lembrete passandoooo:\nestá faltando o relatório da aula de ${dataFormatada} com ${primeiroNome}`;
+
+    navigator.clipboard.writeText(mensagem)
+      .then(() => showToast('Mensagem de lembrete copiada!', 'success'))
+      .catch(() => showToast('Erro ao copiar mensagem. Tente novamente.', 'error'));
+  } else {
+    verRelatorioAula(aulaId);
   }
 }
 
