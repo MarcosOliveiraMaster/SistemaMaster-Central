@@ -432,9 +432,9 @@ async function loadAulasPainel(dataFiltro) {
           </td>
           <td class="px-4 py-3 text-sm text-center" onclick="event.stopPropagation()">
             <button
-              onclick="handleRelatorioClick('${aula.id}', '${escapeHtml(aula.data || '')}', '${escapeHtml(aula.nomeCliente || '')}', ${temRelatorio})"
+              onclick="verRelatorioAula('${aula.id}')"
               class="${corRelatorio} transition-colors p-1 rounded-full"
-              title="${temRelatorio ? 'Ver/Editar Relatório' : (isDataAnteriorHoje(aula.data) ? 'Copiar lembrete de relatório' : 'Adicionar Relatório')}"
+              title="${temRelatorio ? 'Ver/Editar Relatório' : 'Adicionar Relatório'}"
             >
               <i class="fas fa-comment-alt text-lg"></i>
             </button>
