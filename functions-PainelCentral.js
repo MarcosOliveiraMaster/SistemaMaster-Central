@@ -404,25 +404,34 @@ async function loadAulasPainel(dataFiltro) {
         : 'text-gray-300 hover:text-gray-400 hover:bg-gray-50';
 
       return `
-        <tr class="hover:bg-gray-50 transition-colors border-b border-gray-100">
-          <td class="px-4 py-3 text-sm text-gray-800">${aula.nomeCliente || '--'}</td>
+        <tr
+          class="hover:bg-orange-50 transition-colors border-b border-gray-100 cursor-pointer"
+          onclick="abrirDetalhesContratacaoPainelCentral('${escapeHtml(aula.codigoContratacao || '')}')"
+          title="Clique para ver detalhes da contratação"
+        >
+          <td class="px-4 py-3 text-sm text-gray-800 font-medium">
+            <span class="flex items-center gap-1">
+              <i class="fas fa-external-link-alt text-orange-300 text-xs opacity-0 group-hover:opacity-100 transition-opacity"></i>
+              ${aula.nomeCliente || '--'}
+            </span>
+          </td>
           <td class="px-4 py-3 text-sm text-gray-600">${aula.estudante || '--'}</td>
           <td class="px-4 py-3 text-sm text-gray-600">${aula.professor || '--'}</td>
           <td class="px-4 py-3 text-sm text-gray-600">${aula.materia || '--'}</td>
           <td class="px-4 py-3 text-sm text-gray-600 font-medium">${aula.horario || '--'}</td>
           <td class="px-4 py-3 text-sm text-gray-600">${aula.duracao || '--'}</td>
           <td class="px-4 py-3 text-sm text-center">${statusIcon}</td>
-          <td class="px-4 py-3 text-sm">
-            <span 
+          <td class="px-4 py-3 text-sm" onclick="event.stopPropagation()">
+            <span
               class="px-2 py-1 rounded text-xs font-medium status-badge-clickable cursor-pointer ${statusClass}"
               onclick="openStatusModal('${aula.id}', '${aula.StatusAula || 'Pendente'}')"
-              title="Clique para alterar"
+              title="Clique para alterar status"
             >
               ${aula.StatusAula || 'Pendente'}
             </span>
           </td>
-          <td class="px-4 py-3 text-sm text-center">
-            <button 
+          <td class="px-4 py-3 text-sm text-center" onclick="event.stopPropagation()">
+            <button
               onclick="verRelatorioAula('${aula.id}')"
               class="${corRelatorio} transition-colors p-1 rounded-full"
               title="${temRelatorio ? 'Ver/Editar Relatório' : 'Adicionar Relatório'}"
@@ -430,19 +439,19 @@ async function loadAulasPainel(dataFiltro) {
               <i class="fas fa-comment-alt text-lg"></i>
             </button>
           </td>
-          <td class="px-2 py-3 text-sm text-center">
-            <button 
-              onclick="enviarLembreteCliente('${aula.id}', '${escapeHtml(aula.professor || '')}', '${escapeHtml(aula.data || '')}', '${escapeHtml(aula.horario || '')}', '${escapeHtml(aula.estudante || '')}', '${escapeHtml(aula.nomeCliente || '')}', '${escapeHtml(aula.materia || '')}')" 
-              class="text-blue-500 hover:text-blue-600 transition-colors p-1 rounded-full hover:bg-blue-50" 
+          <td class="px-2 py-3 text-sm text-center" onclick="event.stopPropagation()">
+            <button
+              onclick="enviarLembreteCliente('${aula.id}', '${escapeHtml(aula.professor || '')}', '${escapeHtml(aula.data || '')}', '${escapeHtml(aula.horario || '')}', '${escapeHtml(aula.estudante || '')}', '${escapeHtml(aula.nomeCliente || '')}', '${escapeHtml(aula.materia || '')}')"
+              class="text-blue-500 hover:text-blue-600 transition-colors p-1 rounded-full hover:bg-blue-50"
               title="Copiar Lembrete Professor"
             >
               <i class="fas fa-chalkboard-teacher text-lg"></i>
             </button>
           </td>
-          <td class="px-2 py-3 text-sm text-center">
-            <button 
-              onclick="enviarLembreteProfessor('${aula.id}', '${escapeHtml(aula.nomeCliente || '')}', '${escapeHtml(aula.professor || '')}', '${escapeHtml(aula.data || '')}', '${escapeHtml(aula.horario || '')}', '${escapeHtml(aula.materia || '')}')" 
-              class="text-green-500 hover:text-green-600 transition-colors p-1 rounded-full hover:bg-green-50" 
+          <td class="px-2 py-3 text-sm text-center" onclick="event.stopPropagation()">
+            <button
+              onclick="enviarLembreteProfessor('${aula.id}', '${escapeHtml(aula.nomeCliente || '')}', '${escapeHtml(aula.professor || '')}', '${escapeHtml(aula.data || '')}', '${escapeHtml(aula.horario || '')}', '${escapeHtml(aula.materia || '')}')"
+              class="text-green-500 hover:text-green-600 transition-colors p-1 rounded-full hover:bg-green-50"
               title="Copiar Lembrete Cliente"
             >
               <i class="fas fa-user text-lg"></i>
@@ -462,6 +471,42 @@ async function loadAulasPainel(dataFiltro) {
         </td>
       </tr>
     `;
+  }
+}
+
+// ===== DETALHES DA CONTRATAÇÃO A PARTIR DO PAINEL CENTRAL =====
+
+/**
+ * Abre o modal "Detalhes da Contratação" ao clicar em uma linha da tabelaConsultaAulas.
+ * Busca o documento em BancoDeAulas pelo codigoContratacao e abre o modal via BancoDeAulasCards.
+ */
+async function abrirDetalhesContratacaoPainelCentral(codigoContratacao) {
+  if (!codigoContratacao) {
+    showToast('Esta aula não possui código de contratação vinculado.', 'warning');
+    return;
+  }
+
+  try {
+    showToast('Carregando detalhes da contratação...', 'info');
+
+    const docSnap = await db.collection('BancoDeAulas').doc(codigoContratacao).get();
+
+    if (!docSnap.exists) {
+      showToast('Contratação não encontrada no banco de dados.', 'error');
+      return;
+    }
+
+    const contrato = { id: docSnap.id, ...docSnap.data() };
+
+    if (window.BancoDeAulasCards && typeof window.BancoDeAulasCards.viewAulaDetails === 'function') {
+      window.BancoDeAulasCards.viewAulaDetails(contrato);
+    } else {
+      showToast('Módulo de detalhes não carregado. Tente novamente.', 'error');
+      console.warn('⚠️ BancoDeAulasCards.viewAulaDetails não disponível');
+    }
+  } catch (error) {
+    console.error('❌ Erro ao abrir detalhes da contratação:', error);
+    showToast('Erro ao carregar detalhes da contratação.', 'error');
   }
 }
 
