@@ -139,7 +139,7 @@ function loadPainelCentral() {
           <thead>
             <tr class="bg-gray-50 border-b border-gray-200">
               <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Cliente</th>
-              <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Estudante</th>
+              <th class="col-estudante hidden px-4 py-3 text-left text-sm font-semibold text-gray-700">Estudante</th>
               <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Professor</th>
               <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Disciplina</th>
               <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Horário</th>
@@ -415,7 +415,7 @@ async function loadAulasPainel(dataFiltro) {
               ${aula.nomeCliente || '--'}
             </span>
           </td>
-          <td class="px-4 py-3 text-sm text-gray-600">${aula.estudante || '--'}</td>
+          <td class="col-estudante hidden px-4 py-3 text-sm text-gray-600">${aula.estudante || '--'}</td>
           <td class="px-4 py-3 text-sm text-gray-600">${aula.professor || '--'}</td>
           <td class="px-4 py-3 text-sm text-gray-600">${aula.materia || '--'}</td>
           <td class="px-4 py-3 text-sm text-gray-600 font-medium">${aula.horario || '--'}</td>
