@@ -610,9 +610,14 @@ const Simulacoes = (function() {
             <h3 class="font-lexend font-bold text-lg text-gray-800">
               ${isNova ? 'Nova Simulação' : escapeHtml(simulacao.tituloSimulacao || 'Editar Simulação')}
             </h3>
-            <button class="modal-close text-gray-400 hover:text-gray-600">
-              <i class="fas fa-times"></i>
-            </button>
+            <div class="flex items-center gap-2">
+              <button class="modal-fullscreen-toggle text-gray-400 hover:text-gray-600" title="Alternar tela cheia">
+                <i class="fas fa-expand"></i>
+              </button>
+              <button class="modal-close text-gray-400 hover:text-gray-600" title="Fechar">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
           </div>
           
           <div class="modal-body">
@@ -1764,6 +1769,24 @@ const Simulacoes = (function() {
       modal.remove();
     };
     modal.querySelector('.modal-close').addEventListener('click', closeModal);
+
+    // Botão tela cheia
+    const fullscreenBtnSim = modal.querySelector('.modal-fullscreen-toggle');
+    const modalContainerSim = modal.querySelector('.modal-container');
+    let isFullscreenSim = false;
+    fullscreenBtnSim.addEventListener('click', () => {
+      isFullscreenSim = !isFullscreenSim;
+      if (isFullscreenSim) {
+        modalContainerSim.classList.add('modal-fullscreen');
+        fullscreenBtnSim.querySelector('i').classList.replace('fa-expand', 'fa-compress');
+        fullscreenBtnSim.title = 'Sair da tela cheia';
+      } else {
+        modalContainerSim.classList.remove('modal-fullscreen');
+        fullscreenBtnSim.querySelector('i').classList.replace('fa-compress', 'fa-expand');
+        fullscreenBtnSim.title = 'Alternar tela cheia';
+      }
+    });
+
     modal.addEventListener('click', (e) => {
       if (e.target === modal) closeModal();
     });

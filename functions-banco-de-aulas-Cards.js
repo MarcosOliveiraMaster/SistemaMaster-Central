@@ -355,11 +355,16 @@ const BancoDeAulasCards = (function() {
               <i class="fas fa-file-contract text-orange-500 mr-2"></i>
               Detalhes da Contratação - ${aula.codigoContratacao || 'Sem código'}${(typeof formatDateLong === 'function' && formatDateLong(aula.dataContratacao)) ? ' — ' + formatDateLong(aula.dataContratacao) : ''}
             </h3>
-            <button class="modal-close text-gray-400 hover:text-gray-600">
-              <i class="fas fa-times"></i>
-            </button>
+            <div class="flex items-center gap-2">
+              <button class="modal-fullscreen-toggle text-gray-400 hover:text-gray-600" title="Alternar tela cheia">
+                <i class="fas fa-expand"></i>
+              </button>
+              <button class="modal-close text-gray-400 hover:text-gray-600" title="Fechar">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
           </div>
-          
+
           <div class="modal-body vertical-scroll-hidden">
             <!-- Informações do Cliente -->
             <div class="mb-6">
@@ -561,16 +566,42 @@ const BancoDeAulasCards = (function() {
     
     closeBtn.addEventListener('click', closeModal);
     fecharBtn.addEventListener('click', closeModal);
-    
+
+    // Botão tela cheia
+    const fullscreenBtn = modal.querySelector('.modal-fullscreen-toggle');
+    const modalContainerEl = modal.querySelector('.modal-container');
+    let isFullscreen = false;
+    fullscreenBtn.addEventListener('click', () => {
+      isFullscreen = !isFullscreen;
+      if (isFullscreen) {
+        modalContainerEl.classList.add('modal-fullscreen');
+        fullscreenBtn.querySelector('i').classList.replace('fa-expand', 'fa-compress');
+        fullscreenBtn.title = 'Sair da tela cheia';
+      } else {
+        modalContainerEl.classList.remove('modal-fullscreen');
+        fullscreenBtn.querySelector('i').classList.replace('fa-compress', 'fa-expand');
+        fullscreenBtn.title = 'Alternar tela cheia';
+      }
+    });
+
     modal.addEventListener('click', (e) => {
       if (e.target === modal) {
         closeModal();
       }
     });
-    
+
     // Fechar com ESC
     const escHandler = (e) => {
-      if (e.key === 'Escape') closeModal();
+      if (e.key === 'Escape') {
+        if (isFullscreen) {
+          isFullscreen = false;
+          modalContainerEl.classList.remove('modal-fullscreen');
+          fullscreenBtn.querySelector('i').classList.replace('fa-compress', 'fa-expand');
+          fullscreenBtn.title = 'Alternar tela cheia';
+        } else {
+          closeModal();
+        }
+      }
     };
     document.addEventListener('keydown', escHandler);
     
