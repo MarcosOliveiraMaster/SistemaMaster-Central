@@ -1178,7 +1178,11 @@ const Simulacoes = (function() {
       `;
     }
 
-    aulas.sort((a, b) => parseDateAulaSort(a.data) - parseDateAulaSort(b.data));
+    aulas.sort((a, b) => {
+      const dateDiff = parseDateAulaSort(a.data) - parseDateAulaSort(b.data);
+      if (dateDiff !== 0) return dateDiff;
+      return (a.horario || '').localeCompare(b.horario || '');
+    });
 
     return aulas.map((aula, index) => `
       <tr data-aula-index="${index}">
