@@ -565,6 +565,9 @@ const Simulacoes = (function() {
     if (simulacao && simulacao.valorPacoteAplicado && simulacao.valorPacoteAplicado > 0) {
       editingSimulacao.valorPacoteAplicado = simulacao.valorPacoteAplicado;
     }
+    if (simulacao && simulacao.valorLucroMasterPorHora && simulacao.valorLucroMasterPorHora > 0) {
+      editingSimulacao.valorLucroMasterPorHora = simulacao.valorLucroMasterPorHora;
+    }
 
     const valores = calcularValoresSimulacao(simulacao.aulas || []);
 
@@ -573,9 +576,11 @@ const Simulacoes = (function() {
     const persistedLucro = (simulacao && (typeof simulacao.lucroMaster === 'number')) ? simulacao.lucroMaster :
                           (simulacao && (typeof simulacao.valorLucroMaster === 'number') ? simulacao.valorLucroMaster : null);
 
-    const lucroInitial = (editingSimulacao && editingSimulacao.valorLucroMaster && editingSimulacao.valorLucroMaster > 0)
-      ? editingSimulacao.valorLucroMaster
-      : (persistedLucro !== null ? persistedLucro : valores.lucroMaster);
+    const lucroInitial = (editingSimulacao && editingSimulacao.valorLucroMasterPorHora && editingSimulacao.valorLucroMasterPorHora > 0)
+      ? (editingSimulacao.valorLucroMasterPorHora * horas)
+      : (editingSimulacao && editingSimulacao.valorLucroMaster && editingSimulacao.valorLucroMaster > 0)
+        ? editingSimulacao.valorLucroMaster
+        : (persistedLucro !== null ? persistedLucro : valores.lucroMaster);
 
     const valorHoraInitial = (editingSimulacao && editingSimulacao.valorHoraProfessor && editingSimulacao.valorHoraProfessor > 0)
       ? Number(editingSimulacao.valorHoraProfessor)
@@ -587,11 +592,14 @@ const Simulacoes = (function() {
 
     const valorPacoteInitial = (editingSimulacao && editingSimulacao.valorPacoteAplicado && editingSimulacao.valorPacoteAplicado > 0)
       ? Number(editingSimulacao.valorPacoteAplicado)
-      : ( (editingSimulacao && editingSimulacao.valorLucroMaster && editingSimulacao.valorLucroMaster > 0)
-          ? (valorEquipeInitial + Number(editingSimulacao.valorLucroMaster))
-          : ( (simulacao && simulacao.valorPacoteAplicado && simulacao.valorPacoteAplicado > 0)
-              ? Number(simulacao.valorPacoteAplicado)
-              : (valores.ValorPacote || 0)
+      : ( (editingSimulacao && editingSimulacao.valorLucroMasterPorHora && editingSimulacao.valorLucroMasterPorHora > 0)
+          ? (valorEquipeInitial + (editingSimulacao.valorLucroMasterPorHora * horas))
+          : ( (editingSimulacao && editingSimulacao.valorLucroMaster && editingSimulacao.valorLucroMaster > 0)
+              ? (valorEquipeInitial + Number(editingSimulacao.valorLucroMaster))
+              : ( (simulacao && simulacao.valorPacoteAplicado && simulacao.valorPacoteAplicado > 0)
+                  ? Number(simulacao.valorPacoteAplicado)
+                  : (valores.ValorPacote || 0)
+                )
             )
         );
     
@@ -940,6 +948,8 @@ const Simulacoes = (function() {
         const baseValores = calcularValoresSimulacao(simulacao.aulas || []);
         if (editingSimulacao && editingSimulacao.valorPacoteAplicado && editingSimulacao.valorPacoteAplicado > 0) {
           valorPacote = editingSimulacao.valorPacoteAplicado;
+        } else if (editingSimulacao && editingSimulacao.valorLucroMasterPorHora && editingSimulacao.valorLucroMasterPorHora > 0) {
+          valorPacote = valorEquipe + (editingSimulacao.valorLucroMasterPorHora * horas);
         } else if (editingSimulacao && editingSimulacao.valorLucroMaster && editingSimulacao.valorLucroMaster > 0) {
           valorPacote = valorEquipe + editingSimulacao.valorLucroMaster;
         } else if (editingSimulacao && editingSimulacao.valorHoraProfessor && editingSimulacao.valorHoraProfessor > 0) {
@@ -963,6 +973,7 @@ const Simulacoes = (function() {
             if (editingSimulacao.hasOwnProperty('valorHoraProfessor')) delete editingSimulacao.valorHoraProfessor;
             if (editingSimulacao.hasOwnProperty('valorPacoteAplicado')) delete editingSimulacao.valorPacoteAplicado;
             if (editingSimulacao.hasOwnProperty('valorLucroMaster')) delete editingSimulacao.valorLucroMaster;
+            if (editingSimulacao.hasOwnProperty('valorLucroMasterPorHora')) delete editingSimulacao.valorLucroMasterPorHora;
             editingSimulacao.overrideValoresActive = false;
           }
           // Recalcular usando regras padrão: professor R$35/h e lucro R$30/h (pacote = horas * (35+30))
@@ -990,8 +1001,8 @@ const Simulacoes = (function() {
                       <input id="input-valor-hora-prof" type="text" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="Ex: 65.00" />
                     </div>
                     <div>
-                      <label class="block text-sm font-medium text-gray-700 mb-1">Lucro Master Educação</label>
-                      <input id="input-lucro-master" type="text" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="Ex: 200.00" />
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Lucro Master por Hora</label>
+                      <input id="input-lucro-master" type="text" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="Ex: 70.00" />
                     </div>
                     <!-- campo 'Valor total do pacote' removido conforme solicitado -->
                   </div>
@@ -1086,8 +1097,10 @@ const Simulacoes = (function() {
             }
 
             if (hasLucro) {
-              editingSimulacao.valorLucroMaster = valLucro;
+              editingSimulacao.valorLucroMasterPorHora = valLucro;
+              if (editingSimulacao.hasOwnProperty('valorLucroMaster')) delete editingSimulacao.valorLucroMaster;
             } else {
+              if (editingSimulacao && editingSimulacao.hasOwnProperty('valorLucroMasterPorHora')) delete editingSimulacao.valorLucroMasterPorHora;
               if (editingSimulacao && editingSimulacao.hasOwnProperty('valorLucroMaster')) delete editingSimulacao.valorLucroMaster;
             }
 
@@ -1231,14 +1244,18 @@ const Simulacoes = (function() {
     let valorPacoteFinal = 0;
     if (editingSimulacao.valorPacoteAplicado && editingSimulacao.valorPacoteAplicado > 0) {
       valorPacoteFinal = editingSimulacao.valorPacoteAplicado;
+    } else if (editingSimulacao.valorLucroMasterPorHora && editingSimulacao.valorLucroMasterPorHora > 0) {
+      valorPacoteFinal = valorEquipeFinal + (editingSimulacao.valorLucroMasterPorHora * horasTotais);
     } else if (editingSimulacao.valorLucroMaster && editingSimulacao.valorLucroMaster > 0) {
       valorPacoteFinal = valorEquipeFinal + editingSimulacao.valorLucroMaster;
     } else {
       valorPacoteFinal = valores.ValorPacote || 0;
     }
-    const lucroFinal = (editingSimulacao.valorLucroMaster && editingSimulacao.valorLucroMaster > 0)
-      ? editingSimulacao.valorLucroMaster
-      : (valorPacoteFinal - valorEquipeFinal);
+    const lucroFinal = (editingSimulacao.valorLucroMasterPorHora && editingSimulacao.valorLucroMasterPorHora > 0)
+      ? (editingSimulacao.valorLucroMasterPorHora * horasTotais)
+      : (editingSimulacao.valorLucroMaster && editingSimulacao.valorLucroMaster > 0)
+        ? editingSimulacao.valorLucroMaster
+        : (valorPacoteFinal - valorEquipeFinal);
 
     const data = {
       idSimulacao: editingSimulacao.idSimulacao,
@@ -1256,6 +1273,7 @@ const Simulacoes = (function() {
       lucroMaster: lucroFinal,
       valorHoraProfessor: editingSimulacao.valorHoraProfessor || null,
       valorPacoteAplicado: editingSimulacao.valorPacoteAplicado || null,
+      valorLucroMasterPorHora: editingSimulacao.valorLucroMasterPorHora || null,
       timestamp: firebase.firestore.FieldValue.serverTimestamp()
     };
 
@@ -3340,10 +3358,10 @@ const Simulacoes = (function() {
     const baseValores = calcularValoresSimulacao(editingSimulacao.aulas || []);
     if (editingSimulacao && editingSimulacao.valorPacoteAplicado && editingSimulacao.valorPacoteAplicado > 0) {
       valorPacoteCalc = editingSimulacao.valorPacoteAplicado;
+    } else if (editingSimulacao && editingSimulacao.valorLucroMasterPorHora && editingSimulacao.valorLucroMasterPorHora > 0) {
+      valorPacoteCalc = valorEquipe + (editingSimulacao.valorLucroMasterPorHora * horas);
     } else if (editingSimulacao && editingSimulacao.valorLucroMaster && editingSimulacao.valorLucroMaster > 0) {
       valorPacoteCalc = valorEquipe + editingSimulacao.valorLucroMaster;
-    // Se existe override de valor hora do professor, mas não há pacote aplicado nem lucro fixo,
-    // calcular pacote usando a taxa do professor + lucro padrão por hora para evitar lucro negativo.
     } else if (editingSimulacao && editingSimulacao.valorHoraProfessor && editingSimulacao.valorHoraProfessor > 0) {
       valorPacoteCalc = valorEquipe + (LUCRO_PER_HOUR * horas);
     } else {
@@ -3353,16 +3371,15 @@ const Simulacoes = (function() {
     const lucroCalculado = valorPacoteCalc - valorEquipe;
 
     document.getElementById('display-total-horas').textContent = `${horas}h`;
-    // Atualizar display do valor hora/aula
     const elValorHora = document.getElementById('display-valor-hora-aula');
     if (elValorHora) elValorHora.textContent = `R$ ${Number(profRate || 0).toFixed(2)}`;
     document.getElementById('display-valor-pacote').textContent = `R$ ${Number(valorPacoteCalc || 0).toFixed(2)}`;
     document.getElementById('display-valor-equipe').textContent = `R$ ${Number(valorEquipe || 0).toFixed(2)}`;
-    // Se foi definido um Lucro Master fixo, mantê-lo independente das aulas;
-    // caso contrário mostrar o lucro calculado (pacote - equipe)
-    const lucroDisplay = (editingSimulacao && editingSimulacao.valorLucroMaster && editingSimulacao.valorLucroMaster > 0)
-      ? editingSimulacao.valorLucroMaster
-      : lucroCalculado;
+    const lucroDisplay = (editingSimulacao && editingSimulacao.valorLucroMasterPorHora && editingSimulacao.valorLucroMasterPorHora > 0)
+      ? (editingSimulacao.valorLucroMasterPorHora * horas)
+      : (editingSimulacao && editingSimulacao.valorLucroMaster && editingSimulacao.valorLucroMaster > 0)
+        ? editingSimulacao.valorLucroMaster
+        : lucroCalculado;
     document.getElementById('display-lucro-master').textContent = `R$ ${Number(lucroDisplay || 0).toFixed(2)}`;
 
     // Re-renderizar linhas da tabela de aulas para atualizar valores individuais
@@ -3411,22 +3428,22 @@ const Simulacoes = (function() {
       ? (editingSimulacao.valorHoraProfessor * horasTotais)
       : (valores.ValorEquipe || 0);
 
-    // Determinar Valor do Pacote para persistência:
-    // 1) se houver override manual `valorPacoteAplicado`, usar
-    // 2) se houver `valorLucroMaster`, persistir pacote = valorEquipe + valorLucroMaster
-    // 3) caso contrário usar cálculo padrão (tabela progressiva)
     let valorPacoteFinal = 0;
     if (editingSimulacao && editingSimulacao.valorPacoteAplicado && editingSimulacao.valorPacoteAplicado > 0) {
       valorPacoteFinal = editingSimulacao.valorPacoteAplicado;
+    } else if (editingSimulacao && editingSimulacao.valorLucroMasterPorHora && editingSimulacao.valorLucroMasterPorHora > 0) {
+      valorPacoteFinal = valorEquipeFinal + (editingSimulacao.valorLucroMasterPorHora * horasTotais);
     } else if (editingSimulacao && editingSimulacao.valorLucroMaster && editingSimulacao.valorLucroMaster > 0) {
       valorPacoteFinal = valorEquipeFinal + editingSimulacao.valorLucroMaster;
     } else {
       valorPacoteFinal = (valores.ValorPacote || 0);
     }
 
-    const lucroFinal = (editingSimulacao && editingSimulacao.valorLucroMaster && editingSimulacao.valorLucroMaster > 0)
-      ? editingSimulacao.valorLucroMaster
-      : ((valorPacoteFinal || 0) - valorEquipeFinal);
+    const lucroFinal = (editingSimulacao && editingSimulacao.valorLucroMasterPorHora && editingSimulacao.valorLucroMasterPorHora > 0)
+      ? (editingSimulacao.valorLucroMasterPorHora * horasTotais)
+      : (editingSimulacao && editingSimulacao.valorLucroMaster && editingSimulacao.valorLucroMaster > 0)
+        ? editingSimulacao.valorLucroMaster
+        : ((valorPacoteFinal || 0) - valorEquipeFinal);
 
     const simulacaoData = {
       idSimulacao: editingSimulacao.idSimulacao,
@@ -3444,6 +3461,7 @@ const Simulacoes = (function() {
       lucroMaster: lucroFinal,
       valorHoraProfessor: editingSimulacao && editingSimulacao.valorHoraProfessor ? editingSimulacao.valorHoraProfessor : null,
       valorPacoteAplicado: editingSimulacao && editingSimulacao.valorPacoteAplicado ? editingSimulacao.valorPacoteAplicado : null,
+      valorLucroMasterPorHora: editingSimulacao && editingSimulacao.valorLucroMasterPorHora ? editingSimulacao.valorLucroMasterPorHora : null,
       timestamp: firebase.firestore.FieldValue.serverTimestamp()
     };
     
@@ -3547,19 +3565,22 @@ const Simulacoes = (function() {
       // Valor da equipe baseado na taxa aplicada no momento
       const valorEquipeCalc = profRate * horasTotais;
 
-      // Determinar valor do pacote com precedência (igual ao comportamento em recalcularValores)
       let valorPacoteCalc = 0;
       if (editingSimulacao && editingSimulacao.valorPacoteAplicado && editingSimulacao.valorPacoteAplicado > 0) {
         valorPacoteCalc = editingSimulacao.valorPacoteAplicado;
+      } else if (editingSimulacao && editingSimulacao.valorLucroMasterPorHora && editingSimulacao.valorLucroMasterPorHora > 0) {
+        valorPacoteCalc = valorEquipeCalc + (editingSimulacao.valorLucroMasterPorHora * horasTotais);
       } else if (editingSimulacao && editingSimulacao.valorLucroMaster && editingSimulacao.valorLucroMaster > 0) {
         valorPacoteCalc = valorEquipeCalc + editingSimulacao.valorLucroMaster;
       } else {
         valorPacoteCalc = baseValores.ValorPacote;
       }
 
-      const lucroMasterFinal = (editingSimulacao && editingSimulacao.valorLucroMaster && editingSimulacao.valorLucroMaster > 0)
-        ? editingSimulacao.valorLucroMaster
-        : (valorPacoteCalc - valorEquipeCalc);
+      const lucroMasterFinal = (editingSimulacao && editingSimulacao.valorLucroMasterPorHora && editingSimulacao.valorLucroMasterPorHora > 0)
+        ? (editingSimulacao.valorLucroMasterPorHora * horasTotais)
+        : (editingSimulacao && editingSimulacao.valorLucroMaster && editingSimulacao.valorLucroMaster > 0)
+          ? editingSimulacao.valorLucroMaster
+          : (valorPacoteCalc - valorEquipeCalc);
 
       // 4. Gerar IDs de aula e fixar ValorAula com os valores atualmente exibidos
       const aulasComIds = (editingSimulacao.aulas || []).map((aula, index) => {
@@ -3604,8 +3625,8 @@ const Simulacoes = (function() {
         ValorEquipe: Number((valorEquipeCalc || 0).toFixed(2)),
         ValorPacote: Number((valorPacoteCalc || 0).toFixed(2)),
         lucroMaster: Number((lucroMasterFinal || 0).toFixed(2)),
-        // Hora/Aula aplicada na aprovação (valor por hora do professor)
         horaAulaProfessor: Number((profRate || DEFAULT_PROF_RATE).toFixed(2)),
+        valorLucroMasterPorHora: editingSimulacao && editingSimulacao.valorLucroMasterPorHora ? editingSimulacao.valorLucroMasterPorHora : null,
         SomatorioDuracaoAulas: horasTotais,
         aulas: aulasComIds,
         ConfirmacaoProfessorAula: '',
