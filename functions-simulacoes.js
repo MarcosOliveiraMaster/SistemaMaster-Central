@@ -50,7 +50,14 @@ const Simulacoes = (function() {
   }
   
   // ==================== CÁLCULOS FINANCEIROS ====================
-  
+
+  function parseDateAulaSort(dataStr) {
+    if (!dataStr || dataStr === '--') return -1;
+    const match = dataStr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    if (!match) return -1;
+    return new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1])).getTime();
+  }
+
   // Função para calcular duração total e valores
   function calcularValoresSimulacao(aulas) {
     let SomatorioDuracaoAulas = 0;
@@ -1170,7 +1177,9 @@ const Simulacoes = (function() {
         </tr>
       `;
     }
-    
+
+    aulas.sort((a, b) => parseDateAulaSort(a.data) - parseDateAulaSort(b.data));
+
     return aulas.map((aula, index) => `
       <tr data-aula-index="${index}">
         <td>
