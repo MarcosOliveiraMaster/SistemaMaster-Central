@@ -52,9 +52,9 @@ const Simulacoes = (function() {
   // ==================== CÁLCULOS FINANCEIROS ====================
 
   function parseDateAulaSort(dataStr) {
-    if (!dataStr || dataStr === '--') return -1;
+    if (!dataStr || dataStr === '--') return Infinity;
     const match = dataStr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-    if (!match) return -1;
+    if (!match) return Infinity;
     return new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1])).getTime();
   }
 
