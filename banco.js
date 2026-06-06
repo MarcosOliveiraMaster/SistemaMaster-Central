@@ -553,6 +553,112 @@ async function deleteAulasLista(docIds) {
   }
 }
 
+// Função para atualizar cor de uma aula no calendário
+async function updateCorAulaLista(idAula, cor) {
+  try {
+    const querySnapshot = await db.collection("BancoDeAulas-Lista")
+      .where("id-Aula", "==", idAula).get();
+    if (querySnapshot.empty) throw new Error(`Aula ${idAula} não encontrada`);
+    await querySnapshot.docs[0].ref.update({ cor });
+    return true;
+  } catch (error) {
+    console.error('❌ Erro ao atualizar cor:', error.message);
+    throw error;
+  }
+}
+
+// Atualizar campos do calendário em uma aula (data, materia, professor, duracao, horario, cor)
+async function updateCamposCalendario(idAula, campos) {
+  try {
+    const querySnapshot = await db.collection("BancoDeAulas-Lista")
+      .where("id-Aula", "==", idAula).get();
+    if (querySnapshot.empty) throw new Error(`Aula ${idAula} não encontrada`);
+    await querySnapshot.docs[0].ref.update(campos);
+    forceCacheRefresh();
+    return true;
+  } catch (error) {
+    console.error('❌ Erro ao atualizar campos calendário:', error.message);
+    throw error;
+  }
+}
+
+// Excluir uma aula de BancoDeAulas-Lista por id-Aula
+async function deleteAulaByIdAula(idAula) {
+  try {
+    const querySnapshot = await db.collection("BancoDeAulas-Lista")
+      .where("id-Aula", "==", idAula).get();
+    if (querySnapshot.empty) throw new Error(`Aula ${idAula} não encontrada`);
+    await querySnapshot.docs[0].ref.delete();
+    forceCacheRefresh();
+    return true;
+  } catch (error) {
+    console.error('❌ Erro ao excluir aula por id-Aula:', error.message);
+    throw error;
+  }
+}
+
+// Criar nova aula via calendário com campos personalizados, herdando metadados da última aula do contrato
+async function addAulaCalendario(codigoContratacao, campos) {
+  try {
+    const querySnapshot = await db.collection("BancoDeAulas-Lista")
+      .where("id-Aula", ">=", codigoContratacao)
+      .where("id-Aula", "<", codigoContratacao + "")
+      .get();
+
+    if (querySnapshot.empty) throw new Error(`Nenhuma aula base encontrada para: ${codigoContratacao}`);
+
+    const aulas = [];
+    querySnapshot.forEach(doc => { aulas.push({ id: doc.id, ...doc.data() }); });
+    aulas.sort((a, b) => (a['id-Aula'] || '').localeCompare(b['id-Aula'] || ''));
+    const ultima = aulas[aulas.length - 1];
+    const novoId = incrementarIdAula(ultima['id-Aula']);
+
+    let horasDecimais = 0;
+    const dur = campos.duracao || ultima.duracao || '';
+    const matchDur = dur.match(/(\d+)h(\d+)/);
+    if (matchDur) horasDecimais = parseInt(matchDur[1]) + parseInt(matchDur[2]) / 60;
+    const valorHora = Number(ultima.ValorAula && ultima.duracao
+      ? (ultima.ValorAula / ((() => {
+          const m = ultima.duracao.match(/(\d+)h(\d+)/);
+          return m ? parseInt(m[1]) + parseInt(m[2]) / 60 : 1;
+        })())) : 35);
+    const valorAula = horasDecimais > 0 ? horasDecimais * valorHora : 0;
+
+    const novaAula = {
+      ConfirmacaoProfessorAula: false,
+      ObservacoesAula: "",
+      RelatorioAula: "",
+      StatusAula: "Pendente",
+      ValorAula: valorAula,
+      clienteUid:   ultima.clienteUid   || "",
+      clientUid:    ultima.clientUid    || "",
+      codigoContratacao: ultima.codigoContratacao || codigoContratacao,
+      idContratacao: codigoContratacao,
+      cpf:          ultima.cpf          || "",
+      estudante:    ultima.estudante    || "",
+      idProfessor:  ultima.idProfessor  || "",
+      professorUid: ultima.professorUid || "",
+      metodoPagamento: ultima.metodoPagamento || "",
+      nomeCliente:  ultima.nomeCliente  || "",
+      "id-Aula": novoId,
+      data:      campos.data      || "",
+      materia:   campos.materia   || "",
+      professor: campos.professor || ultima.professor || "",
+      duracao:   campos.duracao   || ultima.duracao   || "",
+      horario:   campos.horario   || "",
+      cor:       campos.cor       || null,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    await db.collection("BancoDeAulas-Lista").add(novaAula);
+    forceCacheRefresh();
+    return novoId;
+  } catch (error) {
+    console.error('❌ Erro ao criar aula via calendário:', error.message);
+    throw error;
+  }
+}
+
 // Forçar atualização do cache
 function forceCacheRefresh() {
   CACHE.bancoDeAulas.timestamp      = null;
@@ -587,6 +693,10 @@ if (typeof window !== 'undefined') {
     updateValorAulaLista,
     addNovaAulaLista,
     deleteAulasLista,
+    updateCorAulaLista,
+    updateCamposCalendario,
+    deleteAulaByIdAula,
+    addAulaCalendario,
     forceCacheRefresh,
     isCacheValid
   };

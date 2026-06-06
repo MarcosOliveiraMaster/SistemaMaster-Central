@@ -5,6 +5,7 @@ const BancoDeAulasCards = (function() {
   // Variáveis privadas
   let aulasData = [];
   let currentFilters = {};
+  let _aulaDetalhesAtual = null; // Armazena aula ativa para acesso em setupAulaDetailsEventListeners
   
   // Função para renderizar cards de aulas
   function renderAulasCards(aulas, filters = {}) {
@@ -342,6 +343,7 @@ const BancoDeAulasCards = (function() {
   
   // Função para abrir os detalhes da aula (modal)
   function viewAulaDetails(aula) {
+    _aulaDetalhesAtual = aula;
     console.log('🔍 Visualizando detalhes da aula:', aula.id);
 
     const fmtData = v => { const r = formatDate(v); return r === '--/--/----' ? '' : r; };
@@ -508,8 +510,15 @@ const BancoDeAulasCards = (function() {
                   Aulas Agendadas
                 </h4>
                 <div class="flex gap-2">
-                  <button 
-                    id="btnRemoverAula" 
+                  <button
+                    id="btnVisualizacaoCalendario"
+                    class="btn-secondary btn-compact"
+                    title="Visualizar calendário de aulas"
+                  >
+                    <i class="fas fa-calendar-alt"></i>
+                  </button>
+                  <button
+                    id="btnRemoverAula"
                     class="btn-secondary btn-compact"
                     data-codigo-contratacao="${aula.codigoContratacao}"
                     title="Remover aulas do cronograma"
@@ -517,8 +526,8 @@ const BancoDeAulasCards = (function() {
                     <i class="fas fa-trash mr-2"></i>
                     Remover aula
                   </button>
-                  <button 
-                    id="btnAdicionarAula" 
+                  <button
+                    id="btnAdicionarAula"
                     class="btn-primary btn-compact"
                     data-codigo-contratacao="${aula.codigoContratacao}"
                     title="Adicionar nova aula ao cronograma"
@@ -2298,7 +2307,12 @@ const BancoDeAulasCards = (function() {
 
       // Adicionar event listeners para os botões de relatório e observação
       setupAulaDetailsEventListeners();
-      
+
+      // Sincronizar com o calendário visual se estiver aberto
+      if (typeof window.refreshCalendarioVisual === 'function') {
+        window.refreshCalendarioVisual().catch(() => {});
+      }
+
       console.log(`✅ ${aulas.length} aulas renderizadas na tabela`);
       
     } catch (error) {
@@ -2447,8 +2461,174 @@ const BancoDeAulasCards = (function() {
         showRemoverAulaModal(codigoContratacao);
       });
     }
+
+    // Botão de visualização do calendário
+    const btnVisualizacaoCalendario = document.getElementById('btnVisualizacaoCalendario');
+    if (btnVisualizacaoCalendario) {
+      btnVisualizacaoCalendario.addEventListener('click', async function(e) {
+        e.stopPropagation();
+        if (typeof showVisualizacaoCalendarioModal === 'function') {
+          const codigoCont = (_aulaDetalhesAtual || {}).codigoContratacao || '';
+          // Busca dados frescos do Firebase em vez de usar snapshot em cache
+          let aulasParaCalendario = [];
+          if (codigoCont) {
+            try { aulasParaCalendario = await BANCO.fetchBancoDeAulasLista(codigoCont); }
+            catch(_) { aulasParaCalendario = (_aulaDetalhesAtual || {}).aulas || []; }
+          } else {
+            aulasParaCalendario = (_aulaDetalhesAtual || {}).aulas || [];
+          }
+          showVisualizacaoCalendarioModal(aulasParaCalendario, {
+            getAulas: codigoCont
+              ? async () => BANCO.fetchBancoDeAulasLista(codigoCont)
+              : null,
+            onColorSave: async (cardData, color) => {
+              if (cardData._idAula && BANCO.updateCorAulaLista)
+                await BANCO.updateCorAulaLista(cardData._idAula, color);
+            },
+            onSave: async ({ updates, creates, deletes }) => {
+              const erros = [];
+
+              // 1. Atualizar aulas existentes
+              if (typeof BANCO.updateCamposCalendario === 'function') {
+                for (const item of updates) {
+                  if (!item._idAula) continue;
+                  try {
+                    await BANCO.updateCamposCalendario(item._idAula, {
+                      data:      item.data,
+                      materia:   item.materia,
+                      professor: item.professor,
+                      duracao:   item.duracao,
+                      horario:   item.horario,
+                      cor:       item.cor ?? null
+                    });
+                  } catch (err) {
+                    console.error('❌ updateCamposCalendario:', err);
+                    erros.push(`Update ${item._idAula}: ${err.message}`);
+                  }
+                }
+              } else {
+                console.warn('⚠️ BANCO.updateCamposCalendario não disponível');
+              }
+
+              // 2. Criar aulas novas
+              if (typeof BANCO.addAulaCalendario === 'function') {
+                for (const item of creates) {
+                  if (!codigoCont) { erros.push('Código de contratação ausente'); continue; }
+                  try {
+                    await BANCO.addAulaCalendario(codigoCont, {
+                      data:      item.data,
+                      materia:   item.materia,
+                      professor: item.professor,
+                      duracao:   item.duracao,
+                      horario:   item.horario,
+                      cor:       item.cor ?? null
+                    });
+                  } catch (err) {
+                    console.error('❌ addAulaCalendario:', err);
+                    erros.push(`Criar ${item.materia}: ${err.message}`);
+                  }
+                }
+              }
+
+              // 3. Excluir aulas removidas
+              if (typeof BANCO.deleteAulaByIdAula === 'function') {
+                for (const idAula of deletes) {
+                  try {
+                    await BANCO.deleteAulaByIdAula(idAula);
+                  } catch (err) {
+                    console.error('❌ deleteAulaByIdAula:', err);
+                    erros.push(`Excluir ${idAula}: ${err.message}`);
+                  }
+                }
+              }
+
+              // 4. Recarregar tabela — sempre, mesmo com erros parciais
+              try {
+                const tbodyEl = document.getElementById('tbody-aulas-detalhadas');
+                if (codigoCont && tbodyEl) {
+                  await loadAulasDetalhadas(codigoCont);
+                }
+              } catch (e) {
+                console.warn('⚠️ Erro ao recarregar tabela após salvar calendário:', e);
+              }
+
+              // Lança erros apenas após o refresh da tabela
+              if (erros.length) throw new Error(erros.join(' | '));
+            },
+            getClienteInfo: async () => {
+              const aula = _aulaDetalhesAtual || {};
+
+              // ── Endereço: mesma lógica de showModalSolicitacaoFinal ──
+              const _rawEndereco = aula.enderecoAulas || aula.endereco || '';
+              const _enderecoValido = _rawEndereco && _rawEndereco.split(',').some(p => p.trim() && p.trim().toLowerCase() !== 'null');
+              let enderecoAulas = _enderecoValido ? _rawEndereco : '--';
+              let complementoAulas = aula.referencia || '--';
+              let estudantesComEscola = [];
+
+              const cpfCliente = aula.cpf;
+              if (cpfCliente && cpfCliente !== '--') {
+                try {
+                  const querySnapshot = await db.collection('cadastroClientes').where('cpf', '==', cpfCliente).get();
+                  if (!querySnapshot.empty) {
+                    const clienteData = querySnapshot.docs[0].data();
+                    if (clienteData.mesmoEndereco) {
+                      const end = clienteData.endereco || '';
+                      const cep = clienteData.cep ? ', CEP: ' + clienteData.cep : '';
+                      const cid = clienteData.cidadeUF ? '. ' + clienteData.cidadeUF : '';
+                      if (end) enderecoAulas = end + cep + cid;
+                      if (clienteData.complemento) complementoAulas = clienteData.complemento;
+                    } else {
+                      const end = clienteData.enderecoAulas || '';
+                      const cep = clienteData.cepAulas ? ', CEP: ' + clienteData.cepAulas : '';
+                      const cid = clienteData.cidadeUFAulas ? '. ' + clienteData.cidadeUFAulas : '';
+                      if (end) enderecoAulas = end + cep + cid;
+                      if (clienteData.complementoAulas) complementoAulas = clienteData.complementoAulas;
+                    }
+                    const arrayEstudantes = clienteData.estudantes || clienteData.Estudante || [];
+                    arrayEstudantes.forEach(e => {
+                      if (!e || !e.nomeEstudante) return;
+                      estudantesComEscola.push({
+                        nome: e.nomeEstudante.trim(),
+                        escola: (e.escolaEstudante && e.escolaEstudante.trim()) ? e.escolaEstudante.trim() : 'Escola não informada',
+                        serie: (e.serieEstudante && e.serieEstudante.trim()) ? e.serieEstudante.trim() : 'Série não informada'
+                      });
+                    });
+                  }
+                } catch (err) {
+                  console.warn('⚠️ getClienteInfo: erro ao buscar cadastroClientes:', err);
+                }
+              }
+
+              // ── ValorEquipe: lê do DOM (já calculado por loadAulasDetalhadas) ──
+              // Fallback: campo salvo em _aulaDetalhesAtual.ValorEquipe
+              let totalReceber = null;
+              const _parseBRCurrency = (txt) => {
+                if (!txt) return null;
+                const n = parseFloat(String(txt).replace(/R\$\s*/g, '').replace(/\./g, '').replace(',', '.').trim());
+                return (!isNaN(n) && isFinite(n)) ? n : null;
+              };
+              const elEquipeDOM = document.getElementById('display-valor-equipe-contrato');
+              if (elEquipeDOM) {
+                totalReceber = _parseBRCurrency(elEquipeDOM.textContent || elEquipeDOM.innerText);
+              }
+              if (totalReceber === null && (aula.ValorEquipe || aula.ValorEquipe === 0)) {
+                totalReceber = Number(aula.ValorEquipe);
+              }
+
+              return {
+                nomeCliente: aula.nomeCliente || '--',
+                enderecoAulas,
+                complementoAulas,
+                estudantesComEscola,
+                totalReceber
+              };
+            }
+          });
+        }
+      });
+    }
   }
-  
+
   // Variável para armazenar aula selecionada temporariamente
   let aulaSelecionada = null;
   

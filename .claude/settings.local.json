@@ -26,7 +26,10 @@
       "Bash(Get-ChildItem -Recurse -ErrorAction SilentlyContinue)",
       "Bash(Select-Object -First 50)",
       "Bash(Get-Content \"C:\\\\Users\\\\marco\\\\OneDrive\\\\Documentos\\\\GitHub\\\\SistemaMaster-Central\\\\functions-financeiro.js\")",
-      "Bash(Measure-Object -Line)"
+      "Bash(Measure-Object -Line)",
+      "PowerShell(npx --yes http-server . -p 8080 --cors -a 0.0.0.0)",
+      "Bash(Get-ChildItem -Recurse -Path .)",
+      "Bash(python3 *)"
     ]
   }
 }

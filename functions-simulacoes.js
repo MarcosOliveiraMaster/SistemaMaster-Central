@@ -827,6 +827,9 @@ const Simulacoes = (function() {
                     Cronograma de Aula
                   </h4>
                 <div class="flex gap-2">
+                  <button id="btn-calendario-simulacao" class="btn-secondary btn-compact" title="Visualizar calendário de aulas">
+                    <i class="fas fa-calendar-alt"></i>
+                  </button>
                   <button id="btn-remover-aula-simulacao" class="btn-secondary btn-compact">
                     <i class="fas fa-trash mr-2"></i>
                     Remover aula
@@ -1822,6 +1825,81 @@ const Simulacoes = (function() {
     if (btnRemoverAula) {
       btnRemoverAula.addEventListener('click', () => {
         abrirModalRemoverAulaSimulacao();
+      });
+    }
+
+    // Calendário de aulas
+    const btnCalendarioSim = modal.querySelector('#btn-calendario-simulacao');
+    if (btnCalendarioSim) {
+      btnCalendarioSim.addEventListener('click', () => {
+        if (typeof showVisualizacaoCalendarioModal === 'function') {
+          showVisualizacaoCalendarioModal(editingSimulacao.aulas || [], {
+            onColorSave: async (cardData, color) => {
+              if (cardData._origIdx !== undefined && editingSimulacao.aulas[cardData._origIdx]) {
+                editingSimulacao.aulas[cardData._origIdx].cor = color;
+                if (typeof autoSalvarSimulacao === 'function') autoSalvarSimulacao();
+              }
+            },
+            onSave: async ({ fullAulas }) => {
+              // Reconstrói o array de aulas da simulação a partir do estado atual do calendário
+              editingSimulacao.aulas = fullAulas.map(item => ({
+                data:      item.data,
+                materia:   item.materia,
+                professor: item.professor,
+                duracao:   item.duracao,
+                horario:   item.horario || '',
+                cor:       item.cor     || null
+              }));
+              // Atualiza a tabela imediatamente (sem precisar fechar e reabrir)
+              const tbody = document.getElementById('tbody-aulas-simulacao');
+              if (tbody) tbody.innerHTML = renderAulasSimulacao(editingSimulacao.aulas);
+              if (typeof autoSalvarSimulacao === 'function') autoSalvarSimulacao();
+            },
+            getClienteInfo: async () => {
+              let enderecoAulas = '--', complementoAulas = '--', estudantesComEscola = [];
+              const cpfCliente = editingSimulacao.cpf;
+              if (cpfCliente && cpfCliente !== '--') {
+                try {
+                  const querySnapshot = await db.collection('cadastroClientes').where('cpf', '==', cpfCliente).get();
+                  if (!querySnapshot.empty) {
+                    const clienteData = querySnapshot.docs[0].data();
+                    if (clienteData.mesmoEndereco) {
+                      const end = clienteData.endereco || '';
+                      const cep = clienteData.cep ? ', CEP: ' + clienteData.cep : '';
+                      const cid = clienteData.cidadeUF ? '. ' + clienteData.cidadeUF : '';
+                      if (end) enderecoAulas = end + cep + cid;
+                      if (clienteData.complemento) complementoAulas = clienteData.complemento;
+                    } else {
+                      const end = clienteData.enderecoAulas || '';
+                      const cep = clienteData.cepAulas ? ', CEP: ' + clienteData.cepAulas : '';
+                      const cid = clienteData.cidadeUFAulas ? '. ' + clienteData.cidadeUFAulas : '';
+                      if (end) enderecoAulas = end + cep + cid;
+                      if (clienteData.complementoAulas) complementoAulas = clienteData.complementoAulas;
+                    }
+                    const arrayEstudantes = clienteData.estudantes || clienteData.Estudante || [];
+                    arrayEstudantes.forEach(e => {
+                      if (!e || !e.nomeEstudante) return;
+                      estudantesComEscola.push({
+                        nome: e.nomeEstudante.trim(),
+                        escola: (e.escolaEstudante && e.escolaEstudante.trim()) ? e.escolaEstudante.trim() : 'Escola não informada',
+                        serie: (e.serieEstudante && e.serieEstudante.trim()) ? e.serieEstudante.trim() : 'Série não informada'
+                      });
+                    });
+                  }
+                } catch (err) {
+                  console.warn('⚠️ getClienteInfo (simulação): erro ao buscar cadastroClientes:', err);
+                }
+              }
+              return {
+                nomeCliente: editingSimulacao.nomeCliente || '--',
+                enderecoAulas,
+                complementoAulas,
+                estudantesComEscola,
+                totalReceber: null
+              };
+            }
+          });
+        }
       });
     }
     
