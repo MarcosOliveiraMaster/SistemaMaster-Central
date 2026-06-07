@@ -1890,12 +1890,32 @@ const Simulacoes = (function() {
                   console.warn('⚠️ getClienteInfo (simulação): erro ao buscar cadastroClientes:', err);
                 }
               }
+              const _parseBRCurrency = (txt) => {
+                if (!txt) return null;
+                let s = String(txt).replace(/R\$\s*/g, '').trim();
+                if (s.includes(',')) {
+                  // Formato BR: 1.400,00 → remover pontos de milhar, trocar vírgula por ponto
+                  s = s.replace(/\./g, '').replace(',', '.');
+                }
+                // Sem vírgula: já está no formato 400.00 (toFixed), usar direto
+                const n = parseFloat(s);
+                return (!isNaN(n) && isFinite(n)) ? n : null;
+              };
+              let totalReceber = null;
+              const elPacoteDOM = document.getElementById('display-valor-pacote');
+              if (elPacoteDOM) {
+                totalReceber = _parseBRCurrency(elPacoteDOM.textContent || elPacoteDOM.innerText);
+              }
+              if (totalReceber === null && editingSimulacao.valorPacoteAplicado) {
+                totalReceber = Number(editingSimulacao.valorPacoteAplicado);
+              }
+
               return {
                 nomeCliente: editingSimulacao.nomeCliente || '--',
                 enderecoAulas,
                 complementoAulas,
                 estudantesComEscola,
-                totalReceber: null
+                totalReceber
               };
             }
           });

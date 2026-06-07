@@ -2599,20 +2599,24 @@ const BancoDeAulasCards = (function() {
                 }
               }
 
-              // ── ValorEquipe: lê do DOM (já calculado por loadAulasDetalhadas) ──
-              // Fallback: campo salvo em _aulaDetalhesAtual.ValorEquipe
+              // ── ValorPacote: lê do DOM (já calculado por loadAulasDetalhadas) ──
+              // Fallback: campo salvo em _aulaDetalhesAtual.ValorPacote
               let totalReceber = null;
               const _parseBRCurrency = (txt) => {
                 if (!txt) return null;
-                const n = parseFloat(String(txt).replace(/R\$\s*/g, '').replace(/\./g, '').replace(',', '.').trim());
+                let s = String(txt).replace(/R\$\s*/g, '').trim();
+                if (s.includes(',')) {
+                  s = s.replace(/\./g, '').replace(',', '.');
+                }
+                const n = parseFloat(s);
                 return (!isNaN(n) && isFinite(n)) ? n : null;
               };
-              const elEquipeDOM = document.getElementById('display-valor-equipe-contrato');
-              if (elEquipeDOM) {
-                totalReceber = _parseBRCurrency(elEquipeDOM.textContent || elEquipeDOM.innerText);
+              const elPacoteDOM = document.getElementById('display-valor-pacote-contrato');
+              if (elPacoteDOM) {
+                totalReceber = _parseBRCurrency(elPacoteDOM.textContent || elPacoteDOM.innerText);
               }
-              if (totalReceber === null && (aula.ValorEquipe || aula.ValorEquipe === 0)) {
-                totalReceber = Number(aula.ValorEquipe);
+              if (totalReceber === null && (aula.ValorPacote || aula.ValorPacote === 0)) {
+                totalReceber = Number(aula.ValorPacote);
               }
 
               return {
