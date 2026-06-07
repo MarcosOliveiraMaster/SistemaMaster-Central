@@ -1,8 +1,6 @@
 console.log('✅ previsaoFinanceira.js carregado');
 
-const PREV_MESES   = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-const PREV_MES_MIN = new Date().getMonth();
-const PREV_ANO_MIN = new Date().getFullYear();
+const PREV_MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
 let prevMesAtual      = new Date().getMonth();
 let prevAnoAtual      = new Date().getFullYear();
@@ -409,11 +407,8 @@ function atualizarLabelMes() {
 function atualizarBotaoAnterior() {
   const btn = document.getElementById('btn-prev-mes-anterior');
   if (!btn) return;
-  const noMinimo = prevMesAtual === PREV_MES_MIN && prevAnoAtual === PREV_ANO_MIN;
-  btn.disabled = noMinimo;
-  btn.className = noMinimo
-    ? 'p-1.5 transition-all rounded-lg border border-gray-200 text-gray-300 cursor-not-allowed'
-    : 'p-1.5 text-gray-500 hover:text-orange-500 transition-all rounded-lg hover:bg-orange-50 border border-gray-300';
+  btn.disabled = false;
+  btn.className = 'p-1.5 text-gray-500 hover:text-orange-500 transition-all rounded-lg hover:bg-orange-50 border border-gray-300';
 }
 
 // ─── Estados dos botões ───────────────────────────────────────────────────────
@@ -453,7 +448,6 @@ function setToggleBtnEstado(id, ativo, cor) {
 function setupPrevisaoListeners() {
 
   document.getElementById('btn-prev-mes-anterior')?.addEventListener('click', () => {
-    if (prevMesAtual === PREV_MES_MIN && prevAnoAtual === PREV_ANO_MIN) return;
     prevMesAtual--;
     if (prevMesAtual < 0) { prevMesAtual = 11; prevAnoAtual--; }
     atualizarLabelMes();
