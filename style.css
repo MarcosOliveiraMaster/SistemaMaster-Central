@@ -118,7 +118,7 @@
 .demanda-editor ul { list-style: disc; padding-left: 1.5em; }
 .demanda-editor ol { list-style: decimal; padding-left: 1.5em; }
 .demanda-editor a { color: #f28705; text-decoration: underline; }
-.demanda-editor input[type="checkbox"] { margin-right: 6px; cursor: pointer; }
+.demanda-editor input[type="checkbox"] { margin-right: 10px; cursor: pointer; vertical-align: middle; flex-shrink: 0; }
 .demanda-editor hr {
   border: none;
   border-top: 2px solid #e5e7eb;

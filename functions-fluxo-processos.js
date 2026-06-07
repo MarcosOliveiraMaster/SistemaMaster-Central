@@ -101,7 +101,7 @@ function applyHighlight(hex) {
   const g = parseInt(hex.slice(3,5),16);
   const b = parseInt(hex.slice(5,7),16);
   document.execCommand('insertHTML', false,
-    `<span style="background-color:rgba(${r},${g},${b},0.7);border-radius:4px;padding:1px 3px">${tmp.innerHTML}</span>`
+    `<span style="background-color:rgba(${r},${g},${b},0.7);border-radius:8px;padding:2px 5px">${tmp.innerHTML}</span>`
   );
 }
 function applyIndent(dir, editor) {
@@ -255,8 +255,8 @@ function htmlToWhatsApp(html) {
             .join('')
             .trim();
           return checked
-            ? `✅ ~_${text}_~\n`
-            : `◻️ ${text}\n`;
+            ? `✅  ~_${text}_~\n`
+            : `◻️  ${text}\n`;
         }
 
         const inner = kids(node);
@@ -275,6 +275,16 @@ function htmlToWhatsApp(html) {
   }
 
   let result = kids(root);
+
+  // Garante espaço duplo em torno dos marcadores inline quando adjacentes a texto
+  // Evita que *negrito*, _itálico_ e ~cortado~ colem nas palavras vizinhas
+  result = result.replace(/([^\s\n])(\*[^*\n]+\*)/g, '$1  $2');
+  result = result.replace(/(\*[^*\n]+\*)([^\s\n])/g, '$1  $2');
+  result = result.replace(/([^\s\n])(_[^_\n]+_)/g, '$1  $2');
+  result = result.replace(/(_[^_\n]+_)([^\s\n])/g, '$1  $2');
+  result = result.replace(/([^\s\n])(~[^~\n]+~)/g, '$1  $2');
+  result = result.replace(/(~[^~\n]+~)([^\s\n])/g, '$1  $2');
+
   // Nunca mais de 2 linhas em branco consecutivas
   result = result.replace(/\n{3,}/g, '\n\n').trim();
   return result;
