@@ -118,7 +118,7 @@ function applyIndent(dir, editor) {
   }
 }
 const _DIAS_SEMANA = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
-function formatDate(ts) {
+function _formatDateFluxo(ts) {
   if (!ts) return '—';
   const d   = ts.toDate ? ts.toDate() : new Date(ts);
   const dmy = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -516,7 +516,7 @@ function renderCards(list) {
         </button>
       </div>
       <div class="demanda-card-body">${d.content || ''}</div>
-      <div class="demanda-card-footer">${formatDate(d.createdAt)}</div>
+      <div class="demanda-card-footer">${_formatDateFluxo(d.createdAt)}</div>
     </div>
   `).join('');
 
