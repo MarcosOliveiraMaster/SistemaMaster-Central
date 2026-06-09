@@ -2246,7 +2246,11 @@ const BancoDeAulasCards = (function() {
       };
 
       let totalMinutes = 0;
-      aulas.forEach(a => { totalMinutes += parseDurationToMinutes(a.duracao || ''); });
+      aulas.forEach(a => {
+        if ((a.StatusAula || 'Pendente') !== 'Reagendada') {
+          totalMinutes += parseDurationToMinutes(a.duracao || '');
+        }
+      });
 
       const totalHours = Math.floor(totalMinutes / 60);
       const remainingMinutes = totalMinutes % 60;
