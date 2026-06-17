@@ -464,6 +464,14 @@ const BancoDeAulasCards = (function() {
                       <i class="fas fa-eye mr-1 text-xs"></i>
                       <span class="text-xs">Observações</span>
                     </button>
+                    <button id="btn-ver-dados-cliente" class="btn-secondary text-xs py-1.5 px-2 w-full">
+                      <i class="fas fa-user mr-1 text-xs"></i>
+                      <span class="text-xs">Ver cliente</span>
+                    </button>
+                    <button id="btn-gerar-nfe" class="btn-secondary text-xs py-1.5 px-2 w-full">
+                      <i class="fas fa-file-invoice mr-1 text-xs"></i>
+                      <span class="text-xs">Gerar msg NF-e</span>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -825,6 +833,82 @@ const BancoDeAulasCards = (function() {
     btnVerObservacoes.addEventListener('click', () => {
       showObservacoesModal(aula);
     });
+
+    // Helpers de formatação local (não dependem do DashboardCliente)
+    const _fmtCPF = (cpf) => {
+      if (!cpf) return '—';
+      const c = String(cpf).replace(/\D/g, '');
+      return c.length === 11 ? `${c.slice(0,3)}.${c.slice(3,6)}.${c.slice(6,9)}-${c.slice(9)}` : cpf;
+    };
+    const _fmtCEP = (cep) => {
+      if (!cep) return '—';
+      const c = String(cep).replace(/\D/g, '');
+      return c.length === 8 ? `${c.slice(0,5)}-${c.slice(5)}` : cep;
+    };
+
+    // Configurar botão "Ver dados do cliente"
+    const btnVerDadosCliente = modal.querySelector('#btn-ver-dados-cliente');
+    if (btnVerDadosCliente) {
+      btnVerDadosCliente.addEventListener('click', () => {
+        const cpf = aula.cpf || '';
+        if (!cpf) { showToast('CPF do cliente não encontrado na contratação', 'error'); return; }
+        db.collection('cadastroClientes').where('cpf', '==', cpf).get().then(snap => {
+          if (snap.empty) { showToast('Cliente não encontrado no BD Clientes', 'error'); return; }
+          const clientId = snap.docs[0].id;
+          const clientData = { ...snap.docs[0].data(), id: clientId };
+
+          // Garantir que o DC está inicializado e o HTML do modal existe no DOM
+          if (!window.dashboardCliente || !document.getElementById('dc-modal-detalhes')) {
+            if (typeof loadDashboardCliente === 'function') loadDashboardCliente();
+          }
+
+          const abrir = (tentativas) => {
+            const dc = window.dashboardCliente;
+            if (dc && document.getElementById('dc-modal-detalhes')) {
+              if (!dc.clients.find(c => c.id === clientId)) dc.clients.push(clientData);
+              dc.openModalDetalhes(clientId);
+            } else if (tentativas > 0) {
+              setTimeout(() => abrir(tentativas - 1), 100);
+            } else {
+              showToast('Erro ao abrir dados do cliente', 'error');
+            }
+          };
+          abrir(20);
+        }).catch(() => showToast('Erro ao buscar dados do cliente', 'error'));
+      });
+    }
+
+    // Configurar botão "Gerar mensagem de NF-e"
+    const btnGerarNfe = modal.querySelector('#btn-gerar-nfe');
+    if (btnGerarNfe) {
+      btnGerarNfe.addEventListener('click', () => {
+        const cpf = aula.cpf || '';
+        if (!cpf) { showToast('CPF do cliente não encontrado na contratação', 'error'); return; }
+        const elValor = modal.querySelector('#display-valor-pacote-contrato');
+        const valorTexto = elValor ? elValor.textContent.trim() : '';
+        db.collection('cadastroClientes').where('cpf', '==', cpf).get().then(snap => {
+          if (snap.empty) { showToast('Cliente não encontrado no BD Clientes', 'error'); return; }
+          const d = snap.docs[0].data();
+          const nfNome    = d.confirmaNF ? (d.nfNome    || d.nome)     : d.nome;
+          const nfCpf     = d.confirmaNF ? (d.nfCpf     || d.cpf)      : d.cpf;
+          const nfEndereco = d.confirmaNF ? (d.nfEndereco || d.endereco) : d.endereco;
+          const nfEmail   = d.confirmaNF ? (d.nfEmail   || d.email)    : d.email;
+          const nfCep     = d.cep || '';
+          const mensagem = `Nota Fiscal
+Nome: ${nfNome || '—'}
+Endereço: ${nfEndereco || '—'} - CEP: ${_fmtCEP(nfCep)}
+CPF: ${_fmtCPF(nfCpf)}
+Email: ${nfEmail || '—'}
+Valor: ${valorTexto}
+
+Descritivo
+A presente nota fiscal refere-se aos serviços contratados de aulas particulares ministradas por profissionais qualificados integrantes da rede de professores da Master Educação. As aulas têm como objetivo oferecer um ensino personalizado, adequado às necessidades e objetivos individuais do aluno, proporcionando um ambiente propício ao aprendizado.`;
+          navigator.clipboard.writeText(mensagem)
+            .then(() => showToast('Mensagem de NF-e copiada!', 'success'))
+            .catch(() => showToast('Erro ao copiar mensagem', 'error'));
+        }).catch(() => showToast('Erro ao buscar dados do cliente', 'error'));
+      });
+    }
 
     // Botão editar valores da contratação
     const btnEditarValores = modal.querySelector('#btn-editar-valores-contrato');

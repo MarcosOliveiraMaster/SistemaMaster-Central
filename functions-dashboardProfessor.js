@@ -8,8 +8,10 @@
         white-space: normal !important;
         word-break: break-word !important;
       }
+      .dp-cand-layout {
+        height: calc(100vh - 90px);
+      }
       #dp-candDados {
-        max-height: 70vh;
         overflow-y: auto;
       }
     `;
@@ -420,12 +422,14 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
 .dp-cand-item:hover { background:var(--dp-orange-light); border-color:var(--dp-orange); }
 .dp-cand-item--active { background:var(--dp-orange-light); border-color:var(--dp-orange); font-weight:600; }
 
-/* disponibilidade tabela */
-.dp-disp-table { width:100%; border-collapse:collapse; font-size:.72rem; margin-bottom:.75rem; }
-.dp-disp-table th, .dp-disp-table td { text-align:center; padding:.3rem .5rem; border:1px solid var(--dp-gray-200); }
-.dp-disp-table thead th { background:var(--dp-gray-50); font-weight:600; font-size:.65rem; text-transform:uppercase; }
-.dp-disp-ok  { color:var(--dp-green); font-size:1rem; }
-.dp-disp-no  { color:var(--dp-red);   font-size:1rem; }
+/* disponibilidade tabela — redesign */
+.dp-disp-table { width:100%; border-collapse:separate; border-spacing:3px; margin-bottom:.75rem; }
+.dp-disp-table td { text-align:center; padding:.2rem; }
+.dp-disp-th-corner { width:56px; }
+.dp-disp-th-day { background:var(--dp-orange); color:white; text-align:center; padding:.32rem .15rem; font-weight:700; font-size:.6rem; text-transform:uppercase; letter-spacing:.06em; border-radius:.4rem; }
+.dp-disp-th-period { text-align:left; padding:.3rem .5rem; background:var(--dp-gray-100); color:var(--dp-gray-700); font-size:.68rem; font-weight:700; border-radius:.4rem; white-space:nowrap; }
+.dp-disp-ok { display:block; background:#dcfce7; border:1px solid #86efac; color:#15803d; font-size:.82rem; border-radius:.35rem; padding:.28rem .1rem; font-weight:700; }
+.dp-disp-no { display:block; background:var(--dp-gray-50); border:1px solid var(--dp-gray-200); color:var(--dp-gray-300); font-size:.7rem; border-radius:.35rem; padding:.3rem .1rem; }
 
 /* disciplinas grid */
 .dp-disc-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:.4rem; max-height:110px; overflow-y:auto; }
@@ -435,6 +439,23 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
 /* avaliação col direita */
 .dp-aval-section { display:flex; flex-direction:column; gap:.6rem; }
 .dp-aval-row { display:grid; grid-template-columns:1fr 1fr; gap:.5rem; }
+
+/* ── cards de informações do candidato ── */
+#dp-informacoesCandidato { display:grid; grid-template-columns:1fr 1fr; gap:.45rem; }
+.dp-cand-info-card { background:var(--dp-gray-50); border:1px solid var(--dp-gray-200); border-radius:.5rem; padding:.5rem .65rem; display:flex; flex-direction:column; gap:.15rem; }
+.dp-cand-info-card--full { grid-column:1 / -1; }
+.dp-cand-info-label { font-size:.63rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--dp-gray-500); }
+.dp-cand-info-value { font-size:.8rem; color:var(--dp-gray-800); font-weight:500; word-break:break-word; }
+/* tags de bairros e seções Parte Alta / Parte Baixa */
+.dp-cand-bairros-tags { display:flex; flex-wrap:wrap; gap:.3rem; margin-top:.2rem; }
+.dp-cand-bairro-tag { background:var(--dp-orange-light); color:var(--dp-orange); border:1px solid var(--dp-orange); border-radius:1rem; padding:.15rem .55rem; font-size:.7rem; font-weight:600; white-space:nowrap; }
+.dp-cand-bairros-secao { margin-top:.4rem; }
+.dp-cand-bairros-secao:first-child { margin-top:.1rem; }
+.dp-cand-bairros-secao-titulo { font-size:.6rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--dp-gray-500); margin-bottom:.25rem; padding-bottom:.2rem; border-bottom:1px solid var(--dp-gray-200); }
+/* cards de experiências */
+.dp-cand-exp-card { background:var(--dp-gray-50); border:1px solid var(--dp-gray-200); border-radius:.5rem; padding:.6rem .75rem; display:flex; flex-direction:column; gap:.2rem; }
+.dp-cand-exp-title { font-size:.8rem; font-weight:700; color:var(--dp-gray-800); }
+.dp-cand-exp-desc { font-size:.74rem; color:var(--dp-gray-600); font-style:italic; line-height:1.4; }
 
 /* ── TOAST ── */
 .dp-toast { position:fixed; top:1.2rem; right:1.2rem; z-index:9999; max-width:320px; background:white; border-radius:.6rem; box-shadow:0 8px 24px rgba(0,0,0,.14); padding:.7rem 1rem; font-size:.8rem; display:flex; gap:.6rem; align-items:flex-start; border-left:4px solid var(--dp-blue); animation:dpSlideIn .25s ease; }
@@ -508,12 +529,11 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
     const root = $root();
     if (!root) return;
     root.innerHTML = `
-<!-- Tabs bar -->
-<div class="dp-tabs-bar">
+<!-- Tabs bar (oculta — navegação feita pelo menu lateral) -->
+<div class="dp-tabs-bar" style="display:none">
   <button class="dp-tab dp-tab--active" data-dptab="dp-tab-bancoDados">🗂 Banco de Dados</button>
   <button class="dp-tab"               data-dptab="dp-tab-edicao">✏️ Edição de Professores</button>
   <button class="dp-tab"               data-dptab="dp-tab-candidatos">👥 Avaliação de Candidatos</button>
-  <button id="dp-btnGerarContrato" class="dp-btn dp-btn--success"><i class="fas fa-file-contract" style="margin-right:.4rem"></i>Gerar Contrato</button>
 </div>
 
 <!-- ═══ TAB 1 — BANCO DE DADOS ═══════════════════════════════ -->
@@ -566,6 +586,7 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
     </div>
     <!-- Limpar -->
     <button id="dp-limparBusca" class="dp-btn dp-btn--primary dp-btn--sm" style="margin-left:auto;align-self:center">Limpar Busca</button>
+    <button id="dp-btnGerarContrato" class="dp-btn dp-btn--success dp-btn--sm" style="align-self:center"><i class="fas fa-file-contract" style="margin-right:.4rem"></i>Gerar Contrato</button>
   </div>
   <!-- Tabela -->
   <div class="dp-table-wrapper">
@@ -633,18 +654,21 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
           <h4 style="font-size:.75rem;font-weight:700;color:var(--dp-gray-600);margin-bottom:.4rem;text-transform:uppercase;letter-spacing:.05em">Disponibilidade</h4>
           <table class="dp-disp-table">
             <thead><tr>
-              <th></th><th>Seg</th><th>Ter</th><th>Qua</th><th>Qui</th><th>Sex</th><th>Sáb</th>
+              <th class="dp-disp-th-corner"></th>
+              <th class="dp-disp-th-day">Seg</th><th class="dp-disp-th-day">Ter</th>
+              <th class="dp-disp-th-day">Qua</th><th class="dp-disp-th-day">Qui</th>
+              <th class="dp-disp-th-day">Sex</th><th class="dp-disp-th-day">Sáb</th>
             </tr></thead>
             <tbody>
               <tr>
-                <th>Manhã</th>
-                <td id="dp-segManha">-</td><td id="dp-terManha">-</td><td id="dp-quaManha">-</td>
-                <td id="dp-quiManha">-</td><td id="dp-sexManha">-</td><td id="dp-sabManha">-</td>
+                <th class="dp-disp-th-period">☀️ Manhã</th>
+                <td id="dp-segManha"></td><td id="dp-terManha"></td><td id="dp-quaManha"></td>
+                <td id="dp-quiManha"></td><td id="dp-sexManha"></td><td id="dp-sabManha"></td>
               </tr>
               <tr>
-                <th>Tarde</th>
-                <td id="dp-segTarde">-</td><td id="dp-terTarde">-</td><td id="dp-quaTarde">-</td>
-                <td id="dp-quiTarde">-</td><td id="dp-sexTarde">-</td><td id="dp-sabTarde">-</td>
+                <th class="dp-disp-th-period">🌆 Tarde</th>
+                <td id="dp-segTarde"></td><td id="dp-terTarde"></td><td id="dp-quaTarde"></td>
+                <td id="dp-quiTarde"></td><td id="dp-sexTarde"></td><td id="dp-sabTarde"></td>
               </tr>
             </tbody>
           </table>
@@ -657,12 +681,12 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
         <!-- informações -->
         <div id="dp-secInfo" style="display:none;margin-bottom:.75rem">
           <h4 style="font-size:.75rem;font-weight:700;color:var(--dp-gray-600);margin-bottom:.4rem;text-transform:uppercase;letter-spacing:.05em">Informações</h4>
-          <div id="dp-informacoesCandidato" style="font-size:.78rem;display:flex;flex-direction:column;gap:.3rem;max-height:200px;overflow-y:auto;padding-right:4px"></div>
+          <div id="dp-informacoesCandidato"></div>
         </div>
         <!-- experiências -->
         <div id="dp-secExp" style="display:none">
           <h4 style="font-size:.75rem;font-weight:700;color:var(--dp-gray-600);margin-bottom:.4rem;text-transform:uppercase;letter-spacing:.05em">Experiências</h4>
-          <div id="dp-experienciasConteudo" style="max-height:220px;overflow-y:auto;padding-right:4px;display:flex;flex-direction:column;gap:.5rem;font-size:.78rem"></div>
+          <div id="dp-experienciasConteudo" style="display:flex;flex-direction:column;gap:.5rem"></div>
         </div>
       </div>
     </div>
@@ -2033,7 +2057,7 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
       const dk = d.toLowerCase();
       ['Manha','Tarde'].forEach(t => {
         const el = $id(`dp-${dk}${t}`);
-        if (el) el.innerHTML = isTruthy(getField(c, dk+t)) ? '<span class="dp-disp-ok">✅</span>' : '<span class="dp-disp-no">❌</span>';
+        if (el) el.innerHTML = isTruthy(getField(c, dk+t)) ? '<span class="dp-disp-ok">✓</span>' : '<span class="dp-disp-no">—</span>';
       });
     });
 
@@ -2067,9 +2091,28 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
         ['Curso',   safe(getField(c,'curso'))],
         ['Nível',   safe(getField(c,'nivel'))],
       ];
-      infoEl.innerHTML = campos.filter(([,v]) => v).map(([k,v]) =>
-        `<div><strong>${k}:</strong> ${v}</div>`
-      ).join('');
+      infoEl.innerHTML = campos.filter(([,v]) => v).map(([k,v]) => {
+        if (k === 'Bairros') {
+          const ALTA = ['farol','pintanguinha','pinheiro','feitosa','gruta de lourdes',
+            'canaa','santo amaro','serraria','barro duro','ouro preto',
+            'jardim petropolis','santa amelia','santos dumont','graciliano ramos',
+            'cidade universitaria','santa lucia','eustaquio gomes','benedito bentes','antares'];
+          const isAlta = b => { const nb = normalizeStr(b); return ALTA.some(a => nb.includes(a)); };
+          const lista = v.split(/[,;]+|\s+e\s+/i).map(b => b.trim()).filter(Boolean);
+          const alta  = lista.filter(isAlta).sort((a,b) => a.localeCompare(b,'pt'));
+          const baixa = lista.filter(b => !isAlta(b)).sort((a,b) => a.localeCompare(b,'pt'));
+          const secao = (titulo, items) => !items.length ? '' :
+            `<div class="dp-cand-bairros-secao">
+              <div class="dp-cand-bairros-secao-titulo">${titulo} <span style="font-weight:400;opacity:.65">(${items.length})</span></div>
+              <div class="dp-cand-bairros-tags">${items.map(t=>`<span class="dp-cand-bairro-tag">${t}</span>`).join('')}</div>
+            </div>`;
+          const body = lista.length > 1
+            ? secao('Parte Alta', alta) + secao('Parte Baixa', baixa)
+            : `<span class="dp-cand-info-value">${v}</span>`;
+          return `<div class="dp-cand-info-card dp-cand-info-card--full"><span class="dp-cand-info-label">${k}</span>${body}</div>`;
+        }
+        return `<div class="dp-cand-info-card"><span class="dp-cand-info-label">${k}</span><span class="dp-cand-info-value">${v}</span></div>`;
+      }).join('');
     }
 
     // experiências
@@ -2079,17 +2122,17 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
       const exps = [];
       if (isTruthy(getField(c,'expAulas'))) {
         const desc = safe(getField(c,'descricaoExpAulas'));
-        exps.push(`<div><strong>📚 Aulas Particulares:</strong> Sim${desc ? '<br><em>'+desc+'</em>' : ''}</div>`);
+        exps.push(`<div class="dp-cand-exp-card"><span class="dp-cand-exp-title">📚 Aulas Particulares</span>${desc ? `<span class="dp-cand-exp-desc">${desc}</span>` : ''}</div>`);
       }
       if (isTruthy(getField(c,'expNeuro'))) {
         const desc = safe(getField(c,'descricaoExpNeuro'));
-        exps.push(`<div><strong>🧠 Alunos Atípicos:</strong> Sim${desc ? '<br><em>'+desc+'</em>' : ''}</div>`);
+        exps.push(`<div class="dp-cand-exp-card"><span class="dp-cand-exp-title">🧠 Alunos Atípicos</span>${desc ? `<span class="dp-cand-exp-desc">${desc}</span>` : ''}</div>`);
       }
       if (isTruthy(getField(c,'expTdics'))) {
         const desc = safe(getField(c,'descricaoTdics'));
-        exps.push(`<div><strong>💻 TDICs:</strong> Sim${desc ? '<br><em>'+desc+'</em>' : ''}</div>`);
+        exps.push(`<div class="dp-cand-exp-card"><span class="dp-cand-exp-title">💻 TDICs</span>${desc ? `<span class="dp-cand-exp-desc">${desc}</span>` : ''}</div>`);
       }
-      expEl.innerHTML = exps.length ? exps.join('') : '<p style="color:var(--dp-gray-400)">Nenhuma experiência informada.</p>';
+      expEl.innerHTML = exps.length ? exps.join('') : '<p style="color:var(--dp-gray-400);font-size:.78rem">Nenhuma experiência informada.</p>';
     }
   }
 

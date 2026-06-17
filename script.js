@@ -48,9 +48,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }, CHECK_INTERVAL);
 });
 
+let _pendingProfessorTab = null;
+
 function initializeApp() {
   setupMenuNavigation();
   setupDashboardSubmenu();
+  setupSubgroupSubmenus();
   setupSidebarToggle();
   setupGlobalListeners();
   loadSection('painel-central');
@@ -70,20 +73,32 @@ function setupSidebarToggle() {
       const chevron = document.getElementById('icon-dashboard-expand');
       if (submenu) submenu.classList.add('hidden');
       if (chevron) chevron.classList.remove('rotate');
+      ['submenu-clientes', 'submenu-professores'].forEach(id => {
+        document.getElementById(id)?.classList.add('hidden');
+      });
+      ['icon-clientes-expand', 'icon-professores-expand'].forEach(id => {
+        document.getElementById(id)?.classList.remove('rotate-90');
+      });
     }
   });
 }
 
 function setupMenuNavigation() {
   const menuItems    = document.querySelectorAll('.menu-item:not(.menu-item-expandable)');
-  const submenuItems = document.querySelectorAll('.menu-item-submenu');
+  const submenuItems = document.querySelectorAll('.menu-item-submenu:not(.menu-item-submenu-expandable)');
+  const leafItems    = document.querySelectorAll('.menu-item-submenu-leaf');
+
+  function clearActive() {
+    menuItems.forEach(i => i.classList.remove('active'));
+    submenuItems.forEach(i => i.classList.remove('active'));
+    leafItems.forEach(i => i.classList.remove('active'));
+  }
 
   menuItems.forEach(item => {
     item.addEventListener('click', function () {
       const sectionId = this.getAttribute('data-section');
       if (sectionId && sectionId !== APP_STATE.currentSection) {
-        menuItems.forEach(i => i.classList.remove('active'));
-        submenuItems.forEach(i => i.classList.remove('active'));
+        clearActive();
         this.classList.add('active');
         const title = this.getAttribute('data-title') || this.querySelector('span').textContent;
         updateSectionTitle(title);
@@ -97,11 +112,34 @@ function setupMenuNavigation() {
       e.stopPropagation();
       const sectionId = this.getAttribute('data-section');
       if (sectionId && sectionId !== APP_STATE.currentSection) {
-        menuItems.forEach(i => i.classList.remove('active'));
-        submenuItems.forEach(i => i.classList.remove('active'));
+        clearActive();
         this.classList.add('active');
         const title = this.getAttribute('data-title') || this.querySelector('span').textContent;
         updateSectionTitle(title);
+        loadSection(sectionId);
+      }
+    });
+  });
+
+  leafItems.forEach(item => {
+    item.addEventListener('click', function (e) {
+      e.stopPropagation();
+      const sectionId = this.getAttribute('data-section');
+      const tabId     = this.getAttribute('data-tab');
+      if (!sectionId) return;
+
+      clearActive();
+      this.classList.add('active');
+      const title = this.getAttribute('data-title') || this.querySelector('span').textContent;
+      updateSectionTitle(title);
+
+      if (sectionId === APP_STATE.currentSection) {
+        if (tabId) {
+          const tabBtn = document.querySelector(`[data-dptab="${tabId}"]`);
+          if (tabBtn) tabBtn.click();
+        }
+      } else {
+        if (tabId) _pendingProfessorTab = tabId;
         loadSection(sectionId);
       }
     });
@@ -111,6 +149,25 @@ function setupMenuNavigation() {
 function updateSectionTitle(title) {
   const el = document.getElementById('section-title');
   if (el) el.textContent = title;
+}
+
+function setupSubgroupSubmenus() {
+  [
+    { btnId: 'btn-clientes-menu',   subId: 'submenu-clientes',   iconId: 'icon-clientes-expand'   },
+    { btnId: 'btn-professores-menu', subId: 'submenu-professores', iconId: 'icon-professores-expand' },
+  ].forEach(({ btnId, subId, iconId }) => {
+    const btn  = document.getElementById(btnId);
+    const sub  = document.getElementById(subId);
+    const icon = document.getElementById(iconId);
+    if (!btn || !sub) return;
+    let expanded = false;
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      expanded = !expanded;
+      sub.classList.toggle('hidden', !expanded);
+      if (icon) icon.classList.toggle('rotate-90', expanded);
+    });
+  });
 }
 
 function setupDashboardSubmenu() {
@@ -178,7 +235,14 @@ function loadSectionContent(sectionId) {
       if (typeof loadDashboardCliente === 'function') loadDashboardCliente();
       break;
     case 'professores':
-      if (typeof DashboardProfessores !== 'undefined' && DashboardProfessores.init) DashboardProfessores.init();
+      if (typeof DashboardProfessores !== 'undefined' && DashboardProfessores.init) {
+        DashboardProfessores.init();
+        if (_pendingProfessorTab) {
+          const tabBtn = document.querySelector(`[data-dptab="${_pendingProfessorTab}"]`);
+          if (tabBtn) tabBtn.click();
+          _pendingProfessorTab = null;
+        }
+      }
       break;
     case 'exportar-dados':
       if (typeof loadExportarDados === 'function') loadExportarDados();
