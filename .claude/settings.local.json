@@ -29,7 +29,8 @@
       "Bash(Measure-Object -Line)",
       "PowerShell(npx --yes http-server . -p 8080 --cors -a 0.0.0.0)",
       "Bash(Get-ChildItem -Recurse -Path .)",
-      "Bash(python3 *)"
+      "Bash(python3 *)",
+      "Bash(grep -r \"collection\\\\|db\\\\\\\\.doc\\\\|db\\\\\\\\.add\" --include=\"*.js\")"
     ]
   }
 }

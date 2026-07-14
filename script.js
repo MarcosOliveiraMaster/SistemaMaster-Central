@@ -7,7 +7,7 @@ const CONFIG = {
   sections: [
     'painel-central', 'banco-aulas', 'simulacoes', 'mensagens',
     'calendario', 'fluxo-processos', 'clientes', 'professores',
-    'area-pagamento', 'exportar-dados', 'previsao-financeira'
+    'area-pagamento', 'cofres-pagamento', 'exportar-dados', 'previsao-financeira'
   ]
 };
 
@@ -249,6 +249,9 @@ function loadSectionContent(sectionId) {
       break;
     case 'area-pagamento':
       if (typeof loadAreaPagamento === 'function') loadAreaPagamento();
+      break;
+    case 'cofres-pagamento':
+      if (typeof loadCofresPagemento === 'function') loadCofresPagemento();
       break;
     case 'previsao-financeira':
       if (typeof loadPrevisaoFinanceira === 'function') loadPrevisaoFinanceira();

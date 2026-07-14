@@ -3142,7 +3142,7 @@ const Simulacoes = (function() {
                   >
                     <option value="|A definir" style="padding: 8px; font-weight: 500; color: #f97316;">A definir</option>
                     ${professoresOrdenados.map(prof => `
-                      <option value="${prof.cpf || prof.id}|${prof.nome}" ${prof.nome === professorAtual ? 'selected' : ''} style="padding: 8px;">
+                      <option value="${prof.cpf || prof.id}|${prof.nome}|${prof.uid || ''}" ${prof.nome === professorAtual ? 'selected' : ''} style="padding: 8px;">
                         ${escapeHtml(prof.nome || 'Sem nome')}
                       </option>
                     `).join('')}
@@ -3211,16 +3211,17 @@ const Simulacoes = (function() {
           return;
         }
         
-        // Separar CPF e nome
-        const [cpf, nome] = selectedOption.split('|');
-        
+        // Separar CPF, nome e uid
+        const [cpf, nome, uid] = selectedOption.split('|');
+
         if (nome === professorAtual) {
           showToast('ℹ️ Este já é o professor atual da aula', 'info');
           return;
         }
-        
+
         editingSimulacao.aulas[index].idProfessor = cpf;
         editingSimulacao.aulas[index].professor = nome;
+        editingSimulacao.aulas[index].professorUid = uid || '';
         const tbody = document.getElementById('tbody-aulas-simulacao');
         tbody.innerHTML = renderAulasSimulacao(editingSimulacao.aulas);
         setupAulasInputEvents();
@@ -3725,6 +3726,7 @@ const Simulacoes = (function() {
         return {
           'id-Aula': idAula,
           idProfessor: aula.idProfessor || '',
+          professorUid: aula.professorUid || '',
           professor: aula.professor || 'A definir',
           materia: aula.materia || '',
           estudante: aula.estudante || '',
@@ -3774,10 +3776,15 @@ const Simulacoes = (function() {
       
       // 8. Salvar cada aula em BancoDeAulas-Lista
       for (const aula of aulasComIds) {
-        const prof = professoresData.find(p =>
-          (p.cpf || '').replace(/\D/g, '') === (aula.idProfessor || '').replace(/\D/g, '')
-        );
-        const professorUid = prof ? (prof.uid || '') : '';
+        // professorUid já vem definido da seleção do professor na simulação;
+        // fallback por CPF cobre simulações antigas salvas antes dessa mudança
+        let professorUid = aula.professorUid || '';
+        if (!professorUid && aula.idProfessor) {
+          const prof = professoresData.find(p =>
+            (p.cpf || '').replace(/\D/g, '') === (aula.idProfessor || '').replace(/\D/g, '')
+          );
+          professorUid = prof ? (prof.uid || '') : '';
+        }
         const aulaListaData = {
           ... aula,
           // incluir o valor hora/aula aplicado no momento da aprovação
