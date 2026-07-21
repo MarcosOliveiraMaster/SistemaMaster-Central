@@ -650,6 +650,9 @@ const BancoDeAulasCards = (function() {
             elPacote.textContent = formatBR(data.ValorPacote);
             elEquipe.textContent = formatBR(data.ValorEquipe);
             elLucro.textContent = formatBR(data.lucroMaster);
+            if (data.valorLucroMasterPorHora !== undefined && data.valorLucroMasterPorHora !== null && data.valorLucroMasterPorHora !== '') {
+              elLucro.dataset.porHora = String(data.valorLucroMasterPorHora);
+            }
             if (data.horaAulaProfessor !== undefined && data.horaAulaProfessor !== null && data.horaAulaProfessor !== '') {
               elHoraAula.textContent = formatBR(data.horaAulaProfessor);
             }
@@ -715,6 +718,10 @@ const BancoDeAulasCards = (function() {
             elLucroContrato.textContent = formatCurrencyBR(Number(lucroVal));
           } else {
             elLucroContrato.textContent = formatCurrencyBR(0);
+          }
+          const lucroPorHoraVal = (aula && (aula.valorLucroMasterPorHora || aula.valorLucroMasterPorHora === 0)) ? aula.valorLucroMasterPorHora : null;
+          if (lucroPorHoraVal !== null && lucroPorHoraVal !== undefined && lucroPorHoraVal !== '') {
+            elLucroContrato.dataset.porHora = String(lucroPorHoraVal);
           }
         }
 
@@ -918,6 +925,7 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
         const elEquipe = modal.querySelector('#display-valor-equipe-contrato');
         const elLucro = modal.querySelector('#display-lucro-master-contrato');
         const elHoraAulaModal = modal.querySelector('#display-hora-aula-contrato');
+        const elTotalHorasModal = modal.querySelector('#display-total-horas-contrato');
 
         const parseBR = (str) => {
           if (!str) return 0;
@@ -928,8 +936,29 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
           } catch (e) { return 0; }
         };
 
+        // Converte "3h 30" / "3h30m" em horas decimais (3.5)
+        const parseHorasToDecimal = (str) => {
+          if (!str) return 0;
+          const m = String(str).trim().match(/(\d+)\s*h\s*(\d{1,2})?/);
+          if (!m) return 0;
+          const h = parseInt(m[1], 10) || 0;
+          const min = m[2] ? parseInt(m[2], 10) : 0;
+          return h + (min / 60);
+        };
+
+        const totalHorasDecimalAtual = parseHorasToDecimal(elTotalHorasModal ? (elTotalHorasModal.textContent || elTotalHorasModal.innerText) : '0h 0');
+
         const initialHoraAula = parseBR(elHoraAulaModal ? (elHoraAulaModal.textContent || elHoraAulaModal.innerText) : '0');
-        const initialLucro = parseBR(elLucro.textContent || elLucro.innerText);
+
+        // Lucro Master é editado como valor POR HORA. Se já tivermos a taxa salva (dataset), usamos ela;
+        // caso contrário, derivamos da divisão do total exibido pelas horas totais (compatibilidade com contratos antigos).
+        let initialLucro = 0;
+        if (elLucro && elLucro.dataset && elLucro.dataset.porHora !== undefined && elLucro.dataset.porHora !== '') {
+          initialLucro = Number(elLucro.dataset.porHora) || 0;
+        } else {
+          const lucroTotalAtual = parseBR(elLucro.textContent || elLucro.innerText);
+          initialLucro = totalHorasDecimalAtual > 0 ? Number((lucroTotalAtual / totalHorasDecimalAtual).toFixed(2)) : lucroTotalAtual;
+        }
 
         const modalHtml = `
           <div class="modal-overlay" id="editarValoresModal" style="z-index:10010;">
@@ -942,11 +971,12 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
                 <div class="space-y-4">
                   <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Valor Hora/Aula</label>
-                    <input type="text" id="input-valor-equipe-editar" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none" />
+                    <input type="text" inputmode="decimal" id="input-valor-equipe-editar" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none" />
                   </div>
                   <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Lucro Master</label>
-                    <input type="text" id="input-lucro-master-editar" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none" />
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Lucro Master (por hora)</label>
+                    <input type="text" inputmode="decimal" id="input-lucro-master-editar" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none" />
+                    <p class="text-xs text-gray-400 mt-1">Multiplicado pelo total de horas (${elTotalHorasModal ? (elTotalHorasModal.textContent || elTotalHorasModal.innerText).trim() : '0h 0'}) ao aplicar.</p>
                   </div>
                 </div>
               </div>
@@ -976,34 +1006,33 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
           return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
         };
 
-        // Máscara simples de moeda (bom UX para preenchimento)
+        // Máscara de moeda: dígitos digitados são tratados como centavos (da direita para a esquerda),
+        // igual a um campo de valor de boleto/PDV. O cursor fica sempre no fim, evitando o bug de
+        // reposicionamento de caret que quebrava a digitação na versão anterior.
         const attachCurrencyMask = (inputEl) => {
           if (!inputEl) return;
           const formatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
-          const toNumberFromInput = (s) => {
+          const toNumberFromDigits = (s) => {
             if (!s) return 0;
-            const cleaned = String(s).replace(/[^0-9]/g, ''); // apenas dígitos
+            const cleaned = String(s).replace(/[^0-9]/g, '');
             const cents = cleaned === '' ? 0 : parseInt(cleaned, 10);
             return cents / 100;
           };
 
-          const formatFromDigits = (s) => {
-            const n = toNumberFromInput(s);
-            return formatter.format(n);
+          const applyMask = () => {
+            const n = toNumberFromDigits(inputEl.value);
+            inputEl.value = formatter.format(n);
+            try { inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length); } catch (err) { /* ignore caret issues */ }
           };
 
-          inputEl.addEventListener('input', (e) => {
-            const caret = inputEl.selectionStart;
-            const raw = inputEl.value;
-            const formatted = formatFromDigits(raw);
-            inputEl.value = formatted;
-            try { inputEl.selectionStart = inputEl.selectionEnd = inputEl.value.length - (formatted.length - (caret || 0)); } catch (err) { /* ignore caret issues */ }
-          });
+          inputEl.addEventListener('input', applyMask);
+          inputEl.addEventListener('blur', applyMask);
 
-          // On blur, ensure well formatted
-          inputEl.addEventListener('blur', () => {
-            inputEl.value = formatFromDigits(inputEl.value);
+          // Ao focar, seleciona tudo para que o usuário possa digitar por cima do valor atual
+          // sem precisar apagar manualmente (evita o "bug" de edição no meio do texto formatado).
+          inputEl.addEventListener('focus', () => {
+            try { inputEl.select(); } catch (err) { /* ignore */ }
           });
         };
 
@@ -1045,16 +1074,22 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
             btnAplicar.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Aplicando...';
 
             const valHoraAula = parseInput(inputEquipe.value);
-            const valLucro = parseInput(inputLucro.value);
+            const valLucroPorHora = parseInput(inputLucro.value);
+
+            // Lucro Master total = taxa por hora informada × somatório das durações das aulas
+            const horasDecimalAtual = parseHorasToDecimal(elTotalHorasModal ? (elTotalHorasModal.textContent || elTotalHorasModal.innerText) : '0h 0');
+            const lucroMasterTotal = Number((valLucroPorHora * horasDecimalAtual).toFixed(2));
 
             await BANCO.updateAula(codigoContratacao, {
-              lucroMaster: valLucro,
+              lucroMaster: lucroMasterTotal,
+              valorLucroMasterPorHora: valLucroPorHora,
               horaAulaProfessor: valHoraAula,
               timestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
 
             // Atualizar UI
-            elLucro.textContent = formatBR(valLucro);
+            elLucro.textContent = formatBR(lucroMasterTotal);
+            elLucro.dataset.porHora = String(valLucroPorHora);
             try {
               const elHoraAula = modal.querySelector('#display-hora-aula-contrato');
               if (elHoraAula) elHoraAula.textContent = formatBR(valHoraAula);
@@ -1063,13 +1098,14 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
             showToast('✅ Valores atualizados com sucesso', 'success');
             closeModal();
 
-            // Recarregar tabela com novo valor hora/aula (recalcula ValorAula por linha e atualiza ValorEquipe)
+            // Recarregar tabela com novo valor hora/aula (recalcula ValorAula por linha, ValorEquipe e Lucro Master total)
             try { await loadAulasDetalhadas(codigoContratacao); } catch (e) { /* ignore */ }
 
-            // Atualizar Valor do Pacote = ValorEquipe (recalculado pela tabela) + LucroMaster
+            // Atualizar Valor do Pacote = ValorEquipe + Lucro Master (ambos já recalculados pela tabela)
             try {
               const novoValorEquipe = parseBR(elEquipe.textContent || elEquipe.innerText);
-              elPacote.textContent = formatBR(Number((novoValorEquipe + valLucro).toFixed(2)));
+              const novoLucroMasterTotal = parseBR(elLucro.textContent || elLucro.innerText);
+              elPacote.textContent = formatBR(Number((novoValorEquipe + novoLucroMasterTotal).toFixed(2)));
             } catch (e) { /* ignore */ }
           } catch (err) {
             console.error('Erro ao aplicar valores', err);
@@ -1144,6 +1180,10 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
           if (valorPacote !== undefined) dadosContratacao.ValorPacote = valorPacote;
           if (valorEquipe !== undefined) dadosContratacao.ValorEquipe = valorEquipe;
           if (lucroMaster !== undefined) dadosContratacao.lucroMaster = lucroMaster;
+          const elLucroDataset = modal.querySelector('#display-lucro-master-contrato');
+          if (elLucroDataset && elLucroDataset.dataset && elLucroDataset.dataset.porHora !== undefined && elLucroDataset.dataset.porHora !== '') {
+            dadosContratacao.valorLucroMasterPorHora = Number(elLucroDataset.dataset.porHora) || 0;
+          }
           if (valorHoraAula !== undefined) dadosContratacao.horaAulaProfessor = valorHoraAula;
           if (totalHoras && totalHoras.textContent.trim() !== '0h 0m') {
             dadosContratacao.SomatorioDuracaoAulas = totalHoras.textContent.trim();
@@ -2192,11 +2232,12 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
         const dataB = b.data || '';
         
         // Converter formato "ddd - dd/mm/yyyy" para comparação
-        // Exemplo: "seg - 10/01/2026"
+        // Exemplo: "seg - 10/01/2026" (o prefixo do dia da semana é ignorado,
+        // pois abreviações acentuadas como "sáb" não são reconhecidas por \w)
         const parseData = (dataStr) => {
           if (!dataStr) return new Date(0); // Data vazia vai para o início
-          
-          const match = dataStr.match(/\w{3} - (\d{2})\/(\d{2})\/(\d{4})/);
+
+          const match = dataStr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
           if (!match) return new Date(0);
           
           const dia = parseInt(match[1]);
@@ -2249,7 +2290,12 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
           const totalHoursDecimal = (hours * 60 + minutes) / 60;
           valorAulaComputado = Number((totalHoursDecimal * valorHoraContratoAtual).toFixed(2));
         } catch (e) { valorAulaComputado = 0; }
-        somaValorAulas += isFinite(valorAulaComputado) ? valorAulaComputado : 0;
+        // Aulas "Reagendada" não entram na soma (mesmo critério usado no total de horas
+        // que serve de base para o Lucro Master), senão Valor Equipe e Lucro Master divergem
+        // mesmo com a mesma taxa por hora definida no modal "Editar valores da contratação".
+        if (statusAula !== 'Reagendada') {
+          somaValorAulas += isFinite(valorAulaComputado) ? valorAulaComputado : 0;
+        }
 
         // Guardar para persistir depois
         valoresComputados.push({ docId: aula.id, valor: valorAulaComputado });
@@ -2352,7 +2398,19 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
           const elHora = document.getElementById('display-hora-aula-contrato');
           const elLucro = document.getElementById('display-lucro-master-contrato');
           const horaAulaProfessor = parseBR(elHora ? (elHora.textContent || elHora.innerText) : 'R$ 0,00');
-          const lucroMaster = parseBR(elLucro ? (elLucro.textContent || elLucro.innerText) : 'R$ 0,00');
+          const totalHorasDecimal = totalMinutes / 60;
+
+          // Lucro Master total = taxa por hora (persistida no dataset ao carregar/editar) × total de horas.
+          // Fallback: se ainda não houver taxa por hora conhecida (contratos antigos), preserva o valor total já exibido.
+          let lucroMaster;
+          const lucroPorHoraDataset = elLucro && elLucro.dataset ? elLucro.dataset.porHora : undefined;
+          if (lucroPorHoraDataset !== undefined && lucroPorHoraDataset !== '') {
+            lucroMaster = Number((Number(lucroPorHoraDataset) * totalHorasDecimal).toFixed(2));
+          } else {
+            lucroMaster = parseBR(elLucro ? (elLucro.textContent || elLucro.innerText) : 'R$ 0,00');
+          }
+          if (elLucro) elLucro.textContent = formatCurrencyBR(lucroMaster);
+
           const ValorEquipe = Number(Number(somaValorAulas).toFixed(2));
           const ValorPacote = Number((ValorEquipe + lucroMaster).toFixed(2));
 
@@ -5282,7 +5340,8 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
         const dataB = b.data || '';
         const parseData = (dataStr) => {
           if (!dataStr) return new Date(0);
-          const match = dataStr.match(/\w{3} - (\d{2})\/(\d{2})\/(\d{4})/);
+          // Prefixo do dia da semana é ignorado (abreviações acentuadas como "sáb" não casam com \w)
+          const match = dataStr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
           if (!match) return new Date(0);
           const dia = parseInt(match[1]);
           const mes = parseInt(match[2]) - 1;
@@ -5973,7 +6032,8 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
         const dataB = b.data || '';
         const parseData = (dataStr) => {
           if (!dataStr) return new Date(0);
-          const match = dataStr.match(/\w{3} - (\d{2})\/(\d{2})\/(\d{4})/);
+          // Prefixo do dia da semana é ignorado (abreviações acentuadas como "sáb" não casam com \w)
+          const match = dataStr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
           if (!match) return new Date(0);
           const dia = parseInt(match[1]);
           const mes = parseInt(match[2]) - 1;

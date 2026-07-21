@@ -30,7 +30,8 @@
       "PowerShell(npx --yes http-server . -p 8080 --cors -a 0.0.0.0)",
       "Bash(Get-ChildItem -Recurse -Path .)",
       "Bash(python3 *)",
-      "Bash(grep -r \"collection\\\\|db\\\\\\\\.doc\\\\|db\\\\\\\\.add\" --include=\"*.js\")"
+      "Bash(grep -r \"collection\\\\|db\\\\\\\\.doc\\\\|db\\\\\\\\.add\" --include=\"*.js\")",
+      "Bash(node --check functions-banco-de-aulas-Cards.js)"
     ]
   }
 }
