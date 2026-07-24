@@ -31,7 +31,9 @@
       "Bash(Get-ChildItem -Recurse -Path .)",
       "Bash(python3 *)",
       "Bash(grep -r \"collection\\\\|db\\\\\\\\.doc\\\\|db\\\\\\\\.add\" --include=\"*.js\")",
-      "Bash(node --check functions-banco-de-aulas-Cards.js)"
+      "Bash(node --check functions-banco-de-aulas-Cards.js)",
+      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('banco-de-aulas-documentacao.json','utf8'\\)\\); console.log\\('JSON válido'\\)\")",
+      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('simulacoes-documentacao.json','utf8'\\)\\); console.log\\('JSON válido'\\)\")"
     ]
   }
 }

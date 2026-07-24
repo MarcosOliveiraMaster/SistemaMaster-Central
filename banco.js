@@ -659,6 +659,49 @@ async function addAulaCalendario(codigoContratacao, campos) {
   }
 }
 
+// Duplica uma aula existente (por id-Aula) como uma nova aula "limpa": mesma data,
+// horário, duração, matéria, professor e estudante, mas com status "Pendente" e
+// sem relatório/observação/confirmação (equivalente a uma aula recém-criada).
+async function copiarAulaLista(idAulaOrigem) {
+  try {
+    const origemSnap = await db.collection("BancoDeAulas-Lista")
+      .where("id-Aula", "==", idAulaOrigem).get();
+    if (origemSnap.empty) throw new Error(`Aula ${idAulaOrigem} não encontrada`);
+
+    const origem = origemSnap.docs[0].data();
+    const codigoContratacao = origem.idContratacao || origem.codigoContratacao;
+    if (!codigoContratacao) throw new Error(`Aula ${idAulaOrigem} sem código de contratação`);
+
+    const querySnapshot = await db.collection("BancoDeAulas-Lista")
+      .where("id-Aula", ">=", codigoContratacao)
+      .where("id-Aula", "<", codigoContratacao + "")
+      .get();
+
+    const aulas = [];
+    querySnapshot.forEach(doc => { aulas.push({ id: doc.id, ...doc.data() }); });
+    aulas.sort((a, b) => (a['id-Aula'] || '').localeCompare(b['id-Aula'] || ''));
+    const ultimaAula = aulas[aulas.length - 1];
+    const novoIdAula = incrementarIdAula(ultimaAula['id-Aula']);
+
+    const novaAula = {
+      ...origem,
+      ConfirmacaoProfessorAula: false,
+      ObservacoesAula: "",
+      RelatorioAula: "",
+      StatusAula: "Pendente",
+      "id-Aula": novoIdAula,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    await db.collection("BancoDeAulas-Lista").add(novaAula);
+    forceCacheRefresh();
+    return novoIdAula;
+  } catch (error) {
+    console.error('❌ Erro ao copiar aula:', error.message);
+    throw error;
+  }
+}
+
 // Forçar atualização do cache
 function forceCacheRefresh() {
   CACHE.bancoDeAulas.timestamp      = null;
@@ -697,6 +740,7 @@ if (typeof window !== 'undefined') {
     updateCamposCalendario,
     deleteAulaByIdAula,
     addAulaCalendario,
+    copiarAulaLista,
     forceCacheRefresh,
     isCacheValid
   };

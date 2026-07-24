@@ -1831,9 +1831,11 @@ const Simulacoes = (function() {
     // Calendário de aulas
     const btnCalendarioSim = modal.querySelector('#btn-calendario-simulacao');
     if (btnCalendarioSim) {
-      btnCalendarioSim.addEventListener('click', () => {
+      btnCalendarioSim.addEventListener('click', async () => {
         if (typeof showVisualizacaoCalendarioModal === 'function') {
+          const disciplinasCalendario = await DisciplinasStore.getAll();
           showVisualizacaoCalendarioModal(editingSimulacao.aulas || [], {
+            disciplinas: disciplinasCalendario,
             onColorSave: async (cardData, color) => {
               if (cardData._origIdx !== undefined && editingSimulacao.aulas[cardData._origIdx]) {
                 editingSimulacao.aulas[cardData._origIdx].cor = color;
@@ -2028,10 +2030,10 @@ const Simulacoes = (function() {
     
     // Botões de matéria
     tbody.querySelectorAll('.btn-materia-aula-sim').forEach(btn => {
-      btn.addEventListener('click', function() {
+      btn.addEventListener('click', async function() {
         const index = parseInt(this.dataset.index);
         const materiaAtual = this.dataset.materia;
-        showMateriaModalSimulacao(index, materiaAtual);
+        await showMateriaModalSimulacao(index, materiaAtual);
       });
     });
     
@@ -2561,17 +2563,13 @@ const Simulacoes = (function() {
   }
   
   // Função para abrir modal de matéria (simulação) - MÚLTIPLAS SELEÇÕES
-  function showMateriaModalSimulacao(index, materiasAtual) {
-    const materias = [
-      "Biologia", "Ciências", "Filosofia", "Física", "Geografia",
-      "História", "Língua Portuguesa", "Língua Inglesa", "Matemática", 
-      "Química", "Redação","Sociologia", "Pedagogia"
-    ].sort();
-    
+  async function showMateriaModalSimulacao(index, materiasAtual) {
+    let disciplinas = await DisciplinasStore.getAll(); // [{id, nome}]
+
     // Parsear matérias atuais (pode ser string única ou formatada com ", " e "e" ou "A definir")
     let materiasArray = [];
     let temADefinir = false;
-    
+
     if (materiasAtual) {
       if (Array.isArray(materiasAtual)) {
         materiasArray = materiasAtual;
@@ -2588,42 +2586,14 @@ const Simulacoes = (function() {
         }
       }
     }
-    
+
     // Se não tem matérias e não tem "A definir", então está vazio = "A definir"
     if (materiasArray.length === 0 && !temADefinir && !materiasAtual) {
       temADefinir = true;
     }
-    
-    // Criar opção "A definir" primeiro
-    const btnADefinir = `
-      <button 
-        class="materia-option-btn ${temADefinir ? 'bg-blue-500 text-white border-blue-600 hover:bg-blue-600' : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'} border-2 rounded-lg px-4 py-3 font-medium transition-all duration-200 transform hover:scale-105 text-sm whitespace-nowrap"
-        data-materia="A definir"
-      >
-        A definir
-        ${temADefinir ? '<i class="fas fa-check ml-2"></i>' : ''}
-      </button>
-    `;
-    
-    const opcoesHtml = materias.map(materia => {
-      const isAtual = materiasArray.includes(materia);
-      const buttonClass = isAtual 
-        ? 'bg-green-500 text-white border-green-600 hover:bg-green-600' 
-        : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200';
-      
-      return `
-        <button 
-          class="materia-option-btn ${buttonClass} border-2 rounded-lg px-4 py-3 font-medium transition-all duration-200 transform hover:scale-105 text-sm whitespace-nowrap"
-          data-materia="${materia}"
-        >
-          ${materia}
-          ${isAtual ? '<i class="fas fa-check ml-2"></i>' : ''}
-        </button>
-      `;
-    }).join('');
-    
+
     const materiaAtualFormatada = temADefinir ? 'A definir' : (formatarMateriasMultiplas(materiasArray) || 'Nenhuma');
-    
+
     const modalHtml = `
       <div class="modal-overlay" id="modalMateriaSim" style="z-index: 10000;">
         <div class="modal-container" style="max-width: 900px;">
@@ -2636,7 +2606,7 @@ const Simulacoes = (function() {
               <i class="fas fa-times"></i>
             </button>
           </div>
-          
+
           <div class="modal-body" style="max-height: 500px; overflow-y: auto;">
             <div class="space-y-4">
               <div class="bg-orange-50 border border-orange-200 rounded-lg p-3">
@@ -2646,19 +2616,16 @@ const Simulacoes = (function() {
                   <span class="text-xs text-gray-500 ml-2" id="contadorMaterias">${temADefinir ? '(especial)' : `(${materiasArray.length}/5)`}</span>
                 </p>
               </div>
-              
+
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-3">
-                  Selecione as matérias (máximo 5):
+                  Selecione as matérias (máximo 5) — clique com o botão direito para excluir:
                 </label>
-                <div class="grid grid-cols-4 gap-3">
-                  ${btnADefinir}
-                  ${opcoesHtml}
-                </div>
+                <div class="grid grid-cols-4 gap-3" id="gridMateriasSim"></div>
               </div>
             </div>
           </div>
-          
+
           <div class="modal-footer">
             <button id="btnConfirmarMaterias" class="btn-primary btn-compact">
               Confirmar
@@ -2670,22 +2637,22 @@ const Simulacoes = (function() {
         </div>
       </div>
     `;
-    
+
     const modalContainer = document.createElement('div');
     modalContainer.innerHTML = modalHtml;
     document.body.appendChild(modalContainer);
-    
+
     const modal = modalContainer.querySelector('#modalMateriaSim');
     const btnConfirmar = modal.querySelector('#btnConfirmarMaterias');
     const btnCancelar = modal.querySelector('#btnCancelarMateria');
     const btnClose = modal.querySelector('.modal-close');
-    const btnOpcoes = modal.querySelectorAll('.materia-option-btn');
     const labelFormatadas = modal.querySelector('#materiasFormatadas');
     const contadorEl = modal.querySelector('#contadorMaterias');
-    
+    const gridEl = modal.querySelector('#gridMateriasSim');
+
     let materiasTemp = [...materiasArray];
     let temADefinirTemp = temADefinir;
-    
+
     const atualizarExibicao = () => {
       if (temADefinirTemp) {
         labelFormatadas.textContent = 'A definir';
@@ -2694,11 +2661,11 @@ const Simulacoes = (function() {
         labelFormatadas.textContent = formatarMateriasMultiplas(materiasTemp) || 'Nenhuma';
         contadorEl.textContent = `(${materiasTemp.length}/5)`;
       }
-      
+
       // Atualizar visual dos botões
-      btnOpcoes.forEach(btn => {
+      gridEl.querySelectorAll('.materia-option-btn').forEach(btn => {
         const materia = btn.dataset.materia;
-        
+
         if (materia === 'A definir') {
           if (temADefinirTemp) {
             btn.classList.remove('bg-gray-100', 'text-gray-700', 'border-gray-300', 'hover:bg-gray-200');
@@ -2727,14 +2694,127 @@ const Simulacoes = (function() {
         }
       });
     };
-    
+
+    const renderGrid = () => {
+      const btnADefinir = `
+        <button
+          class="materia-option-btn ${temADefinirTemp ? 'bg-blue-500 text-white border-blue-600 hover:bg-blue-600' : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'} border-2 rounded-lg px-4 py-3 font-medium transition-all duration-200 transform hover:scale-105 text-sm whitespace-nowrap"
+          data-materia="A definir"
+        >
+          A definir
+          ${temADefinirTemp ? '<i class="fas fa-check ml-2"></i>' : ''}
+        </button>
+      `;
+
+      const opcoesHtml = disciplinas.map(d => {
+        const isAtual = materiasTemp.includes(d.nome);
+        const buttonClass = isAtual
+          ? 'bg-green-500 text-white border-green-600 hover:bg-green-600'
+          : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200';
+
+        return `
+          <button
+            class="materia-option-btn ${buttonClass} border-2 rounded-lg px-4 py-3 font-medium transition-all duration-200 transform hover:scale-105 text-sm whitespace-nowrap"
+            data-materia="${d.nome}"
+            data-disc-id="${d.id}"
+          >
+            ${d.nome}
+            ${isAtual ? '<i class="fas fa-check ml-2"></i>' : ''}
+          </button>
+        `;
+      }).join('');
+
+      const btnNovaDisciplina = `
+        <button
+          type="button"
+          id="btnNovaDisciplinaMateriaSim"
+          class="border-2 border-dashed border-gray-300 text-gray-500 rounded-lg px-4 py-3 font-medium transition-all duration-200 hover:border-orange-400 hover:text-orange-500 text-sm whitespace-nowrap"
+        >
+          <i class="fas fa-plus mr-1"></i>Nova Disciplina
+        </button>
+      `;
+
+      gridEl.innerHTML = btnADefinir + opcoesHtml + btnNovaDisciplina;
+
+      gridEl.querySelectorAll('.materia-option-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const materia = btn.dataset.materia;
+
+          if (materia === 'A definir') {
+            // Ao clicar em "A definir", desselecionar todas as outras
+            temADefinirTemp = !temADefinirTemp;
+            materiasTemp = [];
+          } else {
+            // Ao clicar em uma matéria normal, desselecionar "A definir"
+            temADefinirTemp = false;
+
+            const idx = materiasTemp.indexOf(materia);
+            if (idx > -1) {
+              // Remover se já está selecionada
+              materiasTemp.splice(idx, 1);
+            } else {
+              // Adicionar se não exceder limite de 5
+              if (materiasTemp.length < 5) {
+                materiasTemp.push(materia);
+              } else {
+                showToast('⚠️ Máximo de 5 matérias atingido', 'warning');
+                return;
+              }
+            }
+          }
+
+          atualizarExibicao();
+        });
+
+        // Botão direito -> excluir da lista de disciplinas (não se aplica à opção "A definir")
+        if (btn.dataset.discId) {
+          btn.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            const discId = btn.dataset.discId;
+            const nome = btn.dataset.materia;
+            showExcluirDisciplinaMenu(e.clientX, e.clientY, { id: discId, nome }, () => {
+              disciplinas = disciplinas.filter(d => d.id !== discId);
+              const tIdx = materiasTemp.indexOf(nome);
+              if (tIdx > -1) materiasTemp.splice(tIdx, 1);
+              renderGrid();
+              atualizarExibicao();
+            });
+          });
+        }
+      });
+
+      gridEl.querySelector('#btnNovaDisciplinaMateriaSim').addEventListener('click', () => {
+        showNovaDisciplinaModal({
+          onAdicionarNaLista: async (nome) => {
+            disciplinas = await DisciplinasStore.getAll();
+            temADefinirTemp = false;
+            if (materiasTemp.length < 5) materiasTemp.push(nome);
+            renderGrid();
+            atualizarExibicao();
+          },
+          onApenasNestaAula: (nome) => {
+            temADefinirTemp = false;
+            if (materiasTemp.length < 5) {
+              materiasTemp.push(nome);
+              atualizarExibicao();
+            } else {
+              showToast('⚠️ Máximo de 5 matérias atingido', 'warning');
+            }
+          }
+        });
+      });
+    };
+
+    renderGrid();
+
     const closeModal = () => {
       modalContainer.remove();
     };
-    
+
     btnConfirmar.addEventListener('click', () => {
       let materiaFormatada;
-      
+
       if (temADefinirTemp) {
         materiaFormatada = 'A definir';
       } else if (materiasTemp.length === 0) {
@@ -2742,7 +2822,7 @@ const Simulacoes = (function() {
       } else {
         materiaFormatada = formatarMateriasMultiplas(materiasTemp);
       }
-      
+
       editingSimulacao.aulas[index].materia = materiaFormatada;
       const tbody = document.getElementById('tbody-aulas-simulacao');
       tbody.innerHTML = renderAulasSimulacao(editingSimulacao.aulas);
@@ -2751,46 +2831,14 @@ const Simulacoes = (function() {
       showToast(`✅ Matérias atualizadas para: ${materiaFormatada}`, 'success');
       closeModal();
     });
-    
+
     btnCancelar.addEventListener('click', closeModal);
     btnClose.addEventListener('click', closeModal);
-    
-    btnOpcoes.forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        const materia = btn.dataset.materia;
-        
-        if (materia === 'A definir') {
-          // Ao clicar em "A definir", desselecionar todas as outras
-          temADefinirTemp = !temADefinirTemp;
-          materiasTemp = [];
-        } else {
-          // Ao clicar em uma matéria normal, desselecionar "A definir"
-          temADefinirTemp = false;
-          
-          const idx = materiasTemp.indexOf(materia);
-          if (idx > -1) {
-            // Remover se já está selecionada
-            materiasTemp.splice(idx, 1);
-          } else {
-            // Adicionar se não exceder limite de 5
-            if (materiasTemp.length < 5) {
-              materiasTemp.push(materia);
-            } else {
-              showToast('⚠️ Máximo de 5 matérias atingido', 'warning');
-              return;
-            }
-          }
-        }
-        
-        atualizarExibicao();
-      });
-    });
-    
+
     modal.addEventListener('click', (e) => {
       if (e.target === modal) closeModal();
     });
-    
+
     const escHandler = (e) => {
       if (e.key === 'Escape') closeModal();
     };

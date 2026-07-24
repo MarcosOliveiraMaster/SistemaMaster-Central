@@ -526,15 +526,6 @@ const BancoDeAulasCards = (function() {
                     <i class="fas fa-calendar-alt"></i>
                   </button>
                   <button
-                    id="btnRemoverAula"
-                    class="btn-secondary btn-compact"
-                    data-codigo-contratacao="${aula.codigoContratacao}"
-                    title="Remover aulas do cronograma"
-                  >
-                    <i class="fas fa-trash mr-2"></i>
-                    Remover aula
-                  </button>
-                  <button
                     id="btnAdicionarAula"
                     class="btn-primary btn-compact"
                     data-codigo-contratacao="${aula.codigoContratacao}"
@@ -2181,11 +2172,12 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
             <th class="text-center">Aula concluída</th>
             <th class="text-center">Relatório</th>
             <th>Observações</th>
+            <th class="text-center">Ações</th>
           </tr>
         </thead>
         <tbody id="tbody-aulas-detalhadas">
           <tr>
-            <td colspan="11" class="text-center py-8">
+            <td colspan="12" class="text-center py-8">
               <div class="flex flex-col items-center justify-center">
                 <div class="loading-spinner-large mb-3"></div>
                 <p class="text-orange-500 font-comfortaa font-bold">Carregando aulas...</p>
@@ -2217,7 +2209,7 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
       if (!aulas || aulas.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="11" class="text-center py-8">
+            <td colspan="12" class="text-center py-8">
               <i class="fas fa-inbox text-3xl text-gray-300 mb-3"></i>
               <p class="text-gray-500">Nenhuma aula encontrada para este código</p>
             </td>
@@ -2359,6 +2351,14 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
                 <span class="sr-only">${aula.ObservacoesAula ? 'Ver observação' : 'Sem observação'}</span>
               </button>
             </td>
+            <td class="text-center">
+              <button type="button" class="btn-copiar-aula-detalhe text-blue-500 hover:text-blue-700 mr-2" data-id-aula="${aula['id-Aula']}" title="Copiar aula">
+                <i class="fas fa-copy"></i>
+              </button>
+              <button type="button" class="btn-excluir-aula-detalhe text-red-500 hover:text-red-700" data-id-aula="${aula['id-Aula']}" title="Excluir aula">
+                <i class="fas fa-trash"></i>
+              </button>
+            </td>
           </tr>
         `;
       });
@@ -2465,7 +2465,7 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
       console.error('❌ Erro ao carregar aulas detalhadas:', error);
       tbody.innerHTML = `
         <tr>
-          <td colspan="11" class="text-center py-8">
+          <td colspan="12" class="text-center py-8">
             <i class="fas fa-exclamation-triangle text-3xl text-orange-500 mb-3"></i>
             <p class="text-gray-500">Erro ao carregar aulas</p>
             <p class="text-sm text-gray-400 mt-1">${error.message}</p>
@@ -2504,6 +2504,44 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
       });
     });
     
+    // Botões de copiar aula
+    document.querySelectorAll('.btn-copiar-aula-detalhe').forEach(btn => {
+      btn.addEventListener('click', async function() {
+        const idAula = this.dataset.idAula;
+        const codigoContratacao = (_aulaDetalhesAtual || {}).codigoContratacao || '';
+        try {
+          const novoIdAula = await BANCO.copiarAulaLista(idAula);
+          showToast(`✅ Aula copiada com sucesso! ID: ${novoIdAula}`, 'success');
+          if (codigoContratacao) await loadAulasDetalhadas(codigoContratacao);
+        } catch (error) {
+          console.error('❌ Erro ao copiar aula:', error);
+          showToast('❌ Erro ao copiar aula: ' + error.message, 'error');
+        }
+      });
+    });
+
+    // Botões de excluir aula
+    document.querySelectorAll('.btn-excluir-aula-detalhe').forEach(btn => {
+      btn.addEventListener('click', async function() {
+        const idAula = this.dataset.idAula;
+        const codigoContratacao = (_aulaDetalhesAtual || {}).codigoContratacao || '';
+        const confirmar = await showConfirmDialog(
+          'Excluir aula',
+          `Tem certeza que deseja excluir a aula <strong>${idAula}</strong>? Esta ação não pode ser desfeita.`,
+          { textoSim: 'Excluir' }
+        );
+        if (!confirmar) return;
+        try {
+          await BANCO.deleteAulaByIdAula(idAula);
+          showToast('✅ Aula excluída com sucesso', 'success');
+          if (codigoContratacao) await loadAulasDetalhadas(codigoContratacao);
+        } catch (error) {
+          console.error('❌ Erro ao excluir aula:', error);
+          showToast('❌ Erro ao excluir aula: ' + error.message, 'error');
+        }
+      });
+    });
+
     // Botões de status
     document.querySelectorAll('.btn-status-aula').forEach(btn => {
       btn.addEventListener('click', function(e) {
@@ -2546,11 +2584,11 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
     
     // Botões de matéria
     document.querySelectorAll('.btn-materia-aula').forEach(btn => {
-      btn.addEventListener('click', function(e) {
+      btn.addEventListener('click', async function(e) {
         e.stopPropagation();
         const idAula = this.dataset.idAula;
         const materiaAtual = this.dataset.materia;
-        showMateriaModal(idAula, materiaAtual);
+        await showMateriaModal(idAula, materiaAtual);
       });
     });
     
@@ -2598,16 +2636,6 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
       });
     }
     
-    // Botão de remover aula
-    const btnRemoverAula = document.getElementById('btnRemoverAula');
-    if (btnRemoverAula) {
-      btnRemoverAula.addEventListener('click', function(e) {
-        e.stopPropagation();
-        const codigoContratacao = this.dataset.codigoContratacao;
-        showRemoverAulaModal(codigoContratacao);
-      });
-    }
-
     // Botão de visualização do calendário
     const btnVisualizacaoCalendario = document.getElementById('btnVisualizacaoCalendario');
     if (btnVisualizacaoCalendario) {
@@ -2623,7 +2651,9 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
           } else {
             aulasParaCalendario = (_aulaDetalhesAtual || {}).aulas || [];
           }
+          const disciplinasCalendario = await DisciplinasStore.getAll();
           showVisualizacaoCalendarioModal(aulasParaCalendario, {
+            disciplinas: disciplinasCalendario,
             getAulas: codigoCont
               ? async () => BANCO.fetchBancoDeAulasLista(codigoCont)
               : null,
@@ -3482,17 +3512,13 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
   }
   
   // Função para mostrar modal de alteração de matéria da aula - MÚLTIPLAS SELEÇÕES
-  function showMateriaModal(idAula, materiasAtual) {
-    const materias = [
-      "Biologia", "Ciências", "Filosofia", "Física", "Geografia",
-      "História", "Língua Portuguesa", "Língua Inglesa", "Matemática", 
-      "Química", "Redação", "Sociologia", "Pedagogia"
-    ].sort();
-    
+  async function showMateriaModal(idAula, materiasAtual) {
+    let disciplinas = await DisciplinasStore.getAll(); // [{id, nome}]
+
     // Parsear matérias atuais (pode ser string única ou formatada com ", " e "e" ou "A definir")
     let materiasArray = [];
     let temADefinir = false;
-    
+
     if (materiasAtual) {
       if (Array.isArray(materiasAtual)) {
         materiasArray = materiasAtual;
@@ -3509,42 +3535,14 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
         }
       }
     }
-    
+
     // Se não tem matérias e não tem "A definir", então está vazio = "A definir"
     if (materiasArray.length === 0 && !temADefinir && !materiasAtual) {
       temADefinir = true;
     }
-    
-    // Criar opção "A definir" primeiro
-    const btnADefinir = `
-      <button 
-        class="materia-option-btn ${temADefinir ? 'bg-blue-500 text-white border-blue-600 hover:bg-blue-600' : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'} border-2 rounded-lg px-4 py-3 font-medium transition-all duration-200 transform hover:scale-105 text-sm whitespace-nowrap"
-        data-materia="A definir"
-      >
-        A definir
-        ${temADefinir ? '<i class="fas fa-check ml-2"></i>' : ''}
-      </button>
-    `;
-    
-    const opcoesHtml = materias.map(materia => {
-      const isAtual = materiasArray.includes(materia);
-      const buttonClass = isAtual 
-        ? 'bg-green-500 text-white border-green-600 hover:bg-green-600' 
-        : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200';
-      
-      return `
-        <button 
-          class="materia-option-btn ${buttonClass} border-2 rounded-lg px-4 py-3 font-medium transition-all duration-200 transform hover:scale-105 text-sm whitespace-nowrap"
-          data-materia="${materia}"
-        >
-          ${materia}
-          ${isAtual ? '<i class="fas fa-check ml-2"></i>' : ''}
-        </button>
-      `;
-    }).join('');
-    
+
     const materiaAtualFormatada = temADefinir ? 'A definir' : (formatarMateriasMultiplas(materiasArray) || 'Nenhuma');
-    
+
     const modalHtml = `
       <div class="modal-overlay" id="materiaModal" style="z-index: 10000;">
         <div class="modal-container" style="max-width: 900px;">
@@ -3557,7 +3555,7 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
               <i class="fas fa-times"></i>
             </button>
           </div>
-          
+
           <div class="modal-body" style="max-height: 500px; overflow-y: auto;">
             <div class="space-y-4">
               <div class="bg-orange-50 border border-orange-200 rounded-lg p-3">
@@ -3567,19 +3565,16 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
                   <span class="text-xs text-gray-500 ml-2" id="contadorMaterias">${temADefinir ? '(especial)' : `(${materiasArray.length}/5)`}</span>
                 </p>
               </div>
-              
+
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-3">
-                  Selecione as matérias (máximo 5):
+                  Selecione as matérias (máximo 5) — clique com o botão direito para excluir:
                 </label>
-                <div class="grid grid-cols-4 gap-3">
-                  ${btnADefinir}
-                  ${opcoesHtml}
-                </div>
+                <div class="grid grid-cols-4 gap-3" id="gridMaterias"></div>
               </div>
             </div>
           </div>
-          
+
           <div class="modal-footer">
             <button id="btnConfirmarMaterias" class="btn-primary btn-compact">
               Confirmar
@@ -3591,27 +3586,27 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
         </div>
       </div>
     `;
-    
+
     const modalContainer = document.createElement('div');
     modalContainer.innerHTML = modalHtml;
     document.body.appendChild(modalContainer);
-    
+
     const modal = modalContainer.querySelector('#materiaModal');
     const btnConfirmar = modal.querySelector('#btnConfirmarMaterias');
     const btnCancelar = modal.querySelector('#btnCancelarMateria');
     const btnClose = modal.querySelector('.modal-close');
-    const btnOpcoes = modal.querySelectorAll('.materia-option-btn');
     const labelFormatadas = modal.querySelector('#materiasFormatadas');
     const contadorEl = modal.querySelector('#contadorMaterias');
-    
+    const gridEl = modal.querySelector('#gridMaterias');
+
     let materiasTemp = [...materiasArray];
-    
+
     const atualizarExibicao = () => {
       labelFormatadas.textContent = formatarMateriasMultiplas(materiasTemp) || 'Nenhuma';
       contadorEl.textContent = `(${materiasTemp.length}/5)`;
-      
+
       // Atualizar visual dos botões
-      btnOpcoes.forEach(btn => {
+      gridEl.querySelectorAll('.materia-option-btn').forEach(btn => {
         const materia = btn.dataset.materia;
         if (materiasTemp.includes(materia)) {
           btn.classList.remove('bg-gray-100', 'text-gray-700', 'border-gray-300', 'hover:bg-gray-200');
@@ -3627,24 +3622,124 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
         }
       });
     };
-    
+
+    const renderGrid = () => {
+      const btnADefinir = `
+        <button
+          class="materia-option-btn ${temADefinir ? 'bg-blue-500 text-white border-blue-600 hover:bg-blue-600' : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'} border-2 rounded-lg px-4 py-3 font-medium transition-all duration-200 transform hover:scale-105 text-sm whitespace-nowrap"
+          data-materia="A definir"
+        >
+          A definir
+          ${temADefinir ? '<i class="fas fa-check ml-2"></i>' : ''}
+        </button>
+      `;
+
+      const opcoesHtml = disciplinas.map(d => {
+        const isAtual = materiasTemp.includes(d.nome);
+        const buttonClass = isAtual
+          ? 'bg-green-500 text-white border-green-600 hover:bg-green-600'
+          : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200';
+
+        return `
+          <button
+            class="materia-option-btn ${buttonClass} border-2 rounded-lg px-4 py-3 font-medium transition-all duration-200 transform hover:scale-105 text-sm whitespace-nowrap"
+            data-materia="${d.nome}"
+            data-disc-id="${d.id}"
+          >
+            ${d.nome}
+            ${isAtual ? '<i class="fas fa-check ml-2"></i>' : ''}
+          </button>
+        `;
+      }).join('');
+
+      const btnNovaDisciplina = `
+        <button
+          type="button"
+          id="btnNovaDisciplinaMateria"
+          class="border-2 border-dashed border-gray-300 text-gray-500 rounded-lg px-4 py-3 font-medium transition-all duration-200 hover:border-orange-400 hover:text-orange-500 text-sm whitespace-nowrap"
+        >
+          <i class="fas fa-plus mr-1"></i>Nova Disciplina
+        </button>
+      `;
+
+      gridEl.innerHTML = btnADefinir + opcoesHtml + btnNovaDisciplina;
+
+      gridEl.querySelectorAll('.materia-option-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const materia = btn.dataset.materia;
+          const idx = materiasTemp.indexOf(materia);
+
+          if (idx > -1) {
+            materiasTemp.splice(idx, 1);
+          } else {
+            if (materiasTemp.length < 5) {
+              materiasTemp.push(materia);
+            } else {
+              showToast('⚠️ Máximo de 5 matérias atingido', 'warning');
+              return;
+            }
+          }
+
+          atualizarExibicao();
+        });
+
+        // Botão direito -> excluir da lista de disciplinas (não se aplica à opção "A definir")
+        if (btn.dataset.discId) {
+          btn.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            const discId = btn.dataset.discId;
+            const nome = btn.dataset.materia;
+            showExcluirDisciplinaMenu(e.clientX, e.clientY, { id: discId, nome }, () => {
+              disciplinas = disciplinas.filter(d => d.id !== discId);
+              const tIdx = materiasTemp.indexOf(nome);
+              if (tIdx > -1) materiasTemp.splice(tIdx, 1);
+              renderGrid();
+              atualizarExibicao();
+            });
+          });
+        }
+      });
+
+      gridEl.querySelector('#btnNovaDisciplinaMateria').addEventListener('click', () => {
+        showNovaDisciplinaModal({
+          onAdicionarNaLista: async (nome) => {
+            disciplinas = await DisciplinasStore.getAll();
+            if (materiasTemp.length < 5) materiasTemp.push(nome);
+            renderGrid();
+            atualizarExibicao();
+          },
+          onApenasNestaAula: (nome) => {
+            if (materiasTemp.length < 5) {
+              materiasTemp.push(nome);
+              atualizarExibicao();
+            } else {
+              showToast('⚠️ Máximo de 5 matérias atingido', 'warning');
+            }
+          }
+        });
+      });
+    };
+
+    renderGrid();
+
     const closeModal = () => {
       modalContainer.remove();
     };
-    
+
     btnConfirmar.addEventListener('click', async () => {
       if (materiasTemp.length === 0) {
         showToast('⚠️ Selecione ao menos uma matéria', 'warning');
         return;
       }
-      
+
       const materiaFormatada = formatarMateriasMultiplas(materiasTemp);
-      
+
       try {
         await BANCO.updateMateriaAula(idAula, materiaFormatada);
         showToast(`✅ Matérias atualizadas para: ${materiaFormatada}`, 'success');
         closeModal();
-        
+
         // Recarregar a tabela
         const tbody = document.getElementById('tbody-aulas-detalhadas');
         if (tbody) {
@@ -3659,7 +3754,7 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
             </tr>
           `;
         }
-        
+
         // Buscar o código de contratação do modal aberto
         const modalOverlay = document.querySelector('.modal-overlay');
         if (modalOverlay && modalOverlay.id !== 'materiaModal') {
@@ -3677,37 +3772,14 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
         showToast('❌ Erro ao alterar matérias', 'error');
       }
     });
-    
+
     btnCancelar.addEventListener('click', closeModal);
     btnClose.addEventListener('click', closeModal);
-    
-    btnOpcoes.forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        const materia = btn.dataset.materia;
-        const idx = materiasTemp.indexOf(materia);
-        
-        if (idx > -1) {
-          // Remover se já está selecionada
-          materiasTemp.splice(idx, 1);
-        } else {
-          // Adicionar se não exceder limite de 5
-          if (materiasTemp.length < 5) {
-            materiasTemp.push(materia);
-          } else {
-            showToast('⚠️ Máximo de 5 matérias atingido', 'warning');
-            return;
-          }
-        }
-        
-        atualizarExibicao();
-      });
-    });
-    
+
     modal.addEventListener('click', (e) => {
       if (e.target === modal) closeModal();
     });
-    
+
     const escHandler = (e) => {
       if (e.key === 'Escape') closeModal();
     };
@@ -6011,242 +6083,6 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
       }
     };
     document.addEventListener('keydown', escHandler);
-  }
-  
-  // Função para abrir modal de remoção de aulas
-  async function showRemoverAulaModal(codigoContratacao) {
-    console.log('🗑️ Abrindo modal de remoção de aulas para código:', codigoContratacao);
-    
-    try {
-      // Buscar aulas da contratação específica
-      const aulas = await BANCO.fetchBancoDeAulasLista(codigoContratacao);
-      
-      if (!aulas || aulas.length === 0) {
-        showToast('❌ Nenhuma aula encontrada para esta contratação', 'error');
-        return;
-      }
-      
-      // Ordenar aulas por data
-      aulas.sort((a, b) => {
-        const dataA = a.data || '';
-        const dataB = b.data || '';
-        const parseData = (dataStr) => {
-          if (!dataStr) return new Date(0);
-          // Prefixo do dia da semana é ignorado (abreviações acentuadas como "sáb" não casam com \w)
-          const match = dataStr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-          if (!match) return new Date(0);
-          const dia = parseInt(match[1]);
-          const mes = parseInt(match[2]) - 1;
-          const ano = parseInt(match[3]);
-          return new Date(ano, mes, dia);
-        };
-        return parseData(dataA).getTime() - parseData(dataB).getTime();
-      });
-      
-      // Criar linhas da tabela
-      let linhasHtml = '';
-      aulas.forEach((aula, index) => {
-        const statusClass = getStatusBadgeClass(aula.StatusAula || 'Pendente');
-        linhasHtml += `
-          <tr class="aula-row-remove" data-id-aula="${aula['id-Aula']}" data-doc-id="${aula.id}">
-            <td class="py-2 px-3 text-center">
-              <input type="checkbox" class="checkbox-remove-aula w-4 h-4 cursor-pointer" data-id-aula="${aula['id-Aula']}" data-doc-id="${aula.id}">
-            </td>
-            <td class="py-2 px-3 text-sm">${aula.data || '--'}</td>
-            <td class="py-2 px-3 text-sm text-center">${aula.horario || '--'}</td>
-            <td class="py-2 px-3 text-sm text-center">${aula.duracao || '--'}</td>
-            <td class="py-2 px-3 text-sm">${aula.materia || '--'}</td>
-            <td class="py-2 px-3 text-sm">${aula.professor || 'A definir'}</td>
-            <td class="py-2 px-3">
-              <span class="status-badge ${statusClass} text-xs px-2 py-1">
-                ${aula.StatusAula || 'Pendente'}
-              </span>
-            </td>
-          </tr>
-        `;
-      });
-      
-      const modalHtml = `
-        <div class="modal-overlay" id="removerAulaModal">
-          <div class="modal-container max-w-6xl">
-            <div class="modal-header">
-              <h3 class="font-lexend font-bold text-lg text-gray-800">
-                <i class="fas fa-trash-alt text-red-500 mr-2"></i>
-                Selecione as aulas que gostaria de excluir
-              </h3>
-              <button class="modal-close text-gray-400 hover:text-gray-600">
-                <i class="fas fa-times"></i>
-              </button>
-            </div>
-            
-            <div class="modal-body">
-              <div class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start">
-                <i class="fas fa-exclamation-triangle text-yellow-600 mr-3 mt-1"></i>
-                <div>
-                  <p class="text-sm text-yellow-800 font-medium">Atenção!</p>
-                  <p class="text-xs text-yellow-700 mt-1">As aulas selecionadas serão excluídas permanentemente do banco de dados.</p>
-                </div>
-              </div>
-              
-              <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
-                  <thead>
-                    <tr class="bg-gray-100 border-b border-gray-200">
-                      <th class="py-3 px-3 text-xs font-semibold text-gray-600 text-center">
-                        <input type="checkbox" id="select-all-aulas" class="w-4 h-4 cursor-pointer" title="Selecionar todas">
-                      </th>
-                      <th class="py-3 px-3 text-xs font-semibold text-gray-600">Data da Aula</th>
-                      <th class="py-3 px-3 text-xs font-semibold text-gray-600 text-center">Horário</th>
-                      <th class="py-3 px-3 text-xs font-semibold text-gray-600 text-center">Duração</th>
-                      <th class="py-3 px-3 text-xs font-semibold text-gray-600">Matéria</th>
-                      <th class="py-3 px-3 text-xs font-semibold text-gray-600">Professor</th>
-                      <th class="py-3 px-3 text-xs font-semibold text-gray-600">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody id="tbody-remover-aulas">
-                    ${linhasHtml}
-                  </tbody>
-                </table>
-              </div>
-              
-              <div class="mt-4 text-sm text-gray-600">
-                <span id="count-selected-aulas">0</span> aula(s) selecionada(s)
-              </div>
-            </div>
-            
-            <div class="modal-footer">
-              <button id="btn-cancelar-remover" class="btn-secondary">
-                <i class="fas fa-times mr-2"></i>
-                Cancelar
-              </button>
-              <button id="btn-confirmar-remover" class="btn-danger" disabled>
-                <i class="fas fa-trash-alt mr-2"></i>
-                Excluir Aulas
-              </button>
-            </div>
-          </div>
-        </div>
-      `;
-      
-      // Adicionar modal ao DOM
-      document.body.insertAdjacentHTML('beforeend', modalHtml);
-      
-      const modal = document.getElementById('removerAulaModal');
-      const btnCancelar = document.getElementById('btn-cancelar-remover');
-      const btnConfirmar = document.getElementById('btn-confirmar-remover');
-      const selectAll = document.getElementById('select-all-aulas');
-      const countSelected = document.getElementById('count-selected-aulas');
-
-      // Helper para obter checkboxes atuais (em caso de re-render)
-      const getCheckboxes = () => Array.from(modal.querySelectorAll('.checkbox-remove-aula'));
-      
-      // Função para atualizar contador e estado do botão
-      function updateSelection() {
-        const checkboxesNow = getCheckboxes();
-        const selected = modal.querySelectorAll('.checkbox-remove-aula:checked');
-        countSelected.textContent = selected.length;
-        btnConfirmar.disabled = selected.length === 0;
-
-        // Atualizar checkbox "selecionar todos"
-        selectAll.checked = selected.length === checkboxesNow.length && checkboxesNow.length > 0;
-        selectAll.indeterminate = selected.length > 0 && selected.length < checkboxesNow.length;
-      }
-      
-      // Evento para selecionar/desselecionar todos
-      selectAll.addEventListener('change', function() {
-        const checkboxesNow = getCheckboxes();
-        checkboxesNow.forEach(cb => {
-          cb.checked = this.checked;
-          const row = cb.closest('tr');
-          if (this.checked) row.classList.add('bg-red-50'); else row.classList.remove('bg-red-50');
-        });
-        updateSelection();
-      });
-      
-      // Usar event delegation para lidar com checkboxes individuais dinamicamente
-      modal.addEventListener('change', (e) => {
-        if (e.target && e.target.classList && e.target.classList.contains('checkbox-remove-aula')) {
-          const cb = e.target;
-          const row = cb.closest('tr');
-          if (cb.checked) row.classList.add('bg-red-50'); else row.classList.remove('bg-red-50');
-          updateSelection();
-        }
-      });
-      
-      // Botão cancelar
-      btnCancelar.addEventListener('click', () => {
-        modal.remove();
-      });
-      
-      // Botão fechar (X)
-      modal.querySelector('.modal-close').addEventListener('click', () => {
-        modal.remove();
-      });
-      
-      // Botão confirmar exclusão
-      btnConfirmar.addEventListener('click', async () => {
-        const selected = modal.querySelectorAll('.checkbox-remove-aula:checked');
-        
-        if (selected.length === 0) {
-          showToast('⚠️ Selecione pelo menos uma aula para excluir', 'warning');
-          return;
-        }
-        
-        // Confirmar exclusão
-        const confirmacao = confirm(`Tem certeza que deseja excluir ${selected.length} aula(s)? Esta ação não pode ser desfeita.`);
-        if (!confirmacao) return;
-        
-        // Mostrar loading
-        btnConfirmar.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Excluindo...';
-        btnConfirmar.disabled = true;
-        btnCancelar.disabled = true;
-        
-        try {
-          // Coletar IDs das aulas selecionadas
-          const idsAulas = Array.from(selected).map(cb => cb.dataset.idAula);
-          const docIds = Array.from(selected).map(cb => cb.dataset.docId).filter(x => x);
-
-          console.log('🗑️ Excluindo aulas (id-Aula):', idsAulas, ' docIds:', docIds);
-
-          if (!window.BANCO || typeof window.BANCO.deleteAulasLista !== 'function') {
-            throw new Error('Função BANCO.deleteAulasLista não disponível');
-          }
-
-          // Excluir aulas do banco de dados
-          await BANCO.deleteAulasLista(docIds);
-          
-          showToast(`✅ ${selected.length} aula(s) excluída(s) com sucesso`, 'success');
-          
-          // Fechar modal
-          modal.remove();
-          
-          // Recarregar lista de aulas
-          if (typeof loadBancoDeAulas === 'function') {
-            loadBancoDeAulas();
-          }
-          
-          // Recarregar o modal de detalhes caso esteja aberto (atualiza tabela e displays)
-          try {
-            const detalhesContainer = document.querySelector('.modal-container.max-w-6xl');
-            if (detalhesContainer) {
-              // mantém o modal de detalhes aberto e apenas recarrega a tabela
-              await loadAulasDetalhadas(codigoContratacao);
-            }
-          } catch (e) { console.warn('Erro ao recarregar detalhes após exclusão', e); }
-          
-        } catch (error) {
-          console.error('❌ Erro ao excluir aulas:', error);
-          showToast('❌ Erro ao excluir aulas. Tente novamente.', 'error');
-          btnConfirmar.innerHTML = '<i class="fas fa-trash-alt mr-2"></i>Excluir Aulas';
-          btnConfirmar.disabled = false;
-          btnCancelar.disabled = false;
-        }
-      });
-      
-    } catch (error) {
-      console.error('❌ Erro ao carregar aulas:', error);
-      showToast('❌ Erro ao carregar aulas. Tente novamente.', 'error');
-    }
   }
   
   // Função para animar contador

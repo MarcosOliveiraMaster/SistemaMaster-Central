@@ -1,12 +1,5 @@
 console.log('✅ functions-calendario-visual.js carregado');
 
-const DISCIPLINAS_CAL = [
-  "Biologia", "Ciências", "Ciências da Natureza", "Ciências Humanas",
-  "Filosofia", "Física", "Geografia", "História",
-  "Língua Inglesa", "Língua Portuguesa", "Matemática",
-  "Pedagogia", "Química", "Redação", "Sociologia"
-];
-
 const MESES_CAL = [
   'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
   'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'
@@ -65,6 +58,9 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
   let dragCtrlHeld   = false;
   let isDraggingCard = false;
   let isDraggingWeek = false;
+
+  // Lista de disciplinas (carregada pelo chamador via DisciplinasStore.getAll())
+  let disciplinasCal = [...(options.disciplinas || [])];
 
   // Pré-popular com aulas existentes
   (aulasArray || []).forEach((a, origIdx) => {
@@ -153,13 +149,7 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
                 <i class="fas fa-book text-orange-500 mr-1"></i> Disciplinas
               </h4>
               <p class="text-xs text-gray-400 mb-2">Arraste para um dia</p>
-              <div class="cal-disciplinas-list" id="disciplinasList">
-                ${DISCIPLINAS_CAL.map(d => `
-                  <div class="cal-disciplina-card" draggable="true" data-disciplina="${d}" title="${d}">
-                    <i class="fas fa-grip-vertical text-gray-300 text-xs"></i>
-                    <span>${d}</span>
-                  </div>`).join('')}
-              </div>
+              <div class="cal-disciplinas-list" id="disciplinasList"></div>
             </div>
             <div class="cal-right-footer">
               <button id="calBtnSalvar" class="btn-primary btn-compact">
@@ -430,6 +420,57 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
   }
 
   // getContrastColor está em escopo de módulo
+
+  // ── Painel lateral de disciplinas (arrastar / nova / excluir) ──
+  function renderDisciplinasList() {
+    const listEl = overlay.querySelector('#disciplinasList');
+    if (!listEl) return;
+
+    const cardsHtml = disciplinasCal.map(d => `
+      <div class="cal-disciplina-card" draggable="true" data-disciplina="${d.nome}" data-disc-id="${d.id ?? ''}" title="${d.nome}">
+        <i class="fas fa-grip-vertical text-gray-300 text-xs"></i>
+        <span>${d.nome}</span>
+      </div>`).join('');
+
+    const novaHtml = `
+      <div class="cal-disciplina-card cal-disciplina-nova" id="calBtnNovaDisciplina" title="Nova disciplina" style="cursor:pointer;justify-content:center;border-style:dashed;">
+        <i class="fas fa-plus text-orange-400 text-xs"></i>
+        <span>Nova Disciplina</span>
+      </div>`;
+
+    listEl.innerHTML = cardsHtml + novaHtml;
+
+    listEl.querySelectorAll('.cal-disciplina-card[data-disc-id]:not(.cal-disciplina-nova)').forEach(card => {
+      card.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const discId = card.dataset.discId;
+        const nome = card.dataset.disciplina;
+        if (!discId) return; // disciplina temporária desta sessão, não persistida
+        showExcluirDisciplinaMenu(e.clientX, e.clientY, { id: discId, nome }, () => {
+          disciplinasCal = disciplinasCal.filter(d => d.id !== discId);
+          renderDisciplinasList();
+          setupDragDrop();
+        });
+      });
+    });
+
+    listEl.querySelector('#calBtnNovaDisciplina').addEventListener('click', () => {
+      showNovaDisciplinaModal({
+        onAdicionarNaLista: async (nome) => {
+          disciplinasCal = await DisciplinasStore.getAll();
+          renderDisciplinasList();
+          setupDragDrop();
+        },
+        onApenasNestaAula: (nome) => {
+          // Card temporário (id null) — só existe nesta sessão do calendário, não persiste
+          disciplinasCal = [...disciplinasCal, { id: null, nome }];
+          renderDisciplinasList();
+          setupDragDrop();
+        }
+      });
+    });
+  }
 
   // ── Drag & Drop ──────────────────────────────────────────
   function setupDragDrop() {
@@ -834,6 +875,7 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
     m.addEventListener('click', (e) => { if (e.target === m) m.remove(); });
   }
 
+  renderDisciplinasList();
   renderCalendar();
 }
 
@@ -851,9 +893,7 @@ async function showModalAulasCalendarios(aulaData, onSave, onDelete = null) {
 
   const opcoesDuracao = ['1h00', '1h30', '2h00', '2h30', '3h00'];
 
-  const materiasHtml = DISCIPLINAS_CAL.map(m => `
-    <button class="mac-materia-btn${m === aulaData.materia ? ' mac-materia-sel' : ''}" data-materia="${m}">${m}</button>
-  `).join('');
+  let disciplinasMac = await DisciplinasStore.getAll();
 
   const duracaoHtml = opcoesDuracao.map(d => `
     <button class="mac-duracao-btn${d === aulaData.duracao ? ' mac-duracao-sel' : ''}" data-duracao="${d}">${d}</button>
@@ -888,9 +928,7 @@ async function showModalAulasCalendarios(aulaData, onSave, onDelete = null) {
             <label class="block text-sm font-semibold text-gray-700 mb-2">
               <i class="fas fa-book text-orange-500 mr-2"></i>Escolha a disciplina
             </label>
-            <div class="grid grid-cols-4 gap-2">
-              ${materiasHtml}
-            </div>
+            <div class="grid grid-cols-4 gap-2" id="mac-grid-materias"></div>
           </div>
 
           <!-- Horário + Duração -->
@@ -993,13 +1031,58 @@ async function showModalAulasCalendarios(aulaData, onSave, onDelete = null) {
     inputHorario.value = v;
   });
 
-  modal.querySelectorAll('.mac-materia-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      modal.querySelectorAll('.mac-materia-btn').forEach(b => b.classList.remove('mac-materia-sel'));
-      btn.classList.add('mac-materia-sel');
-      materiaSelected = btn.dataset.materia;
+  const gridMateriasEl = document.getElementById('mac-grid-materias');
+
+  const renderMateriasGrid = () => {
+    const materiasHtml = disciplinasMac.map(d => `
+      <button class="mac-materia-btn${d.nome === materiaSelected ? ' mac-materia-sel' : ''}" data-materia="${d.nome}" data-disc-id="${d.id ?? ''}">${d.nome}</button>
+    `).join('');
+
+    const novaHtml = `
+      <button type="button" id="mac-btn-nova-disciplina" class="mac-materia-btn" style="border-style:dashed;color:#9ca3af;">
+        <i class="fas fa-plus mr-1"></i>Nova
+      </button>`;
+
+    gridMateriasEl.innerHTML = materiasHtml + novaHtml;
+
+    gridMateriasEl.querySelectorAll('.mac-materia-btn[data-disc-id]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        gridMateriasEl.querySelectorAll('.mac-materia-btn').forEach(b => b.classList.remove('mac-materia-sel'));
+        btn.classList.add('mac-materia-sel');
+        materiaSelected = btn.dataset.materia;
+      });
+
+      const discId = btn.dataset.discId;
+      if (discId) {
+        btn.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          const nome = btn.dataset.materia;
+          showExcluirDisciplinaMenu(e.clientX, e.clientY, { id: discId, nome }, () => {
+            disciplinasMac = disciplinasMac.filter(d => d.id !== discId);
+            if (materiaSelected === nome) materiaSelected = '';
+            renderMateriasGrid();
+          });
+        });
+      }
     });
-  });
+
+    gridMateriasEl.querySelector('#mac-btn-nova-disciplina').addEventListener('click', () => {
+      showNovaDisciplinaModal({
+        onAdicionarNaLista: async (nome) => {
+          disciplinasMac = await DisciplinasStore.getAll();
+          materiaSelected = nome;
+          renderMateriasGrid();
+        },
+        onApenasNestaAula: (nome) => {
+          materiaSelected = nome;
+          disciplinasMac = [...disciplinasMac, { id: null, nome }];
+          renderMateriasGrid();
+        }
+      });
+    });
+  };
+
+  renderMateriasGrid();
 
   modal.querySelectorAll('.mac-duracao-btn').forEach(btn => {
     btn.addEventListener('click', () => {

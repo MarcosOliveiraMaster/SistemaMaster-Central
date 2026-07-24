@@ -2,3 +2,5 @@ node_modules/
 serviceAccountKey.json
 *.json.key
 .env
+simulacoes-documentacao.json
+banco-de-aulas-documentacao.json
