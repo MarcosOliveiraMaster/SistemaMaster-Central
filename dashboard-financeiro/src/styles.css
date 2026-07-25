@@ -1,0 +1,288 @@
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --border: rgba(11, 11, 11, 0.1);
+  --acento: #2a78d6;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --border: rgba(255, 255, 255, 0.1);
+    --acento: #3987e5;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.app {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 20px 40px;
+}
+
+.topo {
+  padding: 28px 0 8px;
+}
+
+.topo h1 {
+  margin: 0 0 4px;
+  font-size: 24px;
+}
+
+.topo p {
+  margin: 0;
+  color: var(--ink-2);
+  max-width: 70ch;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 20px;
+  align-items: start;
+  margin-top: 16px;
+}
+
+.conteudo {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.secao {
+  margin: 16px 0 0;
+  font-size: 19px;
+}
+
+.nota-holt {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.card h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.card h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.card .subtitulo {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.card-cabecalho {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.card-acoes {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+button {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--ink-2);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--acento);
+  color: var(--acento);
+}
+
+/* ---- tabela ---- */
+
+.tabela-envelope {
+  overflow-x: auto;
+  max-height: 420px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  text-align: left;
+  color: var(--ink-2);
+  font-weight: 600;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--grid);
+  white-space: nowrap;
+}
+
+tbody td {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--grid);
+  white-space: nowrap;
+}
+
+tbody tr:hover {
+  background: color-mix(in srgb, var(--acento) 6%, transparent);
+}
+
+tfoot td {
+  padding: 8px 12px;
+  font-weight: 600;
+  border-top: 2px solid var(--grid);
+  background: var(--surface);
+  position: sticky;
+  bottom: 0;
+  white-space: nowrap;
+}
+
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.aprox {
+  color: var(--muted);
+}
+
+/* ---- filtros (coluna à direita) ---- */
+
+.filtros {
+  position: sticky;
+  top: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.filtros h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.filtros fieldset {
+  border: none;
+  margin: 0;
+  padding: 0;
+}
+
+.filtros legend {
+  padding: 0;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.filtro-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  cursor: pointer;
+}
+
+.filtro-check input {
+  accent-color: var(--acento);
+  width: 15px;
+  height: 15px;
+}
+
+.filtro-slider {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.filtro-slider span {
+  display: block;
+  font-size: 12px;
+  color: var(--ink-2);
+  margin-bottom: 2px;
+}
+
+.filtro-slider input[type='range'] {
+  width: 100%;
+  accent-color: var(--acento);
+}
+
+.filtro-nota {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.rodape {
+  margin-top: 28px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.rodape p {
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .filtros {
+    position: static;
+    order: -1;
+  }
+}
