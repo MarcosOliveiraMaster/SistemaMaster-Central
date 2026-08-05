@@ -1532,7 +1532,7 @@
   background: white;
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  max-width: 90vw;
+  max-width: 95vw;
   max-height: 90vh;
   width: 100%;
   overflow: hidden;
@@ -1623,7 +1623,7 @@
 }
 
 .table-wrapper {
-  overflow-x: auto;
+  overflow-x: scroll;
   overflow-y: auto;
   max-height: 400px;
   scrollbar-width: thin;
@@ -3718,6 +3718,53 @@ h2, h3, h4, h5, h6 {
 .sol-cal-card-mat {
   font-weight: 700;
   display: block;
+}
+
+/* -------------------- VERIFICAR DATAS (feriados / conflito de agenda) -------------------- */
+.verif-datas-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  cursor: default;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  position: relative;
+}
+
+.verif-datas-dot.verif-neutro   { background-color: #D1D5DB; }
+.verif-datas-dot.verif-verde    { background-color: #10B981; }
+.verif-datas-dot.verif-amarelo  { background-color: #F59E0B; }
+.verif-datas-dot.verif-vermelho { background-color: #EF4444; }
+
+.verif-datas-dot.verif-checando {
+  animation: verifPulse 1s ease-in-out infinite;
+}
+
+@keyframes verifPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* Tooltip global (data-tooltip): elemento real anexado ao <body> via JS (script.js),
+   position:fixed, para não ser recortado por ancestrais com overflow:hidden/scroll/auto
+   (modais, tabelas roláveis etc.) — ver setupGlobalTooltips() em script.js */
+.global-tooltip {
+  position: fixed;
+  width: 10vw;
+  height: auto;
+  background: #ffffff;
+  color: var(--gray-dark);
+  font-family: 'Comfortaa', cursive;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  text-align: justify;
+  padding: 8px 10px;
+  border: 1px solid var(--orange);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  white-space: normal;
+  pointer-events: none;
+  z-index: 100000;
 }
 
 .sol-cal-card-prof {

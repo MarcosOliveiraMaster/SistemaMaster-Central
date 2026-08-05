@@ -441,16 +441,16 @@ async function loadAulasPainel(dataFiltro) {
           </td>
           <td class="px-2 py-3 text-sm text-center" onclick="event.stopPropagation()">
             <button
-              onclick="enviarLembreteCliente('${aula.id}', '${escapeHtml(aula.professor || '')}', '${escapeHtml(aula.data || '')}', '${escapeHtml(aula.horario || '')}', '${escapeHtml(aula.estudante || '')}', '${escapeHtml(aula.nomeCliente || '')}', '${escapeHtml(aula.materia || '')}')"
+              onclick="enviarLembreteCliente('${aula.id}', '${escapeHtml(aula.professor || '')}', '${escapeHtml(aula.data || '')}', '${escapeHtml(aula.horario || '')}', '${escapeHtml(aula.estudante || '')}', '${escapeHtml(aula.nomeCliente || '')}', '${escapeHtml(aula.materia || '')}', '${escapeHtml(aula.StatusAula || '')}')"
               class="text-blue-500 hover:text-blue-600 transition-colors p-1 rounded-full hover:bg-blue-50"
               title="Copiar Lembrete Professor"
             >
-              <i class="fas fa-chalkboard-teacher text-lg"></i>
+              <i class="fas fa-graduation-cap text-lg"></i>
             </button>
           </td>
           <td class="px-2 py-3 text-sm text-center" onclick="event.stopPropagation()">
             <button
-              onclick="enviarLembreteProfessor('${aula.id}', '${escapeHtml(aula.nomeCliente || '')}', '${escapeHtml(aula.professor || '')}', '${escapeHtml(aula.data || '')}', '${escapeHtml(aula.horario || '')}', '${escapeHtml(aula.materia || '')}')"
+              onclick="enviarLembreteProfessor('${aula.id}', '${escapeHtml(aula.nomeCliente || '')}', '${escapeHtml(aula.professor || '')}', '${escapeHtml(aula.data || '')}', '${escapeHtml(aula.horario || '')}', '${escapeHtml(aula.materia || '')}', '${escapeHtml(aula.StatusAula || '')}')"
               class="text-green-500 hover:text-green-600 transition-colors p-1 rounded-full hover:bg-green-50"
               title="Copiar Lembrete Cliente"
             >
@@ -694,7 +694,15 @@ window.salvarRelatorio_OLD = async function (id) {
 };
 
 // Funções de envio de lembrete
-window.enviarLembreteProfessor = async function (id, nomeCliente, nomeProfessor, dataAula, horarioAula, nomeMateria) {
+window.enviarLembreteProfessor = async function (id, nomeCliente, nomeProfessor, dataAula, horarioAula, nomeMateria, statusAula) {
+  if (statusAula === 'Reagendada' && typeof showConfirmDialog === 'function') {
+    const confirmou = await showConfirmDialog(
+      'Aula reagendada',
+      'Esta aula foi reagendada, deseja copiar o lembrete mesmo assim?'
+    );
+    if (!confirmou) return;
+  }
+
   // Helper para pegar apenas dois primeiros nomes
   const getDoisNomes = (nome) => {
     if (!nome) return '';
@@ -772,7 +780,15 @@ window.enviarLembreteProfessor = async function (id, nomeCliente, nomeProfessor,
   }
 };
 
-window.enviarLembreteCliente = async function (id, nomeProfessor, dataAula, horarioAula, nomeEstudante, nomeCliente, nomeMateria) {
+window.enviarLembreteCliente = async function (id, nomeProfessor, dataAula, horarioAula, nomeEstudante, nomeCliente, nomeMateria, statusAula) {
+  if (statusAula === 'Reagendada' && typeof showConfirmDialog === 'function') {
+    const confirmou = await showConfirmDialog(
+      'Aula reagendada',
+      'Esta aula foi reagendada, deseja copiar o lembrete mesmo assim?'
+    );
+    if (!confirmou) return;
+  }
+
   // Helper para pegar apenas dois primeiros nomes
   const getDoisNomes = (nome) => {
     if (!nome) return '';

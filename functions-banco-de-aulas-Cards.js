@@ -351,7 +351,7 @@ const BancoDeAulasCards = (function() {
     // Criar modal HTML
     const modalHtml = `
       <div class="modal-overlay">
-        <div class="modal-container max-w-6xl">
+        <div class="modal-container" style="max-width: 95vw; width: 95vw;">
           <div class="modal-header">
             <h3 class="font-lexend font-bold text-lg text-gray-800">
               <i class="fas fa-file-contract text-orange-500 mr-2"></i>
@@ -370,11 +370,12 @@ const BancoDeAulasCards = (function() {
           <div class="modal-body vertical-scroll-hidden">
             <!-- Informações do Cliente -->
             <div class="mb-6">
-              <h4 class="font-lexend font-bold text-base mb-3 text-gray-700">
-                <i class="fas fa-user-circle text-orange-500 mr-2"></i>
-                Informações do Cliente
-              </h4>
-              
+              <button type="button" id="toggle-info-cliente" class="w-full flex items-center justify-between font-lexend font-bold text-base mb-3 text-gray-700 cursor-pointer select-none bg-transparent border-0 p-0">
+                <span><i class="fas fa-user-circle text-orange-500 mr-2"></i>Informações do Cliente</span>
+                <i class="fas fa-chevron-down text-gray-400 text-sm" id="icon-info-cliente" style="transition: transform 0.2s ease;"></i>
+              </button>
+
+              <div id="body-info-cliente" class="hidden">
               <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <!-- Coluna 1: Dados básicos -->
                 <div class="space-y-3">
@@ -458,7 +459,11 @@ const BancoDeAulasCards = (function() {
                     </button>
                     <button id="btn-gerar-solicitacao" class="btn-secondary text-xs py-1.5 px-2 w-full">
                       <i class="fas fa-calendar-plus mr-1 text-xs"></i>
-                      <span class="text-xs">Solicitação</span>
+                      <span class="text-xs">Solicitação Cliente</span>
+                    </button>
+                    <button id="btn-gerar-solicitacao-professor" class="btn-secondary text-xs py-1.5 px-2 w-full">
+                      <i class="fas fa-chalkboard-teacher mr-1 text-xs"></i>
+                      <span class="text-xs">Solicitação Professor</span>
                     </button>
                     <button id="btn-ver-observacoes" class="btn-secondary text-xs py-1.5 px-2 w-full">
                       <i class="fas fa-eye mr-1 text-xs"></i>
@@ -474,6 +479,18 @@ const BancoDeAulasCards = (function() {
                     </button>
                   </div>
                 </div>
+              </div>
+
+              <!-- Estudantes cadastrados -->
+              <div class="mt-4 pt-4 border-t border-gray-100">
+                <div class="text-xs font-medium text-gray-500 mb-2">
+                  <i class="fas fa-user-graduate text-orange-500 mr-1"></i>
+                  Estudantes cadastrados
+                </div>
+                <div id="lista-estudantes-cliente" class="text-sm text-gray-800 space-y-1">
+                  <span class="text-gray-400">Carregando...</span>
+                </div>
+              </div>
               </div>
             </div>
 
@@ -523,8 +540,44 @@ const BancoDeAulasCards = (function() {
                     class="btn-secondary btn-compact"
                     title="Visualizar calendário de aulas"
                   >
-                    <i class="fas fa-calendar-alt"></i>
+                    <i class="fas fa-calendar-alt mr-2"></i>
+                    Vista Calendário
                   </button>
+                  <button
+                    type="button"
+                    id="btnVerificarDatas"
+                    class="btn-secondary btn-compact"
+                    title="Checar feriados e conflitos de agenda nas aulas desta contratação"
+                  >
+                    <i class="fas fa-calendar-check mr-2"></i>
+                    Verificar Datas
+                  </button>
+                  <div class="relative">
+                    <button
+                      type="button"
+                      id="btnColunasAula"
+                      class="btn-secondary btn-compact"
+                      title="Exibir ou ocultar colunas da tabela"
+                    >
+                      <i class="fas fa-sliders-h mr-2"></i>
+                      Colunas
+                      <i class="fas fa-chevron-down ml-2 text-xs"></i>
+                    </button>
+                    <div
+                      id="menuColunasAula"
+                      class="hidden"
+                      style="position:absolute; top:100%; left:0; margin-top:4px; background:#fff; border:1px solid #e5e7eb; border-radius:8px; box-shadow: var(--shadow-sm); padding:6px; z-index:20; min-width:170px;"
+                    >
+                      <label class="flex items-center gap-2 text-sm text-gray-700 py-1.5 px-2 hover:bg-gray-50 rounded cursor-pointer">
+                        <input type="checkbox" id="chkColunaEstudante" class="w-4 h-4">
+                        Estudantes
+                      </label>
+                      <label class="flex items-center gap-2 text-sm text-gray-700 py-1.5 px-2 hover:bg-gray-50 rounded cursor-pointer">
+                        <input type="checkbox" id="chkColunaValorAula" class="w-4 h-4">
+                        Valor da aula
+                      </label>
+                    </div>
+                  </div>
                   <button
                     id="btnAdicionarAula"
                     class="btn-primary btn-compact"
@@ -591,6 +644,17 @@ const BancoDeAulasCards = (function() {
         fullscreenBtn.title = 'Alternar tela cheia';
       }
     });
+
+    // Acordeon: Informações do Cliente (recolhido por padrão)
+    const toggleInfoCliente = modal.querySelector('#toggle-info-cliente');
+    const bodyInfoCliente = modal.querySelector('#body-info-cliente');
+    const iconInfoCliente = modal.querySelector('#icon-info-cliente');
+    if (toggleInfoCliente && bodyInfoCliente) {
+      toggleInfoCliente.addEventListener('click', () => {
+        const estaFechado = bodyInfoCliente.classList.toggle('hidden');
+        if (iconInfoCliente) iconInfoCliente.style.transform = estaFechado ? 'rotate(0deg)' : 'rotate(180deg)';
+      });
+    }
 
     modal.addEventListener('click', (e) => {
       if (e.target === modal) {
@@ -815,17 +879,28 @@ const BancoDeAulasCards = (function() {
       }
     });
     
-    // Configurar botão de gerar solicitação de aula
+    // Configurar botão de gerar solicitação de aula (Cliente)
     const btnGerarSolicitacao = modal.querySelector('#btn-gerar-solicitacao');
     btnGerarSolicitacao.addEventListener('click', () => {
       const codigoContratacao = aula.codigoContratacao;
       if (codigoContratacao) {
-        showModalSolicitacao(codigoContratacao, aula);
+        showModalSolicitacao(codigoContratacao, aula, 'cliente');
       } else {
         showToast('❌ Código de contratação não encontrado', 'error');
       }
     });
-    
+
+    // Configurar botão de gerar solicitação de aula (Professor)
+    const btnGerarSolicitacaoProfessor = modal.querySelector('#btn-gerar-solicitacao-professor');
+    btnGerarSolicitacaoProfessor.addEventListener('click', () => {
+      const codigoContratacao = aula.codigoContratacao;
+      if (codigoContratacao) {
+        showModalSolicitacao(codigoContratacao, aula, 'professor');
+      } else {
+        showToast('❌ Código de contratação não encontrado', 'error');
+      }
+    });
+
     // Configurar botão de ver observações (contratação)
     const btnVerObservacoes = modal.querySelector('#btn-ver-observacoes');
     btnVerObservacoes.addEventListener('click', () => {
@@ -862,7 +937,13 @@ const BancoDeAulasCards = (function() {
 
           const abrir = (tentativas) => {
             const dc = window.dashboardCliente;
-            if (dc && document.getElementById('dc-modal-detalhes')) {
+            const modalDetalhesEl = document.getElementById('dc-modal-detalhes');
+            if (dc && modalDetalhesEl) {
+              // O modal vive dentro da seção "clientes" (display:none quando a aba não está ativa).
+              // Move-lo para o body garante que fique visível mesmo aberto a partir de Banco de Aulas.
+              if (modalDetalhesEl.parentElement !== document.body) {
+                document.body.appendChild(modalDetalhesEl);
+              }
               if (!dc.clients.find(c => c.id === clientId)) dc.clients.push(clientData);
               dc.openModalDetalhes(clientId);
             } else if (tentativas > 0) {
@@ -1346,15 +1427,40 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
     (function populateEstudantesFromCPF() {
       const elEstudantes = modal.querySelector('#modal-estudantes');
       const elSeries = modal.querySelector('#modal-series');
-      if (!elEstudantes && !elSeries) return;
+      const elListaEstudantes = modal.querySelector('#lista-estudantes-cliente');
+      if (!elEstudantes && !elSeries && !elListaEstudantes) return;
 
       const cpfCliente = aula.cpf || '';
       const nomes = [];
       const series = [];
+      const completos = []; // [{nome, escola, serie}]
 
       const applyResults = () => {
         if (elEstudantes) elEstudantes.textContent = nomes.length ? nomes.join(', ') : '--';
         if (elSeries) elSeries.textContent = series.length ? series.join(', ') : '--';
+        if (elListaEstudantes) {
+          elListaEstudantes.innerHTML = completos.length
+            ? completos.map(e => `
+                <div class="flex items-center flex-wrap gap-x-2">
+                  <span class="font-medium">${escapeHtml(e.nome)}</span>
+                  ${e.escola ? `<span class="text-gray-500 text-xs">• Escola: ${escapeHtml(e.escola)}</span>` : ''}
+                  ${e.serie ? `<span class="text-gray-500 text-xs">• Série: ${escapeHtml(e.serie)}</span>` : ''}
+                </div>`).join('')
+            : '<span class="text-gray-400">Nenhum estudante cadastrado</span>';
+        }
+      };
+
+      const coletar = (lista) => {
+        (lista || []).forEach(est => {
+          const nome = est && est.nome ? String(est.nome).trim() : '';
+          const serie = est && est.serie ? String(est.serie).trim() : '';
+          const escola = est && est.escola ? String(est.escola).trim() : '';
+          if (nome) {
+            nomes.push(nome);
+            completos.push({ nome, escola, serie });
+          }
+          if (serie) series.push(serie);
+        });
       };
 
       if (cpfCliente) {
@@ -1362,60 +1468,24 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
           if (!snapshot.empty) {
             snapshot.forEach(doc => {
               const data = doc.data() || {};
-              if (Array.isArray(data.estudantes)) {
-                data.estudantes.forEach(est => {
-                  const nome = est && est.nomeEstudante ? String(est.nomeEstudante).trim() : '';
-                  const serie = est && est.serieEstudante ? String(est.serieEstudante).trim() : '';
-                  if (nome) nomes.push(nome);
-                  if (serie) series.push(serie);
-                  console.log('Estudante encontrado (cadastroClientes):', { docId: doc.id, nome, serie });
-                });
-              }
+              coletar(data.estudantes);
             });
             applyResults();
           } else {
             console.log('Nenhum documento cadastroClientes encontrado para CPF', cpfCliente);
             // fallback para dados presentes em `aula`
-            if (Array.isArray(aula.estudantes) && aula.estudantes.length > 0) {
-              aula.estudantes.forEach(est => {
-                const nome = est && est.nomeEstudante ? String(est.nomeEstudante).trim() : '';
-                const serie = est && est.serieEstudante ? String(est.serieEstudante).trim() : '';
-                if (nome) nomes.push(nome);
-                if (serie) series.push(serie);
-                console.log('Estudante encontrado (aula):', { nome, serie });
-              });
-              applyResults();
-            } else {
-              applyResults();
-            }
+            coletar(aula.estudantes);
+            applyResults();
           }
         }).catch(err => {
           console.error('Erro ao buscar cadastroClientes por CPF', cpfCliente, err);
           // tentar fallback local
-          if (Array.isArray(aula.estudantes) && aula.estudantes.length > 0) {
-            aula.estudantes.forEach(est => {
-              const nome = est && est.nomeEstudante ? String(est.nomeEstudante).trim() : '';
-              const serie = est && est.serieEstudante ? String(est.serieEstudante).trim() : '';
-              if (nome) nomes.push(nome);
-              if (serie) series.push(serie);
-              console.log('Estudante encontrado (aula - fallback):', { nome, serie });
-            });
-            applyResults();
-          } else {
-            applyResults();
-          }
+          coletar(aula.estudantes);
+          applyResults();
         });
       } else {
         // Sem CPF: usar diretamente `aula.estudantes` quando disponível
-        if (Array.isArray(aula.estudantes) && aula.estudantes.length > 0) {
-          aula.estudantes.forEach(est => {
-            const nome = est && est.nomeEstudante ? String(est.nomeEstudante).trim() : '';
-            const serie = est && est.serieEstudante ? String(est.serieEstudante).trim() : '';
-            if (nome) nomes.push(nome);
-            if (serie) series.push(serie);
-            console.log('Estudante encontrado (aula - sem CPF):', { nome, serie });
-          });
-        }
+        coletar(aula.estudantes);
         applyResults();
       }
     })();
@@ -1601,8 +1671,8 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
   
   // Função para mostrar modal de observações
   function showObservacoesModal(aula) {
-    const observacoesOriginais = aula.ObservacaoContratacao || 'Nenhuma observação registrada.';
-    
+    const observacoesOriginais = aula.ObservacaoContratacao || '';
+
     const { modal, closeModal } = createModal(
       'Observações da Contratação',
       `
@@ -1611,8 +1681,8 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
             <i class="fas fa-info-circle text-orange-500 mr-2"></i>
             Observações registradas para esta contratação:
           </div>
-          <div class="bg-white p-4 rounded border border-gray-200 max-h-96 overflow-y-auto">
-            <p class="text-gray-700 whitespace-pre-wrap">${observacoesOriginais}</p>
+          <div class="bg-white p-4 rounded border border-gray-200 max-h-96">
+            <textarea id="textarea-observacoes" class="w-full h-40 p-3 border rounded text-sm" placeholder="Digite observações...">${observacoesOriginais}</textarea>
           </div>
         </div>
       `,
@@ -1623,113 +1693,52 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
           attributes: 'id="btn-fechar-observacoes"'
         },
         {
-          text: 'Editar',
-          classes: 'btn-secondary btn-compact',
-          attributes: 'id="btn-editar-observacoes"'
+          text: 'Salvar alterações',
+          classes: 'btn-primary btn-compact',
+          attributes: 'id="btn-salvar-observacoes" disabled'
         }
       ]
     );
 
     // Elementos
     const btnFechar = modal.querySelector('#btn-fechar-observacoes');
-    const btnEditar = modal.querySelector('#btn-editar-observacoes');
-    const contentWrapper = modal.querySelector('.modal-body > div');
+    const btnSalvar = modal.querySelector('#btn-salvar-observacoes');
+    const textarea = modal.querySelector('#textarea-observacoes');
 
     if (btnFechar) btnFechar.addEventListener('click', closeModal);
 
-    // Função para renderizar o visual somente leitura
-    const renderReadOnly = (text) => {
-      contentWrapper.innerHTML = `
-        <div class="p-4 bg-gray-50 rounded-lg">
-          <div class="text-sm text-gray-600 mb-2">
-            <i class="fas fa-info-circle text-orange-500 mr-2"></i>
-            Observações registradas para esta contratação:
-          </div>
-          <div class="bg-white p-4 rounded border border-gray-200 max-h-96 overflow-y-auto">
-            <p class="text-gray-700 whitespace-pre-wrap">${text || 'Nenhuma observação registrada.'}</p>
-          </div>
-        </div>
-      `;
+    textarea.focus();
+
+    // Rastreia o último texto salvo para habilitar/desabilitar o botão conforme o texto muda
+    let textoSalvo = observacoesOriginais;
+    const atualizarEstadoBotao = () => {
+      btnSalvar.disabled = textarea.value === textoSalvo;
     };
+    textarea.addEventListener('input', atualizarEstadoBotao);
 
-    // Entrar em modo de edição
-    const enterEditMode = () => {
-      const currentText = aula.ObservacaoContratacao || '';
+    btnSalvar.addEventListener('click', async () => {
+      const novoTexto = textarea.value.trim();
+      btnSalvar.disabled = true;
+      const originalHTML = btnSalvar.innerHTML;
+      btnSalvar.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Salvando...';
 
-      contentWrapper.innerHTML = `
-        <div class="p-4 bg-gray-50 rounded-lg">
-          <div class="text-sm text-gray-600 mb-2">
-            <i class="fas fa-edit text-orange-500 mr-2"></i>
-            Editar observações:
-          </div>
-          <div class="bg-white p-4 rounded border border-gray-200 max-h-96">
-            <textarea id="textarea-observacoes" class="w-full h-40 p-3 border rounded text-sm" placeholder="Digite observações...">${currentText || ''}</textarea>
-          </div>
-        </div>
-      `;
+      try {
+        await BANCO.updateAula(aula.id, { ObservacaoContratacao: novoTexto, timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+        showToast('✅ Observações atualizadas com sucesso!', 'success');
 
-      // Alterar botões: esconder 'Editar' e adicionar 'Salvar' e 'Cancelar'
-      btnEditar.style.display = 'none';
-
-      const footer = modal.querySelector('.modal-footer');
-
-      const btnCancelar = document.createElement('button');
-      btnCancelar.id = 'btn-cancelar-edicao-observacoes';
-      btnCancelar.className = 'btn-secondary btn-compact ml-2';
-      btnCancelar.textContent = 'Cancelar';
-
-      const btnSalvar = document.createElement('button');
-      btnSalvar.id = 'btn-salvar-observacoes';
-      btnSalvar.className = 'btn-primary btn-compact ml-2';
-      btnSalvar.innerHTML = 'Salvar';
-
-      footer.appendChild(btnCancelar);
-      footer.appendChild(btnSalvar);
-
-      const textarea = modal.querySelector('#textarea-observacoes');
-      textarea.focus();
-
-      btnCancelar.addEventListener('click', () => {
-        // Reverter para leitura
-        renderReadOnly(aula.ObservacaoContratacao);
-        btnSalvar.remove();
-        btnCancelar.remove();
-        btnEditar.style.display = '';
-      });
-
-      btnSalvar.addEventListener('click', async () => {
-        const novoTexto = textarea.value.trim();
+        // Atualizar o objeto local (para próxima vez que abrir)
+        aula.ObservacaoContratacao = novoTexto;
+        textoSalvo = novoTexto;
+        textarea.value = novoTexto;
+        btnSalvar.innerHTML = originalHTML;
         btnSalvar.disabled = true;
-        const originalHTML = btnSalvar.innerHTML;
-        btnSalvar.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Salvando...';
-
-        try {
-          await BANCO.updateAula(aula.id, { ObservacaoContratacao: novoTexto, timestamp: firebase.firestore.FieldValue.serverTimestamp() });
-          showToast('✅ Observações atualizadas com sucesso!', 'success');
-
-          // Atualizar o objeto local (para próxima vez que abrir)
-          aula.ObservacaoContratacao = novoTexto;
-
-          // Re-renderizar em modo leitura com novo texto
-          renderReadOnly(novoTexto);
-
-          // Remover botões temporários e mostrar 'Editar' novamente
-          btnSalvar.remove();
-          btnCancelar.remove();
-          btnEditar.style.display = '';
-        } catch (error) {
-          console.error('❌ Erro ao salvar observações:', error);
-          showToast('❌ Erro ao salvar observações', 'error');
-          btnSalvar.disabled = false;
-          btnSalvar.innerHTML = originalHTML;
-        }
-      });
-    };
-
-    // Evento do botão Editar
-    if (btnEditar) {
-      btnEditar.addEventListener('click', enterEditMode);
-    }
+      } catch (error) {
+        console.error('❌ Erro ao salvar observações:', error);
+        showToast('❌ Erro ao salvar observações', 'error');
+        btnSalvar.innerHTML = originalHTML;
+        btnSalvar.disabled = false;
+      }
+    });
   }
   
   // Função para abrir modal de edição
@@ -2166,8 +2175,9 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
             <th>Duração</th>
             <th>Matéria</th>
             <th>Professor</th>
-            <th>Valor da Aula</th>
-            <th>Estudante</th>
+            <th class="text-center" title="Verificar Datas: feriado / conflito de agenda">🎓</th>
+            <th class="col-aula-valor hidden">Valor da Aula</th>
+            <th class="col-aula-estudante hidden">Estudante</th>
             <th>Status</th>
             <th class="text-center">Aula concluída</th>
             <th class="text-center">Relatório</th>
@@ -2177,7 +2187,7 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
         </thead>
         <tbody id="tbody-aulas-detalhadas">
           <tr>
-            <td colspan="12" class="text-center py-8">
+            <td colspan="13" class="text-center py-8">
               <div class="flex flex-col items-center justify-center">
                 <div class="loading-spinner-large mb-3"></div>
                 <p class="text-orange-500 font-comfortaa font-bold">Carregando aulas...</p>
@@ -2209,7 +2219,7 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
       if (!aulas || aulas.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="12" class="text-center py-8">
+            <td colspan="13" class="text-center py-8">
               <i class="fas fa-inbox text-3xl text-gray-300 mb-3"></i>
               <p class="text-gray-500">Nenhuma aula encontrada para este código</p>
             </td>
@@ -2319,10 +2329,13 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
                 ${aula.professor || 'A definir'}
               </button>
             </td>
-            <td class="text-right font-mono text-sm">
+            <td class="text-center">
+              <span class="verif-datas-dot verif-neutro" data-id-aula="${aula['id-Aula']}" data-tooltip="Clique em &quot;Verificar Datas&quot; para checar feriados e conflitos"></span>
+            </td>
+            <td class="col-aula-valor hidden text-right font-mono text-sm">
               ${formatCurrencyBR(valorAulaComputado)}
             </td>
-            <td>
+            <td class="col-aula-estudante hidden">
               <button type="button" class="btn-estudante-aula text-sm px-2 py-1 cursor-pointer hover:bg-orange-50 rounded transition-colors" data-id-aula="${aula['id-Aula']}" data-estudante="${aula.estudante || ''}" title="Clique para alterar o estudante">
                 ${aula.estudante || '--'}
               </button>
@@ -2431,7 +2444,18 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
       } catch (e) { /* ignore */ }
 
       tbody.innerHTML = html;
-      
+
+      // Reaplicar o estado atual do dropdown "Colunas" nas células recém-renderizadas
+      // (o tbody é reconstruído a cada edição inline, então o hidden do template não reflete o toggle do usuário)
+      const chkEstudanteSync = document.getElementById('chkColunaEstudante');
+      if (chkEstudanteSync) {
+        document.querySelectorAll('.col-aula-estudante').forEach(el => el.classList.toggle('hidden', !chkEstudanteSync.checked));
+      }
+      const chkValorAulaSync = document.getElementById('chkColunaValorAula');
+      if (chkValorAulaSync) {
+        document.querySelectorAll('.col-aula-valor').forEach(el => el.classList.toggle('hidden', !chkValorAulaSync.checked));
+      }
+
       // Persistir ValorAula computado em cada documento da BancoDeAulas-Lista
       try {
         if (valoresComputados.length > 0 && BANCO && BANCO.db) {
@@ -2465,7 +2489,7 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
       console.error('❌ Erro ao carregar aulas detalhadas:', error);
       tbody.innerHTML = `
         <tr>
-          <td colspan="12" class="text-center py-8">
+          <td colspan="13" class="text-center py-8">
             <i class="fas fa-exclamation-triangle text-3xl text-orange-500 mb-3"></i>
             <p class="text-gray-500">Erro ao carregar aulas</p>
             <p class="text-sm text-gray-400 mt-1">${error.message}</p>
@@ -2635,7 +2659,93 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
         showAdicionarAulaModal(codigoContratacao);
       });
     }
-    
+
+    // Dropdown "Colunas": exibe/oculta as colunas Estudantes e Valor da aula na tabela.
+    // Puramente visual — não altera nenhum dado, apenas classList.toggle('hidden').
+    const btnColunasAula = document.getElementById('btnColunasAula');
+    const menuColunasAula = document.getElementById('menuColunasAula');
+    if (btnColunasAula && menuColunasAula) {
+      btnColunasAula.addEventListener('click', function(e) {
+        e.stopPropagation();
+        menuColunasAula.classList.toggle('hidden');
+      });
+      document.addEventListener('click', function(e) {
+        if (!menuColunasAula.classList.contains('hidden') && !menuColunasAula.contains(e.target) && e.target !== btnColunasAula) {
+          menuColunasAula.classList.add('hidden');
+        }
+      });
+    }
+    const chkColunaEstudante = document.getElementById('chkColunaEstudante');
+    if (chkColunaEstudante) {
+      chkColunaEstudante.addEventListener('change', function() {
+        document.querySelectorAll('.col-aula-estudante').forEach(el => el.classList.toggle('hidden', !this.checked));
+      });
+    }
+    const chkColunaValorAula = document.getElementById('chkColunaValorAula');
+    if (chkColunaValorAula) {
+      chkColunaValorAula.addEventListener('change', function() {
+        document.querySelectorAll('.col-aula-valor').forEach(el => el.classList.toggle('hidden', !this.checked));
+      });
+    }
+
+    // Botão "Verificar Datas": checa feriado/véspera de feriado e conflito de agenda do professor
+    // para cada aula desta contratação, e pinta o círculo 🎓 de cada linha (verde/amarelo/vermelho).
+    const btnVerificarDatas = document.getElementById('btnVerificarDatas');
+    if (btnVerificarDatas) {
+      btnVerificarDatas.addEventListener('click', async function(e) {
+        e.stopPropagation();
+        if (typeof window.verificarStatusAula !== 'function') {
+          showToast('Motor de verificação de datas não disponível', 'error');
+          return;
+        }
+        const codigoContratacao = (_aulaDetalhesAtual || {}).codigoContratacao || '';
+        if (!codigoContratacao) {
+          showToast('Código de contratação não encontrado', 'error');
+          return;
+        }
+
+        const originalHTML = btnVerificarDatas.innerHTML;
+        btnVerificarDatas.disabled = true;
+        btnVerificarDatas.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Verificando...';
+
+        const dots = Array.from(document.querySelectorAll('.verif-datas-dot'));
+        dots.forEach(dot => {
+          dot.classList.remove('verif-neutro', 'verif-verde', 'verif-amarelo', 'verif-vermelho');
+          dot.classList.add('verif-checando');
+        });
+
+        try {
+          const aulasAtuais = await BANCO.fetchBancoDeAulasLista(codigoContratacao);
+          await Promise.all((aulasAtuais || []).map(async (aula) => {
+            const dot = dots.find(d => d.dataset.idAula === (aula['id-Aula'] || ''));
+            if (!dot) return;
+            try {
+              const resultado = await window.verificarStatusAula(aula);
+              dot.classList.remove('verif-checando');
+              dot.classList.add(`verif-${resultado.cor}`);
+              dot.dataset.tooltip = resultado.tooltip;
+            } catch (errAula) {
+              console.error('Erro ao verificar aula:', aula['id-Aula'], errAula);
+              dot.classList.remove('verif-checando');
+              dot.classList.add('verif-neutro');
+              dot.dataset.tooltip = 'Não foi possível verificar esta aula';
+            }
+          }));
+          showToast('✅ Verificação de datas concluída', 'success');
+        } catch (error) {
+          console.error('❌ Erro ao verificar datas:', error);
+          showToast('❌ Erro ao verificar datas', 'error');
+          dots.forEach(dot => {
+            dot.classList.remove('verif-checando');
+            dot.classList.add('verif-neutro');
+          });
+        } finally {
+          btnVerificarDatas.disabled = false;
+          btnVerificarDatas.innerHTML = originalHTML;
+        }
+      });
+    }
+
     // Botão de visualização do calendário
     const btnVisualizacaoCalendario = document.getElementById('btnVisualizacaoCalendario');
     if (btnVisualizacaoCalendario) {
@@ -2762,11 +2872,11 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
                     }
                     const arrayEstudantes = clienteData.estudantes || clienteData.Estudante || [];
                     arrayEstudantes.forEach(e => {
-                      if (!e || !e.nomeEstudante) return;
+                      if (!e || !e.nome) return;
                       estudantesComEscola.push({
-                        nome: e.nomeEstudante.trim(),
-                        escola: (e.escolaEstudante && e.escolaEstudante.trim()) ? e.escolaEstudante.trim() : 'Escola não informada',
-                        serie: (e.serieEstudante && e.serieEstudante.trim()) ? e.serieEstudante.trim() : 'Série não informada'
+                        nome: e.nome.trim(),
+                        escola: (e.escola && e.escola.trim()) ? e.escola.trim() : 'Escola não informada',
+                        serie: (e.serie && e.serie.trim()) ? e.serie.trim() : 'Série não informada'
                       });
                     });
                   }
@@ -4060,8 +4170,8 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
             // Verificar se existe array de estudantes
             if (clienteData.estudantes && Array.isArray(clienteData.estudantes)) {
               clienteEstudantes = clienteData.estudantes
-                .filter(est => est.nomeEstudante && est.nomeEstudante.trim() !== '')
-                .map(est => est.nomeEstudante)
+                .filter(est => est.nome && est.nome.trim() !== '')
+                .map(est => est.nome)
                 .sort();
             }
           }
@@ -4524,6 +4634,7 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
   
   // Função para mostrar modal de observação da aula
   function showObservacaoAulaModal(observacao, idAula) {
+    const observacaoOriginal = observacao || '';
     const modalHtml = `
       <div class="modal-overlay" id="observacaoAulaModal">
         <div class="modal-container max-w-2xl">
@@ -4536,116 +4647,101 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
               <i class="fas fa-times"></i>
             </button>
           </div>
-          
+
           <div class="modal-body">
             <div class="form-group">
               <label class="block text-sm font-medium text-gray-700 mb-2">Observação</label>
-              <textarea id="observacaoTexto" readonly class="w-full p-4 border border-gray-300 rounded-lg bg-gray-50 text-sm resize-none" rows="8" placeholder="Nenhuma observação registrada">${escapeHtml(observacao)}</textarea>
+              <textarea id="observacaoTexto" class="w-full p-4 border border-gray-300 rounded-lg text-sm resize-none" rows="8" placeholder="Nenhuma observação registrada">${escapeHtml(observacaoOriginal)}</textarea>
             </div>
           </div>
-          
+
           <div class="modal-footer">
             <button id="btnFecharObservacao" class="btn-secondary">Fechar</button>
-            <button id="btnEditarObservacao" class="btn-primary">
-              <i class="fas fa-edit mr-2"></i>
-              Editar
+            <button id="btnSalvarObservacao" class="btn-primary" disabled>
+              <i class="fas fa-save mr-2"></i>
+              Salvar alterações
             </button>
           </div>
         </div>
       </div>
     `;
-    
+
     const modalContainer = document.createElement('div');
     modalContainer.innerHTML = modalHtml;
     document.body.appendChild(modalContainer);
-    
+
     const modal = modalContainer.querySelector('#observacaoAulaModal');
     const btnFechar = modal.querySelector('#btnFecharObservacao');
-    const btnEditar = modal.querySelector('#btnEditarObservacao');
+    const btnSalvar = modal.querySelector('#btnSalvarObservacao');
     const btnClose = modal.querySelector('.modal-close');
     const textarea = modal.querySelector('#observacaoTexto');
-    const footer = modal.querySelector('.modal-footer');
-    
+
     const closeModal = () => {
       modalContainer.remove();
     };
-    
+
     btnFechar.addEventListener('click', closeModal);
     btnClose.addEventListener('click', closeModal);
-    
-    // Modo de edição
-    btnEditar.addEventListener('click', () => {
-      // Tornar textarea editável
-      textarea.removeAttribute('readonly');
-      textarea.classList.remove('bg-gray-50');
-      textarea.classList.add('bg-white', 'border-2', 'border-orange-500');
-      textarea.focus();
-      
-      // Esconder botão Editar
-      btnEditar.style.display = 'none';
-      
-      // Criar botão Salvar
-      const btnSalvar = document.createElement('button');
-      btnSalvar.id = 'btnSalvarObservacao';
-      btnSalvar.className = 'btn-primary';
-      btnSalvar.innerHTML = '<i class="fas fa-save mr-2"></i> Salvar Edição';
-      footer.appendChild(btnSalvar);
-      
-      btnSalvar.addEventListener('click', async () => {
-        const novaObservacao = textarea.value.trim();
-        
-        const originalHTML = btnSalvar.innerHTML;
-        btnSalvar.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Salvando...';
-        btnSalvar.disabled = true;
-        textarea.disabled = true;
-        
-        try {
-          await BANCO.updateObservacoesAula(idAula, novaObservacao);
-          showToast('✅ Observações atualizadas com sucesso!', 'success');
-          closeModal();
-          
-          // Recarregar a tabela
-          const tbody = document.getElementById('tbody-aulas-detalhadas');
-          if (tbody) {
-            tbody.innerHTML = `
-              <tr>
-                <td colspan="9" class="text-center py-8">
-                  <div class="flex flex-col items-center justify-center">
-                    <div class="loading-spinner-large mb-3"></div>
-                    <p class="text-orange-500 font-comfortaa font-bold">Atualizando dados...</p>
-                  </div>
-                </td>
-              </tr>
-            `;
-          }
-          
-          // Buscar o código de contratação do modal aberto
-          const modalOverlay = document.querySelector('.modal-overlay');
-          if (modalOverlay && modalOverlay.id !== 'observacaoAulaModal') {
-            const codigoElement = modalOverlay.querySelector('h3');
-            if (codigoElement) {
-              const match = codigoElement.textContent.match(/\d{4}/);
-              if (match) {
-                const codigoContratacao = match[0];
-                await loadAulasDetalhadas(codigoContratacao);
-              }
+
+    textarea.focus();
+    textarea.addEventListener('input', () => {
+      btnSalvar.disabled = textarea.value === observacaoOriginal;
+    });
+
+    btnSalvar.addEventListener('click', async () => {
+      const novaObservacao = textarea.value.trim();
+
+      const originalHTML = btnSalvar.innerHTML;
+      btnSalvar.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Salvando...';
+      btnSalvar.disabled = true;
+      textarea.disabled = true;
+
+      try {
+        await BANCO.updateObservacoesAula(idAula, novaObservacao);
+        showToast('✅ Observações atualizadas com sucesso!', 'success');
+        closeModal();
+
+        // Recarregar a tabela
+        const tbody = document.getElementById('tbody-aulas-detalhadas');
+        if (tbody) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="13" class="text-center py-8">
+                <div class="flex flex-col items-center justify-center">
+                  <div class="loading-spinner-large mb-3"></div>
+                  <p class="text-orange-500 font-comfortaa font-bold">Atualizando dados...</p>
+                </div>
+              </td>
+            </tr>
+          `;
+        }
+
+        // Buscar o código de contratação do modal aberto
+        const modalOverlay = document.querySelector('.modal-overlay');
+        if (modalOverlay && modalOverlay.id !== 'observacaoAulaModal') {
+          const codigoElement = modalOverlay.querySelector('h3');
+          if (codigoElement) {
+            const match = codigoElement.textContent.match(/\d{4}/);
+            if (match) {
+              const codigoContratacao = match[0];
+              await loadAulasDetalhadas(codigoContratacao);
             }
           }
-          
-        } catch (error) {
-          console.error('❌ Erro ao atualizar observações:', error);
-          showToast('❌ Erro ao atualizar observações', 'error');
-          btnSalvar.innerHTML = originalHTML;
-          btnSalvar.disabled = false;
-          textarea.disabled = false;
         }
-      });
+
+      } catch (error) {
+        console.error('❌ Erro ao atualizar observações:', error);
+        showToast('❌ Erro ao atualizar observações', 'error');
+        btnSalvar.innerHTML = originalHTML;
+        btnSalvar.disabled = false;
+        textarea.disabled = false;
+      }
     });
-    
+
     modal.addEventListener('click', (e) => {
       if (e.target === modal) closeModal();
     });
-    
+
     const escHandler = (e) => {
       if (e.key === 'Escape') closeModal();
     };
@@ -5394,7 +5490,7 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
   }
   
   // Função para mostrar modal de seleção de aulas para solicitação
-  async function showModalSolicitacao(codigoContratacao, aulaContratacao) {
+  async function showModalSolicitacao(codigoContratacao, aulaContratacao, tipoSolicitacao = 'cliente') {
     console.log('📋 Abrindo modal de solicitação para código:', codigoContratacao);
     
     try {
@@ -5468,7 +5564,7 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
             <div class="modal-header">
               <h3 class="font-lexend font-bold text-lg text-gray-800">
                 <i class="fas fa-calendar-plus text-orange-500 mr-2"></i>
-                Selecione as aulas para a solicitação
+                Selecione as aulas para a solicitação ${tipoSolicitacao === 'professor' ? '(Professor)' : '(Cliente)'}
               </h3>
               <button class="modal-close text-gray-400 hover:text-gray-600">
                 <i class="fas fa-times"></i>
@@ -5674,7 +5770,7 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
         modal.remove();
 
         // Abrir modal final com a solicitação e as colunas visíveis
-        showModalSolicitacaoFinal(aulaContratacao, aulasSelecionadas, colunasVisiveis);
+        showModalSolicitacaoFinal(aulaContratacao, aulasSelecionadas, colunasVisiveis, tipoSolicitacao);
       });
       
       // Fechar dropdown ao clicar fora dele; fechar modal ao clicar no overlay
@@ -5704,7 +5800,7 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
   }
   
   // Função para mostrar modal final com a solicitação formatada
-  async function showModalSolicitacaoFinal(aulaContratacao, aulasSelecionadas, colunasVisiveis = ['nomeCliente', 'endereco', 'referencia', 'totalReceber', 'estudantes', 'data', 'horario', 'duracao', 'materia', 'professor', 'estudante', 'valorAula', 'status']) {
+  async function showModalSolicitacaoFinal(aulaContratacao, aulasSelecionadas, colunasVisiveis = ['nomeCliente', 'endereco', 'referencia', 'totalReceber', 'estudantes', 'data', 'horario', 'duracao', 'materia', 'professor', 'estudante', 'valorAula', 'status'], tipoSolicitacao = 'cliente') {
     console.log('📄 Gerando solicitação final');
     
     // Mostrar loading
@@ -5764,17 +5860,17 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
           console.log('📋 Array estudantes do cadastroClientes:', arrayEstudantes);
           
           estudantesUnicos.forEach(nomeEstudante => {
-            // Procurar o estudante no array: comparar campo "nomeEstudante" com case-insensitive
+            // Procurar o estudante no array: comparar campo "nome" com case-insensitive
             const estudanteData = arrayEstudantes.find(e => {
-              if (!e || !e.nomeEstudante) return false;
-              const nomeNormalized = e.nomeEstudante.trim().toLowerCase();
+              if (!e || !e.nome) return false;
+              const nomeNormalized = e.nome.trim().toLowerCase();
               const procurandoNormalized = nomeEstudante.trim().toLowerCase();
               return nomeNormalized === procurandoNormalized;
             });
 
             if (estudanteData) {
-              const escola = estudanteData.escolaEstudante && estudanteData.escolaEstudante.trim() ? estudanteData.escolaEstudante.trim() : 'Escola não informada';
-              const serie = estudanteData.serieEstudante && estudanteData.serieEstudante.trim() ? estudanteData.serieEstudante.trim() : 'Série não informada';
+              const escola = estudanteData.escola && estudanteData.escola.trim() ? estudanteData.escola.trim() : 'Escola não informada';
+              const serie = estudanteData.serie && estudanteData.serie.trim() ? estudanteData.serie.trim() : 'Série não informada';
               estudantesComEscola.push({
                 nome: nomeEstudante,
                 escola: escola,
@@ -5849,15 +5945,33 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
       });
     }
     
-    // Calcular totalReceber a partir das aulas selecionadas passadas como parâmetro
-    // (os checkboxes já foram removidos do DOM neste ponto)
+    // Calcular o valor de resumo exibido no topo da solicitação
     let totalReceber = 0;
-    aulasSelecionadas.forEach(aula => {
-        const v = typeof aula.valorAula === 'string'
-            ? parseFloat(aula.valorAula.replace(/[^0-9,.-]+/g, '').replace(',', '.'))
-            : Number(aula.valorAula);
-        if (!isNaN(v) && isFinite(v)) totalReceber += v;
-    });
+    if (tipoSolicitacao === 'professor') {
+      // Professor: somatório do "Valor da Aula" das aulas marcadas na tela anterior
+      aulasSelecionadas.forEach(aula => {
+          const v = typeof aula.valorAula === 'string'
+              ? parseFloat(aula.valorAula.replace(/[^0-9,.-]+/g, '').replace(',', '.'))
+              : Number(aula.valorAula);
+          if (!isNaN(v) && isFinite(v)) totalReceber += v;
+      });
+    } else {
+      // Cliente: valor fixo do pacote contratado, independente da seleção de aulas.
+      // Lê primeiro do DOM (valor já recalculado por loadAulasDetalhadas), com fallback para o campo persistido.
+      const _parseBRCurrencyPacote = (txt) => {
+        if (!txt) return null;
+        let s = String(txt).replace(/R\$\s*/g, '').trim();
+        if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+        const n = parseFloat(s);
+        return (!isNaN(n) && isFinite(n)) ? n : null;
+      };
+      const elPacoteDOM = document.getElementById('display-valor-pacote-contrato');
+      let valorPacoteContrato = elPacoteDOM ? _parseBRCurrencyPacote(elPacoteDOM.textContent || elPacoteDOM.innerText) : null;
+      if (valorPacoteContrato === null && (aulaContratacao.ValorPacote || aulaContratacao.ValorPacote === 0)) {
+        valorPacoteContrato = Number(aulaContratacao.ValorPacote);
+      }
+      totalReceber = (valorPacoteContrato !== null && isFinite(valorPacoteContrato)) ? valorPacoteContrato : 0;
+    }
     
     // Criar linhas da tabela de aulas
     let linhasAulasHtml = '';
@@ -5920,7 +6034,7 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
                 ${colunasVisiveis.includes('totalReceber') ? `
                 <div>
                   <p class="text-xs font-medium text-gray-500 mb-1">
-                    <i class="fas fa-dollar-sign text-green-600 mr-2"></i>Total a Receber (Valor Equipe)
+                    <i class="fas fa-dollar-sign text-green-600 mr-2"></i>${tipoSolicitacao === 'professor' ? 'Total a Receber (Valor Equipe)' : 'Valor Pacote'}
                   </p>
                   <p class="text-lg font-bold text-green-600">R$ ${totalReceber.toFixed(2)}</p>
                 </div>` : ''}

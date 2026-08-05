@@ -398,6 +398,64 @@ function createModal(title, content, buttons = []) {
   return { modal, closeModal };
 }
 
+// ──────────────────────────────────────────────────────────
+// Tooltip global (data-tooltip)
+// Anexado diretamente ao <body> com position:fixed, para não ser recortado
+// por ancestrais com overflow:hidden/scroll/auto (modais, tabelas roláveis etc.)
+// ──────────────────────────────────────────────────────────
+(function setupGlobalTooltips() {
+  let tooltipEl = null;
+
+  function posicionarTooltip(target) {
+    if (!tooltipEl) return;
+    const rectAlvo = target.getBoundingClientRect();
+    const rectTip  = tooltipEl.getBoundingClientRect();
+
+    let top = rectAlvo.top - rectTip.height - 8;
+    if (top < 4) top = rectAlvo.bottom + 8; // não coube acima: mostra abaixo
+
+    let left = rectAlvo.left + (rectAlvo.width / 2) - (rectTip.width / 2);
+    left = Math.max(4, Math.min(left, window.innerWidth - rectTip.width - 4));
+
+    tooltipEl.style.top  = `${top}px`;
+    tooltipEl.style.left = `${left}px`;
+  }
+
+  function mostrarTooltip(target) {
+    const texto = target.getAttribute('data-tooltip');
+    if (!texto) return;
+
+    tooltipEl = document.createElement('div');
+    tooltipEl.className = 'global-tooltip';
+    tooltipEl.textContent = texto;
+    document.body.appendChild(tooltipEl);
+
+    posicionarTooltip(target);
+  }
+
+  function esconderTooltip() {
+    if (tooltipEl) {
+      tooltipEl.remove();
+      tooltipEl = null;
+    }
+  }
+
+  document.addEventListener('mouseover', (e) => {
+    const alvo = e.target.closest('[data-tooltip]');
+    if (alvo) mostrarTooltip(alvo);
+  });
+
+  document.addEventListener('mouseout', (e) => {
+    const alvo = e.target.closest('[data-tooltip]');
+    if (alvo) esconderTooltip();
+  });
+
+  // Se o elemento se mover (ex: rolagem da tabela) enquanto o tooltip está aberto, reposiciona
+  document.addEventListener('scroll', () => {
+    if (tooltipEl) esconderTooltip();
+  }, true);
+})();
+
 // Exportações globais
 window.showToast    = showToast;
 window.removeToast  = removeToast;

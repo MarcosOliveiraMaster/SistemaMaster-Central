@@ -33,7 +33,18 @@
       "Bash(grep -r \"collection\\\\|db\\\\\\\\.doc\\\\|db\\\\\\\\.add\" --include=\"*.js\")",
       "Bash(node --check functions-banco-de-aulas-Cards.js)",
       "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('banco-de-aulas-documentacao.json','utf8'\\)\\); console.log\\('JSON válido'\\)\")",
-      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('simulacoes-documentacao.json','utf8'\\)\\); console.log\\('JSON válido'\\)\")"
+      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('simulacoes-documentacao.json','utf8'\\)\\); console.log\\('JSON válido'\\)\")",
+      "Bash(dir /b *.js)",
+      "Bash(grep -n '^  function $root\\\\|dp-tab-bancoDados\\\\|professores.*section-content' index.html)",
+      "Bash(node --check functions-dashboardProfessor.js)",
+      "Bash(pkill -f static_server.js)",
+      "Bash(node --check functions-simulacoes.js)",
+      "Bash(node --check functions-calendario-visual.js)",
+      "Bash(grep -iE \"\\\\.js$|\\\\.html$|\\\\.css$\")",
+      "Bash(node --check functions-PainelCentral.js)",
+      "Bash(node --check functions-verificar-datas.js)",
+      "Bash(awk 'NR==1870,NR==2100 {print NR\": \"$0}' functions-simulacoes.js)",
+      "Bash(node --check script.js)"
     ]
   }
 }

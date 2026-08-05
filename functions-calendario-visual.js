@@ -1,5 +1,14 @@
 console.log('✅ functions-calendario-visual.js carregado');
 
+// Evita que um botão fique travado para sempre caso a Promise de rede nunca
+// resolva/rejeite (ex.: aba em segundo plano por muito tempo, conexão suspensa).
+function withTimeoutCal(promise, ms = 20000, label = 'operação') {
+  return Promise.race([
+    Promise.resolve(promise),
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`Tempo esgotado ao aguardar ${label}. Verifique sua conexão e tente novamente.`)), ms))
+  ]);
+}
+
 const MESES_CAL = [
   'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
   'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'
@@ -177,6 +186,18 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
   document.addEventListener('keyup',   onKeyUp);
   document.addEventListener('click',   closeCtxMenu);
 
+  // Rede de segurança: se a aba ficar em segundo plano/perder foco no meio de um
+  // drag (ex.: usuário troca de janela), garante que o estado de arraste não
+  // fique "preso" em true para sempre, o que bloquearia drops futuros.
+  const onVisibilityReset = () => {
+    if (document.hidden) {
+      isDraggingCard = false;
+      isDraggingWeek = false;
+      dragCtrlHeld = false;
+    }
+  };
+  document.addEventListener('visibilitychange', onVisibilityReset);
+
   function closeCtxMenu() {
     const m = document.getElementById('calCtxMenu');
     if (m) m.remove();
@@ -188,6 +209,7 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
     document.removeEventListener('keydown', onKeyDown);
     document.removeEventListener('keyup',   onKeyUp);
     document.removeEventListener('click',   closeCtxMenu);
+    document.removeEventListener('visibilitychange', onVisibilityReset);
   };
 
   // Recarrega aulasMap do Firebase e re-renderiza o mês atual
@@ -196,7 +218,7 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
     if ((!force && _calRefreshing) || !options.getAulas) return;
     _calRefreshing = true;
     try {
-      const freshAulas = await options.getAulas();
+      const freshAulas = await withTimeoutCal(options.getAulas(), 20000, 'atualização das aulas');
       // Reconstrói aulasMap
       Object.keys(aulasMap).forEach(k => delete aulasMap[k]);
       (freshAulas || []).forEach((a, origIdx) => {
@@ -296,7 +318,7 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
       // Usa baseline atualizado (não o aulasArray original) para evitar double-delete
       const deletes = [...aulasBaseIds].filter(id => !currentIds.has(id));
 
-      await options.onSave({ updates, creates, deletes, fullAulas });
+      await withTimeoutCal(options.onSave({ updates, creates, deletes, fullAulas }), 30000, 'salvamento do calendário');
 
       // Força reload do calendário com dados frescos do Firebase
       // e atualiza o baseline para a próxima Salvar
@@ -323,7 +345,7 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
     try {
       let clienteInfo = null;
       if (typeof options.getClienteInfo === 'function') {
-        clienteInfo = await options.getClienteInfo();
+        clienteInfo = await withTimeoutCal(options.getClienteInfo(), 20000, 'dados do cliente');
       }
       showSolicitacaoCalendarioModal(aulasMap, clienteInfo);
     } catch (err) {
@@ -735,7 +757,7 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
 
       if (options.onColorSave) {
         for (const { ref } of cardsToColor) {
-          try { await options.onColorSave(ref, selectedColor); } catch (_) {}
+          try { await withTimeoutCal(options.onColorSave(ref, selectedColor), 15000, 'salvamento de cor'); } catch (_) {}
         }
       }
 

@@ -49,6 +49,7 @@ window.DashboardProfessores = (function () {
     },
     colProfessores: 'dataBaseProfessores',
     colCandidatos: 'candidatos',
+    colAulas: 'BancoDeAulas-Lista',
     colunasOcultas: ['id', 'expAulas', 'expNeuro', 'expTdics', 'foto', 'fotoPerfil', 'dataEnvio', 'timeStamp', 'timestamp', 'Migradoem', 'senhainicial', 'dataenviolegivel', 'uid', 'dataAtivacao', 'DATAENVIOLEGIVEL', 'MIGRADOEM'],
     colunasDiasTurnos: [
       'segManha','segTarde','terManha','terTarde',
@@ -125,6 +126,12 @@ window.DashboardProfessores = (function () {
     candidatos     : [],
     candidatoAtual : null,
     mesSelecionado : null,
+    // Tab4 — Análise e Desempenho de Equipe
+    t4Loaded        : false,
+    t4ControlesInit : false,
+    aulasEquipe       : [],
+    professoresEquipe : [],
+    chartRankingMes   : null,
   };
 
   // ─────────────────────────────────────────────────────────────
@@ -518,6 +525,23 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
 .dp-autocomplete-item { padding:.5rem .75rem; cursor:pointer; font-size:.82rem; transition:background var(--dp-transition); }
 .dp-autocomplete-item:hover { background:var(--dp-orange-light); }
 .dp-autocomplete-empty { padding:.5rem .75rem; color:var(--dp-gray-400); font-size:.82rem; font-style:italic; }
+
+/* ── TAB4: Análise e Desempenho de Equipe ── */
+.dp-equipe-wrap { flex:1; overflow-y:auto; padding:1rem; display:flex; flex-direction:column; gap:1rem; }
+.dp-eq-panel { background:white; border:1px solid var(--dp-gray-200); border-radius:.75rem; padding:1rem 1.1rem; box-shadow:0 2px 8px rgba(0,0,0,.05); }
+.dp-eq-panel h3 { font-size:.9rem; font-weight:700; color:var(--dp-gray-800); margin-bottom:.75rem; display:flex; align-items:center; gap:.4rem; }
+.dp-eq-filtros { display:flex; flex-wrap:wrap; align-items:flex-end; gap:1rem; background:var(--dp-gray-50); border:1px solid var(--dp-gray-200); border-radius:.6rem; padding:.65rem .85rem; margin-bottom:1rem; }
+.dp-eq-filtro-item { display:flex; flex-direction:column; gap:.3rem; }
+.dp-eq-filtro-item label { font-size:.62rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--dp-gray-600); }
+.dp-eq-filtros .dp-select { font-size:.78rem; min-width:150px; }
+.dp-eq-chart-box { position:relative; height:300px; }
+.dp-eq-table { width:100%; border-collapse:collapse; font-size:.78rem; }
+.dp-eq-table th { text-align:left; padding:.5rem .6rem; background:var(--dp-gray-50); color:var(--dp-gray-600); font-weight:700; text-transform:uppercase; font-size:.65rem; letter-spacing:.04em; border-bottom:1px solid var(--dp-gray-200); }
+.dp-eq-table td { padding:.5rem .6rem; border-bottom:1px solid var(--dp-gray-100); color:var(--dp-gray-800); }
+.dp-eq-table tr:last-child td { border-bottom:none; }
+.dp-eq-ranking-item { display:flex; align-items:center; justify-content:space-between; padding:.55rem .8rem; background:var(--dp-gray-50); border:1px solid var(--dp-gray-200); border-radius:.5rem; font-size:.82rem; }
+.dp-eq-ranking-pos { font-weight:700; }
+.dp-eq-ranking-total { font-weight:700; color:var(--dp-orange); }
     `;
     document.head.appendChild(style);
   }
@@ -534,6 +558,7 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
   <button class="dp-tab dp-tab--active" data-dptab="dp-tab-bancoDados">🗂 Banco de Dados</button>
   <button class="dp-tab"               data-dptab="dp-tab-edicao">✏️ Edição de Professores</button>
   <button class="dp-tab"               data-dptab="dp-tab-candidatos">👥 Avaliação de Candidatos</button>
+  <button class="dp-tab"               data-dptab="dp-tab-equipe">📊 Análise e Desempenho de Equipe</button>
 </div>
 
 <!-- ═══ TAB 1 — BANCO DE DADOS ═══════════════════════════════ -->
@@ -630,6 +655,7 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
           <option value="Candidato">Candidato</option>
           <option value="Aprovado">Aprovado</option>
           <option value="Reprovado">Reprovado</option>
+          <option value="Repescagem">Repescagem</option>
         </select>
         <select id="dp-filtroDiscCand" class="dp-select" style="font-size:.75rem">
           <option value="">Todas as disciplinas</option>
@@ -738,6 +764,62 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
         <button id="dp-btnPromover"     class="dp-btn dp-btn--success" style="width:100%">🎓 Promover Professor</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- ═══ TAB 4 — ANÁLISE E DESEMPENHO DE EQUIPE ═══════════════ -->
+<div id="dp-tab-equipe" class="dp-tab-content">
+  <div class="dp-equipe-wrap">
+
+    <!-- Painel 1: Ranking do período -->
+    <div class="dp-eq-panel">
+      <h3>🏆 Ranking de Aulas por Período</h3>
+      <div class="dp-eq-filtros">
+        <div class="dp-eq-filtro-item">
+          <label for="dp-eqFiltroAno">Ano</label>
+          <select id="dp-eqFiltroAno" class="dp-select"></select>
+        </div>
+        <div class="dp-eq-filtro-item">
+          <label for="dp-eqFiltroMes">Mês</label>
+          <select id="dp-eqFiltroMes" class="dp-select">
+            <option value="">Todos os meses</option>
+            <option value="0">Janeiro</option>
+            <option value="1">Fevereiro</option>
+            <option value="2">Março</option>
+            <option value="3">Abril</option>
+            <option value="4">Maio</option>
+            <option value="5">Junho</option>
+            <option value="6">Julho</option>
+            <option value="7">Agosto</option>
+            <option value="8">Setembro</option>
+            <option value="9">Outubro</option>
+            <option value="10">Novembro</option>
+            <option value="11">Dezembro</option>
+          </select>
+        </div>
+        <div class="dp-eq-filtro-item">
+          <label for="dp-eqFiltroOrdem">Ordenar por</label>
+          <select id="dp-eqFiltroOrdem" class="dp-select">
+            <option value="desc">Mais aulas</option>
+            <option value="asc">Menos aulas</option>
+          </select>
+        </div>
+      </div>
+      <div class="dp-eq-chart-box"><canvas id="dp-eqChartRanking"></canvas></div>
+    </div>
+
+    <!-- Painel 2: Professores há mais tempo sem dar aula -->
+    <div class="dp-eq-panel">
+      <h3>⏳ Professores há mais tempo sem dar aula</h3>
+      <div id="dp-eqSemAula"></div>
+    </div>
+
+    <!-- Painel 3: Ranking geral desde o início -->
+    <div class="dp-eq-panel">
+      <h3>📈 Ranking Geral (desde o início da contagem)</h3>
+      <div id="dp-eqRankingGeral" style="display:flex;flex-direction:column;gap:.4rem"></div>
+    </div>
+
   </div>
 </div>
 
@@ -1082,6 +1164,7 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
 
     if (tabId === 'dp-tab-edicao'     && !S.t2Loaded) { S.t2Loaded = true; carregarT2(); }
     if (tabId === 'dp-tab-candidatos' && !S.t3Loaded) { S.t3Loaded = true; carregarT3(); }
+    if (tabId === 'dp-tab-equipe'     && !S.t4Loaded) { S.t4Loaded = true; carregarT4(); }
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -1969,8 +2052,7 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
     const lista = $id('dp-listaCandidatos');
     if (lista) lista.innerHTML = '<p style="color:var(--dp-gray-400);font-size:.75rem;text-align:center;padding:1rem">Carregando candidatos…</p>';
     try {
-      const todos = await fetchColecao(CFG.colCandidatos);
-      S.candidatos = todos.filter(c => c.status !== 'Repescagem');
+      S.candidatos = await fetchColecao(CFG.colCandidatos);
       popularFiltroDiscCand();
       renderListaCandidatos();
       initControlesT3();
@@ -2203,12 +2285,13 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
     const cand = S.candidatoAtual;
     popup({
       titulo: 'Mover para Repescagem?',
-      corpo: `<strong>${cand.nome || 'Candidato'}</strong> será marcado como Repescagem e removido da lista ativa.`,
+      corpo: `<strong>${cand.nome || 'Candidato'}</strong> será marcado como Repescagem.`,
       labelOk: 'Confirmar', tipoOk: 'danger',
       onOk: async () => {
         try {
           await updateDoc(CFG.colCandidatos, cand.id, { status: 'Repescagem' });
-          S.candidatos = S.candidatos.filter(c => c.id !== cand.id);
+          const idx = S.candidatos.findIndex(c => c.id === cand.id);
+          if (idx !== -1) S.candidatos[idx].status = 'Repescagem';
           S.candidatoAtual = null;
           limparPainelCandidato();
           renderListaCandidatos();
@@ -2216,6 +2299,185 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
         } catch (e) { toast('Erro: ' + e.message, 'error'); }
       }
     });
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // 3.4  TAB4 — Análise e Desempenho de Equipe
+  // ─────────────────────────────────────────────────────────────
+
+  // Converte "ddd - dd/mm/aaaa" (formato salvo em BancoDeAulas-Lista) em {dia,mes,ano,date}
+  function parseDataAula(str) {
+    if (!str || typeof str !== 'string' || !str.includes('-')) return null;
+    const partes = str.split('-')[1].trim().split('/');
+    if (partes.length !== 3) return null;
+    const dia = parseInt(partes[0], 10);
+    const mes = parseInt(partes[1], 10) - 1;
+    const ano = parseInt(partes[2], 10);
+    if (isNaN(dia) || isNaN(mes) || isNaN(ano)) return null;
+    return { dia, mes, ano, date: new Date(ano, mes, dia) };
+  }
+
+  async function carregarT4() {
+    try {
+      const [aulas, profs] = await Promise.all([
+        fetchColecao(CFG.colAulas),
+        fetchColecao(CFG.colProfessores)
+      ]);
+
+      S.aulasEquipe = aulas
+        .filter(a => (getField(a, 'StatusAula') || '').toLowerCase() === 'concluída')
+        .map(a => Object.assign({}, a, { _data: parseDataAula(getField(a, 'data')) }))
+        .filter(a => a._data);
+
+      S.professoresEquipe = profs.filter(p => (getField(p, 'status') || 'Ativo').toLowerCase() !== 'desligado');
+
+      if (typeof ChartDataLabels !== 'undefined') Chart.register(ChartDataLabels);
+
+      popularFiltroAnoEquipe();
+      renderRankingMes();
+      renderSemAula();
+      renderRankingGeral();
+      initControlesT4();
+    } catch (e) {
+      const painel = $id('dp-tab-equipe');
+      if (painel) painel.insertAdjacentHTML('afterbegin', `<p style="color:var(--dp-red);padding:1rem">Erro ao carregar dados de equipe: ${e.message}</p>`);
+    }
+  }
+
+  function popularFiltroAnoEquipe() {
+    const sel = $id('dp-eqFiltroAno'); if (!sel) return;
+    const anoAtual = new Date().getFullYear();
+    const anos = new Set(S.aulasEquipe.map(a => a._data.ano));
+    anos.add(anoAtual);
+    sel.innerHTML = [...anos].sort((a, b) => b - a).map(a => `<option value="${a}">${a}</option>`).join('');
+    sel.value = String(anoAtual);
+  }
+
+  function initControlesT4() {
+    if (S.t4ControlesInit) return;
+    S.t4ControlesInit = true;
+    ['dp-eqFiltroAno', 'dp-eqFiltroMes', 'dp-eqFiltroOrdem'].forEach(id => {
+      const el = $id(id);
+      if (el) el.addEventListener('change', renderRankingMes);
+    });
+  }
+
+  // Agrupa aulas concluídas por professor (chave: idProfessor/cpf, ou nome se ausente)
+  function agruparAulasPorProfessor(filtroAno, filtroMes) {
+    const contagem = {};
+    S.aulasEquipe.forEach(a => {
+      if (filtroAno && a._data.ano !== Number(filtroAno)) return;
+      if (filtroMes !== '' && filtroMes != null && a._data.mes !== Number(filtroMes)) return;
+      const idProf = (getField(a, 'idProfessor') || '').toString().trim();
+      const nome = getField(a, 'professor') || 'Sem nome';
+      const chave = idProf || nome;
+      if (!contagem[chave]) contagem[chave] = { nome, total: 0 };
+      contagem[chave].total++;
+    });
+    return Object.values(contagem);
+  }
+
+  function renderRankingMes() {
+    const ano   = $id('dp-eqFiltroAno')?.value || '';
+    const mes   = $id('dp-eqFiltroMes')?.value ?? '';
+    const ordem = $id('dp-eqFiltroOrdem')?.value || 'desc';
+
+    let lista = agruparAulasPorProfessor(ano, mes);
+    lista.sort((x, y) => ordem === 'asc' ? x.total - y.total : y.total - x.total);
+    lista = lista.slice(0, 15);
+
+    renderChartRanking(lista);
+  }
+
+  function renderChartRanking(lista) {
+    const canvas = $id('dp-eqChartRanking'); if (!canvas || typeof Chart === 'undefined') return;
+    if (S.chartRankingMes) S.chartRankingMes.destroy();
+
+    S.chartRankingMes = new Chart(canvas.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: lista.map(i => i.nome),
+        datasets: [{
+          label: 'Aulas dadas',
+          data: lista.map(i => i.total),
+          backgroundColor: '#f28705',
+          borderRadius: 6,
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          datalabels: {
+            anchor: 'end', align: 'right', color: '#4b5563',
+            font: { weight: 'bold' },
+            formatter: v => v
+          }
+        },
+        scales: {
+          x: { beginAtZero: true, ticks: { precision: 0 }, grid: { borderDash: [2, 4], color: '#E5E7EB' } },
+          y: { grid: { display: false } }
+        }
+      }
+    });
+  }
+
+  function renderSemAula() {
+    const cont = $id('dp-eqSemAula'); if (!cont) return;
+    const hoje = new Date();
+
+    const ultimaPorCpf = {};
+    S.aulasEquipe.forEach(a => {
+      const cpf = (getField(a, 'idProfessor') || '').toString().trim();
+      if (!cpf) return;
+      const atual = ultimaPorCpf[cpf];
+      if (!atual || a._data.date > atual) ultimaPorCpf[cpf] = a._data.date;
+    });
+
+    const linhas = S.professoresEquipe.map(p => {
+      const cpf   = (getField(p, 'cpf') || '').toString().trim();
+      const nome  = getField(p, 'nome') || 'Sem nome';
+      const ultima = cpf ? ultimaPorCpf[cpf] : null;
+      const dias  = ultima ? Math.floor((hoje - ultima) / 86400000) : Infinity;
+      return { nome, ultima, dias };
+    }).sort((a, b) => b.dias - a.dias).slice(0, 20);
+
+    if (!linhas.length) {
+      cont.innerHTML = '<p style="color:var(--dp-gray-400);font-size:.78rem;text-align:center;padding:.75rem">Nenhum professor ativo encontrado.</p>';
+      return;
+    }
+
+    cont.innerHTML = `
+      <table class="dp-eq-table">
+        <thead><tr><th>Professor</th><th>Última aula</th><th>Dias sem aula</th></tr></thead>
+        <tbody>
+          ${linhas.map(l => `
+            <tr>
+              <td>${l.nome}</td>
+              <td>${l.ultima ? l.ultima.toLocaleDateString('pt-BR') : '—'}</td>
+              <td>${l.dias === Infinity ? '<span style="color:var(--dp-red);font-weight:700">Nunca deu aula</span>' : `${l.dias} dia(s)`}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  function renderRankingGeral() {
+    const cont = $id('dp-eqRankingGeral'); if (!cont) return;
+    const lista = agruparAulasPorProfessor('', '').sort((a, b) => b.total - a.total).slice(0, 10);
+    const medalhas = ['🥇', '🥈', '🥉'];
+
+    if (!lista.length) {
+      cont.innerHTML = '<p style="color:var(--dp-gray-400);font-size:.78rem;text-align:center;padding:.75rem">Nenhuma aula concluída registrada ainda.</p>';
+      return;
+    }
+
+    cont.innerHTML = lista.map((l, i) => `
+      <div class="dp-eq-ranking-item">
+        <span class="dp-eq-ranking-pos">${medalhas[i] || (i + 1) + 'º'} ${l.nome}</span>
+        <span class="dp-eq-ranking-total">${l.total} aula(s)</span>
+      </div>`).join('');
   }
 
   // Cria conta no Firebase Auth via REST API (não afeta a sessão do admin).

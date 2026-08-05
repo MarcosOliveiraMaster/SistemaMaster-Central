@@ -762,7 +762,18 @@ const Simulacoes = (function() {
                   </select>
                 </div>
               </div>
-              
+
+              <!-- Estudantes cadastrados -->
+              <div class="mt-4 pt-4 border-t border-gray-100">
+                <div class="text-xs font-medium text-gray-500 mb-2">
+                  <i class="fas fa-user-graduate text-orange-500 mr-1"></i>
+                  Estudantes cadastrados
+                </div>
+                <div id="lista-estudantes-cliente-sim" class="text-sm text-gray-800 space-y-1">
+                  <span class="text-gray-400">Selecione um cliente para ver os estudantes cadastrados</span>
+                </div>
+              </div>
+
               <!-- Valores Calculados -->
               <div class="flex items-start justify-between mt-4">
                 <div class="text-sm text-gray-600 font-medium">Valores calculados automaticamente a partir das aulas</div>
@@ -828,7 +839,12 @@ const Simulacoes = (function() {
                   </h4>
                 <div class="flex gap-2">
                   <button id="btn-calendario-simulacao" class="btn-secondary btn-compact" title="Visualizar calendário de aulas">
-                    <i class="fas fa-calendar-alt"></i>
+                    <i class="fas fa-calendar-alt mr-2"></i>
+                    Vista Calendário
+                  </button>
+                  <button id="btn-verificar-datas-simulacao" type="button" class="btn-secondary btn-compact" title="Checar feriados e conflitos de agenda nas aulas desta simulação">
+                    <i class="fas fa-calendar-check mr-2"></i>
+                    Verificar Datas
                   </button>
                   <button id="btn-remover-aula-simulacao" class="btn-secondary btn-compact">
                     <i class="fas fa-trash mr-2"></i>
@@ -852,6 +868,7 @@ const Simulacoes = (function() {
                         <th>Matéria</th>
                         <th>Estudante</th>
                         <th>Professor</th>
+                        <th class="text-center" title="Verificar Datas: feriado / conflito de agenda">🎓</th>
                         <th>Hora/Aula - Professor</th>
                         <th class="text-center">Ações</th>
                       </tr>
@@ -1172,7 +1189,7 @@ const Simulacoes = (function() {
     if (!aulas || aulas.length === 0) {
       return `
         <tr>
-          <td colspan="7" class="text-center py-8 text-gray-500 text-sm">
+          <td colspan="8" class="text-center py-8 text-gray-500 text-sm">
             <i class="fas fa-calendar-plus text-3xl text-gray-300 mb-3"></i>
             <p>Nenhuma aula adicionada</p>
             <p class="text-xs mt-1">Clique em "Adicionar aula" para começar</p>
@@ -1218,6 +1235,9 @@ const Simulacoes = (function() {
           <button type="button" class="btn-professor-aula-sim text-sm px-2 py-1 cursor-pointer hover:bg-orange-50 rounded transition-colors ${!aula.professor || aula.professor === 'A definir' ? 'text-orange-500 font-semibold' : ''}" data-index="${index}" data-professor="${aula.professor || 'A definir'}" data-id-professor="${aula.idProfessor || ''}" title="Clique para alterar o professor">
             ${aula.professor || 'A definir'}
           </button>
+        </td>
+        <td class="text-center">
+          <span class="verif-datas-dot verif-neutro" data-aula-index="${index}" data-tooltip="Clique em &quot;Verificar Datas&quot; para checar feriados e conflitos"></span>
         </td>
         <td class="text-right">
           R$ ${Number(calcularValorAula(aula.duracao)).toFixed(2)}
@@ -1779,7 +1799,25 @@ const Simulacoes = (function() {
     const selectCliente = modal.querySelector('#select-cliente');
     const inputNovoCliente = modal.querySelector('#input-novo-cliente');
     const btnAdicionarCliente = modal.querySelector('#btn-adicionar-cliente');
-    
+
+    // Lista de estudantes cadastrados do cliente selecionado
+    const elListaEstudantesSim = modal.querySelector('#lista-estudantes-cliente-sim');
+    const renderListaEstudantesSim = (clienteId) => {
+      if (!elListaEstudantesSim) return;
+      const cliente = clientesData.find(c => c.id === clienteId);
+      const estudantes = (cliente && Array.isArray(cliente.estudantes)) ? cliente.estudantes : [];
+      const completos = estudantes.filter(e => e && e.nome && e.nome.trim());
+      elListaEstudantesSim.innerHTML = completos.length
+        ? completos.map(e => `
+            <div class="flex items-center flex-wrap gap-x-2">
+              <span class="font-medium">${escapeHtml(e.nome.trim())}</span>
+              ${e.escola ? `<span class="text-gray-500 text-xs">• Escola: ${escapeHtml(e.escola)}</span>` : ''}
+              ${e.serie ? `<span class="text-gray-500 text-xs">• Série: ${escapeHtml(e.serie)}</span>` : ''}
+            </div>`).join('')
+        : '<span class="text-gray-400">Nenhum estudante cadastrado</span>';
+    };
+    renderListaEstudantesSim(selectCliente ? selectCliente.value : '');
+
     // Fechar modal
     const closeModal = () => {
       modal.remove();
@@ -1880,11 +1918,11 @@ const Simulacoes = (function() {
                     }
                     const arrayEstudantes = clienteData.estudantes || clienteData.Estudante || [];
                     arrayEstudantes.forEach(e => {
-                      if (!e || !e.nomeEstudante) return;
+                      if (!e || !e.nome) return;
                       estudantesComEscola.push({
-                        nome: e.nomeEstudante.trim(),
-                        escola: (e.escolaEstudante && e.escolaEstudante.trim()) ? e.escolaEstudante.trim() : 'Escola não informada',
-                        serie: (e.serieEstudante && e.serieEstudante.trim()) ? e.serieEstudante.trim() : 'Série não informada'
+                        nome: e.nome.trim(),
+                        escola: (e.escola && e.escola.trim()) ? e.escola.trim() : 'Escola não informada',
+                        serie: (e.serie && e.serie.trim()) ? e.serie.trim() : 'Série não informada'
                       });
                     });
                   }
@@ -1924,7 +1962,60 @@ const Simulacoes = (function() {
         }
       });
     }
-    
+
+    // Botão "Verificar Datas" (simulação): checa feriado/véspera de feriado e conflito de agenda
+    // do professor para cada aula simulada, pintando o círculo 🎓 de cada linha.
+    const btnVerificarDatasSim = modal.querySelector('#btn-verificar-datas-simulacao');
+    if (btnVerificarDatasSim) {
+      btnVerificarDatasSim.addEventListener('click', async () => {
+        if (typeof window.verificarStatusAula !== 'function') {
+          showToast('Motor de verificação de datas não disponível', 'error');
+          return;
+        }
+        const aulas = editingSimulacao.aulas || [];
+        if (aulas.length === 0) return;
+
+        const originalHTML = btnVerificarDatasSim.innerHTML;
+        btnVerificarDatasSim.disabled = true;
+        btnVerificarDatasSim.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Verificando...';
+
+        const dots = Array.from(modal.querySelectorAll('.verif-datas-dot'));
+        dots.forEach(dot => {
+          dot.classList.remove('verif-neutro', 'verif-verde', 'verif-amarelo', 'verif-vermelho');
+          dot.classList.add('verif-checando');
+        });
+
+        try {
+          await Promise.all(aulas.map(async (aula, index) => {
+            const dot = dots.find(d => Number(d.dataset.aulaIndex) === index);
+            if (!dot) return;
+            try {
+              const resultado = await window.verificarStatusAula(aula);
+              dot.classList.remove('verif-checando');
+              dot.classList.add(`verif-${resultado.cor}`);
+              dot.dataset.tooltip = resultado.tooltip;
+            } catch (errAula) {
+              console.error('Erro ao verificar aula simulada:', index, errAula);
+              dot.classList.remove('verif-checando');
+              dot.classList.add('verif-neutro');
+              dot.dataset.tooltip = 'Não foi possível verificar esta aula';
+            }
+          }));
+          showToast('✅ Verificação de datas concluída', 'success');
+        } catch (error) {
+          console.error('❌ Erro ao verificar datas (simulação):', error);
+          showToast('❌ Erro ao verificar datas', 'error');
+          dots.forEach(dot => {
+            dot.classList.remove('verif-checando');
+            dot.classList.add('verif-neutro');
+          });
+        } finally {
+          btnVerificarDatasSim.disabled = false;
+          btnVerificarDatasSim.innerHTML = originalHTML;
+        }
+      });
+    }
+
     // Seleção de cliente
     selectCliente.addEventListener('change', (e) => {
       if (e.target.value === '__novo__') {
@@ -1932,14 +2023,17 @@ const Simulacoes = (function() {
         btnAdicionarCliente.classList.remove('hidden');
         selectCliente.classList.add('hidden');
         document.getElementById('cpf-cliente').value = '';
+        renderListaEstudantesSim('');
       } else if (e.target.value) {
         const cliente = clientesData.find(c => c.id === e. target.value);
         if (cliente) {
           document.getElementById('cpf-cliente').value = cliente.cpf || '';
         }
+        renderListaEstudantesSim(e.target.value);
         autoSalvarSimulacao();
       } else {
         document.getElementById('cpf-cliente').value = '';
+        renderListaEstudantesSim('');
         autoSalvarSimulacao();
       }
     });
