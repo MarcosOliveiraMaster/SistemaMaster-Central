@@ -702,6 +702,61 @@ async function copiarAulaLista(idAulaOrigem) {
   }
 }
 
+// ─────────────────────────────────────────────────────────────
+// Coleção "calendario" — eventos customizados do Calendário Master
+// (data, hora, nome, responsavel). Não armazena aulas nem pagamentos,
+// que continuam vindo de BancoDeAulas-Lista e BancoDeAulas.
+// ─────────────────────────────────────────────────────────────
+
+// Função para adicionar um evento customizado ao calendário
+async function addEventoCalendario(eventoData) {
+  try {
+    const docRef = await db.collection("calendario").add({
+      ...eventoData,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    return docRef.id;
+  } catch (error) {
+    console.error('❌ Erro ao adicionar evento do calendário:', error.message);
+    throw error;
+  }
+}
+
+// Função para buscar todos os eventos customizados do calendário
+async function fetchEventosCalendario() {
+  try {
+    const querySnapshot = await db.collection("calendario").get();
+    const eventos = [];
+    querySnapshot.forEach(doc => { eventos.push({ id: doc.id, ...doc.data() }); });
+    return eventos;
+  } catch (error) {
+    console.error('❌ Erro ao buscar eventos do calendário:', error.message);
+    return [];
+  }
+}
+
+// Função para atualizar um evento customizado do calendário
+async function updateEventoCalendario(eventoId, updatedData) {
+  try {
+    await db.collection("calendario").doc(eventoId).update(updatedData);
+    return true;
+  } catch (error) {
+    console.error('❌ Erro ao atualizar evento do calendário:', error.message);
+    throw error;
+  }
+}
+
+// Função para excluir um evento customizado do calendário
+async function deleteEventoCalendario(eventoId) {
+  try {
+    await db.collection("calendario").doc(eventoId).delete();
+    return true;
+  } catch (error) {
+    console.error('❌ Erro ao excluir evento do calendário:', error.message);
+    throw error;
+  }
+}
+
 // Forçar atualização do cache
 function forceCacheRefresh() {
   CACHE.bancoDeAulas.timestamp      = null;
@@ -741,6 +796,10 @@ if (typeof window !== 'undefined') {
     deleteAulaByIdAula,
     addAulaCalendario,
     copiarAulaLista,
+    addEventoCalendario,
+    fetchEventosCalendario,
+    updateEventoCalendario,
+    deleteEventoCalendario,
     forceCacheRefresh,
     isCacheValid
   };

@@ -40,8 +40,19 @@ let semanaGraficoAtual = calcularSemanaAtual(); // Calcula a semana atual do mê
 // ===== VARIÁVEL GLOBAL PARA CONTROLE DE DIA (TABELA CONSULTA AULAS) =====
 let diaConsultaAulasAtual = new Date(); // Data atual para a tabela
 
-// ===== VARIÁVEL GLOBAL PARA CONTROLE DE FILTRO (PAGAMENTO) =====
-let filtroSelecionado = 'todos'; // 'todos', 'pagamento', 'contrato'
+// ===== VARIÁVEIS GLOBAIS DE FILTRO (TABELA DE PAGAMENTO) =====
+let pgtoContratosDoMes = [];  // cache do mês atual, evita refetch a cada filtro/busca/ordenação
+let pgtoTextoBusca = '';
+let pgtoSituacaoAtiva = { contrato: false, pagamento: true };
+let pgtoMetodoSelecionado = 'todos';
+let pgtoOrdenarPor = 'parcela1'; // 'parcela1' | 'parcela2' | 'numero'
+
+// ===== VARIÁVEIS GLOBAIS DO CALENDÁRIO MASTER =====
+let calMasterMes = new Date().getMonth(); // 0-11
+let calMasterAno = new Date().getFullYear();
+let calMasterExibirAulas = false;
+let calMasterExibirPagamentos = true;
+let calMasterEventosCache = []; // cache dos eventos customizados carregados no mês atual
 
 // Função para carregar o Painel Central
 function loadPainelCentral() {
@@ -163,56 +174,88 @@ function loadPainelCentral() {
     </div>
 
     <!-- Seções Inferiores -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+    <div class="flex flex-col gap-4 mt-4">
       <!-- Informações de pagamento -->
-      <div class="bg-white rounded-lg border border-gray-300 p-4 h-full">
+      <div class="bg-white rounded-lg border border-gray-300 p-4">
         <h2 class="text-lg font-lexend font-bold text-gray-800 mb-4">Informações de pagamento</h2>
         
-        <!-- Navegação de Mês e Filtros -->
-        <div class="flex items-center gap-4 mb-4">
+        <!-- Barra de filtros (mês + busca + situação + método + ordenar, todos com a mesma altura) -->
+        <div class="flex flex-wrap items-center gap-2 mb-4">
           <!-- Navegação de Mês -->
-          <div class="flex items-center justify-center gap-1">
-            <button id="btn-mes-anterior" class="px-2 py-1 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-800">
-              <i class="fas fa-chevron-left text-lg"></i>
+          <div class="flex items-center gap-1 border border-gray-300 rounded-lg px-1" style="height: 34px;">
+            <button id="btn-mes-anterior" class="px-1.5 hover:bg-gray-100 rounded transition-colors text-gray-600 hover:text-gray-800" style="height: 26px;">
+              <i class="fas fa-chevron-left text-sm"></i>
             </button>
-            <span id="mes-pagamento-atual" class="text-sm font-semibold text-gray-800 min-w-[80px] text-center">
+            <span id="mes-pagamento-atual" class="text-xs font-semibold text-gray-800 min-w-[70px] text-center">
               Fevereiro
             </span>
-            <button id="btn-mes-proximo" class="px-2 py-1 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-800">
-              <i class="fas fa-chevron-right text-lg"></i>
+            <button id="btn-mes-proximo" class="px-1.5 hover:bg-gray-100 rounded transition-colors text-gray-600 hover:text-gray-800" style="height: 26px;">
+              <i class="fas fa-chevron-right text-sm"></i>
             </button>
           </div>
-          
-          <!-- Filtros de opções -->
-          <div class="flex flex-1 gap-0">
-            <button id="btn-filtro-todos" class="flex-1 py-1.5 text-xs font-medium rounded-l-lg transition-all bg-orange-500 text-white hover:bg-orange-600" data-filtro="todos">
-              Todos
-            </button>
-            <button id="btn-filtro-pagamento" class="flex-1 py-1.5 text-xs font-medium transition-all bg-gray-100 text-gray-700 hover:bg-gray-200" data-filtro="pagamento">
-              Pagamento Pendente
-            </button>
-            <button id="btn-filtro-contrato" class="flex-1 py-1.5 text-xs font-medium rounded-r-lg transition-all bg-gray-100 text-gray-700 hover:bg-gray-200" data-filtro="contrato">
-              Contrato Pendente
-            </button>
+
+          <!-- Busca por cliente -->
+          <div class="relative flex-1" style="min-width: 180px;">
+            <i class="fas fa-search absolute text-gray-400 text-xs" style="left: 10px; top: 50%; transform: translateY(-50%);"></i>
+            <input type="text" id="pgto-busca-cliente" placeholder="Buscar cliente..."
+                   class="w-full border border-gray-300 rounded-lg pl-7 pr-3 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500" style="height: 34px;">
           </div>
-        </div>
-        
-        <!-- Área de Cards de Pagamento -->
-        <div id="areaCardsPagamento" class="border-t border-gray-200 pt-4" style="height: 500px; overflow-y: auto;">
-          <div class="space-y-3">
-            <!-- Cards serão carregados aqui -->
-            <div class="text-center py-8 text-gray-500">
-              <i class="fas fa-spinner fa-spin text-orange-500 text-2xl mb-2"></i>
-              <p class="text-sm">Carregando dados...</p>
+
+          <!-- Dropdown de Situação -->
+          <div class="relative" id="pgto-situacao-wrapper">
+            <button type="button" id="pgto-btn-situacao" class="flex items-center gap-2 border border-gray-300 rounded-lg px-3 text-xs bg-white hover:bg-gray-50 cursor-pointer whitespace-nowrap" style="height: 34px;">
+              <span>Situação: Todos</span>
+              <i class="fas fa-chevron-down text-gray-400"></i>
+            </button>
+            <div id="pgto-situacao-dropdown" class="hidden absolute left-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-max">
+              <div class="p-2 space-y-1">
+                <label class="flex items-center justify-between gap-3 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer text-xs select-none">
+                  <span class="flex items-center gap-2">
+                    <input type="checkbox" class="pgto-situacao-chk w-4 h-4" data-situacao="contrato">
+                    <span class="font-semibold text-gray-600">Contrato pendente</span>
+                  </span>
+                  <span id="pgto-contador-contrato" class="text-xs font-bold text-gray-600 bg-gray-100 rounded-full px-2 py-0.5 min-w-[18px] text-center">0</span>
+                </label>
+                <label class="flex items-center justify-between gap-3 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer text-xs select-none">
+                  <span class="flex items-center gap-2">
+                    <input type="checkbox" class="pgto-situacao-chk w-4 h-4" data-situacao="pagamento" checked>
+                    <span class="font-semibold text-orange-600">Pagamento pendente</span>
+                  </span>
+                  <span id="pgto-contador-pagamento" class="text-xs font-bold text-orange-600 bg-orange-50 rounded-full px-2 py-0.5 min-w-[18px] text-center">0</span>
+                </label>
+              </div>
             </div>
+          </div>
+
+          <!-- Método de pagamento -->
+          <select id="pgto-filtro-metodo" class="border border-gray-300 rounded-lg px-2 text-xs bg-white cursor-pointer" style="height: 34px;">
+            <option value="todos">Todos os métodos</option>
+            <option value="cartão de crédito">Cartão de crédito</option>
+            <option value="pix completo">Pix completo</option>
+            <option value="pix dividido">Pix dividido</option>
+          </select>
+
+          <!-- Ordenar por -->
+          <select id="pgto-ordenar-por" class="border border-gray-300 rounded-lg px-2 text-xs bg-white cursor-pointer" style="height: 34px;">
+            <option value="parcela1">Ordenar por: 1ª Parcela</option>
+            <option value="parcela2">Ordenar por: 2ª Parcela</option>
+            <option value="numero">Ordenar por: Número da contratação</option>
+          </select>
+        </div>
+
+        <!-- Área da tabela de pagamento -->
+        <div id="areaCardsPagamento" class="border-t border-gray-200" style="max-height: 500px; overflow-y: auto;">
+          <div class="text-center py-8 text-gray-500">
+            <i class="fas fa-spinner fa-spin text-orange-500 text-2xl mb-2"></i>
+            <p class="text-sm">Carregando dados...</p>
           </div>
         </div>
       </div>
 
       <!-- Eventos do calendário Master -->
-      <div class="bg-white rounded-lg border border-gray-300 p-4 h-full">
+      <div class="bg-white rounded-lg border border-gray-300 p-4">
         <h2 class="text-lg font-lexend font-bold text-gray-800 mb-4">Eventos do calendário Master</h2>
-        <!-- Conteúdo será implementado posteriormente -->
+        <div id="areaCalendarioMaster"></div>
       </div>
     </div>
   `;
@@ -243,6 +286,9 @@ function loadPainelCentral() {
 
   // Carregar cards de pagamento do mês atual
   carregarCardsPagamento();
+
+  // Inicializar Calendário Master
+  carregarCalendarioMaster();
 }
 
 // ===== FUNÇÕES DE GERENCIAMENTO DE DATA =====
@@ -1218,84 +1264,22 @@ async function carregarCardsPagamento() {
     // Buscar todos os dados de BancoDeAulas
     const snapshot = await firebase.firestore().collection('BancoDeAulas').get();
     const contratos = [];
-    
-    snapshot.forEach(doc => {
-      contratos.push({
-        id: doc.id,
-        ...doc.data()
-      });
-    });
+    snapshot.forEach(doc => contratos.push({ id: doc.id, ...doc.data() }));
 
     console.log(`📊 Total de contratos encontrados: ${contratos.length}`);
 
-    // Filtrar contratos por mês do timestamp
-    const contratosFiltrados = contratos.filter(contrato => {
-      if (!contrato.timestamp) return false;
-      
-      let dataContrato = null;
-      
-      // Handle diferentes tipos de timestamp (Timestamp do Firebase ou string)
-      if (contrato.timestamp.toDate) {
-        // Firebase Timestamp
-        dataContrato = contrato.timestamp.toDate();
-      } else if (typeof contrato.timestamp === 'string') {
-        // String de data (dd/mm/yyyy)
-        try {
-          const partes = contrato.timestamp.split('/'); 
-          if (partes.length === 3) {
-            const dia = parseInt(partes[0]);
-            const mes = parseInt(partes[1]) - 1; // 0-11
-            const ano = parseInt(partes[2]);
-            dataContrato = new Date(ano, mes, dia);
-          }
-        } catch (e) {
-          return false;
-        }
-      } else if (contrato.timestamp instanceof Date) {
-        dataContrato = contrato.timestamp;
-      }
-      
-      if (!dataContrato) return false;
-      
-      // Comparar mês e ano
-      return dataContrato.getMonth() === mesPagamentoAtual && 
+    // Filtrar contratos por mês/ano do timestamp de criação — cacheia pro mês atual,
+    // pra não precisar refazer a busca no Firestore a cada mudança de filtro/busca/ordenação
+    pgtoContratosDoMes = contratos.filter(contrato => {
+      const dataContrato = _pgtoTimestampToDate(contrato.timestamp);
+      return !!dataContrato &&
+             dataContrato.getMonth() === mesPagamentoAtual &&
              dataContrato.getFullYear() === new Date().getFullYear();
     });
 
-    console.log(`✅ Contratos filtrados para o mês: ${contratosFiltrados.length}`);
+    console.log(`✅ Contratos do mês: ${pgtoContratosDoMes.length}`);
 
-    // Aplicar filtro adicional baseado na seleção do usuário
-    let contratosComFiltro = contratosFiltrados;
-
-    if (filtroSelecionado === 'pagamento') {
-      // Filtrar por "Aguardando 1º Pagamento" OU "Aguardando 2º Pagamento"
-      contratosComFiltro = contratosFiltrados.filter(contrato => {
-        const statusPg = (contrato.statusPagamento || '').toLowerCase();
-        return statusPg.includes('aguardando 1º pagamento') || statusPg.includes('aguardando 2º pagamento');
-      });
-      console.log(`✅ Contratos com "Pagamento Pendente": ${contratosComFiltro.length}`);
-    } else if (filtroSelecionado === 'contrato') {
-      // Filtrar por "Pendente de Assinatura"
-      contratosComFiltro = contratosFiltrados.filter(contrato => {
-        const statusCt = (contrato.statusContrato || '').toLowerCase();
-        return statusCt.includes('pendente de assinatura');
-      });
-      console.log(`✅ Contratos com "Contrato Pendente": ${contratosComFiltro.length}`);
-    }
-
-    if (contratosComFiltro.length === 0) {
-      areaCards.innerHTML = `
-        <div class="flex flex-col items-center justify-center py-8 text-gray-500">
-          <i class="fas fa-inbox text-3xl text-gray-400 mb-2"></i>
-          <p class="text-sm">Nenhum contrato encontrado para este filtro</p>
-        </div>
-      `;
-      return;
-    }
-
-    // Renderizar cards
-    renderCardsContratacao(contratosComFiltro);
-
+    aplicarFiltrosPagamento();
   } catch (error) {
     console.error('❌ Erro ao carregar cards de pagamento:', error);
     areaCards.innerHTML = `
@@ -1307,98 +1291,152 @@ async function carregarCardsPagamento() {
   }
 }
 
-function renderCardsContratacao(contratos) {
+// Converte Timestamp do Firebase, string "dd/mm/yyyy" ou Date em um objeto Date
+function _pgtoTimestampToDate(valor) {
+  if (!valor) return null;
+  if (valor.toDate) return valor.toDate();
+  if (valor instanceof Date) return valor;
+  if (typeof valor === 'string') {
+    const partes = valor.split('/');
+    if (partes.length === 3) {
+      const dia = parseInt(partes[0]);
+      const mes = parseInt(partes[1]) - 1;
+      const ano = parseInt(partes[2]);
+      const d = new Date(ano, mes, dia);
+      return isNaN(d.getTime()) ? null : d;
+    }
+  }
+  return null;
+}
+
+// Classifica um contrato em 'contrato' | 'pagamento' | null.
+// Contrato pendente de assinatura é o bloqueio mais urgente, por isso tem prioridade sobre pagamento pendente.
+function classificarSituacaoPagamento(contrato) {
+  const statusCt = (contrato.statusContrato || '').toLowerCase();
+  if (statusCt.includes('pendente de assinatura')) return 'contrato';
+  const statusPg = (contrato.statusPagamento || '').toLowerCase();
+  if (statusPg.includes('aguardando 1º pagamento') || statusPg.includes('aguardando 2º pagamento')) return 'pagamento';
+  return null;
+}
+
+function ordenarLinhasPagamento(linhas, campo) {
+  const arr = [...linhas];
+  arr.sort((a, b) => {
+    if (campo === 'numero') return String(a.contrato.id).localeCompare(String(b.contrato.id));
+    const chave = campo === 'parcela2' ? 'dataSegundaParcela' : 'dataPrimeiraParcela';
+    const da = _pgtoTimestampToDate(a.contrato[chave]);
+    const db = _pgtoTimestampToDate(b.contrato[chave]);
+    return (da ? da.getTime() : Infinity) - (db ? db.getTime() : Infinity);
+  });
+  return arr;
+}
+
+// Aplica busca/situação/método/ordenação sobre o cache do mês (pgtoContratosDoMes) e renderiza a tabela.
+// Chamada a cada mudança de filtro — não refaz a busca no Firestore.
+function aplicarFiltrosPagamento() {
   const areaCards = document.getElementById('areaCardsPagamento');
   if (!areaCards) return;
 
-  const cardsHtml = contratos.map(contrato => {
+  const contadores = { contrato: 0, pagamento: 0 };
+  const buscaLower = pgtoTextoBusca.toLowerCase();
+
+  const linhas = pgtoContratosDoMes.reduce((acc, contrato) => {
+    const situacao = classificarSituacaoPagamento(contrato);
+    if (!situacao) return acc;
+
+    if (pgtoMetodoSelecionado !== 'todos' && (contrato.modoPagamento || '').toLowerCase().trim() !== pgtoMetodoSelecionado) return acc;
+    const nomeCliente = contrato.nome || contrato.nomeCliente || '';
+    if (buscaLower && !nomeCliente.toLowerCase().includes(buscaLower)) return acc;
+
+    contadores[situacao]++;
+    if (!pgtoSituacaoAtiva[situacao]) return acc;
+
+    acc.push({ contrato, situacao });
+    return acc;
+  }, []);
+
+  const elContadorContrato = document.getElementById('pgto-contador-contrato');
+  const elContadorPagamento = document.getElementById('pgto-contador-pagamento');
+  if (elContadorContrato) elContadorContrato.textContent = contadores.contrato;
+  if (elContadorPagamento) elContadorPagamento.textContent = contadores.pagamento;
+
+  if (linhas.length === 0) {
+    areaCards.innerHTML = `
+      <div class="flex flex-col items-center justify-center py-8 text-gray-500">
+        <i class="fas fa-inbox text-3xl text-gray-400 mb-2"></i>
+        <p class="text-sm">Nenhum contrato encontrado para estes filtros</p>
+      </div>
+    `;
+    return;
+  }
+
+  renderTabelaPagamento(ordenarLinhasPagamento(linhas, pgtoOrdenarPor));
+}
+
+const PGTO_SITUACAO_CONFIG = {
+  contrato:  { accent: 'border-gray-400',   label: 'Contrato pendente',  labelColor: 'text-gray-600' },
+  pagamento: { accent: 'border-orange-500', label: 'Pagamento pendente', labelColor: 'text-orange-600' }
+};
+
+function renderTabelaPagamento(linhas) {
+  const areaCards = document.getElementById('areaCardsPagamento');
+  if (!areaCards) return;
+
+  const linhasHtml = linhas.map(({ contrato, situacao }) => {
     const nomeCliente = contrato.nome || contrato.nomeCliente || 'Cliente não identificado';
     const statusPagamento = contrato.statusPagamento || 'Não informado';
     const statusContrato = contrato.statusContrato || 'Não informado';
     const metodoPagamento = contrato.modoPagamento || 'Não informado';
     const dataPrimeiraParcela = limparDadosInvalidos(formatarDataContrato(contrato.dataPrimeiraParcela));
     const dataSegundaParcela = limparDadosInvalidos(formatarDataContrato(contrato.dataSegundaParcela));
-    const dataAssinaturaContrato = limparDadosInvalidos(formatarDataContrato(contrato.dataAssinaturaContrato));
     const dataContratacao = formatarDataContrato(contrato.timestamp);
-
-    // Determinar cores dos badges
     const colorPagamento = getCorStatusPagamento(statusPagamento);
     const colorContrato = getCorStatusPagamento(statusContrato);
+    const cfg = PGTO_SITUACAO_CONFIG[situacao] || PGTO_SITUACAO_CONFIG.pagamento;
 
     return `
-      <div class="bg-white border-l-4 border-orange-500 rounded-lg shadow-sm hover:shadow-md transition-all p-4 mb-[10px]">
-        <!-- Header com nome e data -->
-        <div class="flex justify-between items-start mb-3">
-          <div class="flex-1">
-            <p class="font-bold text-gray-900 text-sm leading-tight">
-              ${escapeHtml(nomeCliente)}
-            </p>
-          </div>
-          <div class="text-right">
-            <p class="text-xs text-gray-500 font-medium">
-              <i class="fas fa-calendar-alt text-gray-400 mr-1"></i>
-              ${dataContratacao}
-            </p>
-          </div>
-        </div>
-
-        <!-- Divider -->
-        <div class="h-px bg-gray-100 mb-3"></div>
-
-        <!-- Informações de Pagamento -->
-        <div class="mb-3">
-          <div class="flex justify-between items-center mb-2">
-            <p class="text-xs text-gray-600 font-semibold">
-              Informações de Pagamento
-            </p>
-            <span class="${colorPagamento} font-medium px-2.5 py-1.5 bg-opacity-10 rounded text-xs">
-              ${statusPagamento}
-            </span>
-          </div>
-          <div class="grid grid-cols-3 gap-2 text-xs">
-            <!-- Método Pagamento -->
-            <div>
-              <p class="text-gray-500 mb-1">Método Pagamento</p>
-              <p class="text-gray-700 px-2 py-1 bg-gray-50 rounded text-center">
-                ${metodoPagamento}
-              </p>
-            </div>
-            <!-- Data 1º Parcela -->
-            <div>
-              <p class="text-gray-500 mb-1">Data 1º Parcela</p>
-              <p class="text-gray-700 px-2 py-1 bg-gray-50 rounded text-center">
-                ${dataPrimeiraParcela}
-              </p>
-            </div>
-            <!-- Data 2º Parcela -->
-            <div>
-              <p class="text-gray-500 mb-1">Data 2º Parcela</p>
-              <p class="text-gray-700 px-2 py-1 bg-gray-50 rounded text-center">
-                ${dataSegundaParcela}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Status Contrato com detalhes -->
-        <div class="mb-0">
-          <div class="flex flex-wrap gap-2 items-center">
-            <p class="text-xs text-gray-600 font-semibold">
-              Contrato
-            </p>
-            <span class="text-xs ${colorContrato} font-medium px-2.5 py-1.5 bg-opacity-10 rounded">
-              ${statusContrato}
-            </span>
-            <span class="text-xs text-gray-500 px-2 py-1">
-              <i class="fas fa-calendar text-xs mr-1"></i>${dataAssinaturaContrato}
-            </span>
-          </div>
-        </div>
-      </div>
+      <tr class="border-l-4 ${cfg.accent} border-b border-gray-100 hover:bg-orange-50 transition-colors cursor-pointer"
+          onclick="abrirDetalhesContratacaoPainelCentral('${escapeHtml(String(contrato.id))}')"
+          title="Ver detalhes da contratação">
+        <td class="px-3 py-2 text-sm font-semibold text-gray-800 whitespace-nowrap">${escapeHtml(nomeCliente)}</td>
+        <td class="px-3 py-2 text-xs font-bold uppercase ${cfg.labelColor} whitespace-nowrap">${cfg.label}</td>
+        <td class="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">${escapeHtml(String(contrato.id))}</td>
+        <td class="px-3 py-2 text-xs text-gray-600 whitespace-nowrap">${dataContratacao}</td>
+        <td class="px-3 py-2 whitespace-nowrap">
+          <span class="${colorPagamento} font-medium px-2 py-1 rounded-full text-xs">${statusPagamento}</span>
+        </td>
+        <td class="px-3 py-2 whitespace-nowrap">
+          <span class="${colorContrato} font-medium px-2 py-1 rounded-full text-xs">${statusContrato}</span>
+        </td>
+        <td class="px-3 py-2 text-xs text-gray-600 whitespace-nowrap">${escapeHtml(metodoPagamento)}</td>
+        <td class="px-3 py-2 text-xs text-gray-600 whitespace-nowrap">${dataPrimeiraParcela}</td>
+        <td class="px-3 py-2 text-xs text-gray-600 whitespace-nowrap">${dataSegundaParcela}</td>
+      </tr>
     `;
   }).join('');
 
-  areaCards.innerHTML = `${cardsHtml}`;
+  areaCards.innerHTML = `
+    <div class="overflow-x-auto">
+      <table class="w-full text-left border-collapse">
+        <thead class="sticky top-0 bg-gray-50 z-10">
+          <tr class="border-b border-gray-200">
+            <th class="px-3 py-2 text-xs font-semibold text-gray-600 whitespace-nowrap">Cliente</th>
+            <th class="px-3 py-2 text-xs font-semibold text-gray-600 whitespace-nowrap">Situação</th>
+            <th class="px-3 py-2 text-xs font-semibold text-gray-600 whitespace-nowrap">Nº Contratação</th>
+            <th class="px-3 py-2 text-xs font-semibold text-gray-600 whitespace-nowrap">Data</th>
+            <th class="px-3 py-2 text-xs font-semibold text-gray-600 whitespace-nowrap">Pagamento</th>
+            <th class="px-3 py-2 text-xs font-semibold text-gray-600 whitespace-nowrap">Contrato</th>
+            <th class="px-3 py-2 text-xs font-semibold text-gray-600 whitespace-nowrap">Método</th>
+            <th class="px-3 py-2 text-xs font-semibold text-gray-600 whitespace-nowrap">1ª Parcela</th>
+            <th class="px-3 py-2 text-xs font-semibold text-gray-600 whitespace-nowrap">2ª Parcela</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${linhasHtml}
+        </tbody>
+      </table>
+    </div>
+  `;
 }
 
 function limparDadosInvalidos(valor) {
@@ -1468,49 +1506,67 @@ function getCorStatusPagamento(status) {
 // ===== FUNÇÕES DE FILTRO DE PAGAMENTO =====
 
 function initFiltrosPagamento() {
-  const btnTodos = document.getElementById('btn-filtro-todos');
-  const btnPagamento = document.getElementById('btn-filtro-pagamento');
-  const btnContrato = document.getElementById('btn-filtro-contrato');
+  const inputBusca = document.getElementById('pgto-busca-cliente');
+  const btnSituacao = document.getElementById('pgto-btn-situacao');
+  const dropdownSituacao = document.getElementById('pgto-situacao-dropdown');
+  const checksSituacao = document.querySelectorAll('.pgto-situacao-chk');
+  const selectMetodo = document.getElementById('pgto-filtro-metodo');
+  const selectOrdenar = document.getElementById('pgto-ordenar-por');
 
-  if (!btnTodos || !btnPagamento || !btnContrato) {
-    console.error('Botões de filtro de pagamento não encontrados');
+  if (!inputBusca || !btnSituacao || !dropdownSituacao || !selectMetodo || !selectOrdenar) {
+    console.error('Elementos de filtro de pagamento não encontrados');
     return;
   }
 
-  btnTodos.addEventListener('click', () => mudarFiltro('todos'));
-  btnPagamento.addEventListener('click', () => mudarFiltro('pagamento'));
-  btnContrato.addEventListener('click', () => mudarFiltro('contrato'));
-}
+  let debounceBusca = null;
+  inputBusca.addEventListener('input', () => {
+    clearTimeout(debounceBusca);
+    debounceBusca = setTimeout(() => {
+      pgtoTextoBusca = inputBusca.value.trim();
+      aplicarFiltrosPagamento();
+    }, 250);
+  });
 
-function mudarFiltro(novoFiltro) {
-  filtroSelecionado = novoFiltro;
-
-  // Atualizar estilos de todos os botões
-  const botoes = {
-    'todos': document.getElementById('btn-filtro-todos'),
-    'pagamento': document.getElementById('btn-filtro-pagamento'),
-    'contrato': document.getElementById('btn-filtro-contrato')
-  };
-
-  // Remover seleção de todos os botões
-  Object.values(botoes).forEach(btn => {
-    if (btn) {
-      btn.classList.remove('bg-orange-500', 'text-white', 'hover:bg-orange-600');
-      btn.classList.add('bg-gray-100', 'text-gray-700', 'hover:bg-gray-200');
+  btnSituacao.addEventListener('click', (e) => {
+    e.stopPropagation();
+    dropdownSituacao.classList.toggle('hidden');
+  });
+  document.addEventListener('click', (e) => {
+    if (!dropdownSituacao.classList.contains('hidden') && !dropdownSituacao.contains(e.target) && e.target !== btnSituacao) {
+      dropdownSituacao.classList.add('hidden');
     }
   });
 
-  // Adicionar seleção ao botão clicado
-  const botaoSelecionado = botoes[novoFiltro];
-  if (botaoSelecionado) {
-    botaoSelecionado.classList.remove('bg-gray-100', 'text-gray-700', 'hover:bg-gray-200');
-    botaoSelecionado.classList.add('bg-orange-500', 'text-white', 'hover:bg-orange-600');
-  }
+  checksSituacao.forEach(chk => {
+    chk.addEventListener('change', () => {
+      pgtoSituacaoAtiva[chk.dataset.situacao] = chk.checked;
+      atualizarLabelSituacaoPagamento();
+      aplicarFiltrosPagamento();
+    });
+  });
 
-  console.log(`🔍 Filtro selecionado: ${novoFiltro}`);
-  
-  // Recarregar cards com o novo filtro aplicado
-  carregarCardsPagamento();
+  selectMetodo.addEventListener('change', () => {
+    pgtoMetodoSelecionado = selectMetodo.value;
+    aplicarFiltrosPagamento();
+  });
+
+  selectOrdenar.addEventListener('change', () => {
+    pgtoOrdenarPor = selectOrdenar.value;
+    aplicarFiltrosPagamento();
+  });
+
+  atualizarLabelSituacaoPagamento();
+}
+
+function atualizarLabelSituacaoPagamento() {
+  const btnSituacao = document.getElementById('pgto-btn-situacao');
+  const span = btnSituacao && btnSituacao.querySelector('span');
+  if (!span) return;
+
+  if (pgtoSituacaoAtiva.contrato && pgtoSituacaoAtiva.pagamento) span.textContent = 'Situação: Todos';
+  else if (pgtoSituacaoAtiva.contrato) span.textContent = 'Situação: Contrato pendente';
+  else if (pgtoSituacaoAtiva.pagamento) span.textContent = 'Situação: Pagamento pendente';
+  else span.textContent = 'Situação: Nenhuma';
 }
 
 // ===== LÓGICA DO GRÁFICO DE AULAS =====
@@ -2144,3 +2200,496 @@ ${rec}`;
     if (modal) modal.remove();
   }
 };
+
+// ============================================================
+// CALENDÁRIO MASTER (Painel Central)
+// Reaproveita: _primeiroNome() e _parseDataAula() de functions-verificar-datas.js,
+// showConfirmDialog() de functions-disciplinas.js, abrirDetalhesContratacaoPainelCentral()
+// já existente neste arquivo. Aulas e pagamentos NÃO são gravados na coleção "calendario" —
+// só os eventos criados pelo botão "Criar evento".
+// ============================================================
+
+function carregarCalendarioMaster() {
+  const area = document.getElementById('areaCalendarioMaster');
+  if (!area) {
+    console.error('areaCalendarioMaster não encontrada');
+    return;
+  }
+
+  area.innerHTML = `
+    <div class="flex items-center flex-wrap justify-end gap-4 mb-3 pb-3 border-b border-gray-200">
+      <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
+        <input type="checkbox" id="calMaster-chk-aulas" class="w-4 h-4">
+        Exibir aulas
+      </label>
+      <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
+        <input type="checkbox" id="calMaster-chk-pagamentos" class="w-4 h-4" checked>
+        Datas de pagamento
+      </label>
+      <button type="button" id="calMaster-btn-criar-evento" class="btn-primary btn-compact">
+        <i class="fas fa-plus mr-2"></i>
+        Criar evento
+      </button>
+    </div>
+
+    <div class="flex items-center justify-center gap-2 mb-3">
+      <button type="button" id="calMaster-btn-mes-anterior" class="px-2 py-1 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-800">
+        <i class="fas fa-chevron-left text-lg"></i>
+      </button>
+      <span id="calMaster-mes-atual" class="text-sm font-semibold text-gray-800 min-w-[140px] text-center"></span>
+      <button type="button" id="calMaster-btn-mes-proximo" class="px-2 py-1 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-800">
+        <i class="fas fa-chevron-right text-lg"></i>
+      </button>
+    </div>
+
+    <div id="calMaster-grid" class="cal-master-grid"></div>
+  `;
+
+  const chkAulas = document.getElementById('calMaster-chk-aulas');
+  const chkPagamentos = document.getElementById('calMaster-chk-pagamentos');
+  const btnCriarEvento = document.getElementById('calMaster-btn-criar-evento');
+  const btnMesAnterior = document.getElementById('calMaster-btn-mes-anterior');
+  const btnMesProximo = document.getElementById('calMaster-btn-mes-proximo');
+
+  chkAulas.addEventListener('change', () => {
+    calMasterExibirAulas = chkAulas.checked;
+    renderGradeCalendarioMaster();
+  });
+  chkPagamentos.addEventListener('change', () => {
+    calMasterExibirPagamentos = chkPagamentos.checked;
+    renderGradeCalendarioMaster();
+  });
+  btnCriarEvento.addEventListener('click', () => abrirModalCriarEvento());
+  btnMesAnterior.addEventListener('click', () => mudarMesCalMaster(-1));
+  btnMesProximo.addEventListener('click', () => mudarMesCalMaster(1));
+
+  atualizarExibicaoMesCalMaster();
+  renderGradeCalendarioMaster();
+}
+
+function mudarMesCalMaster(direcao) {
+  calMasterMes += direcao;
+  if (calMasterMes < 0) {
+    calMasterMes = 11;
+    calMasterAno -= 1;
+  } else if (calMasterMes > 11) {
+    calMasterMes = 0;
+    calMasterAno += 1;
+  }
+  atualizarExibicaoMesCalMaster();
+  renderGradeCalendarioMaster();
+}
+
+function atualizarExibicaoMesCalMaster() {
+  const meses = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+  ];
+  const el = document.getElementById('calMaster-mes-atual');
+  if (el) el.textContent = `${meses[calMasterMes]} ${calMasterAno}`;
+}
+
+function _calMasterHorarioToMinutos(hhmm) {
+  if (!hhmm) return 0;
+  const m = String(hhmm).match(/(\d{1,2}):(\d{2})/);
+  if (!m) return 0;
+  return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+}
+
+// Primeiro e segundo nome (ex: "Maria Eduarda Silva" -> "Maria Eduarda")
+function _calMasterDoisNomes(nome) {
+  if (!nome) return '';
+  const partes = String(nome).trim().split(/\s+/);
+  if (partes.length <= 2) return partes.join(' ');
+  return `${partes[0]} ${partes[1]}`;
+}
+
+// Converte "yyyy-mm-dd" (input type=date) para "dd/mm/yyyy" (padrão de data usado no resto do sistema)
+function _calMasterISOparaBR(iso) {
+  if (!iso) return '';
+  const partes = iso.split('-');
+  if (partes.length !== 3) return iso;
+  return `${partes[2]}/${partes[1]}/${partes[0]}`;
+}
+
+// Converte "dd/mm/yyyy" para "yyyy-mm-dd" (para preencher input type=date)
+function _calMasterBRparaISO(br) {
+  if (!br) return '';
+  const m = String(br).match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  if (!m) return '';
+  return `${m[3]}-${m[2]}-${m[1]}`;
+}
+
+async function renderGradeCalendarioMaster() {
+  const grid = document.getElementById('calMaster-grid');
+  if (!grid) return;
+
+  grid.innerHTML = `
+    <div class="cal-master-loading">
+      <i class="fas fa-spinner fa-spin text-orange-500 text-2xl"></i>
+    </div>
+  `;
+
+  // Mapa dia -> lista de eventos { tipo, minutos, linhas, onclickAttr }
+  const eventosPorDia = {};
+  const addEvento = (dia, evento) => {
+    if (!eventosPorDia[dia]) eventosPorDia[dia] = [];
+    eventosPorDia[dia].push(evento);
+  };
+
+  const promessas = [];
+
+  // Aulas (laranja) — vêm de BancoDeAulas-Lista, não são gravadas em "calendario"
+  if (calMasterExibirAulas) {
+    promessas.push(
+      BANCO.fetchBancoDeAulasListaBatch().then(aulas => {
+        aulas.forEach(aula => {
+          const d = _parseDataAula(aula.data);
+          if (!d || d.getMonth() !== calMasterMes || d.getFullYear() !== calMasterAno) return;
+          addEvento(d.getDate(), {
+            tipo: 'aula',
+            minutos: _calMasterHorarioToMinutos(aula.horario),
+            linhas: [`Cliente: ${_calMasterDoisNomes(aula.nomeCliente)}`, `Prof.: ${_calMasterDoisNomes(aula.professor)}`, aula.horario || '--'],
+            onclickAttr: `abrirDetalhesContratacaoPainelCentral('${escapeHtml(String(aula.codigoContratacao || ''))}')`
+          });
+        });
+      }).catch(err => console.error('❌ Erro ao carregar aulas do Calendário Master:', err))
+    );
+  }
+
+  // Datas de pagamento (verde) — vêm de BancoDeAulas, não são gravadas em "calendario"
+  if (calMasterExibirPagamentos) {
+    promessas.push(
+      BANCO.fetchBancoDeAulas().then(contratos => {
+        contratos.forEach(contrato => {
+          const codigo = contrato.codigoContratacao || contrato.id;
+          const nomePrimeiro = _primeiroNome(contrato.nomeCliente || contrato.nome);
+          const onclickAttr = `abrirDetalhesContratacaoPainelCentral('${escapeHtml(String(codigo || ''))}')`;
+
+          const d1 = _parseDataAula(contrato.dataPrimeiraParcela);
+          if (d1 && d1.getMonth() === calMasterMes && d1.getFullYear() === calMasterAno) {
+            addEvento(d1.getDate(), {
+              tipo: 'pagamento',
+              minutos: 0,
+              linhas: ['Pagamento 1ª parcela', `(${nomePrimeiro})`],
+              onclickAttr
+            });
+          }
+
+          const d2 = _parseDataAula(contrato.dataSegundaParcela);
+          if (d2 && d2.getMonth() === calMasterMes && d2.getFullYear() === calMasterAno) {
+            addEvento(d2.getDate(), {
+              tipo: 'pagamento',
+              minutos: 0,
+              linhas: ['Pagamento 2ª parcela', `(${nomePrimeiro})`],
+              onclickAttr
+            });
+          }
+        });
+      }).catch(err => console.error('❌ Erro ao carregar pagamentos do Calendário Master:', err))
+    );
+  }
+
+  // Eventos customizados (azul) — únicos que vêm da coleção "calendario", sempre exibidos
+  promessas.push(
+    BANCO.fetchEventosCalendario().then(eventos => {
+      calMasterEventosCache = eventos;
+      eventos.forEach(evento => {
+        const d = _parseDataAula(evento.data);
+        if (!d || d.getMonth() !== calMasterMes || d.getFullYear() !== calMasterAno) return;
+        addEvento(d.getDate(), {
+          tipo: 'evento',
+          minutos: _calMasterHorarioToMinutos(evento.hora),
+          linhas: [evento.nome || '--', evento.hora || '--'],
+          onclickAttr: `calMasterAbrirDetalhesEvento('${escapeHtml(String(evento.id))}')`
+        });
+      });
+    }).catch(err => console.error('❌ Erro ao carregar eventos do Calendário Master:', err))
+  );
+
+  await Promise.all(promessas);
+
+  // Ordenar eventos de cada dia por horário
+  Object.keys(eventosPorDia).forEach(dia => {
+    eventosPorDia[dia].sort((a, b) => a.minutos - b.minutos);
+  });
+
+  // Montar grid do mês
+  const primeiroDiaMes = new Date(calMasterAno, calMasterMes, 1);
+  const diaSemanaInicio = primeiroDiaMes.getDay(); // 0=domingo
+  const diasNoMes = new Date(calMasterAno, calMasterMes + 1, 0).getDate();
+  const diasNoMesAnterior = new Date(calMasterAno, calMasterMes, 0).getDate();
+
+  const diasSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  let html = diasSemana.map(d => `<div class="cal-master-weekday">${d}</div>`).join('');
+
+  const renderEventoHtml = (evento) => {
+    const linhasHtml = evento.linhas.map(l => `<span class="cal-master-event-line">${escapeHtml(String(l))}</span>`).join('');
+    return `
+      <div class="cal-master-event cal-master-event-${evento.tipo}" onclick="${evento.onclickAttr}" title="${escapeHtml(evento.linhas.join(' • '))}">
+        ${linhasHtml}
+      </div>
+    `;
+  };
+
+  // Padding: dias do mês anterior
+  for (let i = diaSemanaInicio - 1; i >= 0; i--) {
+    const dia = diasNoMesAnterior - i;
+    html += `<div class="cal-master-day cal-master-day-other"><div class="cal-master-day-num">${dia}</div></div>`;
+  }
+
+  // Dias do mês atual
+  for (let dia = 1; dia <= diasNoMes; dia++) {
+    const eventosDoDia = eventosPorDia[dia] || [];
+    html += `
+      <div class="cal-master-day">
+        <div class="cal-master-day-num">${dia}</div>
+        <div class="cal-master-day-events">
+          ${eventosDoDia.map(renderEventoHtml).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  // Padding: dias do próximo mês (completar última semana)
+  const totalCelulas = diaSemanaInicio + diasNoMes;
+  const restante = (7 - (totalCelulas % 7)) % 7;
+  for (let dia = 1; dia <= restante; dia++) {
+    html += `<div class="cal-master-day cal-master-day-other"><div class="cal-master-day-num">${dia}</div></div>`;
+  }
+
+  grid.innerHTML = html;
+}
+
+function abrirModalCriarEvento() {
+  const modalHtml = `
+    <div class="modal-overlay" id="modalCriarEventoCalendario">
+      <div class="modal-container" style="max-width: 480px;">
+        <div class="modal-header">
+          <h3 class="font-lexend font-bold text-lg text-gray-800">
+            <i class="fas fa-calendar-plus text-blue-500 mr-2"></i>
+            Criar evento
+          </h3>
+          <button class="modal-close text-gray-400 hover:text-gray-600">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="space-y-3">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Nome do evento</label>
+              <input type="text" id="calMasterNovoNome" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="Ex: Reunião de equipe">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Data</label>
+                <input type="date" id="calMasterNovaData" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Hora</label>
+                <input type="time" id="calMasterNovaHora" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Responsável</label>
+              <select id="calMasterNovoResponsavel" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                <option value="Ester Oliveira">Ester Oliveira</option>
+                <option value="Ester Calazans">Ester Calazans</option>
+                <option value="Todos">Todos</option>
+                <option value="A Definir" selected>A Definir</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="calMasterBtnCancelarEvento" class="btn-secondary btn-compact">Cancelar</button>
+          <button id="calMasterBtnSalvarEvento" class="btn-primary btn-compact" disabled>
+            <i class="fas fa-check mr-2"></i>
+            Criar evento
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const container = document.createElement('div');
+  container.innerHTML = modalHtml;
+  document.body.appendChild(container);
+
+  const modal = container.querySelector('#modalCriarEventoCalendario');
+  const closeModal = () => container.remove();
+
+  modal.querySelector('.modal-close').addEventListener('click', closeModal);
+  modal.querySelector('#calMasterBtnCancelarEvento').addEventListener('click', closeModal);
+  modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+  const inputNome = modal.querySelector('#calMasterNovoNome');
+  const inputData = modal.querySelector('#calMasterNovaData');
+  const inputHora = modal.querySelector('#calMasterNovaHora');
+  const btnSalvar = modal.querySelector('#calMasterBtnSalvarEvento');
+
+  const validar = () => {
+    btnSalvar.disabled = !(inputNome.value.trim() && inputData.value && inputHora.value);
+  };
+  inputNome.addEventListener('input', validar);
+  inputData.addEventListener('change', validar);
+  inputHora.addEventListener('change', validar);
+
+  btnSalvar.addEventListener('click', async () => {
+    const originalHTML = btnSalvar.innerHTML;
+    btnSalvar.disabled = true;
+    btnSalvar.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Salvando...';
+
+    try {
+      await BANCO.addEventoCalendario({
+        nome: inputNome.value.trim(),
+        data: _calMasterISOparaBR(inputData.value),
+        hora: inputHora.value,
+        responsavel: modal.querySelector('#calMasterNovoResponsavel').value
+      });
+      showToast('✅ Evento criado com sucesso!', 'success');
+      closeModal();
+      renderGradeCalendarioMaster();
+    } catch (error) {
+      console.error('❌ Erro ao criar evento:', error);
+      showToast('❌ Erro ao criar evento', 'error');
+      btnSalvar.disabled = false;
+      btnSalvar.innerHTML = originalHTML;
+    }
+  });
+}
+
+function calMasterAbrirDetalhesEvento(eventoId) {
+  const evento = calMasterEventosCache.find(e => e.id === eventoId);
+  if (!evento) {
+    showToast('Evento não encontrado', 'error');
+    return;
+  }
+
+  const opcoesResponsavel = ['Ester Oliveira', 'Ester Calazans', 'Todos', 'A Definir'];
+  const dataISO = _calMasterBRparaISO(evento.data);
+
+  const modalHtml = `
+    <div class="modal-overlay" id="modalDetalhesEventoCalendario">
+      <div class="modal-container" style="max-width: 480px;">
+        <div class="modal-header">
+          <h3 class="font-lexend font-bold text-lg text-gray-800">
+            <i class="fas fa-calendar-day text-blue-500 mr-2"></i>
+            Detalhes do Evento
+          </h3>
+          <button class="modal-close text-gray-400 hover:text-gray-600">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="space-y-3">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Nome do evento</label>
+              <input type="text" id="calMasterEditNome" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="${escapeHtml(evento.nome || '')}">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Data</label>
+                <input type="date" id="calMasterEditData" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="${dataISO}">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Hora</label>
+                <input type="time" id="calMasterEditHora" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="${escapeHtml(evento.hora || '')}">
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Responsável</label>
+              <select id="calMasterEditResponsavel" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                ${opcoesResponsavel.map(opt => `<option value="${opt}" ${evento.responsavel === opt ? 'selected' : ''}>${opt}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="calMasterBtnExcluirEvento" class="btn-secondary btn-compact text-red-600 hover:bg-red-50">
+            <i class="fas fa-trash mr-2"></i>
+            Excluir
+          </button>
+          <button id="calMasterBtnSalvarEdicaoEvento" class="btn-primary btn-compact" disabled>
+            <i class="fas fa-save mr-2"></i>
+            Salvar alterações
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const container = document.createElement('div');
+  container.innerHTML = modalHtml;
+  document.body.appendChild(container);
+
+  const modal = container.querySelector('#modalDetalhesEventoCalendario');
+  const closeModal = () => container.remove();
+  modal.querySelector('.modal-close').addEventListener('click', closeModal);
+  modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+  const inputNome = modal.querySelector('#calMasterEditNome');
+  const inputData = modal.querySelector('#calMasterEditData');
+  const inputHora = modal.querySelector('#calMasterEditHora');
+  const selectResp = modal.querySelector('#calMasterEditResponsavel');
+  const btnSalvar = modal.querySelector('#calMasterBtnSalvarEdicaoEvento');
+  const btnExcluir = modal.querySelector('#calMasterBtnExcluirEvento');
+
+  const valoresOriginais = {
+    nome: evento.nome || '',
+    data: dataISO,
+    hora: evento.hora || '',
+    responsavel: evento.responsavel || ''
+  };
+  const detectarMudanca = () => {
+    btnSalvar.disabled = (
+      inputNome.value.trim() === valoresOriginais.nome &&
+      inputData.value === valoresOriginais.data &&
+      inputHora.value === valoresOriginais.hora &&
+      selectResp.value === valoresOriginais.responsavel
+    );
+  };
+  inputNome.addEventListener('input', detectarMudanca);
+  inputData.addEventListener('change', detectarMudanca);
+  inputHora.addEventListener('change', detectarMudanca);
+  selectResp.addEventListener('change', detectarMudanca);
+
+  btnSalvar.addEventListener('click', async () => {
+    const originalHTML = btnSalvar.innerHTML;
+    btnSalvar.disabled = true;
+    btnSalvar.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Salvando...';
+    try {
+      await BANCO.updateEventoCalendario(evento.id, {
+        nome: inputNome.value.trim(),
+        data: _calMasterISOparaBR(inputData.value),
+        hora: inputHora.value,
+        responsavel: selectResp.value
+      });
+      showToast('✅ Evento atualizado com sucesso!', 'success');
+      closeModal();
+      renderGradeCalendarioMaster();
+    } catch (error) {
+      console.error('❌ Erro ao atualizar evento:', error);
+      showToast('❌ Erro ao atualizar evento', 'error');
+      btnSalvar.disabled = false;
+      btnSalvar.innerHTML = originalHTML;
+    }
+  });
+
+  btnExcluir.addEventListener('click', async () => {
+    const confirmou = await showConfirmDialog('Excluir evento', `Tem certeza que deseja excluir o evento "${escapeHtml(evento.nome || '')}"?`);
+    if (!confirmou) return;
+
+    btnExcluir.disabled = true;
+    try {
+      await BANCO.deleteEventoCalendario(evento.id);
+      showToast('✅ Evento excluído com sucesso!', 'success');
+      closeModal();
+      renderGradeCalendarioMaster();
+    } catch (error) {
+      console.error('❌ Erro ao excluir evento:', error);
+      showToast('❌ Erro ao excluir evento', 'error');
+      btnExcluir.disabled = false;
+    }
+  });
+}

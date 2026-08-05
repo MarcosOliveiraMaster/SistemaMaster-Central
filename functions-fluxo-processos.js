@@ -433,7 +433,7 @@ function subscribeToDemanads() {
   if (_unsubDemandas) _unsubDemandas();
   _unsubDemandas = firebase.firestore()
     .collection(DB_COLLECTION)
-    .orderBy('createdAt', 'asc')
+    .orderBy('createdAt', 'desc')
     .onSnapshot(snap => {
       _demandasList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       applyFilters();

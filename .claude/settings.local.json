@@ -44,7 +44,13 @@
       "Bash(node --check functions-PainelCentral.js)",
       "Bash(node --check functions-verificar-datas.js)",
       "Bash(awk 'NR==1870,NR==2100 {print NR\": \"$0}' functions-simulacoes.js)",
-      "Bash(node --check script.js)"
+      "Bash(node --check script.js)",
+      "Bash(node --check banco.js)",
+      "Bash(node -e ' *)",
+      "Bash(timeout 30 cat \"C:\\\\Users\\\\marco\\\\OneDrive\\\\Documentos\\\\GitHub\\\\MasterEduTech\\\\src\\\\features\\\\painel-central\\\\painel-central.css\")",
+      "Bash(timeout 60 cat \"C:\\\\Users\\\\marco\\\\OneDrive\\\\Documentos\\\\GitHub\\\\MasterEduTech\\\\src\\\\features\\\\painel-central\\\\painel-central.css\")",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(node --check functions-fluxo-processos.js)"
     ]
   }
 }
