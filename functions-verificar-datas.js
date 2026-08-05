@@ -89,10 +89,11 @@ async function _verificarFeriadoData(dataStr) {
 }
 
 // Busca no Firestore outras aulas do mesmo professor na mesma data.
-// Retorna { mesmoHorario: {nomeCliente, codigoContratacao}|null, mesmoDia: {...}|null }
-async function _verificarConflitoAgenda(idProfessor, dataStr, horario, excluirId) {
+// Retorna { mesmoHorario: [{nomeCliente, codigoContratacao, horario}], mesmoDia: [...] } — arrays,
+// pois pode haver mais de uma aula conflitante no mesmo dia.
+async function _verificarConflitoAgenda(idProfessor, dataStr, horario, excluirId, codigoContratacaoAtual) {
   if (!idProfessor || idProfessor === 'A definir' || !dataStr) {
-    return { mesmoHorario: null, mesmoDia: null };
+    return { mesmoHorario: [], mesmoDia: [] };
   }
 
   const snap = await BANCO.db.collection('BancoDeAulas-Lista')
@@ -100,24 +101,34 @@ async function _verificarConflitoAgenda(idProfessor, dataStr, horario, excluirId
     .where('data', '==', dataStr)
     .get();
 
-  let mesmoHorario = null;
-  let mesmoDia = null;
+  const mesmoHorario = [];
+  const mesmoDia = [];
 
   snap.forEach(doc => {
     const a = doc.data();
     const idAtual = a['id-Aula'] || doc.id;
     if (idAtual === excluirId || doc.id === excluirId) return;
     if (_STATUS_IGNORADOS_CONFLITO.includes(a.StatusAula)) return;
+    // Aulas do mesmo pacote/contratação sendo consultado não são conflito — é esperado
+    // que o mesmo professor dê mais de uma aula dentro do mesmo contrato.
+    if (codigoContratacaoAtual && a.codigoContratacao === codigoContratacaoAtual) return;
 
     const info = { nomeCliente: a.nomeCliente || a.nome || '', codigoContratacao: a.codigoContratacao || '', horario: a.horario || '' };
     if (a.horario === horario) {
-      mesmoHorario = info;
-    } else if (!mesmoDia) {
-      mesmoDia = info;
+      mesmoHorario.push(info);
+    } else {
+      mesmoDia.push(info);
     }
   });
 
   return { mesmoHorario, mesmoDia };
+}
+
+// Monta a lista de conflitos em tópicos (usado quando há mais de uma aula conflitante)
+function _listarConflitos(lista, incluirHorario) {
+  return lista
+    .map(c => `• ${_primeiroNome(c.nomeCliente)} (pacote ${c.codigoContratacao}${incluirHorario ? `, às ${c.horario || '--'}` : ''})`)
+    .join('\n');
 }
 
 // Função principal: recebe uma aula (com data, horario, idProfessor, e opcionalmente id-Aula)
@@ -127,27 +138,28 @@ window.verificarStatusAula = async function (aula) {
   const horario = aula.horario;
   const idProfessor = aula.idProfessor;
   const excluirId = aula['id-Aula'] || aula.id;
+  const codigoContratacaoAtual = aula.codigoContratacao;
 
   const [{ feriado, vesperaFeriado }, { mesmoHorario, mesmoDia }] = await Promise.all([
     _verificarFeriadoData(dataStr),
-    _verificarConflitoAgenda(idProfessor, dataStr, horario, excluirId)
+    _verificarConflitoAgenda(idProfessor, dataStr, horario, excluirId, codigoContratacaoAtual)
   ]);
 
   // Prioridade: vermelho > amarelo > verde
-  if (mesmoHorario) {
-    return {
-      cor: 'vermelho',
-      tooltip: `Existe uma aula com ${_primeiroNome(mesmoHorario.nomeCliente)} no pacote ${mesmoHorario.codigoContratacao} para este mesmo dia e horário`
-    };
+  if (mesmoHorario.length > 0) {
+    const tooltip = mesmoHorario.length === 1
+      ? `Existe uma aula com ${_primeiroNome(mesmoHorario[0].nomeCliente)} no pacote ${mesmoHorario[0].codigoContratacao} para este mesmo dia e horário`
+      : `Existem ${mesmoHorario.length} aulas para este mesmo dia e horário:\n${_listarConflitos(mesmoHorario, false)}`;
+    return { cor: 'vermelho', tooltip };
   }
   if (feriado) {
     return { cor: 'vermelho', tooltip: `Este dia é feriado de ${feriado.nome}` };
   }
-  if (mesmoDia) {
-    return {
-      cor: 'amarelo',
-      tooltip: `Existe uma aula com ${_primeiroNome(mesmoDia.nomeCliente)} no pacote ${mesmoDia.codigoContratacao} neste mesmo dia, às ${mesmoDia.horario || '--'}`
-    };
+  if (mesmoDia.length > 0) {
+    const tooltip = mesmoDia.length === 1
+      ? `Existe uma aula com ${_primeiroNome(mesmoDia[0].nomeCliente)} no pacote ${mesmoDia[0].codigoContratacao} neste mesmo dia, às ${mesmoDia[0].horario || '--'}`
+      : `Existem ${mesmoDia.length} aulas neste mesmo dia:\n${_listarConflitos(mesmoDia, true)}`;
+    return { cor: 'amarelo', tooltip };
   }
   if (vesperaFeriado) {
     return { cor: 'amarelo', tooltip: `Amanhã é feriado de ${vesperaFeriado.nome} — véspera de feriado` };

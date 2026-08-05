@@ -3762,7 +3762,7 @@ h2, h3, h4, h5, h6 {
   border: 1px solid var(--orange);
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow);
-  white-space: normal;
+  white-space: pre-line;
   pointer-events: none;
   z-index: 100000;
 }

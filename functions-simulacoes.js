@@ -1568,7 +1568,7 @@ const Simulacoes = (function() {
       };
 
       modalSol.remove();
-      BancoDeAulasCards.showModalSolicitacaoFinal(aulaContratacao, aulasSelecionadas, colunasVisiveis);
+      BancoDeAulasCards.showModalSolicitacaoFinal(aulaContratacao, aulasSelecionadas, colunasVisiveis, 'professor');
     });
 
     modalSol.addEventListener('click', (e) => {
