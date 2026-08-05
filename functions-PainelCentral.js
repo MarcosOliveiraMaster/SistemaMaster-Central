@@ -2217,29 +2217,33 @@ function carregarCalendarioMaster() {
   }
 
   area.innerHTML = `
-    <div class="flex items-center flex-wrap justify-end gap-4 mb-3 pb-3 border-b border-gray-200">
-      <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
-        <input type="checkbox" id="calMaster-chk-aulas" class="w-4 h-4">
-        Exibir aulas
-      </label>
-      <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
-        <input type="checkbox" id="calMaster-chk-pagamentos" class="w-4 h-4" checked>
-        Datas de pagamento
-      </label>
-      <button type="button" id="calMaster-btn-criar-evento" class="btn-primary btn-compact">
-        <i class="fas fa-plus mr-2"></i>
-        Criar evento
-      </button>
-    </div>
+    <div class="flex items-center flex-wrap justify-between gap-4 mb-3 pb-3 border-b border-gray-200">
+      <!-- Navegação de Mês -->
+      <div class="flex items-center gap-1 border border-gray-300 rounded-lg px-1" style="height: 34px;">
+        <button type="button" id="calMaster-btn-mes-anterior" class="px-1.5 hover:bg-gray-100 rounded transition-colors text-gray-600 hover:text-gray-800" style="height: 26px;">
+          <i class="fas fa-chevron-left text-sm"></i>
+        </button>
+        <span id="calMaster-mes-atual" class="text-xs font-semibold text-gray-800 min-w-[110px] text-center"></span>
+        <button type="button" id="calMaster-btn-mes-proximo" class="px-1.5 hover:bg-gray-100 rounded transition-colors text-gray-600 hover:text-gray-800" style="height: 26px;">
+          <i class="fas fa-chevron-right text-sm"></i>
+        </button>
+      </div>
 
-    <div class="flex items-center justify-center gap-2 mb-3">
-      <button type="button" id="calMaster-btn-mes-anterior" class="px-2 py-1 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-800">
-        <i class="fas fa-chevron-left text-lg"></i>
-      </button>
-      <span id="calMaster-mes-atual" class="text-sm font-semibold text-gray-800 min-w-[140px] text-center"></span>
-      <button type="button" id="calMaster-btn-mes-proximo" class="px-2 py-1 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-800">
-        <i class="fas fa-chevron-right text-lg"></i>
-      </button>
+      <!-- Checkboxes + Criar evento -->
+      <div class="flex items-center flex-wrap gap-4">
+        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none" style="height: 34px;">
+          <input type="checkbox" id="calMaster-chk-aulas" class="w-4 h-4">
+          Exibir aulas
+        </label>
+        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none" style="height: 34px;">
+          <input type="checkbox" id="calMaster-chk-pagamentos" class="w-4 h-4" checked>
+          Datas de pagamento
+        </label>
+        <button type="button" id="calMaster-btn-criar-evento" class="btn-primary btn-compact" style="height: 34px;">
+          <i class="fas fa-plus mr-2"></i>
+          Criar evento
+        </button>
+      </div>
     </div>
 
     <div id="calMaster-grid" class="cal-master-grid"></div>
@@ -2439,10 +2443,14 @@ async function renderGradeCalendarioMaster() {
   }
 
   // Dias do mês atual
+  const hoje = new Date();
+  const isMesAtualHoje = hoje.getFullYear() === calMasterAno && hoje.getMonth() === calMasterMes;
+
   for (let dia = 1; dia <= diasNoMes; dia++) {
     const eventosDoDia = eventosPorDia[dia] || [];
+    const classeHoje = (isMesAtualHoje && dia === hoje.getDate()) ? ' cal-master-day-hoje' : '';
     html += `
-      <div class="cal-master-day">
+      <div class="cal-master-day${classeHoje}">
         <div class="cal-master-day-num">${dia}</div>
         <div class="cal-master-day-events">
           ${eventosDoDia.map(renderEventoHtml).join('')}

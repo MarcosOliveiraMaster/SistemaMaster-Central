@@ -3815,6 +3815,11 @@ h2, h3, h4, h5, h6 {
   opacity: 0.5;
 }
 
+.cal-master-day-hoje {
+  border: 2px solid var(--orange);
+  box-shadow: 0 0 0 3px rgba(242, 135, 5, 0.25);
+}
+
 .cal-master-day-num {
   font-size: 0.7rem;
   font-weight: 700;
