@@ -52,7 +52,17 @@ let calMasterMes = new Date().getMonth(); // 0-11
 let calMasterAno = new Date().getFullYear();
 let calMasterExibirAulas = false;
 let calMasterExibirPagamentos = true;
+let calMasterExibirRenovacoes = true;
 let calMasterEventosCache = []; // cache dos eventos customizados carregados no mês atual
+
+// Cache local do cálculo de renovações (evita recomputar a cada troca de mês
+// dentro da mesma janela de cache do BANCO.fetchBancoDeAulasListaBatch)
+let calMasterRenovacoesCache = null;
+let calMasterRenovacoesCacheTimestamp = 0;
+const CAL_MASTER_RENOVACOES_TTL = 5 * 60 * 1000;
+
+// Status de aula ignorados ao determinar a "última aula" de um pacote (não contam como aula real)
+const CAL_MASTER_STATUS_IGNORADOS_RENOVACAO = ['Cancelada', 'Reagendada'];
 
 // Função para carregar o Painel Central
 function loadPainelCentral() {
@@ -2239,6 +2249,10 @@ function carregarCalendarioMaster() {
           <input type="checkbox" id="calMaster-chk-pagamentos" class="w-4 h-4" checked>
           Datas de pagamento
         </label>
+        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none" style="height: 34px;">
+          <input type="checkbox" id="calMaster-chk-renovacoes" class="w-4 h-4" checked>
+          Mostrar renovações
+        </label>
         <button type="button" id="calMaster-btn-criar-evento" class="btn-primary btn-compact" style="height: 34px;">
           <i class="fas fa-plus mr-2"></i>
           Criar evento
@@ -2251,6 +2265,7 @@ function carregarCalendarioMaster() {
 
   const chkAulas = document.getElementById('calMaster-chk-aulas');
   const chkPagamentos = document.getElementById('calMaster-chk-pagamentos');
+  const chkRenovacoes = document.getElementById('calMaster-chk-renovacoes');
   const btnCriarEvento = document.getElementById('calMaster-btn-criar-evento');
   const btnMesAnterior = document.getElementById('calMaster-btn-mes-anterior');
   const btnMesProximo = document.getElementById('calMaster-btn-mes-proximo');
@@ -2261,6 +2276,10 @@ function carregarCalendarioMaster() {
   });
   chkPagamentos.addEventListener('change', () => {
     calMasterExibirPagamentos = chkPagamentos.checked;
+    renderGradeCalendarioMaster();
+  });
+  chkRenovacoes.addEventListener('change', () => {
+    calMasterExibirRenovacoes = chkRenovacoes.checked;
     renderGradeCalendarioMaster();
   });
   btnCriarEvento.addEventListener('click', () => abrirModalCriarEvento());
@@ -2306,6 +2325,55 @@ function _calMasterDoisNomes(nome) {
   const partes = String(nome).trim().split(/\s+/);
   if (partes.length <= 2) return partes.join(' ');
   return `${partes[0]} ${partes[1]}`;
+}
+
+// Calcula a data de renovação de cada pacote a partir da última aula válida (ignorando
+// Cancelada/Reagendada). Regra: 2 dias antes da última aula; se o pacote tiver só 1 ou 2
+// aulas válidas no total, 7 dias depois da última aula.
+// Reaproveita BANCO.fetchBancoDeAulasListaBatch() (já cacheado) — nenhuma leitura extra do
+// Firestore além da que a coluna "Exibir aulas" já faria. Resultado cacheado localmente por
+// CAL_MASTER_RENOVACOES_TTL pra não recalcular a cada troca de mês.
+async function calcularRenovacoesPacotes() {
+  const agora = Date.now();
+  if (calMasterRenovacoesCache && (agora - calMasterRenovacoesCacheTimestamp) < CAL_MASTER_RENOVACOES_TTL) {
+    return calMasterRenovacoesCache;
+  }
+
+  const aulas = await BANCO.fetchBancoDeAulasListaBatch();
+  const porContrato = {}; // { codigoContratacao: { ultimaData, count, nomeCliente } }
+
+  aulas.forEach(aula => {
+    if (CAL_MASTER_STATUS_IGNORADOS_RENOVACAO.includes(aula.StatusAula)) return;
+    const codigo = aula.codigoContratacao;
+    if (!codigo) return;
+    const d = _parseDataAula(aula.data);
+    if (!d) return;
+
+    const nomeCliente = aula.nomeCliente || aula.nome || '';
+    if (!porContrato[codigo]) {
+      porContrato[codigo] = { ultimaData: d, count: 1, nomeCliente };
+    } else {
+      porContrato[codigo].count++;
+      if (d.getTime() > porContrato[codigo].ultimaData.getTime()) {
+        porContrato[codigo].ultimaData = d;
+        if (nomeCliente) porContrato[codigo].nomeCliente = nomeCliente;
+      }
+    }
+  });
+
+  const renovacoes = Object.entries(porContrato).map(([codigoContratacao, info]) => {
+    const dataRenovacao = new Date(info.ultimaData);
+    if (info.count <= 2) {
+      dataRenovacao.setDate(dataRenovacao.getDate() + 7);
+    } else {
+      dataRenovacao.setDate(dataRenovacao.getDate() - 2);
+    }
+    return { codigoContratacao, nomeCliente: info.nomeCliente, dataRenovacao };
+  });
+
+  calMasterRenovacoesCache = renovacoes;
+  calMasterRenovacoesCacheTimestamp = agora;
+  return renovacoes;
 }
 
 // Converte "yyyy-mm-dd" (input type=date) para "dd/mm/yyyy" (padrão de data usado no resto do sistema)
@@ -2410,6 +2478,23 @@ async function renderGradeCalendarioMaster() {
       });
     }).catch(err => console.error('❌ Erro ao carregar eventos do Calendário Master:', err))
   );
+
+  // Renovações de pacote (roxo) — calculadas a partir da última aula válida de cada contrato
+  if (calMasterExibirRenovacoes) {
+    promessas.push(
+      calcularRenovacoesPacotes().then(renovacoes => {
+        renovacoes.forEach(r => {
+          if (r.dataRenovacao.getMonth() !== calMasterMes || r.dataRenovacao.getFullYear() !== calMasterAno) return;
+          addEvento(r.dataRenovacao.getDate(), {
+            tipo: 'renovacao',
+            minutos: 0,
+            linhas: ['Renovação pacote', `(${_calMasterDoisNomes(r.nomeCliente)})`],
+            onclickAttr: `abrirDetalhesContratacaoPainelCentral('${escapeHtml(String(r.codigoContratacao))}')`
+          });
+        });
+      }).catch(err => console.error('❌ Erro ao calcular renovações do Calendário Master:', err))
+    );
+  }
 
   await Promise.all(promessas);
 

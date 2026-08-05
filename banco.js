@@ -40,6 +40,11 @@ const CACHE = {
     data: null,
     timestamp: null,
     maxAge: 30 * 60 * 1000
+  },
+  bancoDeAulasListaBatch: {
+    data: null,
+    timestamp: null,
+    maxAge: 5 * 60 * 1000
   }
 };
 
@@ -187,13 +192,18 @@ async function addNovaAula(aulaData) {
 }
 
 // Função para carregar TODAS as aulas de BancoDeAulas-Lista em batch
-async function fetchBancoDeAulasListaBatch() {
+async function fetchBancoDeAulasListaBatch(forceRefresh = false) {
+  if (!forceRefresh && isCacheValid('bancoDeAulasListaBatch')) {
+    return CACHE.bancoDeAulasListaBatch.data;
+  }
   try {
     const querySnapshot = await db.collection("BancoDeAulas-Lista").get();
     const todasAulas = [];
     querySnapshot.forEach(doc => {
       todasAulas.push({ id: doc.id, statusAula: doc.data().statusAula || 'Não informado', ...doc.data() });
     });
+    CACHE.bancoDeAulasListaBatch.data = todasAulas;
+    CACHE.bancoDeAulasListaBatch.timestamp = Date.now();
     return todasAulas;
   } catch (error) {
     console.error('❌ Erro ao carregar aulas em batch:', error.message);
@@ -762,6 +772,7 @@ function forceCacheRefresh() {
   CACHE.bancoDeAulas.timestamp      = null;
   CACHE.cadastroClientes.timestamp  = null;
   CACHE.dataBaseProfessores.timestamp = null;
+  CACHE.bancoDeAulasListaBatch.timestamp = null;
 }
 
 // Exportar funções para uso global
