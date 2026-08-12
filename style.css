@@ -4032,3 +4032,38 @@ h2, h3, h4, h5, h6 {
 }
 
 .cbusca-event-sem-codigo { cursor: default; }
+
+/* Feriados no Calendário Master */
+.cbusca-feriado { font-weight: 600; }
+
+.cbusca-feriado-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.cbusca-feriado-item + .cbusca-feriado-item {
+  border-top: 1px solid #f3f4f6;
+}
+
+.cbusca-feriado-bolinha {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #16A34A;
+  flex-shrink: 0;
+  margin-top: 5px;
+}
+
+.cbusca-feriado-nome {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.cbusca-feriado-esfera {
+  font-size: 0.72rem;
+  color: #9ca3af;
+  margin-top: 1px;
+}

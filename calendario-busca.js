@@ -28,10 +28,14 @@ const CalendarioBusca = (function () {
   const SEM_PROFESSOR = 'A definir';
   const SEM_CLIENTE = 'Sem cliente';
 
-  // Paleta para diferenciar os selecionados. Mesmas cores de CORES_CAL
-  // (functions-calendario-visual.js), replicadas aqui para o módulo ficar autocontido.
-  const PALETA = ['#3B82F6', '#F97316', '#22C55E', '#EF4444', '#8B5CF6',
-                  '#EC4899', '#14B8A6', '#F59E0B', '#6366F1', '#0EA5E9'];
+  // Paleta para diferenciar os selecionados, derivada de CORES_CAL
+  // (functions-calendario-visual.js) e replicada aqui para o módulo ficar autocontido.
+  // Sem verde de propósito: verde é reservado para feriado.
+  const PALETA = ['#3B82F6', '#F97316', '#EF4444', '#8B5CF6',
+                  '#EC4899', '#F59E0B', '#6366F1', '#0EA5E9'];
+
+  // Cor única dos feriados, em qualquer esfera.
+  const COR_FERIADO = '#16A34A';
 
   const LARGURA_DROPDOWN_MIN = 220;
   const LARGURA_DROPDOWN_MAX = 440;
@@ -370,6 +374,11 @@ const CalendarioBusca = (function () {
       eventosPorDia[dia].sort((a, b) => _cbHorarioMinutos(a.horario) - _cbHorarioMinutos(b.horario));
     });
 
+    // Feriados são independentes do filtro: aparecem sempre que a grade é montada.
+    const feriadosPorDia = (typeof Feriados !== 'undefined' && Feriados.porDia)
+      ? Feriados.porDia(estado.mes, estado.ano)
+      : {};
+
     const primeiroDia = new Date(estado.ano, estado.mes, 1).getDay();
     const diasNoMes = new Date(estado.ano, estado.mes + 1, 0).getDate();
     const diasMesAnterior = new Date(estado.ano, estado.mes, 0).getDate();
@@ -385,11 +394,13 @@ const CalendarioBusca = (function () {
 
     for (let dia = 1; dia <= diasNoMes; dia++) {
       const doDia = eventosPorDia[dia] || [];
+      const feriadosDoDia = feriadosPorDia[dia] || [];
       const classeHoje = (mesCorrente && dia === hoje.getDate()) ? ' cal-master-day-hoje' : '';
       html += `
         <div class="cal-master-day${classeHoje}">
           <div class="cal-master-day-num">${dia}</div>
           <div class="cal-master-day-events">
+            ${feriadosDoDia.length ? cardFeriadoHtml(dia, feriadosDoDia) : ''}
             ${doDia.map(cardHtml).join('')}
           </div>
         </div>`;
@@ -430,6 +441,92 @@ const CalendarioBusca = (function () {
            title="${_cbEsc(titulo)}">
         ${linhas.map(l => `<span class="cal-master-event-line">${_cbEsc(l)}</span>`).join('')}
       </div>`;
+  }
+
+  /**
+   * Card verde do feriado. Uma mesma data pode acumular mais de um feriado
+   * (29/06 é São Pedro no estado e Marechal Floriano Peixoto no município):
+   * o card mostra o primeiro e sinaliza o resto, e o modal lista todos.
+   */
+  function cardFeriadoHtml(dia, feriados) {
+    const rotulo = feriados.length > 1
+      ? `${feriados[0].nome} +${feriados.length - 1}`
+      : feriados[0].nome;
+    const titulo = feriados.map(f => `${f.nome} (${f.esfera})`).join(' • ');
+    return `
+      <div class="cal-master-event cbusca-feriado"
+           style="background:${COR_FERIADO}"
+           data-feriado-dia="${dia}"
+           title="${_cbEsc(titulo)}">
+        <span class="cal-master-event-line">
+          <i class="fas fa-star" style="font-size:0.55rem;margin-right:3px;"></i>${_cbEsc(rotulo)}
+        </span>
+      </div>`;
+  }
+
+  /** Modal do feriado: nome, esfera e botão de fechar. */
+  function abrirModalFeriado(dia) {
+    const feriados = (typeof Feriados !== 'undefined' && Feriados.doDia)
+      ? Feriados.doDia(dia, estado.mes, estado.ano)
+      : [];
+    if (!feriados.length) return;
+
+    const anterior = document.getElementById('cbusca-modal-feriado');
+    if (anterior) anterior.remove();
+
+    const dataFmt = `${String(dia).padStart(2, '0')}/${String(estado.mes + 1).padStart(2, '0')}/${estado.ano}`;
+
+    const modal = document.createElement('div');
+    modal.id = 'cbusca-modal-feriado';
+    modal.className = 'modal-overlay';
+    modal.style.zIndex = '1000';
+    modal.innerHTML = `
+      <div class="modal-container" style="max-width: 420px;">
+        <div class="modal-header">
+          <div>
+            <h3 class="text-lg font-lexend font-bold text-gray-800">
+              ${feriados.length > 1 ? 'Feriados' : 'Feriado'}
+            </h3>
+            <p class="text-sm text-gray-500 mt-0.5">${dataFmt}</p>
+          </div>
+          <button type="button" id="cbusca-modal-feriado-x"
+                  class="text-gray-400 hover:text-gray-600 transition-colors p-1" aria-label="Fechar">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          ${feriados.map(f => `
+            <div class="cbusca-feriado-item">
+              <span class="cbusca-feriado-bolinha"></span>
+              <div>
+                <p class="cbusca-feriado-nome">${_cbEsc(f.nome)}</p>
+                <p class="cbusca-feriado-esfera">${_cbEsc(f.esfera)}</p>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="modal-footer" style="justify-content: flex-end;">
+          <button type="button" id="cbusca-modal-feriado-fechar"
+                  class="py-2 px-4 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all">
+            Fechar
+          </button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    const fechar = () => {
+      modal.remove();
+      document.removeEventListener('keydown', onEsc);
+    };
+    function onEsc(e) { if (e.key === 'Escape') fechar(); }
+
+    modal.querySelector('#cbusca-modal-feriado-x').addEventListener('click', fechar);
+    modal.querySelector('#cbusca-modal-feriado-fechar').addEventListener('click', fechar);
+    modal.addEventListener('click', e => { if (e.target === modal) fechar(); });
+    document.addEventListener('keydown', onEsc);
   }
 
   /**
@@ -548,9 +645,15 @@ const CalendarioBusca = (function () {
     const conteudo = document.getElementById('cbusca-conteudo');
     if (conteudo) {
       conteudo.addEventListener('click', e => {
-        const card = e.target.closest ? e.target.closest('.cbusca-event') : null;
-        if (!card) return;
-        abrirDetalhes(card.dataset.codigo);
+        if (!e.target.closest) return;
+        // Feriado antes de aula: os dois são cards dentro do mesmo dia.
+        const feriado = e.target.closest('.cbusca-feriado');
+        if (feriado) {
+          abrirModalFeriado(parseInt(feriado.dataset.feriadoDia, 10));
+          return;
+        }
+        const card = e.target.closest('.cbusca-event');
+        if (card) abrirDetalhes(card.dataset.codigo);
       });
     }
   }
@@ -585,6 +688,7 @@ const CalendarioBusca = (function () {
   return {
     loadCalendarioMaster,
     abrirDetalhes,
+    abrirModalFeriado,
     // Expostos para teste e depuração.
     _estado: estado,
     _opcoesDoMes: opcoesDoMes,
