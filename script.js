@@ -228,6 +228,9 @@ function loadSectionContent(sectionId) {
     case 'simulacoes':
       if (typeof Simulacoes !== 'undefined' && Simulacoes.loadSimulacoes) Simulacoes.loadSimulacoes();
       break;
+    case 'calendario':
+      if (typeof loadCalendarioMaster === 'function') loadCalendarioMaster();
+      break;
     case 'fluxo-processos':
       if (typeof loadFluxoProcessos === 'function') loadFluxoProcessos();
       break;
