@@ -91,6 +91,61 @@ function aplicarTagsNegrito(texto) {
   return resultado;
 }
 
+// Colunas do cronograma levadas ao contrato, na ordem em que são desenhadas.
+const CAMPOS_CRONOGRAMA = ['data', 'hora', 'duracao', 'materia', 'professor', 'estudante'];
+
+// Detecta valor monetário. Cobre "R$ 120,00" e também "120,00" / "120.00" isolados.
+const PADRAO_MONETARIO = /R\$|^\d+[.,]\d{2}$/;
+
+/**
+ * Normaliza uma célula do cronograma: célula sem informação vira "--" para que
+ * nenhuma coluna do contrato saia em branco.
+ */
+function normalizarCelulaContrato(valor) {
+  const texto = (valor === null || valor === undefined) ? '' : String(valor).trim();
+  if (!texto || texto === '--' || texto === 'undefined' || texto === 'null' || texto === 'A definir') {
+    return '--';
+  }
+  return texto;
+}
+
+/**
+ * Trava de segurança redundante: sob nenhuma hipótese o valor da aula pode aparecer
+ * na tabela do contrato. Se algum campo chegar com aparência monetária, ele é
+ * neutralizado como "--" e o incidente é registrado no console.
+ */
+function sanitizarValoresMonetarios(linhas) {
+  return linhas.map(linha => {
+    const limpa = Object.assign({}, linha);
+    CAMPOS_CRONOGRAMA.forEach(campo => {
+      if (PADRAO_MONETARIO.test(limpa[campo])) {
+        console.error(
+          `[Contrato] Valor monetário bloqueado na coluna "${campo}" do cronograma:`,
+          limpa[campo]
+        );
+        limpa[campo] = '--';
+      }
+    });
+    return limpa;
+  });
+}
+
+/**
+ * Encurta o texto para caber na largura da célula, já que doc.text não quebra
+ * nem corta e o excedente invadiria a célula vizinha.
+ */
+function truncarTextoCelula(doc, texto, larguraDisponivel) {
+  const valor = (texto === null || texto === undefined) ? '' : String(texto);
+  if (larguraDisponivel <= 0) return '';
+  if (doc.getTextWidth(valor) <= larguraDisponivel) return valor;
+
+  let corte = valor;
+  while (corte.length > 1 && doc.getTextWidth(corte + '...') > larguraDisponivel) {
+    corte = corte.slice(0, -1);
+  }
+  return corte + '...';
+}
+
 /**
  * 4. Renderização Especial de Parágrafos (Suporta estilos mistos)
  */
@@ -225,27 +280,44 @@ function gerarPDFContrato(contratoTexto, nomeCliente, cpfCliente, enderecoClient
     loadingDiv.innerHTML = '<div style="padding:32px 48px;border-radius:12px;background:#fff;box-shadow:0 2px 16px #0002;font-size:1.2rem;font-family:sans-serif;color:#333;">Carregando contrato...</div>';
     document.body.appendChild(loadingDiv);
 
-    // 2. Buscar dados da tabela "table-details" do HTML
+    // 2. Buscar dados da tabela "Aulas Agendadas" do modal "Detalhes da contratação"
     await new Promise(resolve => setTimeout(resolve, 600)); // Simula tempo de carregamento
-    const table = document.querySelector('.table-details');
+
+    // Escopo restrito ao tbody da contratação. A classe .table-details também é usada
+    // pelas telas de pagamento e simulações, cujas colunas são monetárias; um seletor
+    // global poderia raspar a tabela errada e levar valores para dentro do contrato.
+    const tbodyAulas = document.querySelector('#tbody-aulas-detalhadas');
     let tableData = [];
-    if (table) {
-      const rows = table.querySelectorAll('tbody tr');
-      rows.forEach(row => {
-        const cells = row.querySelectorAll('td');
-        // Agora extraímos colunas 1,2,3,4,5 e 7 (pulando a coluna 6 - Valor da Aula)
-        if (cells.length >= 7) {
-          tableData.push({
-            data: cells[0].innerText.trim(),
-            hora: cells[1].innerText.trim(),
-            duracao: cells[2].innerText.trim(),
-            materia: cells[3].innerText.trim(),
-            professor: cells[4].innerText.trim(),
-            estudante: cells[6].innerText.trim()
-          });
-        }
+    if (tbodyAulas) {
+      tbodyAulas.querySelectorAll('tr').forEach(row => {
+        // Só são aulas as linhas que possuem os botões de edição inline. Isso descarta
+        // a linha de carregamento e a de "nenhuma aula encontrada", que usam colspan.
+        const btnData = row.querySelector('.btn-data-aula');
+        if (!btnData) return;
+
+        // Leitura por data-* (mesmo padrão do "Salvar Alterações" em
+        // functions-banco-de-aulas-Cards.js). A célula "Valor da Aula" é texto puro,
+        // sem botão e sem dataset, portanto é inalcançável por estes seletores —
+        // o valor da aula não tem como entrar na tabela do contrato.
+        const btnHorario   = row.querySelector('.btn-horario-aula');
+        const btnDuracao   = row.querySelector('.btn-duracao-aula');
+        const btnMateria   = row.querySelector('.btn-materia-aula');
+        const btnProfessor = row.querySelector('.btn-professor-aula');
+        const btnEstudante = row.querySelector('.btn-estudante-aula');
+
+        tableData.push({
+          data:      normalizarCelulaContrato(btnData.dataset.data),
+          hora:      normalizarCelulaContrato(btnHorario   && btnHorario.dataset.horario),
+          duracao:   normalizarCelulaContrato(btnDuracao   && btnDuracao.dataset.duracao),
+          materia:   normalizarCelulaContrato(btnMateria   && btnMateria.dataset.materia),
+          professor: normalizarCelulaContrato(btnProfessor && btnProfessor.dataset.professor),
+          estudante: normalizarCelulaContrato(btnEstudante && btnEstudante.dataset.estudante)
+        });
       });
     }
+
+    // Trava de segurança: nenhuma célula do cronograma pode conter valor monetário.
+    tableData = sanitizarValoresMonetarios(tableData);
 
     // 3. Renderizar elementos do contrato, inserindo a tabela no local do marcador
     for (const elemento of elementos) {
@@ -279,27 +351,38 @@ function gerarPDFContrato(contratoTexto, nomeCliente, cpfCliente, enderecoClient
           doc.setFont(fonte.nome, 'bold');
           doc.setFontSize(15);
           const headers = ['Data da aula', 'Início', 'Duração', 'Matéria', 'Professor', 'Estudante'];
-          // Calcular larguras automáticas para Início, Matéria, Professor e Estudante
-          doc.setFontSize(9);
-          doc.setFont(fonte.nome, 'normal');
-          let materiaWidth = doc.getTextWidth('Matéria') + 12;
-          let estudanteWidth = doc.getTextWidth('Estudante') + 12;
-          let inicioWidth = doc.getTextWidth('Início') + 12;
-          let professorWidth = doc.getTextWidth('Professor') + 12;
-          tableData.forEach(row => {
-            const mW = doc.getTextWidth(row.materia) + 12;
-            if (mW > materiaWidth) materiaWidth = mW;
-            const eW = doc.getTextWidth(row.estudante) + 12;
-            if (eW > estudanteWidth) estudanteWidth = eW;
-            const iW = doc.getTextWidth(row.hora) + 12;
-            if (iW > inicioWidth) inicioWidth = iW;
-            const pW = doc.getTextWidth(row.professor) + 12;
-            if (pW > professorWidth) professorWidth = pW;
-          });
-          // Larguras fixas para as demais
-          const colWidths = [80, inicioWidth, 60, materiaWidth, professorWidth, estudanteWidth];
-          const totalWidth = colWidths.reduce((a, b) => a + b, 0);
+
+          // Larguras automáticas: o cabeçalho é medido em negrito (como é desenhado)
+          // e o conteúdo em normal. Colunas de texto livre (matéria, professor,
+          // estudante) recebem teto para não estourar a largura útil da página.
           const pageWidth = doc.internal.pageSize.width;
+          const larguraMaxTabela = pageWidth - margens.esquerda - margens.direita;
+          const LARGURA_MAX_COLUNA = 130;
+          const PADDING_CELULA = 12;
+
+          const medirTexto = (texto, estilo) => {
+            doc.setFont(fonte.nome, estilo);
+            doc.setFontSize(9);
+            return doc.getTextWidth((texto === null || texto === undefined) ? '' : String(texto));
+          };
+
+          let colWidths = headers.map((h, i) => {
+            let largura = medirTexto(h, 'bold') + PADDING_CELULA;
+            tableData.forEach(row => {
+              const larguraConteudo = medirTexto(row[CAMPOS_CRONOGRAMA[i]], 'normal') + PADDING_CELULA;
+              if (larguraConteudo > largura) largura = larguraConteudo;
+            });
+            return Math.min(largura, LARGURA_MAX_COLUNA);
+          });
+
+          // Se ainda assim estourar, reduz todas proporcionalmente.
+          let totalWidth = colWidths.reduce((a, b) => a + b, 0);
+          if (totalWidth > larguraMaxTabela) {
+            const fator = larguraMaxTabela / totalWidth;
+            colWidths = colWidths.map(w => w * fator);
+            totalWidth = colWidths.reduce((a, b) => a + b, 0);
+          }
+
           const tableX = (pageWidth - totalWidth) / 2;
           doc.setFontSize(15);
           doc.text('', pageWidth / 2, yAtual, { align: 'center' });
@@ -316,7 +399,7 @@ function gerarPDFContrato(contratoTexto, nomeCliente, cpfCliente, enderecoClient
             doc.setDrawColor(68,68,68);
             doc.rect(x, yAtual, colWidths[i], cellHeight, 'FD'); // linhas retas
             doc.setTextColor(255,255,255);
-            doc.text(h, x + 3, yAtual + 12);
+            doc.text(truncarTextoCelula(doc, h, colWidths[i] - PADDING_CELULA / 2), x + 3, yAtual + 12);
             doc.setTextColor(0,0,0);
             x += colWidths[i];
           });
@@ -326,10 +409,10 @@ function gerarPDFContrato(contratoTexto, nomeCliente, cpfCliente, enderecoClient
           doc.setFont(fonte.nome, 'normal');
           tableData.forEach(row => {
             let x = tableX;
-            [row.data, row.hora, row.duracao, row.materia, row.professor, row.estudante].forEach((val, i) => {
+            CAMPOS_CRONOGRAMA.forEach((campo, i) => {
               doc.setDrawColor(68,68,68);
               doc.rect(x, yAtual, colWidths[i], cellHeight, 'D'); // linhas retas
-              doc.text(val, x + 3, yAtual + 12);
+              doc.text(truncarTextoCelula(doc, row[campo], colWidths[i] - PADDING_CELULA / 2), x + 3, yAtual + 12);
               x += colWidths[i];
             });
             yAtual += cellHeight;
