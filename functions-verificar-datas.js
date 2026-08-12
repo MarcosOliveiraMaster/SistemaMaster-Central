@@ -4,29 +4,69 @@
 // Usado pelo botão "Verificar Datas" em Detalhes da Contratação e Simulações
 // ============================================================
 
-// Feriados estaduais (Alagoas) e municipais (Maceió) — lista mantida manualmente,
-// pois não existe API pública confiável para esses níveis. Repete todo ano (sem campo "ano").
-window.FERIADOS_AL_MACEIO = [
-  { mes: 9, dia: 16, nome: 'Emancipação Política de Alagoas' },
-  { mes: 12, dia: 5, nome: 'Aniversário de Maceió' }
-];
+// Feriados estaduais (Alagoas) e municipais (Maceió).
+//
+// Esta lista era mantida à mão aqui e tinha só duas datas, uma delas incorreta
+// ("Aniversário de Maceió" em 05/12, que não é feriado). Passou a ser derivada de
+// feriados.js, que é a fonte única do sistema e cobre também São João, São Pedro,
+// Dia Estadual do Evangélico, Nossa Senhora dos Prazeres, Nossa Senhora da
+// Conceição, Corpus Christi e Marechal Floriano Peixoto.
+//
+// Continua exposta em window com o mesmo formato de antes ({ mes: 1-12, dia, nome })
+// para não quebrar quem já dependia dela. É montada sob demanda porque feriados.js
+// carrega depois deste arquivo no index.html.
+function _feriadosRegionaisDoAno(ano) {
+  if (typeof Feriados === 'undefined' || !Feriados.listar) return [];
+  return Feriados.listar(ano)
+    .filter(f => f.esfera !== Feriados.NACIONAL)
+    .map(f => ({ mes: f.mes + 1, dia: f.dia, nome: f.nome }));
+}
+
+Object.defineProperty(window, 'FERIADOS_AL_MACEIO', {
+  get() { return _feriadosRegionaisDoAno(new Date().getFullYear()); },
+  configurable: true
+});
 
 // Status de aula que NÃO contam como conflito real de agenda
 const _STATUS_IGNORADOS_CONFLITO = ['Cancelada', 'Reagendada'];
 
 const _cacheFeriadosNacionais = {}; // { [ano]: [{date, name, type}] }
 
+// Nacionais do feriados.js, no formato da BrasilAPI ({ date, name, type }).
+// Servem de base offline: antes, uma falha de rede deixava a verificação sem
+// nenhum feriado nacional.
+function _nacionaisLocais(ano) {
+  if (typeof Feriados === 'undefined' || !Feriados.listar) return [];
+  return Feriados.listar(ano)
+    .filter(f => f.esfera === Feriados.NACIONAL)
+    .map(f => ({
+      date: `${ano}-${String(f.mes + 1).padStart(2, '0')}-${String(f.dia).padStart(2, '0')}`,
+      name: f.nome,
+      type: 'national'
+    }));
+}
+
+// União da base local com a BrasilAPI: a rede só acrescenta o que faltar
+// (feriados nacionais novos), e a ausência dela não zera mais o resultado.
 async function _buscarFeriadosNacionais(ano) {
   if (_cacheFeriadosNacionais[ano]) return _cacheFeriadosNacionais[ano];
+
+  const locais = _nacionaisLocais(ano);
+  let daApi = [];
   try {
     const resp = await fetch(`https://brasilapi.com.br/api/feriados/v1/${ano}`);
     if (!resp.ok) throw new Error('Resposta não OK da BrasilAPI');
     const data = await resp.json();
-    _cacheFeriadosNacionais[ano] = Array.isArray(data) ? data : [];
+    daApi = Array.isArray(data) ? data : [];
   } catch (err) {
-    console.warn('⚠️ Não foi possível buscar feriados nacionais (BrasilAPI):', err);
-    _cacheFeriadosNacionais[ano] = [];
+    console.warn('⚠️ BrasilAPI indisponível; usando apenas a lista local de feriados:', err);
   }
+
+  const porData = new Map();
+  locais.forEach(f => porData.set(f.date, f));
+  daApi.forEach(f => { if (f && f.date && !porData.has(f.date)) porData.set(f.date, f); });
+
+  _cacheFeriadosNacionais[ano] = [...porData.values()];
   return _cacheFeriadosNacionais[ano];
 }
 
@@ -73,12 +113,16 @@ async function _verificarFeriadoData(dataStr) {
   let feriadoHoje = feriadosHoje.find(f => f.date === isoHoje);
   let feriadoAmanha = listaAmanha.find(f => f.date === isoAmanha);
 
+  // Regionais pelo ano da própria data, e não pelo ano corrente: os móveis
+  // (Corpus Christi) mudam de dia a cada ano.
   if (!feriadoHoje) {
-    const fixo = window.FERIADOS_AL_MACEIO.find(f => f.mes === dataObj.getMonth() + 1 && f.dia === dataObj.getDate());
+    const fixo = _feriadosRegionaisDoAno(anoHoje)
+      .find(f => f.mes === dataObj.getMonth() + 1 && f.dia === dataObj.getDate());
     if (fixo) feriadoHoje = { name: fixo.nome };
   }
   if (!feriadoAmanha) {
-    const fixo = window.FERIADOS_AL_MACEIO.find(f => f.mes === amanha.getMonth() + 1 && f.dia === amanha.getDate());
+    const fixo = _feriadosRegionaisDoAno(anoAmanha)
+      .find(f => f.mes === amanha.getMonth() + 1 && f.dia === amanha.getDate());
     if (fixo) feriadoAmanha = { name: fixo.nome };
   }
 

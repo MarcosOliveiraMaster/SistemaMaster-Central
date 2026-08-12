@@ -53,6 +53,7 @@ let calMasterAno = new Date().getFullYear();
 let calMasterExibirAulas = false;
 let calMasterExibirPagamentos = true;
 let calMasterExibirRenovacoes = true;
+let calMasterExibirFeriados = true;   // feriados nacionais, de Alagoas e de Maceió
 let calMasterEventosCache = []; // cache dos eventos customizados carregados no mês atual
 
 // Cache local do cálculo de renovações (evita recomputar a cada troca de mês
@@ -2253,6 +2254,10 @@ function carregarCalendarioMaster() {
           <input type="checkbox" id="calMaster-chk-renovacoes" class="w-4 h-4" checked>
           Mostrar renovações
         </label>
+        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none" style="height: 34px;">
+          <input type="checkbox" id="calMaster-chk-feriados" class="w-4 h-4" checked>
+          Exibir feriados
+        </label>
         <button type="button" id="calMaster-btn-criar-evento" class="btn-primary btn-compact" style="height: 34px;">
           <i class="fas fa-plus mr-2"></i>
           Criar evento
@@ -2266,6 +2271,7 @@ function carregarCalendarioMaster() {
   const chkAulas = document.getElementById('calMaster-chk-aulas');
   const chkPagamentos = document.getElementById('calMaster-chk-pagamentos');
   const chkRenovacoes = document.getElementById('calMaster-chk-renovacoes');
+  const chkFeriados = document.getElementById('calMaster-chk-feriados');
   const btnCriarEvento = document.getElementById('calMaster-btn-criar-evento');
   const btnMesAnterior = document.getElementById('calMaster-btn-mes-anterior');
   const btnMesProximo = document.getElementById('calMaster-btn-mes-proximo');
@@ -2280,6 +2286,10 @@ function carregarCalendarioMaster() {
   });
   chkRenovacoes.addEventListener('change', () => {
     calMasterExibirRenovacoes = chkRenovacoes.checked;
+    renderGradeCalendarioMaster();
+  });
+  chkFeriados.addEventListener('change', () => {
+    calMasterExibirFeriados = chkFeriados.checked;
     renderGradeCalendarioMaster();
   });
   btnCriarEvento.addEventListener('click', () => abrirModalCriarEvento());
@@ -2478,6 +2488,25 @@ async function renderGradeCalendarioMaster() {
       });
     }).catch(err => console.error('❌ Erro ao carregar eventos do Calendário Master:', err))
   );
+
+  // Feriados (verde) — nacionais, de Alagoas e de Maceió. Vêm de feriados.js, que é
+  // cálculo puro: nada de rede nem de Firestore, por isso não entram em "promessas".
+  // minutos -1 mantém o feriado no topo do dia, antes de qualquer evento com horário.
+  if (calMasterExibirFeriados && typeof Feriados !== 'undefined' && Feriados.porDia) {
+    const feriadosPorDia = Feriados.porDia(calMasterMes, calMasterAno);
+    Object.keys(feriadosPorDia).forEach(dia => {
+      const doDia = feriadosPorDia[dia];
+      const rotulo = doDia.length > 1
+        ? `${doDia[0].nome} +${doDia.length - 1}`
+        : doDia[0].nome;
+      addEvento(parseInt(dia, 10), {
+        tipo: 'feriado',
+        minutos: -1,
+        linhas: [rotulo],
+        onclickAttr: `CalendarioBusca.abrirModalFeriado(${parseInt(dia, 10)}, ${calMasterMes}, ${calMasterAno})`
+      });
+    });
+  }
 
   // Renovações de pacote (roxo) — calculadas a partir da última aula válida de cada contrato
   if (calMasterExibirRenovacoes) {

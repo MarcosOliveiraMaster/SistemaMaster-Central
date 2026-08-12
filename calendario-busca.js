@@ -464,17 +464,24 @@ const CalendarioBusca = (function () {
       </div>`;
   }
 
-  /** Modal do feriado: nome, esfera e botão de fechar. */
-  function abrirModalFeriado(dia) {
+  /**
+   * Modal do feriado: nome, esfera e botão de fechar.
+   * mes/ano são opcionais e caem no mês exibido nesta seção — o Calendário Master
+   * do Painel Central passa os três, por navegar num mês próprio.
+   */
+  function abrirModalFeriado(dia, mes, ano) {
+    const mesAlvo = (mes === undefined || mes === null) ? estado.mes : mes;
+    const anoAlvo = (ano === undefined || ano === null) ? estado.ano : ano;
+
     const feriados = (typeof Feriados !== 'undefined' && Feriados.doDia)
-      ? Feriados.doDia(dia, estado.mes, estado.ano)
+      ? Feriados.doDia(dia, mesAlvo, anoAlvo)
       : [];
     if (!feriados.length) return;
 
     const anterior = document.getElementById('cbusca-modal-feriado');
     if (anterior) anterior.remove();
 
-    const dataFmt = `${String(dia).padStart(2, '0')}/${String(estado.mes + 1).padStart(2, '0')}/${estado.ano}`;
+    const dataFmt = `${String(dia).padStart(2, '0')}/${String(mesAlvo + 1).padStart(2, '0')}/${anoAlvo}`;
 
     const modal = document.createElement('div');
     modal.id = 'cbusca-modal-feriado';

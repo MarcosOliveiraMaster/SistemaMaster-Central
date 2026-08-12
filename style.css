@@ -4067,3 +4067,16 @@ h2, h3, h4, h5, h6 {
   color: #9ca3af;
   margin-top: 1px;
 }
+
+/* Feriado no Calendário Master do Painel Central.
+   Verde mais fechado que o de pagamento (#10B981) e com estrela via ::before,
+   já que renderEventoHtml() escapa o texto e não aceita ícone embutido. */
+.cal-master-event-feriado {
+  background: #16A34A;
+  font-weight: 700;
+}
+
+.cal-master-event-feriado::before {
+  content: "\2605\00a0";
+  font-size: 0.55rem;
+}
