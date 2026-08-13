@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Partes do Corpo | Body Parts — Master Educação</title>
+  <meta name="description" content="Aula interativa de inglês sobre partes do corpo: 12 cards animados com pronúncia, jogo da memória, forca, liga pontos e caça-palavras.">
+  <meta name="theme-color" content="#f28705">
+  <link rel="shortcut icon" href="../favicon.ico">
+  <link rel="icon" type="image/x-icon" href="../favicon.ico">
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/estilo.css">
+</head>
+<body>
+
+  <a class="pular" href="#conteudo">Pular para o conteúdo</a>
+
+  <header class="topo">
+    <div class="topo-linha">
+      <div class="marca">
+        <span class="marca-icone" aria-hidden="true">
+          <svg viewBox="0 0 40 40"><circle cx="20" cy="12" r="7"/><path d="M20 21c-8 0-13 6-13 13h26c0-7-5-13-13-13z"/></svg>
+        </span>
+        <span class="marca-texto">
+          <strong>Partes do Corpo</strong>
+          <em>Body Parts &middot; Inglês para crianças</em>
+        </span>
+      </div>
+
+      <div class="topo-acoes">
+        <button type="button" id="btn-som" class="btn-som" aria-pressed="false" title="Som ligado">
+          <svg viewBox="0 0 24 24" class="ic" aria-hidden="true">
+            <path d="M4 9h3l5-4v14l-5-4H4z"/>
+            <path class="ic-onda" d="M16 8.5c1.6 1.6 1.6 5.4 0 7"/>
+            <path class="ic-onda" d="M19 6c3 3 3 9 0 12"/>
+            <path class="ic-corte" d="M15 9l6 6M21 9l-6 6"/>
+          </svg>
+          <span class="som-texto">Som on</span>
+        </button>
+        <button type="button" id="nav-toggle" class="nav-toggle" aria-label="Abrir menu">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+
+    <nav id="nav" class="nav" role="tablist" aria-label="Seções da aula">
+      <button type="button" class="nav-btn ativo" data-secao="cards" role="tab" aria-selected="true">
+        <span class="nav-ic" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>
+        </span>
+        Partes do corpo
+      </button>
+      <button type="button" class="nav-btn" data-secao="memoria" role="tab" aria-selected="false">
+        <span class="nav-ic" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><rect x="2.5" y="4" width="8" height="16" rx="2"/><rect x="13.5" y="4" width="8" height="16" rx="2"/></svg>
+        </span>
+        Jogo da memória
+      </button>
+      <button type="button" class="nav-btn" data-secao="forca" role="tab" aria-selected="false">
+        <span class="nav-ic" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M5 21V3h11v3M16 6v3" fill="none" stroke-width="2.4"/><circle cx="16" cy="12.5" r="3"/></svg>
+        </span>
+        Forca
+      </button>
+      <button type="button" class="nav-btn" data-secao="ligar" role="tab" aria-selected="false">
+        <span class="nav-ic" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><circle cx="5" cy="6" r="2.6"/><circle cx="5" cy="18" r="2.6"/><circle cx="19" cy="6" r="2.6"/><circle cx="19" cy="18" r="2.6"/><path d="M7.6 6H16.4M7.6 18h8.8" fill="none" stroke-width="2.2"/></svg>
+        </span>
+        Liga pontos
+      </button>
+      <button type="button" class="nav-btn" data-secao="caca" role="tab" aria-selected="false">
+        <span class="nav-ic" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke-width="2.4"/><path d="M15.5 15.5L21 21" fill="none" stroke-width="2.6"/></svg>
+        </span>
+        Caça-palavras
+      </button>
+    </nav>
+  </header>
+
+  <div id="aviso" class="aviso" role="status" aria-live="polite"></div>
+
+  <main id="conteudo">
+
+    <!-- ================================================== 1. CARDS -->
+    <section id="secao-cards" class="secao ativa" role="tabpanel" aria-label="Partes do corpo">
+      <div class="secao-cabeca">
+        <div>
+          <h1 class="secao-titulo">Nós vamos falar sobre <span>partes do corpo</span></h1>
+          <p class="secao-sub">Clique em qualquer card para ouvir a pronúncia em inglês. Cada desenho tem uma animação da parte do corpo.</p>
+        </div>
+        <div class="secao-acoes">
+          <button type="button" id="btn-ouvir-todos" class="btn btn-principal">
+            <svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><path d="M8 5l12 7-12 7z"/></svg>
+            Ouvir todas
+          </button>
+        </div>
+      </div>
+
+      <div class="legenda-grid">
+        <span data-n="1">Imagem animada</span>
+        <span data-n="2">Nome em português</span>
+        <span data-n="3">Nome em inglês</span>
+        <span data-n="4">Clique = pronúncia</span>
+      </div>
+
+      <div id="grid-cards" class="grid-cards"></div>
+    </section>
+
+    <!-- ================================================ 2. MEMÓRIA -->
+    <section id="secao-memoria" class="secao" role="tabpanel" aria-label="Jogo da memória" hidden>
+      <div class="secao-cabeca">
+        <div>
+          <h2 class="secao-titulo">Jogo da <span>memória</span></h2>
+          <p class="secao-sub">Encontre os 12 pares: cada <strong>desenho</strong> combina com o seu <strong>nome em inglês</strong>.</p>
+        </div>
+        <div class="secao-acoes">
+          <button type="button" id="mem-novo" class="btn btn-principal">
+            <svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><path d="M12 5V2L7 6l5 4V7a5 5 0 11-5 5H4a8 8 0 108-8z"/></svg>
+            Novo jogo
+          </button>
+        </div>
+      </div>
+
+      <div class="painel-info">
+        <span class="chip"><em>Pares</em><strong id="mem-pares">0/12</strong></span>
+        <span class="chip"><em>Jogadas</em><strong id="mem-jogadas">0</strong></span>
+        <span class="chip"><em>Tempo</em><strong id="mem-tempo">00:00</strong></span>
+        <span class="chip"><em>Recorde</em><strong id="mem-recorde">—</strong></span>
+      </div>
+
+      <div id="mem-tabuleiro" class="mem-tabuleiro"></div>
+    </section>
+
+    <!-- =================================================== 3. FORCA -->
+    <section id="secao-forca" class="secao" role="tabpanel" aria-label="Jogo da forca" hidden>
+      <div class="secao-cabeca">
+        <div>
+          <h2 class="secao-titulo">Jogo da <span>forca</span></h2>
+          <p class="secao-sub">A palavra a descobrir é uma parte do corpo <strong>em inglês</strong>. A dica também está em inglês.</p>
+        </div>
+        <div class="secao-acoes">
+          <span id="fc-placar" class="placar"></span>
+          <button type="button" id="fc-novo" class="btn btn-principal">
+            <svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><path d="M12 5V2L7 6l5 4V7a5 5 0 11-5 5H4a8 8 0 108-8z"/></svg>
+            Nova palavra
+          </button>
+        </div>
+      </div>
+
+      <div class="forca-grade">
+        <div class="forca-desenho">
+          <svg id="fc-boneco" viewBox="0 0 200 240" aria-label="Boneco da forca">
+            <!-- Estrutura -->
+            <path class="f-base" d="M20 224h100" />
+            <path class="f-base" d="M45 224V24" />
+            <path class="f-base" d="M45 24h85" />
+            <path class="f-base f-corda" d="M130 24v26" />
+            <!-- Boneco -->
+            <circle class="f-peca f-cabeca" cx="130" cy="68" r="19" />
+            <path class="f-peca f-tronco" d="M130 87v62" />
+            <path class="f-peca f-braco-e" d="M130 102l-26 22" />
+            <path class="f-peca f-braco-d" d="M130 102l26 22" />
+            <path class="f-peca f-perna-e" d="M130 149l-24 34" />
+            <path class="f-peca f-perna-d" d="M130 149l24 34" />
+            <!-- Rosto (aparece na derrota) -->
+            <g class="f-rosto">
+              <path d="M122 62l7 7M129 62l-7 7" />
+              <path d="M134 62l7 7M141 62l-7 7" />
+              <path d="M124 79q6-6 12 0" />
+            </g>
+          </svg>
+          <p class="forca-erros">Erros: <strong id="fc-erros">0/6</strong></p>
+        </div>
+
+        <div class="forca-jogo">
+          <div id="fc-dica" class="fc-dica"></div>
+          <div id="fc-palavra" class="fc-palavra" role="img" aria-label="Palavra a descobrir"></div>
+          <p id="fc-mensagem" class="fc-mensagem"></p>
+          <div id="fc-teclado" class="fc-teclado" aria-label="Letras disponíveis"></div>
+          <p class="forca-ajuda">Você também pode digitar as letras no teclado do computador.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================== 4. LIGA PONTOS -->
+    <section id="secao-ligar" class="secao" role="tabpanel" aria-label="Liga pontos" hidden>
+      <div class="secao-cabeca">
+        <div>
+          <h2 class="secao-titulo">Liga <span>pontos</span></h2>
+          <p class="secao-sub">Ligue o <strong>desenho</strong> (à esquerda) ao <strong>nome em inglês</strong> (à direita).</p>
+        </div>
+        <div class="secao-acoes">
+          <span id="lp-placar" class="placar"></span>
+          <button type="button" id="lp-novo" class="btn btn-principal">
+            <svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><path d="M12 5V2L7 6l5 4V7a5 5 0 11-5 5H4a8 8 0 108-8z"/></svg>
+            Novo jogo
+          </button>
+        </div>
+      </div>
+
+      <p id="lp-mensagem" class="lp-mensagem"></p>
+
+      <div id="lp-area" class="lp-area">
+        <svg id="lp-linhas" class="lp-linhas" aria-hidden="true"></svg>
+        <div class="lp-coluna">
+          <h3 class="lp-cabecalho">Desenho</h3>
+          <div id="lp-esquerda" class="lp-lista"></div>
+        </div>
+        <div class="lp-coluna">
+          <h3 class="lp-cabecalho">Nome em inglês</h3>
+          <div id="lp-direita" class="lp-lista"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================ 5. CAÇA-PALAVRAS -->
+    <section id="secao-caca" class="secao" role="tabpanel" aria-label="Caça-palavras" hidden>
+      <div class="secao-cabeca">
+        <div>
+          <h2 class="secao-titulo">Caça-<span>palavras</span></h2>
+          <p class="secao-sub">São sempre <strong>6 palavras</strong>, sorteadas de novo a cada carregamento da página ou novo jogo.</p>
+        </div>
+        <div class="secao-acoes">
+          <span id="cp-placar" class="placar"></span>
+          <button type="button" id="cp-novo" class="btn btn-principal">
+            <svg viewBox="0 0 24 24" class="ic" aria-hidden="true"><path d="M12 5V2L7 6l5 4V7a5 5 0 11-5 5H4a8 8 0 108-8z"/></svg>
+            Novo jogo
+          </button>
+        </div>
+      </div>
+
+      <p id="cp-mensagem" class="cp-mensagem"></p>
+
+      <div class="cp-area">
+        <div id="cp-grade" class="cp-grade" aria-label="Grade de letras"></div>
+        <aside class="cp-painel">
+          <h3 class="cp-titulo">Encontre estas palavras</h3>
+          <ul id="cp-lista" class="cp-lista"></ul>
+          <p class="cp-nota">Arraste na horizontal, vertical ou diagonal — para frente ou para trás.</p>
+        </aside>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="rodape">
+    <p>Master Educação &middot; Aula interativa de inglês &middot; <span id="ano"></span></p>
+  </footer>
+
+  <!-- Modal de conclusão -->
+  <div id="modal" class="modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="modal-titulo">
+    <div class="modal-caixa">
+      <h2 class="modal-titulo" id="modal-titulo"></h2>
+      <div class="modal-corpo"></div>
+      <button type="button" class="btn btn-principal modal-fechar">Continuar</button>
+    </div>
+  </div>
+  <div id="confete" class="confete" aria-hidden="true"></div>
+
+  <script src="js/dados.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/cards.js"></script>
+  <script src="js/memoria.js"></script>
+  <script src="js/forca.js"></script>
+  <script src="js/ligar.js"></script>
+  <script src="js/caca-palavras.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
