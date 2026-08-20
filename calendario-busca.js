@@ -28,6 +28,13 @@ const CalendarioBusca = (function () {
   const SEM_PROFESSOR = 'A definir';
   const SEM_CLIENTE = 'Sem cliente';
 
+  // loadCalendarioMaster() reconstrói o shell e chama ligarEventos() a cada visita
+  // à seção. O listener de "clique fora fecha o dropdown" ficava sendo religado em
+  // `document` a cada vez, sem nunca ser removido — cada troca de seção deixava um
+  // handler órfão acumulado. Ligado uma única vez aqui, buscando os elementos atuais
+  // via id (estáveis entre re-renders) em vez de fechar sobre referências antigas.
+  let _fechaDropdownAoClicarFora = false;
+
   // Paleta para diferenciar os selecionados, derivada de CORES_CAL
   // (functions-calendario-visual.js) e replicada aqui para o módulo ficar autocontido.
   // Sem verde de propósito: verde é reservado para feriado.
@@ -589,11 +596,15 @@ const CalendarioBusca = (function () {
           if (inputBusca) inputBusca.focus();
         }
       });
-      document.addEventListener('click', e => {
-        if (ddMenu.classList.contains('hidden')) return;
-        const wrapper = document.getElementById('cbusca-dd-wrapper');
-        if (wrapper && !wrapper.contains(e.target)) ddMenu.classList.add('hidden');
-      });
+      if (!_fechaDropdownAoClicarFora) {
+        _fechaDropdownAoClicarFora = true;
+        document.addEventListener('click', e => {
+          const menu = document.getElementById('cbusca-dd-menu');
+          if (!menu || menu.classList.contains('hidden')) return;
+          const wrapper = document.getElementById('cbusca-dd-wrapper');
+          if (wrapper && !wrapper.contains(e.target)) menu.classList.add('hidden');
+        });
+      }
     }
 
     const inputBusca = document.getElementById('cbusca-dd-busca');

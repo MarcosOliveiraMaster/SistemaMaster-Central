@@ -6,6 +6,8 @@ const BancoDeAulasCards = (function() {
   let aulasData = [];
   let currentFilters = {};
   let _aulaDetalhesAtual = null; // Armazena aula ativa para acesso em setupAulaDetailsEventListeners
+  let _modalDetalhesAtivo = null; // Referência ao modal de detalhes em exibição (evita instâncias duplicadas empilhadas)
+  let _cancelarCarregamentoAtual = null; // Handle para parar o timer/progresso do carregamento de aulas em andamento (ver loadAulasDetalhadas)
   
   // Função para renderizar cards de aulas
   function renderAulasCards(aulas, filters = {}) {
@@ -343,6 +345,15 @@ const BancoDeAulasCards = (function() {
   
   // Função para abrir os detalhes da aula (modal)
   function viewAulaDetails(aula) {
+    // Evita empilhar múltiplas instâncias do modal (ex.: cliques repetidos no card
+    // do calendário antes do primeiro carregamento terminar). Sem isto, IDs como
+    // "tbody-aulas-detalhadas" ficam duplicados no DOM e document.getElementById
+    // passa a resolver sempre para a instância mais antiga — a mais nova (visível
+    // para o usuário) nunca recebe os dados e fica presa em "carregando".
+    if (_modalDetalhesAtivo && typeof _modalDetalhesAtivo._fecharModal === 'function') {
+      _modalDetalhesAtivo._fecharModal();
+    }
+
     _aulaDetalhesAtual = aula;
     console.log('🔍 Visualizando detalhes da aula:', aula.id);
 
@@ -620,11 +631,26 @@ const BancoDeAulasCards = (function() {
     const modal = modalContainer.querySelector('.modal-overlay');
     const closeBtn = modal.querySelector('.modal-close');
     const fecharBtn = modal.querySelector('#btn-fechar-modal');
-    
+
     const closeModal = () => {
+      // 'remove' não é um evento real do DOM em elementos comuns — depender dele
+      // (como antes) fazia o listener de ESC nunca ser removido, vazando um handler
+      // em `document` a cada abertura do modal até a aba travar. Limpeza é feita
+      // diretamente aqui, no único ponto de saída do modal.
+      document.removeEventListener('keydown', escHandler);
+      // Interrompe o timer/progresso do carregamento de aulas em andamento (se houver),
+      // senão ele continua rodando após o modal sumir e pode escrever num modal futuro
+      // que reaproveita os mesmos ids (#tbody-aulas-detalhadas, barra de progresso).
+      if (_cancelarCarregamentoAtual) {
+        _cancelarCarregamentoAtual.cancelar();
+        _cancelarCarregamentoAtual = null;
+      }
+      if (_modalDetalhesAtivo === modalContainer) _modalDetalhesAtivo = null;
       modalContainer.remove();
     };
-    
+    modalContainer._fecharModal = closeModal;
+    _modalDetalhesAtivo = modalContainer;
+
     closeBtn.addEventListener('click', closeModal);
     fecharBtn.addEventListener('click', closeModal);
 
@@ -738,11 +764,7 @@ const BancoDeAulasCards = (function() {
         `;
       }
     }
-    
-    modalContainer.addEventListener('remove', () => {
-      document.removeEventListener('keydown', escHandler);
-    });
-    
+
     // Configurar botão de editar contratação (abre modal de edição)
     const btnEditarContratacao = modal.querySelector('#btn-editar-contratacao');
     btnEditarContratacao.addEventListener('click', () => {
@@ -2189,9 +2211,12 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
           <tr>
             <td colspan="13" class="text-center py-8">
               <div class="flex flex-col items-center justify-center">
-                <div class="loading-spinner-large mb-3"></div>
-                <p class="text-orange-500 font-comfortaa font-bold">Carregando aulas...</p>
+                <p class="text-orange-500 font-comfortaa font-bold" id="detalhes-loading-label">Carregando aulas...</p>
                 <p class="text-sm text-gray-500 mt-1">Buscando dados detalhados</p>
+                <div class="detalhes-loading-progress-track">
+                  <div class="detalhes-loading-progress-bar" id="detalhes-loading-progress-bar"></div>
+                </div>
+                <p class="detalhes-loading-progress-label" id="detalhes-loading-progress-label">0%</p>
               </div>
             </td>
           </tr>
@@ -2202,21 +2227,123 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
     return html;
   }
   
-  // Função para carregar aulas da BancoDeAulas-Lista
-  async function loadAulasDetalhadas(codigoContratacao) {
+  // Barra de progresso "simulada" para a etapa de carregamento das aulas detalhadas.
+  // O Firestore não expõe progresso real de uma leitura de coleção, então avançamos
+  // gradualmente até um teto (dando sensação de atividade) e só completamos para
+  // 100% quando os dados realmente chegam — assim o usuário nunca vê a barra parada.
+  function iniciarProgressoCarregamentoAulas() {
+    let percentual = 0;
+    let ativo = true;
+
+    const atualizarDOM = () => {
+      const bar = document.getElementById('detalhes-loading-progress-bar');
+      const label = document.getElementById('detalhes-loading-progress-label');
+      if (bar) bar.style.width = percentual + '%';
+      if (label) label.textContent = percentual + '%';
+    };
+
+    const intervalId = setInterval(() => {
+      if (!ativo) return;
+      percentual += Math.max(1, Math.round((88 - percentual) * 0.12));
+      if (percentual > 88) percentual = 88;
+      atualizarDOM();
+    }, 220);
+
+    atualizarDOM();
+
+    return {
+      avancarPara(valor) {
+        if (!ativo) return;
+        percentual = Math.max(percentual, Math.min(valor, 99));
+        atualizarDOM();
+      },
+      concluir() {
+        if (!ativo) return;
+        ativo = false;
+        clearInterval(intervalId);
+        percentual = 100;
+        atualizarDOM();
+      },
+      parar() {
+        ativo = false;
+        clearInterval(intervalId);
+      }
+    };
+  }
+
+  // Função para carregar aulas da BancoDeAulas-Lista.
+  // Não é mais `async`: precisa devolver o handle de cancelamento (`cancelar`)
+  // de forma síncrona, para que closeModal() consiga parar o timer/progresso
+  // em andamento assim que o modal é fechado (ou substituído por outro).
+  // Sem isto, o intervalo da barra de progresso de uma chamada antiga continuava
+  // rodando após o modal ser removido e podia escrever no `#detalhes-loading-progress-bar`
+  // de um modal seguinte (mesmo id reaproveitado), já que só existe uma instância do
+  // modal por vez.
+  function loadAulasDetalhadas(codigoContratacao) {
     const tbody = document.getElementById('tbody-aulas-detalhadas');
     if (!tbody) {
       console.error('❌ tbody-aulas-detalhadas não encontrado');
-      return;
+      return null;
     }
-    
+
+    const progresso = iniciarProgressoCarregamentoAulas();
+
+    // Timeout de segurança: sem isto, uma leitura do Firestore que trava deixa
+    // a barra de progresso (e o modal) presos em "carregando" para sempre.
+    const TIMEOUT_MS = 20000;
+    let finalizado = false;
+    const timeoutId = setTimeout(() => {
+      if (finalizado) return;
+      finalizado = true;
+      progresso.parar();
+      const tbodyAtual = document.getElementById('tbody-aulas-detalhadas');
+      if (tbodyAtual) {
+        tbodyAtual.innerHTML = `
+          <tr>
+            <td colspan="13" class="text-center py-8">
+              <i class="fas fa-exclamation-triangle text-3xl text-orange-500 mb-3"></i>
+              <p class="text-gray-500">O carregamento está demorando mais que o esperado.</p>
+              <p class="text-sm text-gray-400 mt-1">Verifique sua conexão e tente novamente.</p>
+              <button type="button" id="btn-retry-aulas-detalhadas" class="btn-secondary btn-compact mt-3">
+                <i class="fas fa-redo mr-2"></i>Tentar novamente
+              </button>
+            </td>
+          </tr>
+        `;
+        const btnRetry = document.getElementById('btn-retry-aulas-detalhadas');
+        if (btnRetry) btnRetry.addEventListener('click', () => loadAulasDetalhadas(codigoContratacao));
+      }
+    }, TIMEOUT_MS);
+
+    // Cada chamada (inicial ou via "Tentar novamente") substitui o handle global —
+    // como só existe uma instância do modal por vez, isto garante que closeModal()
+    // sempre cancele o timer/progresso da tentativa realmente em andamento.
+    const controle = {
+      cancelar() {
+        if (finalizado) return;
+        finalizado = true;
+        clearTimeout(timeoutId);
+        progresso.parar();
+      }
+    };
+    _cancelarCarregamentoAtual = controle;
+
+    (async () => {
     try {
       console.log('📥 Carregando aulas detalhadas para código:', codigoContratacao);
-      
+
       // Buscar aulas da BancoDeAulas-Lista
       const aulas = await BANCO.fetchBancoDeAulasLista(codigoContratacao);
-      
+
+      // O timeout já assumiu a tela (usuário pode ter clicado em "Tentar novamente"
+      // e disparado uma nova chamada) — não sobrescrever com esta resposta atrasada.
+      if (finalizado) return;
+      progresso.avancarPara(55);
+
       if (!aulas || aulas.length === 0) {
+        finalizado = true;
+        clearTimeout(timeoutId);
+        progresso.concluir();
         tbody.innerHTML = `
           <tr>
             <td colspan="13" class="text-center py-8">
@@ -2443,6 +2570,7 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
         }
       } catch (e) { /* ignore */ }
 
+      progresso.avancarPara(90);
       tbody.innerHTML = html;
 
       // Reaplicar o estado atual do dropdown "Colunas" nas células recém-renderizadas
@@ -2484,21 +2612,37 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
       }
 
       console.log(`✅ ${aulas.length} aulas renderizadas na tabela`);
-      
+
+      finalizado = true;
+      clearTimeout(timeoutId);
+      progresso.concluir();
+
     } catch (error) {
       console.error('❌ Erro ao carregar aulas detalhadas:', error);
+      if (finalizado) return; // timeout já assumiu a tela; não sobrescrever
+      finalizado = true;
+      clearTimeout(timeoutId);
+      progresso.parar();
       tbody.innerHTML = `
         <tr>
           <td colspan="13" class="text-center py-8">
             <i class="fas fa-exclamation-triangle text-3xl text-orange-500 mb-3"></i>
             <p class="text-gray-500">Erro ao carregar aulas</p>
             <p class="text-sm text-gray-400 mt-1">${error.message}</p>
+            <button type="button" id="btn-retry-aulas-detalhadas" class="btn-secondary btn-compact mt-3">
+              <i class="fas fa-redo mr-2"></i>Tentar novamente
+            </button>
           </td>
         </tr>
       `;
+      const btnRetry = document.getElementById('btn-retry-aulas-detalhadas');
+      if (btnRetry) btnRetry.addEventListener('click', () => loadAulasDetalhadas(codigoContratacao));
     }
+    })();
+
+    return controle;
   }
-  
+
   // Função para configurar event listeners dos botões de relatório e observação
   function setupAulaDetailsEventListeners() {
     // Botões de estudante

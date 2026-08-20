@@ -533,6 +533,24 @@ async function loadAulasPainel(dataFiltro) {
 
 // ===== DETALHES DA CONTRATAÇÃO A PARTIR DO PAINEL CENTRAL =====
 
+// Códigos de contratação com uma busca em andamento — evita disparar leituras
+// duplicadas no Firestore quando o usuário clica várias vezes seguidas no mesmo
+// card/linha antes da primeira resposta chegar (uma das causas do "trava"/"não abre"
+// relatado ao reabrir "Detalhes da Contratação" repetidamente pelo Calendário Master).
+const _codigosCarregandoDetalhes = new Set();
+
+/**
+ * Busca com prazo máximo: uma leitura do Firestore que nunca resolve (rede instável,
+ * aba em segundo plano por muito tempo etc.) travava esta tela em "carregando" para
+ * sempre. Depois do prazo, rejeita para que o usuário veja um erro e possa tentar de novo.
+ */
+function _comTimeout(promise, ms, mensagemErro) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(mensagemErro)), ms))
+  ]);
+}
+
 /**
  * Abre o modal "Detalhes da Contratação" ao clicar em uma linha da tabelaConsultaAulas.
  * Busca o documento em BancoDeAulas pelo codigoContratacao e abre o modal via BancoDeAulasCards.
@@ -543,10 +561,21 @@ async function abrirDetalhesContratacaoPainelCentral(codigoContratacao) {
     return;
   }
 
+  if (_codigosCarregandoDetalhes.has(codigoContratacao)) {
+    // Já existe uma busca em andamento para este mesmo código — ignora o clique repetido
+    // em vez de empilhar outra leitura/modal.
+    return;
+  }
+  _codigosCarregandoDetalhes.add(codigoContratacao);
+
   try {
     showToast('Carregando detalhes da contratação...', 'info');
 
-    const docSnap = await db.collection('BancoDeAulas').doc(codigoContratacao).get();
+    const docSnap = await _comTimeout(
+      db.collection('BancoDeAulas').doc(codigoContratacao).get(),
+      20000,
+      'Tempo de carregamento excedido ao buscar a contratação.'
+    );
 
     if (!docSnap.exists) {
       showToast('Contratação não encontrada no banco de dados.', 'error');
@@ -563,7 +592,11 @@ async function abrirDetalhesContratacaoPainelCentral(codigoContratacao) {
     }
   } catch (error) {
     console.error('❌ Erro ao abrir detalhes da contratação:', error);
-    showToast('Erro ao carregar detalhes da contratação.', 'error');
+    showToast(error && error.message === 'Tempo de carregamento excedido ao buscar a contratação.'
+      ? error.message
+      : 'Erro ao carregar detalhes da contratação.', 'error');
+  } finally {
+    _codigosCarregandoDetalhes.delete(codigoContratacao);
   }
 }
 
