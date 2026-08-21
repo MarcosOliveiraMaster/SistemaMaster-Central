@@ -2480,6 +2480,13 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
       </div>`).join('');
   }
 
+  // NOTA (revertido temporariamente — manageProfessorAuth exige Cloud Functions,
+  // que exige plano Blaze; o projeto está no Spark). Volta ao REST accounts:signUp
+  // client-side: quando o e-mail já tem conta (EMAIL_EXISTS — ex.: candidato que já
+  // foi cliente antes, ou repromoção), retorna null e "uid" não é gravado aqui.
+  // Contorno: rodar SistemMaster-Login/corrigir-uid-aulas.js depois (não depende
+  // de Cloud Functions/Blaze) para sincronizar o "uid" nesses casos.
+  //
   // Cria conta no Firebase Auth via REST API (não afeta a sessão do admin).
   // Retorna o uid do novo usuário, ou null se o e-mail já tiver conta cadastrada.
   async function criarContaAuth(email, senha) {
@@ -2514,7 +2521,14 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
           const emailLogin = String(profData.email || '').trim().toLowerCase();
           const cpfSenha   = String(profData.cpf   || '').replace(/\D/g, '');
           const uid = await criarContaAuth(emailLogin, cpfSenha);
-          if (uid) profData.uid = uid;
+          if (uid) {
+            profData.uid = uid;
+          } else {
+            // E-mail já tinha conta — uid não resolvido aqui. Marca o doc pra
+            // ficar visível no aviso do painel "Atualizar Permissões" até
+            // corrigir-uid-aulas.js rodar e limpar essa flag.
+            profData.precisaVerificarUid = true;
+          }
 
           await addDoc(CFG.colProfessores, profData);
           await deleteDoc(CFG.colCandidatos, cand.id);
@@ -2523,7 +2537,12 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
           S.t2Loaded = false; // forçar reload na próxima abertura da Tab2
           limparPainelCandidato();
           renderListaCandidatos();
-          toast(`${profData.nome || 'Professor'} promovido com sucesso!`, 'success');
+
+          if (!uid) {
+            toast(`⚠️ ${profData.nome || 'Professor'} promovido, mas o e-mail já tinha conta — rode corrigir-uid-aulas.js para sincronizar o login.`, 'warning');
+          } else {
+            toast(`${profData.nome || 'Professor'} promovido com sucesso!`, 'success');
+          }
         } catch (e) { toast('Erro ao promover: ' + e.message, 'error'); }
       }
     });

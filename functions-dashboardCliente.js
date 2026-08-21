@@ -2018,6 +2018,12 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
   // FIREBASE AUTH — CLIENTES (APP SECUNDÁRIA)
   // ============================================================
 
+  // NOTA (revertido temporariamente — manageClientAuth existe e funciona, mas
+  // exige que o projeto esteja no plano Blaze pra QUALQUER Cloud Function poder
+  // rodar, e o projeto está no Spark). Volta ao SDK client-side direto: quando
+  // o e-mail já tem conta ("auth/email-already-in-use"), "uid" não é gravado
+  // aqui. Contorno: rodar SistemMaster-Login/corrigir-uid-aulas.js com
+  // --incluir-cliente depois (não depende de Cloud Functions/Blaze).
   _getSecondaryAuth() {
     const APP_NAME = 'dc-cliente-auth';
     try {
@@ -2081,11 +2087,14 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
         if (res.sucesso) {
           const update = { acessoPlataforma: true };
           if (res.uid) update.uid = res.uid;
+          // Marca o cadastro como pendente de sincronização de uid quando a
+          // conta já existia — corrigir-uid-aulas.js limpa essa flag ao resolver.
+          if (res.jaExistia) update.precisaVerificarUid = true;
           await db.collection('cadastroClientes').doc(c._docId).update(update);
           resultados.push({
-            nome, tipo: 'ok',
+            nome, tipo: res.jaExistia ? 'warn' : 'ok',
             msg: res.jaExistia
-              ? 'Acesso concedido (conta já existia no sistema).'
+              ? '⚠️ Acesso concedido (conta já existia no sistema). Rode corrigir-uid-aulas.js --incluir-cliente para sincronizar o uid.'
               : 'Conta criada e acesso concedido com sucesso.'
           });
         } else {

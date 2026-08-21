@@ -478,7 +478,7 @@ async function salvarInfoAdicional(id) {
 
   // Buscar uid do professor para regras de segurança
   const professor = (window._pagProfessoresAtivos || []).find(p => p.cpf === professorId);
-  const uidProfessor = professor?.uid || '';
+  const professorUid = professor?.uid || '';
 
   try {
     const docId = professorId + '_' + mes + '-' + ano + '_' + Date.now();
@@ -488,7 +488,7 @@ async function salvarInfoAdicional(id) {
       valor,
       tipo,
       idProfessor: professorId,
-      uidProfessor,
+      professorUid,
       mes: parseInt(mes, 10),
       ano: parseInt(ano, 10)
     });

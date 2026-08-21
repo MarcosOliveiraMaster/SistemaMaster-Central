@@ -805,9 +805,11 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
         cModal.querySelector('#calDupSim').addEventListener('click', () => {
           duplicates.forEach(({ key: k, idx: i }) => {
             if (aulasMap[k]?.[i]) Object.assign(aulasMap[k][i], {
-              professor: novaAula.professor,
-              duracao:   novaAula.duracao,
-              horario:   novaAula.horario
+              professor:    novaAula.professor,
+              idProfessor:  novaAula.idProfessor,
+              professorUid: novaAula.professorUid,
+              duracao:      novaAula.duracao,
+              horario:      novaAula.horario
             });
           });
           cModal.remove();
@@ -921,9 +923,15 @@ async function showModalAulasCalendarios(aulaData, onSave, onDelete = null) {
     <button class="mac-duracao-btn${d === aulaData.duracao ? ' mac-duracao-sel' : ''}" data-duracao="${d}">${d}</button>
   `).join('');
 
-  const profOptsHtml = `<option value="">A definir</option>` +
+  // Value carrega cpf|nome|uid (mesmo padrão do modal "Selecione Professor" em
+  // functions-banco-de-aulas-Cards.js) para que idProfessor/professorUid sejam
+  // gravados junto com o nome ao salvar — antes só o nome era enviado, o que
+  // deixava idProfessor/professorUid da aula desatualizados após uma troca de
+  // professor por esta tela. Seleção continua por nome (sinal mais confiável
+  // para aulas já dessincronizadas por esse bug antes desta correção).
+  const profOptsHtml = `<option value="|A definir">A definir</option>` +
     professores.map(p =>
-      `<option value="${p.nome}"${p.nome === aulaData.professor ? ' selected' : ''}>${p.nome}</option>`
+      `<option value="${p.cpf || ''}|${p.nome}|${p.uid || ''}"${p.nome === aulaData.professor ? ' selected' : ''}>${p.nome}</option>`
     ).join('');
 
   const excluirBtnHtml = onDelete
@@ -1124,12 +1132,14 @@ async function showModalAulasCalendarios(aulaData, onSave, onDelete = null) {
   });
 
   btnConfirmar.addEventListener('click', () => {
-    const horario   = inputHorario.value.trim();
-    const professor = selectProf.value || 'A definir';
+    const horario = inputHorario.value.trim();
+    const [cpfSel, nomeSel, uidSel] = (selectProf.value || '|A definir').split('|');
     onSave({
-      materia:   materiaSelected || aulaData.materia || 'A definir',
-      duracao:   duracaoSelected || aulaData.duracao || '--',
-      professor,
+      materia:      materiaSelected || aulaData.materia || 'A definir',
+      duracao:      duracaoSelected || aulaData.duracao || '--',
+      professor:    nomeSel || 'A definir',
+      idProfessor:  cpfSel || '',
+      professorUid: uidSel || '',
       horario
     });
     closeModal();

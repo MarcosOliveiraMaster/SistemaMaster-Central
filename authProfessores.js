@@ -331,6 +331,21 @@ window.AuthProfessores = (function () {
 .ap-result-nome { font-weight:600; }
 .ap-result-msg  { font-size:.7rem; opacity:.85; }
 
+/* ── Aviso de uid pendente de sincronização ───────────────────── */
+.ap-perm-alert-uid {
+  display:flex; gap:.6rem; align-items:flex-start;
+  background:#fffbeb; border:1px solid #fde68a; border-radius:.5rem;
+  padding:.65rem .8rem; margin-bottom:.75rem; color:#92400e;
+  font-family:'Lexend',sans-serif; font-size:.78rem;
+}
+.ap-perm-alert-uid i { margin-top:.15rem; flex-shrink:0; }
+.ap-perm-alert-uid strong { display:block; margin-bottom:.15rem; }
+.ap-perm-alert-uid span { display:block; opacity:.9; }
+.ap-perm-alert-uid p { margin:.35rem 0 0; font-size:.72rem; opacity:.85; }
+.ap-perm-alert-uid code {
+  background:#fef3c7; padding:.05rem .3rem; border-radius:.25rem; font-size:.7rem;
+}
+
     `;
     document.head.appendChild(style);
   }
@@ -342,6 +357,17 @@ window.AuthProfessores = (function () {
   function getDb() {
     return firebase.app().firestore();
   }
+
+  // NOTA (revertido temporariamente — manageProfessorAuth exige Firebase Cloud
+  // Functions, que exige plano Blaze; o projeto está no Spark, então a Cloud
+  // Function não pode ser deployada por enquanto). Isso restaura o comportamento
+  // client-side antigo: se o e-mail já tiver conta no Firebase Auth (ex.: professor
+  // revogado e depois readicionado — isso SEMPRE cai nesse caso, já que a conta
+  // nunca é deletada), o campo "uid" não é gravado automaticamente aqui.
+  //
+  // Contorno enquanto isso: depois de conceder acesso a alguém que já tinha conta
+  // ("Acesso reativado..."), rodar SistemMaster-Login/corrigir-uid-aulas.js
+  // (Admin SDK, não depende de Cloud Functions/Blaze) para sincronizar o "uid".
 
   /**
    * Retorna Auth da instância SECUNDÁRIA do Firebase.
@@ -384,7 +410,9 @@ window.AuthProfessores = (function () {
       try { await auth.signOut(); } catch { /* ignora */ }
 
       if (e.code === 'auth/email-already-in-use') {
-        // Conta já existe — acesso será reativado apenas no Firestore
+        // Conta já existe — acesso será reativado apenas no Firestore.
+        // "uid" NÃO é resolvido aqui (limitação do SDK client-side) — rodar
+        // corrigir-uid-aulas.js depois pra sincronizar.
         return { sucesso: true, uid: null, jaExistia: true };
       }
       return { sucesso: false, erro: e.message };
@@ -398,10 +426,15 @@ window.AuthProfessores = (function () {
    * @param {string}  docId  - ID do documento em dataBaseProfessores
    * @param {boolean} acesso - true = concede | false = revoga
    * @param {string|null} uid - Firebase Auth UID (salvo apenas na criação)
+   * @param {boolean} precisaVerificarUid - marca o doc como pendente de sincronização
+   *   de uid (caso "conta já existia") — corrigir-uid-aulas.js limpa essa flag
+   *   quando resolve. Persiste o aviso além do toast, pra sobreviver caso o
+   *   admin não rode o script na hora.
    */
-  async function atualizarAcessoFirestore(docId, acesso, uid = null) {
+  async function atualizarAcessoFirestore(docId, acesso, uid = null, precisaVerificarUid = false) {
     const dados = { acessoPlataforma: acesso };
     if (uid) dados.uid = uid;
+    if (precisaVerificarUid) dados.precisaVerificarUid = true;
     return getDb().collection(COL_PROFESSORES).doc(docId).update(dados);
   }
 
@@ -598,6 +631,12 @@ window.AuthProfessores = (function () {
         if (!ativo && temAcesso)  perderao.push(p);
       });
 
+      // Professores com acesso concedido mas cujo uid não foi sincronizado
+      // (caso "conta já existia" — ver criarContaProfessor). Ficam de fora de
+      // receberao/perderao (já têm acessoPlataforma:true), então precisam de
+      // um aviso à parte pra não passar despercebido.
+      const pendentesUid = professores.filter(p => p.precisaVerificarUid === true);
+
       // Ordenação alfabética por nome
       const sortByName = arr => arr.sort((a, b) => {
         const na = (a.nome || a.Nome || '').toLowerCase();
@@ -606,19 +645,31 @@ window.AuthProfessores = (function () {
       });
       sortByName(receberao);
       sortByName(perderao);
+      sortByName(pendentesUid);
+
+      const bannerPendentesUidHtml = pendentesUid.length ? `
+        <div class="ap-perm-alert-uid">
+          <i class="fas fa-triangle-exclamation"></i>
+          <div>
+            <strong>${pendentesUid.length} professor(es) com acesso concedido, mas uid não sincronizado:</strong>
+            <span>${pendentesUid.map(p => escHtml(p.nome || p.Nome || p._docId)).join(', ')}</span>
+            <p>Rode <code>corrigir-uid-aulas.js</code> (repositório Login) para sincronizar — aulas
+               dessas pessoas podem não aparecer corretamente até lá.</p>
+          </div>
+        </div>` : '';
 
       if (!receberao.length && !perderao.length) {
-        body.innerHTML = `
+        body.innerHTML = bannerPendentesUidHtml + `
           <div class="ap-empty">
             <span class="ap-empty-icon">✅</span>
             <strong>Tudo sincronizado!</strong>
             <p>Todos os acessos já estão de acordo com os status atuais.<br>
-               Nenhuma ação necessária.</p>
+               Nenhuma ação necessária${pendentesUid.length ? ' aqui — só a sincronização de uid acima' : ''}.</p>
           </div>`;
         return;
       }
 
-      let html = `
+      let html = bannerPendentesUidHtml + `
         <div class="ap-search-wrap">
           <i class="fas fa-search"></i>
           <input type="text" class="ap-search-input" id="ap-searchInput"
@@ -854,17 +905,23 @@ window.AuthProfessores = (function () {
         if (res.sucesso) {
           // Atualiza Firestore: acessoPlataforma=true
           // Se conta nova: salva também o uid do Firebase Auth
+          // Se conta já existia: marca precisaVerificarUid pra ficar visível no
+          // painel até corrigir-uid-aulas.js rodar e limpar essa flag.
           await atualizarAcessoFirestore(
             p._docId,
             true,
-            res.jaExistia ? null : res.uid
+            res.jaExistia ? null : res.uid,
+            res.jaExistia
           );
 
           resultados.push({
             nome,
-            tipo: 'ok',
+            tipo: res.jaExistia ? 'warn' : 'ok',
             msg: res.jaExistia
-              ? 'Acesso reativado (conta já existia no sistema).'
+              // Lembrete explícito: nesse caso o "uid" não é sincronizado aqui
+              // (limitação do SDK client-side / Cloud Function indisponível no
+              // plano Spark) — rodar corrigir-uid-aulas.js em seguida.
+              ? '⚠️ Acesso reativado (conta já existia no sistema). Rode corrigir-uid-aulas.js (repo Login) para sincronizar o uid.'
               : 'Conta criada e acesso concedido com sucesso.'
           });
         } else {
@@ -879,8 +936,12 @@ window.AuthProfessores = (function () {
     for (const p of paraRevoke) {
       const nome = p.nome || p.Nome || p._docId;
       try {
-        // Apenas seta acessoPlataforma: false — NUNCA deleta a conta
-        await atualizarAcessoFirestore(p._docId, false);
+        // Apenas seta acessoPlataforma: false — NUNCA deleta a conta.
+        // (Não desativa a conta no Firebase Auth: isso exigiria a Cloud Function
+        // manageProfessorAuth, indisponível no plano Spark. O login do professor
+        // já checa acessoPlataforma, então continua bloqueado na prática — ver
+        // SistemMaster-Login/auth.js.)
+        await getDb().collection(COL_PROFESSORES).doc(p._docId).update({ acessoPlataforma: false });
         resultados.push({ nome, tipo: 'ok', msg: 'Acesso removido. Conta mantida no sistema.' });
       } catch (e) {
         resultados.push({ nome, tipo: 'error', msg: `Erro ao remover acesso: ${e.message}` });

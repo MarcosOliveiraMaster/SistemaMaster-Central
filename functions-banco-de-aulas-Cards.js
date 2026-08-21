@@ -2923,14 +2923,20 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
                 for (const item of updates) {
                   if (!item._idAula) continue;
                   try {
-                    await BANCO.updateCamposCalendario(item._idAula, {
+                    const camposCalendario = {
                       data:      item.data,
                       materia:   item.materia,
                       professor: item.professor,
                       duracao:   item.duracao,
                       horario:   item.horario,
                       cor:       item.cor ?? null
-                    });
+                    };
+                    // Só inclui idProfessor/professorUid quando o modal realmente os
+                    // enviou (campo professor foi tocado) — evita sobrescrever um
+                    // identificador já correto quando só horário/data/matéria mudam.
+                    if (item.idProfessor !== undefined)  camposCalendario.idProfessor  = item.idProfessor;
+                    if (item.professorUid !== undefined) camposCalendario.professorUid = item.professorUid;
+                    await BANCO.updateCamposCalendario(item._idAula, camposCalendario);
                   } catch (err) {
                     console.error('❌ updateCamposCalendario:', err);
                     erros.push(`Update ${item._idAula}: ${err.message}`);
