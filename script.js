@@ -7,7 +7,8 @@ const CONFIG = {
   sections: [
     'painel-central', 'banco-aulas', 'simulacoes', 'mensagens',
     'calendario', 'fluxo-processos', 'clientes', 'professores',
-    'area-pagamento', 'cofres-pagamento', 'exportar-dados', 'previsao-financeira'
+    'area-pagamento', 'cofres-pagamento', 'exportar-dados', 'previsao-financeira',
+    'detalhes-banco-de-aulas'
   ]
 };
 
@@ -53,6 +54,7 @@ let _pendingProfessorTab = null;
 function initializeApp() {
   setupMenuNavigation();
   setupDashboardSubmenu();
+  setupAreaDevSubmenu();
   setupSubgroupSubmenus();
   setupSidebarToggle();
   setupGlobalListeners();
@@ -79,6 +81,11 @@ function setupSidebarToggle() {
       ['icon-clientes-expand', 'icon-professores-expand'].forEach(id => {
         document.getElementById(id)?.classList.remove('rotate-90');
       });
+
+      const submenuDev = document.getElementById('submenu-area-dev');
+      const chevronDev = document.getElementById('icon-area-dev-expand');
+      if (submenuDev) submenuDev.classList.add('hidden');
+      if (chevronDev) chevronDev.classList.remove('rotate');
     }
   });
 }
@@ -184,6 +191,20 @@ function setupDashboardSubmenu() {
   });
 }
 
+function setupAreaDevSubmenu() {
+  const btn    = document.getElementById('btn-area-dev-menu');
+  const sub    = document.getElementById('submenu-area-dev');
+  const icon   = document.getElementById('icon-area-dev-expand');
+  let expanded = false;
+  if (!btn || !sub) return;
+  btn.addEventListener('click', function (e) {
+    e.preventDefault(); e.stopPropagation();
+    expanded = !expanded;
+    sub.classList.toggle('hidden', !expanded);
+    if (icon) icon.classList.toggle('rotate', expanded);
+  });
+}
+
 async function loadSection(sectionId) {
   if (!CONFIG.sections.includes(sectionId)) return;
 
@@ -258,6 +279,9 @@ function loadSectionContent(sectionId) {
       break;
     case 'previsao-financeira':
       if (typeof loadPrevisaoFinanceira === 'function') loadPrevisaoFinanceira();
+      break;
+    case 'detalhes-banco-de-aulas':
+      if (typeof DetalhesBancoDeAulas !== 'undefined' && DetalhesBancoDeAulas.init) DetalhesBancoDeAulas.init();
       break;
   }
 }

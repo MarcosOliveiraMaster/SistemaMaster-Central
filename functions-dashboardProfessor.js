@@ -1857,7 +1857,7 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
     const campos = $id('dp-painelCampos');
     campos.innerHTML = '';
 
-    const prioridades   = ['nome','cpf','email','contato','nivel','curso','pix','bairros','disciplinas','status','fotoPerfil'];
+    const prioridades   = ['nome','cpf','idProfessor','email','contato','nivel','curso','pix','bairros','disciplinas','status','fotoPerfil'];
     const disponibilidades = CFG.colunasDiasTurnos;
     const outros = Object.keys(item).filter(k => k !== 'id' && !prioridades.includes(k) && !disponibilidades.includes(k));
 
@@ -1870,8 +1870,12 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
 
     const gInfo = mkSection('Informações Básicas');
     prioridades.forEach(k => {
-      if (item.hasOwnProperty(k) || k === 'status' || k === 'fotoPerfil') {
-        gInfo.appendChild(criarCampoEdicao(k, item[k] ?? (k === 'fotoPerfil' ? 'icone-padrao' : '')));
+      if (item.hasOwnProperty(k) || k === 'status' || k === 'fotoPerfil' || k === 'idProfessor') {
+        // idProfessor ainda não existe na maioria dos cadastros — pré-preenche
+        // com o próprio CPF (é o valor que deveria estar, por design do sistema:
+        // idProfessor nas aulas é sempre uma cópia do CPF do professor).
+        const valorPadrao = k === 'idProfessor' ? (item.cpf || '') : (k === 'fotoPerfil' ? 'icone-padrao' : '');
+        gInfo.appendChild(criarCampoEdicao(k, item[k] ?? valorPadrao));
       }
     });
 
@@ -1981,7 +1985,7 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
 
   function labelDeChave(k) {
     const map = {
-      nome:'Nome Completo',cpf:'CPF',email:'E-mail',contato:'Telefone/WhatsApp',nivel:'Nível Acadêmico',
+      nome:'Nome Completo',cpf:'CPF',idProfessor:'ID Professor (referência usada nas aulas)',email:'E-mail',contato:'Telefone/WhatsApp',nivel:'Nível Acadêmico',
       curso:'Curso',pix:'Chave PIX',bairros:'Bairros de Atuação',disciplinas:'Disciplinas (separadas por vírgula)',
       expAulas:'Exp. Aulas Particulares',descricaoExpAulas:'Desc. Exp. Aulas',
       expNeuro:'Exp. Alunos Atípicos',descricaoExpNeuro:'Desc. Exp. Alunos Atípicos',

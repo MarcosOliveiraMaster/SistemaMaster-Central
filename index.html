@@ -148,6 +148,16 @@
         <button class="menu-item" data-section="exportar-dados">
           <i class="fas fa-file-export mr-3"></i><span>Exportar Dados</span>
         </button>
+        <button class="menu-item menu-item-expandable" data-section="area-dev" id="btn-area-dev-menu">
+          <i class="fas fa-code mr-3"></i>
+          <span>Área Dev</span>
+          <i class="fas fa-chevron-down ml-auto text-sm transition-transform" id="icon-area-dev-expand"></i>
+        </button>
+        <div id="submenu-area-dev" class="ml-4 space-y-1 hidden">
+          <button class="menu-item-submenu-leaf" data-section="detalhes-banco-de-aulas" data-title="Detalhes Banco de Aulas">
+            <i class="fas fa-table-cells mr-3"></i><span>Detalhes Banco de Aulas</span>
+          </button>
+        </div>
       </nav>
 
       <!-- ── Usuário logado + Logout ── -->
@@ -205,6 +215,7 @@
             <p class="text-gray-600 text-sm">Esta seção está em desenvolvimento.</p>
           </div>
         </section>
+        <section id="detalhes-banco-de-aulas" class="section-content"></section>
       </div>
     </main>
   </div>
@@ -269,6 +280,7 @@
   <script src="functions-dashboardCliente.js"></script>
   <script src="functions-dashboardProfessor.js"></script>
   <script src="functions-exportar-dados.js"></script>
+  <script src="functions-detalhes-banco-de-aulas.js"></script>
   <script src="functions-pagamento.js"></script>
   <script src="functions-cofres-pagamento.js"></script>
   <script src="previsaoFinanceira.js"></script>
