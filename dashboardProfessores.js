@@ -14,9 +14,13 @@ window.GaleriaProfessores = (function () {
     colProfessores: 'dataBaseProfessores',
     campoFoto:     'fotoUpload',      // data URL (base64) da foto enviada
     campoFotoEm:   'fotoUploadEm',    // timestamp do último envio
+    campoBairros:     'bairros',      // string livre (mesmo campo usado em BD Professores)
+    campoDisciplinas: 'disciplinas',  // string ou array (idem)
     maxDim:        480,               // maior lado da imagem redimensionada (px)
     jpegQuality:   0.82,
     limiteAviso:   700 * 1024,        // aviso se o base64 passar disso (~700KB)
+    // mesma lista fixa usada em BD Professores (functions-dashboardProfessor.js)
+    disciplinasFixas: ['Ciências', 'Física', 'Geografia', 'História', 'Inglês', 'Literatura', 'Matemática', 'Pedagogia', 'Português', 'Química', 'Biologia'],
   };
 
   // ─────────────────────────────────────────────────────────────
@@ -26,7 +30,10 @@ window.GaleriaProfessores = (function () {
     db: null,
     professores: [],
     carregado: false,
-    termoBusca: '',
+    termoNome: '',
+    termoBairro: '',
+    discsSelecionadas: [],
+    slotsSelecionados: [],
     profSelecionado: null,
     pendingDataURL: null,
   };
@@ -94,6 +101,22 @@ window.GaleriaProfessores = (function () {
     return status !== 'desligado';
   }
 
+  // mesma semântica de BD Professores: aceita boolean, "sim"/"true"/1 etc.
+  function isTruthy(v) {
+    if (v === undefined || v === null) return false;
+    if (typeof v === 'boolean') return v;
+    if (typeof v === 'number') return v === 1;
+    if (Array.isArray(v)) return v.some(isTruthy);
+    return ['true', '1', 'sim', 's', 'yes', 'on'].includes(String(v).toLowerCase().trim());
+  }
+
+  // aceita array ou string separada por , ; | /
+  function listaDisciplinas(raw) {
+    if (raw == null) return [];
+    if (Array.isArray(raw)) return raw.map(x => normalizeStr(String(x))).filter(Boolean);
+    return String(raw).split(/[,;|/]/).map(s => normalizeStr(s)).filter(Boolean);
+  }
+
   // ─────────────────────────────────────────────────────────────
   // STYLES
   // ─────────────────────────────────────────────────────────────
@@ -122,12 +145,50 @@ window.GaleriaProfessores = (function () {
   display: flex; flex-direction: column; height: 100%; overflow: auto; background: var(--gp-gray-100);
 }
 
-.gp-toolbar { display:flex; align-items:center; gap:.6rem; padding:.85rem 1rem; background:white; border-bottom:1px solid var(--gp-gray-200); flex-shrink:0; position:sticky; top:0; z-index:20; }
+/* ── canal de filtros (3 colunas iguais) ── */
+.gp-filterbar { display:grid; grid-template-columns:repeat(3, 1fr); gap:1rem; padding:1rem; background:white; border-bottom:1px solid var(--gp-gray-200); flex-shrink:0; position:sticky; top:0; z-index:20; }
+.gp-filter-col { display:flex; flex-direction:column; gap:.55rem; min-width:0; }
+
+.gp-field { position:relative; }
+.gp-field > i { position:absolute; left:.75rem; top:50%; transform:translateY(-50%); color:var(--gp-gray-400); font-size:.85rem; z-index:1; pointer-events:none; }
+.gp-field input, .gp-field-btn { width:100%; font-family:'Lexend',sans-serif; font-size:.85rem; border:1px solid var(--gp-gray-200); border-radius:.6rem; padding:.55rem .75rem .55rem 2.1rem; background:var(--gp-gray-50); color:var(--gp-gray-800); transition:border-color var(--gp-transition), box-shadow var(--gp-transition), background var(--gp-transition); }
+.gp-field input:focus, .gp-field-btn:focus, .gp-field-btn.gp-open { outline:none; border-color:var(--gp-orange); box-shadow:0 0 0 3px rgba(242,135,5,.12); background:white; }
+.gp-field-btn { display:flex; align-items:center; text-align:left; cursor:pointer; color:var(--gp-gray-600); }
+.gp-field-btn.gp-has-value { color:var(--gp-gray-800); font-weight:600; }
+.gp-field-btn .gp-chev { margin-left:auto; color:var(--gp-gray-400); transition:transform .2s ease; }
+.gp-field-btn.gp-open .gp-chev { transform:rotate(180deg); }
+
+.gp-dropdown-panel { position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:60; background:white; border:1px solid var(--gp-gray-200); border-radius:.6rem; box-shadow:var(--gp-shadow); max-height:240px; overflow-y:auto; padding:.35rem; display:none; }
+.gp-dropdown-panel.gp-open { display:block; }
+.gp-dropdown-item { display:flex; align-items:center; gap:.5rem; padding:.4rem .5rem; border-radius:.4rem; font-size:.8rem; cursor:pointer; }
+.gp-dropdown-item:hover { background:var(--gp-gray-50); }
+.gp-dropdown-item input { accent-color:var(--gp-orange); width:14px; height:14px; flex-shrink:0; }
+
+.gp-more-btn { justify-content:flex-start; }
+.gp-more-btn > i { position:static; margin-right:.55rem; transform:none; }
+
+.gp-avail-wrap { overflow-x:auto; }
+.gp-avail-table { border-collapse:separate; border-spacing:3px; width:100%; min-width:250px; }
+.gp-avail-table th, .gp-avail-table td { text-align:center; padding:0; }
+.gp-avail-table th { font-size:.6rem; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:white; background:var(--gp-orange); padding:.3rem .1rem; border-radius:.35rem; }
+.gp-avail-table th:first-child { background:transparent; }
+.gp-avail-th-period { text-align:left; font-size:.68rem; font-weight:700; color:var(--gp-gray-600); background:var(--gp-gray-100); padding:.4rem .5rem; border-radius:.35rem; white-space:nowrap; }
+.gp-avail-table td.gp-cell { background:var(--gp-gray-50); border-radius:.35rem; padding:.45rem 0; }
+.gp-avail-table input[type=checkbox] { width:15px; height:15px; accent-color:var(--gp-orange); cursor:pointer; }
+
+.gp-toolbar { display:flex; align-items:center; gap:.6rem; padding:.6rem 1rem; background:white; border-bottom:1px solid var(--gp-gray-200); flex-shrink:0; }
 .gp-search { position:relative; flex:1; max-width:420px; }
 .gp-search i { position:absolute; left:.75rem; top:50%; transform:translateY(-50%); color:var(--gp-gray-400); font-size:.85rem; }
 .gp-input { width:100%; font-family:'Lexend',sans-serif; font-size:.85rem; border:1px solid var(--gp-gray-200); border-radius:.6rem; padding:.55rem .75rem .55rem 2.1rem; background:var(--gp-gray-50); transition:border-color var(--gp-transition), box-shadow var(--gp-transition); }
 .gp-input:focus { outline:none; border-color:var(--gp-orange); box-shadow:0 0 0 3px rgba(242,135,5,.12); background:white; }
 .gp-contador { font-size:.75rem; color:var(--gp-gray-600); white-space:nowrap; }
+.gp-clear { font-size:.75rem; color:var(--gp-orange-dk); background:none; border:none; cursor:pointer; font-weight:600; margin-left:auto; padding:.2rem .3rem; display:none; }
+.gp-clear.gp-show { display:inline-block; }
+.gp-clear:hover { text-decoration:underline; }
+
+@media (max-width: 860px) {
+  .gp-filterbar { grid-template-columns: 1fr; }
+}
 
 .gp-grid { display:grid; grid-template-columns:repeat(auto-fill, var(--gp-a)); gap:1.1rem; padding:1.1rem; justify-content:start; align-content:start; flex:1; }
 
@@ -180,12 +241,70 @@ window.GaleriaProfessores = (function () {
     const root = $root();
     if (!root) return;
     root.innerHTML = `
-<div class="gp-toolbar">
-  <div class="gp-search">
-    <i class="fas fa-search"></i>
-    <input type="text" id="gp-busca" class="gp-input" placeholder="Buscar professor pelo nome...">
+<div class="gp-filterbar">
+  <!-- Parte 1: nome + disciplinas -->
+  <div class="gp-filter-col">
+    <div class="gp-field">
+      <i class="fas fa-search"></i>
+      <input type="text" id="gp-fNome" placeholder="Buscar professor pelo nome...">
+    </div>
+    <div class="gp-field" id="gp-discWrap">
+      <i class="fas fa-book"></i>
+      <button type="button" class="gp-field-btn" id="gp-discBtn">
+        <span id="gp-discLabel">Disciplinas</span>
+        <i class="fas fa-chevron-down gp-chev"></i>
+      </button>
+      <div class="gp-dropdown-panel" id="gp-discPanel"></div>
+    </div>
   </div>
+
+  <!-- Parte 2: bairro + mais filtros -->
+  <div class="gp-filter-col">
+    <div class="gp-field">
+      <i class="fas fa-map-marker-alt"></i>
+      <input type="text" id="gp-fBairro" placeholder="Buscar por bairro...">
+    </div>
+    <button type="button" class="gp-field-btn gp-more-btn" id="gp-btnMaisFiltros">
+      <i class="fas fa-sliders-h"></i>
+      <span>Mais filtros e configurações</span>
+    </button>
+  </div>
+
+  <!-- Parte 3: disponibilidade (dia x turno) -->
+  <div class="gp-filter-col">
+    <div class="gp-avail-wrap">
+      <table class="gp-avail-table" id="gp-availTable">
+        <thead>
+          <tr><th></th><th>Seg</th><th>Ter</th><th>Qua</th><th>Qui</th><th>Sex</th><th>Sáb</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="gp-avail-th-period">Manhã</td>
+            <td class="gp-cell"><input type="checkbox" data-slot="segManha"></td>
+            <td class="gp-cell"><input type="checkbox" data-slot="terManha"></td>
+            <td class="gp-cell"><input type="checkbox" data-slot="quaManha"></td>
+            <td class="gp-cell"><input type="checkbox" data-slot="quiManha"></td>
+            <td class="gp-cell"><input type="checkbox" data-slot="sexManha"></td>
+            <td class="gp-cell"><input type="checkbox" data-slot="sabManha"></td>
+          </tr>
+          <tr>
+            <td class="gp-avail-th-period">Tarde</td>
+            <td class="gp-cell"><input type="checkbox" data-slot="segTarde"></td>
+            <td class="gp-cell"><input type="checkbox" data-slot="terTarde"></td>
+            <td class="gp-cell"><input type="checkbox" data-slot="quaTarde"></td>
+            <td class="gp-cell"><input type="checkbox" data-slot="quiTarde"></td>
+            <td class="gp-cell"><input type="checkbox" data-slot="sexTarde"></td>
+            <td class="gp-cell"><input type="checkbox" data-slot="sabTarde"></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="gp-toolbar">
   <span id="gp-contador" class="gp-contador"></span>
+  <button type="button" class="gp-clear" id="gp-btnLimpar">Limpar filtros</button>
 </div>
 <div id="gp-grid" class="gp-grid"></div>
 
@@ -216,11 +335,30 @@ window.GaleriaProfessores = (function () {
   // ─────────────────────────────────────────────────────────────
   // RENDER
   // ─────────────────────────────────────────────────────────────
+  function filtroAtivo() {
+    return !!(S.termoNome || S.termoBairro || S.discsSelecionadas.length || S.slotsSelecionados.length);
+  }
+
+  // Combinação entre grupos: E (nome E disciplina E bairro E disponibilidade).
+  // Dentro de disciplinas: E — professor precisa lecionar TODAS as marcadas (mesma
+  // convenção já usada no filtro de disciplinas da aba BD Professores).
+  // Dentro de disponibilidade: E — professor precisa atender TODOS os horários marcados.
   function filtrarProfessores() {
-    const termo = normalizeStr(S.termoBusca);
-    const ativos = S.professores.filter(isAtivo);
-    if (!termo) return ativos;
-    return ativos.filter(p => normalizeStr(getField(p, 'nome')).includes(termo));
+    const termoNome = normalizeStr(S.termoNome);
+    const termoBairro = normalizeStr(S.termoBairro);
+    const discs = S.discsSelecionadas.map(normalizeStr);
+    const slots = S.slotsSelecionados;
+
+    return S.professores.filter(isAtivo).filter(p => {
+      if (termoNome && !normalizeStr(getField(p, 'nome')).includes(termoNome)) return false;
+      if (termoBairro && !normalizeStr(getField(p, CFG.campoBairros)).includes(termoBairro)) return false;
+      if (discs.length) {
+        const lista = listaDisciplinas(getField(p, CFG.campoDisciplinas));
+        if (!discs.every(d => lista.includes(d))) return false;
+      }
+      if (slots.length && !slots.every(s => isTruthy(getField(p, s)))) return false;
+      return true;
+    });
   }
 
   function renderGrid(lista) {
@@ -228,7 +366,9 @@ window.GaleriaProfessores = (function () {
     const contador = $id('gp-contador');
     if (!grid) return;
 
-    if (contador) contador.textContent = `${lista.length} professor(es)`;
+    const total = S.professores.filter(isAtivo).length;
+    if (contador) contador.textContent = `${lista.length} de ${total} professor(es)`;
+    $id('gp-btnLimpar')?.classList.toggle('gp-show', filtroAtivo());
 
     if (!lista.length) {
       grid.innerHTML = `
@@ -376,11 +516,77 @@ window.GaleriaProfessores = (function () {
   // ─────────────────────────────────────────────────────────────
   // EVENTOS
   // ─────────────────────────────────────────────────────────────
+  function initDisciplinasDropdown() {
+    const panel = $id('gp-discPanel');
+    const btn = $id('gp-discBtn');
+    const wrap = $id('gp-discWrap');
+    if (!panel || !btn || !wrap) return;
+
+    panel.innerHTML = CFG.disciplinasFixas.map(d => `
+      <label class="gp-dropdown-item">
+        <input type="checkbox" value="${escapeHtml(d)}">${escapeHtml(d)}
+      </label>`).join('');
+
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      panel.classList.toggle('gp-open');
+      btn.classList.toggle('gp-open', panel.classList.contains('gp-open'));
+    });
+    document.addEventListener('click', e => {
+      if (!wrap.contains(e.target)) {
+        panel.classList.remove('gp-open');
+        btn.classList.remove('gp-open');
+      }
+    });
+
+    panel.addEventListener('change', () => {
+      const checked = Array.from(panel.querySelectorAll('input:checked')).map(i => i.value);
+      S.discsSelecionadas = checked;
+      const label = $id('gp-discLabel');
+      if (!checked.length) { label.textContent = 'Disciplinas'; btn.classList.remove('gp-has-value'); }
+      else { label.textContent = checked.length === 1 ? checked[0] : `${checked.length} disciplinas`; btn.classList.add('gp-has-value'); }
+      renderGrid(filtrarProfessores());
+    });
+  }
+
+  function limparFiltros() {
+    S.termoNome = ''; S.termoBairro = ''; S.discsSelecionadas = []; S.slotsSelecionados = [];
+    $id('gp-fNome').value = ''; $id('gp-fBairro').value = '';
+    $id('gp-discPanel')?.querySelectorAll('input:checked').forEach(i => { i.checked = false; });
+    $id('gp-discLabel').textContent = 'Disciplinas';
+    $id('gp-discBtn')?.classList.remove('gp-has-value');
+    $id('gp-availTable')?.querySelectorAll('input:checked').forEach(i => { i.checked = false; });
+    renderGrid(filtrarProfessores());
+  }
+
   function initEventos() {
-    $id('gp-busca')?.addEventListener('input', debounce(e => {
-      S.termoBusca = e.target.value;
+    $id('gp-fNome')?.addEventListener('input', debounce(e => {
+      S.termoNome = e.target.value;
       renderGrid(filtrarProfessores());
     }, 200));
+
+    $id('gp-fBairro')?.addEventListener('input', debounce(e => {
+      S.termoBairro = e.target.value;
+      renderGrid(filtrarProfessores());
+    }, 200));
+
+    initDisciplinasDropdown();
+
+    $id('gp-availTable')?.addEventListener('change', e => {
+      const cb = e.target;
+      if (!cb.matches('input[type=checkbox]')) return;
+      const slot = cb.getAttribute('data-slot');
+      const idx = S.slotsSelecionados.indexOf(slot);
+      if (cb.checked && idx === -1) S.slotsSelecionados.push(slot);
+      if (!cb.checked && idx > -1) S.slotsSelecionados.splice(idx, 1);
+      renderGrid(filtrarProfessores());
+    });
+
+    $id('gp-btnMaisFiltros')?.addEventListener('click', () => {
+      toast('Mais filtros e configurações em breve.', 'info');
+    });
+
+    $id('gp-btnLimpar')?.addEventListener('click', limparFiltros);
 
     $id('gp-fileInput')?.addEventListener('change', onFileChange);
     $id('gp-btnSalvar')?.addEventListener('click', salvarFoto);
