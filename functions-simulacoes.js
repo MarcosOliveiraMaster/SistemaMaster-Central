@@ -1341,20 +1341,8 @@ const Simulacoes = (function() {
       return;
     }
 
-    // Ordenar aulas por data
-    const aulasOrdenadas = [...aulas].sort((a, b) => {
-      const parseData = (dataStr) => {
-        if (!dataStr) return new Date(0);
-        const match = dataStr.match(/\w{3} - (\d{2})\/(\d{2})\/(\d{4})/);
-        if (!match) {
-          const match2 = dataStr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-          if (match2) return new Date(parseInt(match2[3]), parseInt(match2[2]) - 1, parseInt(match2[1]));
-          return new Date(0);
-        }
-        return new Date(parseInt(match[3]), parseInt(match[2]) - 1, parseInt(match[1]));
-      };
-      return parseData(a.data).getTime() - parseData(b.data).getTime();
-    });
+    // Ordenar aulas por data (sem data definida vai para o fim da lista — ver parseDateAulaSort)
+    const aulasOrdenadas = [...aulas].sort((a, b) => parseDateAulaSort(a.data) - parseDateAulaSort(b.data));
 
     let linhasHtml = '';
     aulasOrdenadas.forEach((aula, index) => {
@@ -2261,10 +2249,13 @@ const Simulacoes = (function() {
                   <i class="fas fa-mouse-pointer text-orange-500 mr-2"></i>
                   <span>Data selecionada: <strong id="selectedDate">${dataAtual || 'Selecione uma data'}</strong></span>
                 </div>
+                <button type="button" id="btnSemDataDefinida" class="btn-secondary btn-compact w-full mt-3">
+                  <i class="fas fa-calendar-times mr-2"></i>Sem data definida
+                </button>
               </div>
             </div>
           </div>
-          
+
           <div class="modal-footer">
             <button id="btnCancelarData" class="btn-secondary btn-compact">
               Cancelar
@@ -2273,13 +2264,14 @@ const Simulacoes = (function() {
         </div>
       </div>
     `;
-    
+
     const modalContainer = document.createElement('div');
     modalContainer.innerHTML = modalHtml;
     document.body.appendChild(modalContainer);
-    
+
     const modal = modalContainer.querySelector('#modalDataSim');
     const btnCancelar = modal.querySelector('#btnCancelarData');
+    const btnSemData = modal.querySelector('#btnSemDataDefinida');
     const btnClose = modal.querySelector('.modal-close');
     const monthYearEl = modal.querySelector('#monthYear');
     const calendarDaysEl = modal.querySelector('#calendarDays');
@@ -2305,7 +2297,19 @@ const Simulacoes = (function() {
       const diaSemana = diasSemana[date.getDay()];
       return `${diaSemana} - ${dia}/${mes}/${ano}`;
     };
-    
+
+    // Grava a nova data (ou '' para "sem data definida") na aula da simulação e
+    // recarrega a tabela. Compartilhada entre a seleção de um dia e o botão "Sem data definida".
+    const aplicarNovaData = (novaDataFormatted, mensagemSucesso) => {
+      editingSimulacao.aulas[index].data = novaDataFormatted;
+      const tbody = document.getElementById('tbody-aulas-simulacao');
+      tbody.innerHTML = renderAulasSimulacao(editingSimulacao.aulas);
+      setupAulasInputEvents();
+      autoSalvarSimulacao();
+      showToast(mensagemSucesso, 'success');
+      closeModal();
+    };
+
     const renderCalendar = () => {
       monthYearEl.textContent = `${meses[displayMonth]} ${displayYear}`;
       calendarDaysEl.innerHTML = '';
@@ -2328,10 +2332,19 @@ const Simulacoes = (function() {
         dayEl.type = 'button';
         dayEl.className = 'calendar-day h-10 rounded-lg text-sm font-medium transition-all hover:bg-orange-100 hover:text-orange-600';
         dayEl.textContent = day;
-        
+
+        // Feriado (nacional/estadual/municipal): borda laranja leve
+        if (typeof Feriados !== 'undefined' && Feriados.doDia) {
+          const feriadosDoDia = Feriados.doDia(day, displayMonth, displayYear);
+          if (feriadosDoDia.length > 0) {
+            dayEl.classList.add('calendar-day-feriado');
+            dayEl.title = feriadosDoDia.map(f => f.nome).join(', ');
+          }
+        }
+
         const dayDate = new Date(displayYear, displayMonth, day);
         dayDate.setHours(0, 0, 0, 0);
-        
+
         // Verificar se é o dia selecionado
         if (selectedDate && 
             dayDate.getDate() === selectedDate.getDate() && 
@@ -2351,15 +2364,8 @@ const Simulacoes = (function() {
           selectedDate = new Date(displayYear, displayMonth, day);
           const newDateFormatted = formatDate(selectedDate);
           selectedDateEl.textContent = newDateFormatted;
-          
-          // Atualizar a aula e recarregar tabela
-          editingSimulacao.aulas[index].data = newDateFormatted;
-          const tbody = document.getElementById('tbody-aulas-simulacao');
-          tbody.innerHTML = renderAulasSimulacao(editingSimulacao.aulas);
-          setupAulasInputEvents();
-          autoSalvarSimulacao();
-          showToast(`✅ Data alterada para ${newDateFormatted}`, 'success');
-          closeModal();
+
+          aplicarNovaData(newDateFormatted, `✅ Data alterada para ${newDateFormatted}`);
         });
         
         calendarDaysEl.appendChild(dayEl);
@@ -2384,13 +2390,21 @@ const Simulacoes = (function() {
       renderCalendar();
     });
     
+    btnSemData.addEventListener('click', () => {
+      if (!dataAtual) {
+        showToast('ℹ️ Esta aula já está sem data definida', 'info');
+        return;
+      }
+      aplicarNovaData('', '✅ Data removida — aula sem data definida');
+    });
+
     btnCancelar.addEventListener('click', closeModal);
     btnClose.addEventListener('click', closeModal);
-    
+
     modal.addEventListener('click', (e) => {
       if (e.target === modal) closeModal();
     });
-    
+
     const escHandler = (e) => {
       if (e.key === 'Escape') closeModal();
     };

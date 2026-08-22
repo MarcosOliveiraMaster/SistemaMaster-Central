@@ -1264,6 +1264,10 @@
   pointer-events: none;
 }
 
+.calendar-day-feriado {
+  border-color: rgba(242, 135, 5, 0.45);
+}
+
 
 /* -------------------- FILTROS -------------------- */
 .filter-container {
@@ -3859,6 +3863,7 @@ h2, h3, h4, h5, h6 {
 }
 
 .verif-datas-dot.verif-neutro   { background-color: #D1D5DB; }
+.verif-datas-dot.verif-cinza    { background-color: #4B5563; }
 .verif-datas-dot.verif-verde    { background-color: #10B981; }
 .verif-datas-dot.verif-amarelo  { background-color: #F59E0B; }
 .verif-datas-dot.verif-vermelho { background-color: #EF4444; }

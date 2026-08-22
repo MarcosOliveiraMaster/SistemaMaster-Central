@@ -8,7 +8,11 @@ const BancoDeAulasCards = (function() {
   let _aulaDetalhesAtual = null; // Armazena aula ativa para acesso em setupAulaDetailsEventListeners
   let _modalDetalhesAtivo = null; // Referência ao modal de detalhes em exibição (evita instâncias duplicadas empilhadas)
   let _cancelarCarregamentoAtual = null; // Handle para parar o timer/progresso do carregamento de aulas em andamento (ver loadAulasDetalhadas)
-  
+
+  // Sentinela para ordenação por data: aulas sem data (ou com data ilegível) vão para o
+  // fim da lista, não para o início — usar Date.now() distorceria a ordem entre elas.
+  const DATA_VAZIA_SORT = new Date(8640000000000000);
+
   // Função para renderizar cards de aulas
   function renderAulasCards(aulas, filters = {}) {
     console.log('🎴 Renderizando cards:', aulas.length);
@@ -2374,10 +2378,10 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
         // Exemplo: "seg - 10/01/2026" (o prefixo do dia da semana é ignorado,
         // pois abreviações acentuadas como "sáb" não são reconhecidas por \w)
         const parseData = (dataStr) => {
-          if (!dataStr) return new Date(0); // Data vazia vai para o início
+          if (!dataStr) return DATA_VAZIA_SORT; // Data vazia vai para o fim
 
           const match = dataStr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-          if (!match) return new Date(0);
+          if (!match) return DATA_VAZIA_SORT;
           
           const dia = parseInt(match[1]);
           const mes = parseInt(match[2]) - 1; // JavaScript mês é 0-indexed
@@ -3143,10 +3147,13 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
                   <i class="fas fa-mouse-pointer text-orange-500 mr-2"></i>
                   <span>Data selecionada: <strong id="selectedDate">${dataAtual || 'Selecione uma data'}</strong></span>
                 </div>
+                <button type="button" id="btnSemDataDefinida" class="btn-secondary btn-compact w-full mt-3">
+                  <i class="fas fa-calendar-times mr-2"></i>Sem data definida
+                </button>
               </div>
             </div>
           </div>
-          
+
           <div class="modal-footer">
             <button id="btnCancelarData" class="btn-secondary btn-compact">
               Cancelar
@@ -3155,13 +3162,14 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
         </div>
       </div>
     `;
-    
+
     const modalContainer = document.createElement('div');
     modalContainer.innerHTML = modalHtml;
     document.body.appendChild(modalContainer);
-    
+
     const modal = modalContainer.querySelector('#dataModal');
     const btnCancelar = modal.querySelector('#btnCancelarData');
+    const btnSemData = modal.querySelector('#btnSemDataDefinida');
     const btnClose = modal.querySelector('.modal-close');
     const monthYearEl = modal.querySelector('#monthYear');
     const calendarDaysEl = modal.querySelector('#calendarDays');
@@ -3187,7 +3195,48 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
       const diaSemana = diasSemana[date.getDay()];
       return `${diaSemana} - ${dia}/${mes}/${ano}`;
     };
-    
+
+    // Grava a nova data (ou '' para "sem data definida") e recarrega a tabela de aulas.
+    // Compartilhada entre a seleção de um dia no calendário e o botão "Sem data definida".
+    const aplicarNovaData = async (novaDataFormatted, mensagemSucesso) => {
+      try {
+        await BANCO.updateDataAula(idAula, novaDataFormatted);
+        showToast(mensagemSucesso, 'success');
+        closeModal();
+
+        // Recarregar a tabela
+        const tbody = document.getElementById('tbody-aulas-detalhadas');
+        if (tbody) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="9" class="text-center py-8">
+                <div class="flex flex-col items-center justify-center">
+                  <div class="loading-spinner-large mb-3"></div>
+                  <p class="text-orange-500 font-comfortaa font-bold">Atualizando dados...</p>
+                </div>
+              </td>
+            </tr>
+          `;
+        }
+
+        // Buscar o código de contratação do modal aberto
+        const modalOverlay = document.querySelector('.modal-overlay');
+        if (modalOverlay && modalOverlay.id !== 'dataModal') {
+          const codigoElement = modalOverlay.querySelector('h3');
+          if (codigoElement) {
+            const match = codigoElement.textContent.match(/\d{4}/);
+            if (match) {
+              const codigoContratacao = match[0];
+              await loadAulasDetalhadas(codigoContratacao);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('❌ Erro ao alterar data:', error);
+        showToast('❌ Erro ao alterar data', 'error');
+      }
+    };
+
     const renderCalendar = () => {
       monthYearEl.textContent = `${meses[displayMonth]} ${displayYear}`;
       calendarDaysEl.innerHTML = '';
@@ -3210,10 +3259,19 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
         dayEl.type = 'button';
         dayEl.className = 'calendar-day h-10 rounded-lg text-sm font-medium transition-all hover:bg-orange-100 hover:text-orange-600';
         dayEl.textContent = day;
-        
+
+        // Feriado (nacional/estadual/municipal): borda laranja leve
+        if (typeof Feriados !== 'undefined' && Feriados.doDia) {
+          const feriadosDoDia = Feriados.doDia(day, displayMonth, displayYear);
+          if (feriadosDoDia.length > 0) {
+            dayEl.classList.add('calendar-day-feriado');
+            dayEl.title = feriadosDoDia.map(f => f.nome).join(', ');
+          }
+        }
+
         const dayDate = new Date(displayYear, displayMonth, day);
         dayDate.setHours(0, 0, 0, 0);
-        
+
         // Verificar se é o dia selecionado
         if (selectedDate && 
             dayDate.getDate() === selectedDate.getDate() && 
@@ -3253,42 +3311,7 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
             `,
             async () => {
               // Sim - alterar data
-              try {
-                await BANCO.updateDataAula(idAula, newDateFormatted);
-                showToast(`✅ Data alterada para ${newDateFormatted}`, 'success');
-                closeModal();
-                
-                // Recarregar a tabela
-                const tbody = document.getElementById('tbody-aulas-detalhadas');
-                if (tbody) {
-                  tbody.innerHTML = `
-                    <tr>
-                      <td colspan="9" class="text-center py-8">
-                        <div class="flex flex-col items-center justify-center">
-                          <div class="loading-spinner-large mb-3"></div>
-                          <p class="text-orange-500 font-comfortaa font-bold">Atualizando dados...</p>
-                        </div>
-                      </td>
-                    </tr>
-                  `;
-                }
-                
-                // Buscar o código de contratação do modal aberto
-                const modalOverlay = document.querySelector('.modal-overlay');
-                if (modalOverlay && modalOverlay.id !== 'dataModal') {
-                  const codigoElement = modalOverlay.querySelector('h3');
-                  if (codigoElement) {
-                    const match = codigoElement.textContent.match(/\d{4}/);
-                    if (match) {
-                      const codigoContratacao = match[0];
-                      await loadAulasDetalhadas(codigoContratacao);
-                    }
-                  }
-                }
-              } catch (error) {
-                console.error('❌ Erro ao alterar data:', error);
-                showToast('❌ Erro ao alterar data', 'error');
-              }
+              await aplicarNovaData(newDateFormatted, `✅ Data alterada para ${newDateFormatted}`);
             },
             () => {
               // Não - apenas fechar
@@ -3361,13 +3384,38 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
       renderCalendar();
     });
     
+    btnSemData.addEventListener('click', () => {
+      if (!dataAtual) {
+        showToast('ℹ️ Esta aula já está sem data definida', 'info');
+        return;
+      }
+
+      showConfirmModal(
+        'Remover a data desta aula?',
+        `
+          <div class="text-center py-4">
+            <i class="fas fa-calendar-times text-4xl text-orange-500 mb-4"></i>
+            <p class="text-gray-600 mb-2">Data atual:</p>
+            <p class="text-lg font-bold text-gray-800 mb-4">${dataAtual}</p>
+            <p class="text-gray-600">A aula ficará sem data definida.</p>
+          </div>
+        `,
+        async () => {
+          await aplicarNovaData('', '✅ Data removida — aula sem data definida');
+        },
+        () => {
+          console.log('Remoção de data cancelada');
+        }
+      );
+    });
+
     btnCancelar.addEventListener('click', closeModal);
     btnClose.addEventListener('click', closeModal);
-    
+
     modal.addEventListener('click', (e) => {
       if (e.target === modal) closeModal();
     });
-    
+
     const escHandler = (e) => {
       if (e.key === 'Escape') closeModal();
     };
@@ -3375,11 +3423,11 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
     modalContainer.addEventListener('remove', () => {
       document.removeEventListener('keydown', escHandler);
     });
-    
+
     // Renderizar calendário inicial
     renderCalendar();
   }
-  
+
   // Função para mostrar modal de alteração de horário da aula
   function showHorarioModal(idAula, horarioAtual) {
     const modalHtml = `
@@ -5670,10 +5718,10 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
         const dataA = a.data || '';
         const dataB = b.data || '';
         const parseData = (dataStr) => {
-          if (!dataStr) return new Date(0);
+          if (!dataStr) return DATA_VAZIA_SORT;
           // Prefixo do dia da semana é ignorado (abreviações acentuadas como "sáb" não casam com \w)
           const match = dataStr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-          if (!match) return new Date(0);
+          if (!match) return DATA_VAZIA_SORT;
           const dia = parseInt(match[1]);
           const mes = parseInt(match[2]) - 1;
           const ano = parseInt(match[3]);

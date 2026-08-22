@@ -184,6 +184,11 @@ window.verificarStatusAula = async function (aula) {
   const excluirId = aula['id-Aula'] || aula.id;
   const codigoContratacaoAtual = aula.codigoContratacao;
 
+  // Aula sem data definida: não há o que checar (nem feriado, nem conflito de agenda).
+  if (!dataStr) {
+    return { cor: 'cinza', tooltip: 'Aula sem data definida — nada para verificar' };
+  }
+
   const [{ feriado, vesperaFeriado }, { mesmoHorario, mesmoDia }] = await Promise.all([
     _verificarFeriadoData(dataStr),
     _verificarConflitoAgenda(idProfessor, dataStr, horario, excluirId, codigoContratacaoAtual)
