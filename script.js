@@ -6,7 +6,7 @@ const CONFIG = {
   animationDuration: 300,
   sections: [
     'painel-central', 'banco-aulas', 'simulacoes', 'mensagens',
-    'calendario', 'fluxo-processos', 'clientes', 'professores',
+    'calendario', 'fluxo-processos', 'clientes', 'professores', 'galeria-professores',
     'area-pagamento', 'cofres-pagamento', 'exportar-dados', 'previsao-financeira',
     'detalhes-banco-de-aulas'
   ]
@@ -267,6 +267,9 @@ function loadSectionContent(sectionId) {
           _pendingProfessorTab = null;
         }
       }
+      break;
+    case 'galeria-professores':
+      if (typeof GaleriaProfessores !== 'undefined' && GaleriaProfessores.init) GaleriaProfessores.init();
       break;
     case 'exportar-dados':
       if (typeof loadExportarDados === 'function') loadExportarDados();
