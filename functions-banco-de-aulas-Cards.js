@@ -212,8 +212,10 @@ const BancoDeAulasCards = (function() {
     // Obter dados da BancoDeAulas-Listas usando o prefixo do código
     // IMPORTANTE: Passar o código COMPLETO para a função, não apenas o prefixo
     const aulasContratacao = window.obterAulasContratacao(codigo);
-    const totalAulas = aulasContratacao ? aulasContratacao.total : 0;
-    const equipaConfirmada = aulasContratacao ? aulasContratacao.comProfessor : 0;
+    // Total exibido no card (e usado na barra de progresso) não conta aulas Reagendadas
+    const totalAulas = aulasContratacao ? aulasContratacao.totalValidas : 0;
+    // COMENTADO: Equipe confirmada - não é mais exibida no card (ver linha 3 abaixo)
+    // const equipaConfirmada = aulasContratacao ? aulasContratacao.comProfessor : 0;
     const aulasFinalizadas = aulasContratacao ? aulasContratacao.concluidas : 0;
     
     card.innerHTML = `
@@ -247,15 +249,23 @@ const BancoDeAulasCards = (function() {
             </span>
           </div>
           
-          <!-- Linha 3: Total de Aulas (esquerda) e Equipe Confirmada (direita) -->
+          <!-- Linha 3: Total de Aulas (reagendadas não contam no total) -->
+          <!-- COMENTADO: Equipe Confirmada - não é mais exibida no card
           <div class="flex justify-between items-center text-sm">
             <div class="flex items-center gap-1">
               <span class="info-label">Total de aulas:</span>
-              <span class="info-value font-medium">${totalAulas}</span>
+              <span class="info-value font-medium">(totalAulas)</span>
             </div>
             <div class="flex items-center gap-1">
               <span class="info-label">Equipe Confirmada:</span>
-              <span class="info-value font-medium">${equipaConfirmada}</span>
+              <span class="info-value font-medium">(equipaConfirmada)</span>
+            </div>
+          </div>
+          -->
+          <div class="flex items-center text-sm">
+            <div class="flex items-center gap-1">
+              <span class="info-label">Total de aulas:</span>
+              <span class="info-value font-medium">${totalAulas}</span>
             </div>
           </div>
           
@@ -4054,9 +4064,12 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
     try {
       // Buscar professores do banco de dados
       const professores = await BANCO.fetchDataBaseProfessores();
-      
+
+      // Apenas professores ativos podem ser atribuídos a uma aula
+      const professoresAtivos = professores.filter(p => (p.status || 'Ativo') === 'Ativo');
+
       // Ordenar alfabeticamente por nome
-      const professoresOrdenados = professores.sort((a, b) => {
+      const professoresOrdenados = professoresAtivos.sort((a, b) => {
         const nomeA = a.nome || '';
         const nomeB = b.nome || '';
         return nomeA.localeCompare(nomeB);
@@ -6368,13 +6381,10 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
   
   // Função para limpar filtros
   function clearFilters() {
-    document.getElementById('filter-cliente').value = '';
-    document.getElementById('filter-data').value = '';
-    document.getElementById('filter-codigo').value = '';
-    document.getElementById('filter-professor').value = '';
-    document.getElementById('filter-data-custom').classList.add('hidden');
-    document.getElementById('filter-data-custom').value = '';
-    
+    if (typeof window.limparFiltrosBancoDeAulas === 'function') {
+      window.limparFiltrosBancoDeAulas();
+      return;
+    }
     // Re-renderizar com todos os dados
     renderAulasCards(aulasData);
   }

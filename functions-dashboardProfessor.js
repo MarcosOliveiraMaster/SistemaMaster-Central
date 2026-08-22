@@ -989,7 +989,7 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
     
     // Filtrar apenas professores ativos e ordenar alfabeticamente
     const professores = [...S.dadosTabela]
-      .filter(p => p.nome)
+      .filter(p => p.nome && (p.status || 'Ativo') === 'Ativo')
       .sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'));
     
     lista.innerHTML = professores.map(prof => `
@@ -1427,6 +1427,8 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
   function aplicarFiltros() {
     if (!S.dadosTabela) return;
     let res = [...S.dadosTabela];
+
+    res = res.filter(i => (getField(i, 'status') || 'Ativo') === 'Ativo');
 
     const nome   = ($id('dp-filtroNome')?.value   || '').trim().toLowerCase();
     const bairro = ($id('dp-filtroBairro')?.value || '').trim().toLowerCase();

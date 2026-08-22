@@ -3226,8 +3226,11 @@ const Simulacoes = (function() {
   // Função para abrir modal de professor (simulação)
   async function showProfessorModalSimulacao(index, professorAtual, idProfessorAtual) {
     try {
+      // Apenas professores ativos podem ser atribuídos a uma aula
+      const professoresAtivos = professoresData.filter(p => (p.status || 'Ativo') === 'Ativo');
+
       // Ordenar professores alfabeticamente
-      const professoresOrdenados = professoresData.sort((a, b) => {
+      const professoresOrdenados = professoresAtivos.sort((a, b) => {
         const nomeA = a.nome || '';
         const nomeB = b.nome || '';
         return nomeA.localeCompare(nomeB);

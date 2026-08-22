@@ -104,21 +104,26 @@ function obterAulasContratacao(idContratacao) {
   }
   
   const aulas = AULAS_LISTA_AGRUPADAS[prefixo] || [];
-  
+
   // Calcular estatísticas
   const total = aulas.length;
+  // Total "válido": não contamos aulas Reagendadas (foram substituídas por uma
+  // aula de Reposição, contar as duas duplicaria a aula no total exibido)
+  const totalValidas = aulas.filter(a =>
+    (a.statusAula || '').toLowerCase() !== 'reagendada'
+  ).length;
   // Aulas concluídas: contar quantos têm StatusAula = "Concluída" (case-insensitive)
-  const concluidas = aulas.filter(a => 
-    a.statusAula && 
+  const concluidas = aulas.filter(a =>
+    a.statusAula &&
     a.statusAula.toLowerCase() === 'concluída'
   ).length;
   // Equipe confirmada: contar quantos têm professor definido (não "A definir")
-  const comProfessor = aulas.filter(a => 
-    a.professor && 
-    a.professor.toLowerCase() !== 'a definir' && 
+  const comProfessor = aulas.filter(a =>
+    a.professor &&
+    a.professor.toLowerCase() !== 'a definir' &&
     a.professor.trim() !== ''
   ).length;
-  
+
   if (total === 0) {
     console.warn(`⚠️ obterAulasContratacao => SEM AULAS!`, {
       id: idContratacao,
@@ -131,14 +136,16 @@ function obterAulasContratacao(idContratacao) {
     console.log(`✅ obterAulasContratacao => ID: ${idContratacao}`, {
       prefixo,
       total,
+      totalValidas,
       comProfessor,
       concluidas,
       detalhes: `${comProfessor} com professor | ${concluidas} concluídas`
     });
   }
-  
+
   return {
     total,
+    totalValidas,
     concluidas,
     comProfessor,
     aulas: aulas
@@ -161,30 +168,62 @@ async function loadBancoDeAulas() {
     <div class="space-y-4">
       <!-- Barra de Filtros Unificada -->
       <div class="filter-container p-3">
-        <!-- Linha principal: Datas, Professores, Atualizar, Limpar, Mais Filtros -->
+        <!-- Linha principal: Professores, Clientes, Atualizar, Mais Filtros -->
         <div class="flex flex-wrap gap-3 items-end w-full">
 
-          <!-- Filtros de Datas -->
-          <div class="filter-group flex-1 min-w-[150px]">
+          <!-- Filtro Professores (busca + múltipla escolha) -->
+          <div class="filter-group flex-1 min-w-[200px] ms-wrap">
             <label class="filter-label filter-label-compact">
-              <i class="fas fa-calendar-alt mr-1 text-orange-400"></i>Filtros de Datas
+              <i class="fas fa-chalkboard-user mr-1 text-orange-400"></i>Professores
             </label>
-            <select id="filter-datas" class="filter-select filter-compact w-full">
-              <option value="">Selecione...</option>
-              <option value="hoje">Aulas de Hoje</option>
-              <option value="semana">Aulas para Semana</option>
-            </select>
+            <button type="button" id="ms-professor-btn" class="filter-select filter-compact w-full ms-btn">
+              <span id="ms-professor-btn-label">Todos os professores</span>
+              <i class="fas fa-chevron-down text-xs"></i>
+            </button>
+            <div id="ms-professor-panel" class="ms-panel hidden">
+              <div class="ms-search-wrap">
+                <input type="text" id="ms-professor-search" class="ms-search-input" placeholder="Buscar professor...">
+              </div>
+              <div id="ms-professor-options" class="ms-options"></div>
+            </div>
           </div>
 
-          <!-- Filtro Professores -->
-          <div class="filter-group flex-1 min-w-[150px]">
+          <!-- Filtro Clientes (busca + múltipla escolha) -->
+          <div class="filter-group flex-1 min-w-[200px] ms-wrap">
             <label class="filter-label filter-label-compact">
-              <i class="fas fa-chalkboard-user mr-1 text-orange-400"></i>Filtro Professores
+              <i class="fas fa-user mr-1 text-orange-400"></i>Clientes
             </label>
-            <select id="filter-professor" class="filter-select filter-compact w-full">
-              <option value="">Selecione...</option>
-            </select>
+            <button type="button" id="ms-cliente-btn" class="filter-select filter-compact w-full ms-btn">
+              <span id="ms-cliente-btn-label">Todos os clientes</span>
+              <i class="fas fa-chevron-down text-xs"></i>
+            </button>
+            <div id="ms-cliente-panel" class="ms-panel hidden">
+              <div class="ms-search-wrap">
+                <input type="text" id="ms-cliente-search" class="ms-search-input" placeholder="Buscar cliente...">
+              </div>
+              <div id="ms-cliente-options" class="ms-options"></div>
+            </div>
           </div>
+
+          <!-- Atualizar -->
+          <div class="filter-group flex-none min-w-[110px] flex items-end">
+            <button id="btn-refresh" class="btn-secondary btn-compact w-full">
+              <i class="fas fa-sync-alt mr-1 text-xs"></i>
+              Atualizar
+            </button>
+          </div>
+
+          <!-- Mais Filtros (toggle, ícone apenas) -->
+          <div class="filter-group flex-none flex items-end">
+            <button id="btn-mais-filtros" class="btn-secondary btn-compact btn-icon-toggle" title="Mais filtros">
+              <i class="fas fa-chevron-down text-xs" id="icon-mais-filtros"></i>
+            </button>
+          </div>
+
+        </div>
+
+        <!-- Segunda linha: filtros extras (oculta por padrão) -->
+        <div id="filtros-extras" class="flex flex-wrap gap-3 items-end mt-3 hidden w-full">
 
           <!-- Filtro Aulas -->
           <div class="filter-group flex-1 min-w-[150px]">
@@ -199,35 +238,6 @@ async function loadBancoDeAulas() {
             </select>
           </div>
 
-          <!-- Atualizar Dados -->
-          <div class="filter-group flex-1 min-w-[120px] flex items-end">
-            <button id="btn-refresh" class="btn-secondary btn-compact w-full">
-              <i class="fas fa-sync-alt mr-1 text-xs"></i>
-              Atualizar Dados
-            </button>
-          </div>
-
-          <!-- Limpar Filtros -->
-          <div class="filter-group flex-1 min-w-[120px] flex items-end">
-            <button id="btn-limpar-filtros" class="btn-secondary btn-compact w-full">
-              <i class="fas fa-eraser mr-1 text-xs"></i>
-              Limpar Filtros
-            </button>
-          </div>
-
-          <!-- Mais Filtros (toggle) -->
-          <div class="filter-group flex-1 min-w-[120px] flex items-end">
-            <button id="btn-mais-filtros" class="btn-secondary btn-compact w-full">
-              <i class="fas fa-chevron-down mr-1 text-xs" id="icon-mais-filtros"></i>
-              Mais Filtros
-            </button>
-          </div>
-
-        </div>
-
-        <!-- Segunda linha: filtros extras (oculta por padrão) -->
-        <div id="filtros-extras" class="flex flex-wrap gap-3 items-end mt-3 hidden w-full">
-
           <!-- Filtro Pagamento -->
           <div class="filter-group flex-1 min-w-[150px]">
             <label class="filter-label filter-label-compact">
@@ -241,16 +251,6 @@ async function loadBancoDeAulas() {
             </select>
           </div>
 
-          <!-- Cliente -->
-          <div class="filter-group flex-1 min-w-[150px]">
-            <label class="filter-label filter-label-compact">
-              <i class="fas fa-user mr-1 text-orange-400"></i>Cliente
-            </label>
-            <select id="filter-cliente" class="filter-select filter-compact w-full">
-              <option value="">Todos os clientes</option>
-            </select>
-          </div>
-
           <!-- Código -->
           <div class="filter-group flex-1 min-w-[150px]">
             <label class="filter-label filter-label-compact">
@@ -260,6 +260,38 @@ async function loadBancoDeAulas() {
                    class="filter-input filter-compact w-full"
                    placeholder="Digite o código"
                    maxlength="10">
+          </div>
+
+          <!-- Filtros de Datas -->
+          <div class="filter-group flex-1 min-w-[150px]">
+            <label class="filter-label filter-label-compact">
+              <i class="fas fa-calendar-alt mr-1 text-orange-400"></i>Filtros de Datas
+            </label>
+            <select id="filter-datas" class="filter-select filter-compact w-full">
+              <option value="">Selecione...</option>
+              <option value="hoje">Aulas de Hoje</option>
+              <option value="semana">Aulas para Semana</option>
+            </select>
+          </div>
+
+          <!-- Ano da Contratação -->
+          <div class="filter-group flex-1 min-w-[120px]">
+            <label class="filter-label filter-label-compact">
+              <i class="fas fa-calendar-day mr-1 text-orange-400"></i>Ano
+            </label>
+            <input type="text" id="filter-ano"
+                   class="filter-input filter-compact w-full"
+                   placeholder="Ano"
+                   value="2026"
+                   inputmode="numeric"
+                   maxlength="4">
+          </div>
+
+          <!-- Limpar Filtros (ícone apenas) -->
+          <div class="filter-group flex-none flex items-end">
+            <button id="btn-limpar-filtros" class="btn-secondary btn-compact btn-icon-toggle" title="Limpar filtros">
+              <i class="fas fa-eraser text-xs"></i>
+            </button>
           </div>
 
         </div>
@@ -374,90 +406,130 @@ function renderAulasCardsFallback(aulas) {
   `;
 }
 
-// Popular filtro de clientes
+// Popular filtro de clientes (dropdown com busca + múltipla escolha)
 function populateClienteFilter(clientes) {
   console.log('👥 Populando filtro de clientes:', clientes.length);
-  
-  const select = document.getElementById('filter-cliente');
-  if (!select) {
-    console.error('❌ Elemento filter-cliente não encontrado');
+
+  const container = document.getElementById('ms-cliente-options');
+  if (!container) {
+    console.error('❌ Elemento ms-cliente-options não encontrado');
     return;
   }
-  
-  // Limpar opções existentes (exceto a primeira)
-  while (select.options.length > 1) {
-    select.remove(1);
-  }
-  
+
   // Ordenar clientes por nome
   const clientesOrdenados = [...clientes].sort((a, b) => {
     const nomeA = a.nome || '';
     const nomeB = b.nome || '';
     return nomeA.localeCompare(nomeB, 'pt-BR', { sensitivity: 'base' });
   });
-  
-  // Adicionar opções com nome dos clientes
-  clientesOrdenados.forEach(cliente => {
+
+  container.innerHTML = clientesOrdenados.map(cliente => {
     const nome = cliente.nome || 'Cliente sem nome';
-    const cpf = cliente.cpf || '';
-    
-    const option = document.createElement('option');
-    option.value = cpf || cliente.id;
-    option.textContent = nome;
-    option.title = cpf ? `${nome} (${cpf})` : nome;
-    select.appendChild(option);
-  });
+    const cpf = cliente.cpf || cliente.id || '';
+    return `
+      <label class="ms-option" data-label="${nome.replace(/"/g, '&quot;')}">
+        <input type="checkbox" value="${cpf}">
+        <span>${nome}</span>
+      </label>
+    `;
+  }).join('') || '<div class="ms-option-empty">Nenhum cliente encontrado</div>';
 }
 
-// Popular filtro de professores
+// Popular filtro de professores (dropdown com busca + múltipla escolha)
 function populateProfessorFilter(professores) {
   console.log('👨‍🏫 Populando filtro de professores:', professores.length);
-  
-  const select = document.getElementById('filter-professor');
-  if (!select) {
-    console.error('❌ Elemento filter-professor não encontrado');
+
+  const container = document.getElementById('ms-professor-options');
+  if (!container) {
+    console.error('❌ Elemento ms-professor-options não encontrado');
     return;
   }
-  
-  // Limpar opções existentes (exceto a primeira)
-  while (select.options.length > 1) {
-    select.remove(1);
-  }
-  
-  // Professores já estão ordenados pela query
-  professores.forEach(professor => {
+
+  let html = professores.map(professor => {
     const nome = professor.nome || 'Professor sem nome';
-    const option = document.createElement('option');
-    option.value = professor.id;
-    option.textContent = nome;
-    select.appendChild(option);
-  });
+    return `
+      <label class="ms-option" data-label="${nome.replace(/"/g, '&quot;')}">
+        <input type="checkbox" value="${professor.id}">
+        <span>${nome}</span>
+      </label>
+    `;
+  }).join('');
 
-  // Adicionar separador e opção "Cronograma sem professor"
-  const separador = document.createElement('option');
-  separador.disabled = true;
-  separador.textContent = '──────────────';
-  select.appendChild(separador);
+  html += `
+    <label class="ms-option" data-label="Cronograma sem professor">
+      <input type="checkbox" value="__sem-professor__">
+      <span>Cronograma sem professor</span>
+    </label>
+  `;
 
-  const semProfessor = document.createElement('option');
-  semProfessor.value = '__sem-professor__';
-  semProfessor.textContent = 'Cronograma sem professor';
-  select.appendChild(semProfessor);
+  container.innerHTML = html;
 }
 
-// Helper: resetar todos os filtros exceto o que está sendo usado
-function resetOtherFilters(exceptId) {
-  const filterIds = ['filter-datas', 'filter-professor', 'filter-pagamento', 'filter-aulas', 'filter-cliente'];
-  filterIds.forEach(id => {
-    if (id === exceptId) return;
-    const el = document.getElementById(id);
-    if (el) el.value = '';
-  });
-  // Limpar código também se não for o filtro ativo
-  if (exceptId !== 'filter-codigo') {
-    const codigoInput = document.getElementById('filter-codigo');
-    if (codigoInput) codigoInput.value = '';
+// ── Multi-select com busca (dropdowns de Professores e Clientes) ──
+
+function toggleMsPanel(prefix) {
+  const panel = document.getElementById(`ms-${prefix}-panel`);
+  if (!panel) return;
+  const willOpen = panel.classList.contains('hidden');
+
+  // Fecha qualquer outro painel aberto
+  document.querySelectorAll('.ms-panel').forEach(p => p.classList.add('hidden'));
+
+  if (willOpen) {
+    panel.classList.remove('hidden');
+    const search = document.getElementById(`ms-${prefix}-search`);
+    if (search) {
+      search.value = '';
+      filterMsOptions(prefix);
+      search.focus();
+    }
   }
+}
+
+function filterMsOptions(prefix) {
+  const term = (document.getElementById(`ms-${prefix}-search`)?.value || '')
+    .trim().toLowerCase();
+  const options = document.querySelectorAll(`#ms-${prefix}-options .ms-option`);
+  options.forEach(opt => {
+    const label = (opt.dataset.label || opt.textContent || '').toLowerCase();
+    opt.style.display = label.includes(term) ? '' : 'none';
+  });
+}
+
+function updateMsButtonLabel(prefix, allLabel) {
+  const checks = Array.from(document.querySelectorAll(`#ms-${prefix}-options input[type=checkbox]:checked`));
+  const labelEl = document.getElementById(`ms-${prefix}-btn-label`);
+  if (!labelEl) return;
+
+  if (checks.length === 0) {
+    labelEl.textContent = allLabel;
+  } else if (checks.length === 1) {
+    labelEl.textContent = checks[0].closest('.ms-option')?.dataset.label || checks[0].value;
+  } else {
+    labelEl.textContent = `${checks.length} selecionados`;
+  }
+}
+
+function getMsSelectedValues(prefix) {
+  return Array.from(document.querySelectorAll(`#ms-${prefix}-options input[type=checkbox]:checked`))
+    .map(cb => cb.value);
+}
+
+// Fecha os painéis de multi-select ao clicar fora deles
+document.addEventListener('click', function (e) {
+  document.querySelectorAll('.ms-wrap').forEach(wrap => {
+    if (!wrap.contains(e.target)) {
+      wrap.querySelector('.ms-panel')?.classList.add('hidden');
+    }
+  });
+});
+
+// Converte Firestore Timestamp (ou objeto {_seconds}) em Date
+function timestampParaDate(v) {
+  if (!v) return null;
+  if (typeof v.toDate === 'function') return v.toDate();
+  if (typeof v === 'object' && typeof v._seconds === 'number') return new Date(v._seconds * 1000);
+  return null;
 }
 
 // Helper: renderizar resultado filtrado
@@ -468,152 +540,205 @@ function renderFilteredResults(filteredAulas, msg) {
   if (msg) showToast(msg, 'info', 2000);
 }
 
+// ── Filtro combinado (todos os filtros ativos são somados/AND) ──
+function computeAndRenderFilters() {
+  let result = AULAS_DATA;
+  const partes = [];
+
+  // Professores (múltipla escolha, OR entre eles)
+  const profIds = getMsSelectedValues('professor');
+  if (profIds.length > 0) {
+    result = result.filter(aula => profIds.some(pid => {
+      if (pid === '__sem-professor__') {
+        return aula.aulas?.some(a =>
+          !a.professor || a.professor === 'A definir' || a.professor.trim() === ''
+        );
+      }
+      const nomeProfessor = PROFESSORES_DATA.find(p => p.id === pid)?.nome || '';
+      return aula.aulas?.some(a =>
+        a.professor && a.professor.toLowerCase().includes(nomeProfessor.toLowerCase())
+      );
+    }));
+    partes.push(`👨‍🏫 ${profIds.length} professor(es)`);
+  }
+
+  // Clientes (múltipla escolha, OR entre eles)
+  const clienteCpfs = getMsSelectedValues('cliente');
+  if (clienteCpfs.length > 0) {
+    result = result.filter(aula => clienteCpfs.includes(aula.cpf));
+    partes.push(`👤 ${clienteCpfs.length} cliente(s)`);
+  }
+
+  // Filtro de Aulas (status dos cronogramas)
+  const aulasStatus = document.getElementById('filter-aulas')?.value;
+  if (aulasStatus === 'execucao') {
+    result = result.filter(aula => {
+      const aulasInfo = obterAulasContratacao(aula.codigoContratacao || '');
+      if (aulasInfo.total === 0) return false;
+      return aulasInfo.aulas.some(a => {
+        const st = (a.statusAula || '').toLowerCase();
+        return st === 'pendente' || st === 'não informado' || st === '';
+      });
+    });
+    partes.push('▶️ em execução');
+  } else if (aulasStatus === 'completos') {
+    result = result.filter(aula => {
+      const aulasInfo = obterAulasContratacao(aula.codigoContratacao || '');
+      if (aulasInfo.total === 0) return false;
+      return aulasInfo.aulas.every(a => {
+        const st = (a.statusAula || '').toLowerCase();
+        return st === 'concluída' || st === 'reposição';
+      });
+    });
+    partes.push('✅ completos');
+  }
+
+  // Pagamento
+  const pagamento = document.getElementById('filter-pagamento')?.value;
+  if (pagamento) {
+    result = result.filter(aula => aula.statusPagamento === pagamento);
+    partes.push('💰 pagamento');
+  }
+
+  // Código
+  const codigo = document.getElementById('filter-codigo')?.value.trim().toLowerCase();
+  if (codigo) {
+    result = result.filter(aula => (aula.codigoContratacao || '').toLowerCase().includes(codigo));
+    partes.push('🔍 código');
+  }
+
+  // Datas
+  const datas = document.getElementById('filter-datas')?.value;
+  if (datas === 'hoje') {
+    const hoje = getTodayFormatted();
+    result = result.filter(aula => aula.aulas?.some(a => a.data && a.data.includes(hoje)));
+    partes.push('📅 hoje');
+  } else if (datas === 'semana') {
+    const hoje = new Date();
+    const fimDaSemana = new Date();
+    fimDaSemana.setDate(hoje.getDate() + 7);
+    result = result.filter(aula => aula.aulas?.some(a => {
+      if (!a.data) return false;
+      const match = a.data.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+      if (!match) return false;
+      const dataAula = new Date(match[3], match[2] - 1, match[1]);
+      return dataAula >= hoje && dataAula <= fimDaSemana;
+    }));
+    partes.push('📅 semana');
+  }
+
+  // Ano da contratação (só aplica depois de "commitado" via Enter/blur)
+  const anoInput = document.getElementById('filter-ano');
+  const ano = anoInput?.dataset.active === '1' ? anoInput.value.trim() : '';
+  if (ano) {
+    result = result.filter(aula => {
+      const data = timestampParaDate(aula.timestamp);
+      return data && String(data.getFullYear()) === ano;
+    });
+    partes.push(`📆 ano ${ano}`);
+  }
+
+  const msg = partes.length > 0
+    ? `${result.length} cronograma(s) — ${partes.join(', ')}`
+    : `${result.length} cronograma(s) no total`;
+  renderFilteredResults(result, msg);
+}
+
+// Commit do filtro de Ano (Enter ou blur)
+function commitAnoFilter() {
+  const input = document.getElementById('filter-ano');
+  if (!input) return;
+  const valor = input.value.trim();
+  if (/^\d{4}$/.test(valor)) {
+    input.dataset.active = '1';
+  } else {
+    delete input.dataset.active;
+  }
+  computeAndRenderFilters();
+}
+
+// Limpar todos os filtros da seção Banco de Aulas
+function limparFiltrosBancoDeAulas() {
+  document.querySelectorAll('#ms-professor-options input[type=checkbox]').forEach(cb => cb.checked = false);
+  document.querySelectorAll('#ms-cliente-options input[type=checkbox]').forEach(cb => cb.checked = false);
+  updateMsButtonLabel('professor', 'Todos os professores');
+  updateMsButtonLabel('cliente', 'Todos os clientes');
+
+  const filterAulas = document.getElementById('filter-aulas');
+  if (filterAulas) filterAulas.value = '';
+
+  const filterPagamento = document.getElementById('filter-pagamento');
+  if (filterPagamento) filterPagamento.value = '';
+
+  const filterDatas = document.getElementById('filter-datas');
+  if (filterDatas) filterDatas.value = '';
+
+  const filterCodigo = document.getElementById('filter-codigo');
+  if (filterCodigo) filterCodigo.value = '';
+
+  const filterAno = document.getElementById('filter-ano');
+  if (filterAno) {
+    filterAno.value = '2026';
+    delete filterAno.dataset.active;
+  }
+
+  renderFilteredResults(AULAS_DATA, '🧹 Filtros limpos');
+}
+
 // Configurar eventos da seção
 function setupBancoDeAulasEvents() {
   console.log('⚙️ Configurando eventos da seção Banco de Aulas');
 
-  // ── Filtro de Datas ──
-  document.getElementById('filter-datas')?.addEventListener('change', function () {
-    if (!this.value) {
-      renderFilteredResults(AULAS_DATA);
-      return;
-    }
-    resetOtherFilters('filter-datas');
-
-    if (this.value === 'hoje') {
-      const hoje = getTodayFormatted();
-      const result = AULAS_DATA.filter(aula =>
-        aula.aulas?.some(a => a.data && a.data.includes(hoje))
-      );
-      renderFilteredResults(result, `📅 ${result.length} aula(s) para hoje`);
-    } else if (this.value === 'semana') {
-      const hoje = new Date();
-      const fimDaSemana = new Date();
-      fimDaSemana.setDate(hoje.getDate() + 7);
-      const result = AULAS_DATA.filter(aula =>
-        aula.aulas?.some(a => {
-          if (!a.data) return false;
-          const match = a.data.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-          if (!match) return false;
-          const dataAula = new Date(match[3], match[2] - 1, match[1]);
-          return dataAula >= hoje && dataAula <= fimDaSemana;
-        })
-      );
-      renderFilteredResults(result, `📅 ${result.length} aula(s) para esta semana`);
+  // ── Dropdown Professores (busca + múltipla escolha) ──
+  document.getElementById('ms-professor-btn')?.addEventListener('click', () => toggleMsPanel('professor'));
+  document.getElementById('ms-professor-search')?.addEventListener('input', () => filterMsOptions('professor'));
+  document.getElementById('ms-professor-options')?.addEventListener('change', (e) => {
+    if (e.target.matches('input[type=checkbox]')) {
+      updateMsButtonLabel('professor', 'Todos os professores');
+      computeAndRenderFilters();
     }
   });
 
-  // ── Filtro de Professores ──
-  document.getElementById('filter-professor')?.addEventListener('change', function () {
-    if (!this.value) {
-      renderFilteredResults(AULAS_DATA);
-      return;
+  // ── Dropdown Clientes (busca + múltipla escolha) ──
+  document.getElementById('ms-cliente-btn')?.addEventListener('click', () => toggleMsPanel('cliente'));
+  document.getElementById('ms-cliente-search')?.addEventListener('input', () => filterMsOptions('cliente'));
+  document.getElementById('ms-cliente-options')?.addEventListener('change', (e) => {
+    if (e.target.matches('input[type=checkbox]')) {
+      updateMsButtonLabel('cliente', 'Todos os clientes');
+      computeAndRenderFilters();
     }
-    resetOtherFilters('filter-professor');
-
-    if (this.value === '__sem-professor__') {
-      const result = AULAS_DATA.filter(aula =>
-        aula.aulas?.some(a =>
-          !a.professor || a.professor === 'A definir' || a.professor.trim() === ''
-        )
-      );
-      renderFilteredResults(result, `👨‍🏫 ${result.length} cronograma(s) sem professor`);
-    } else {
-      // Buscar nome do professor pelo ID selecionado
-      const selectedOption = this.options[this.selectedIndex];
-      const nomeProfessor = selectedOption ? selectedOption.textContent : '';
-      const result = AULAS_DATA.filter(aula =>
-        aula.aulas?.some(a =>
-          a.professor && a.professor.toLowerCase().includes(nomeProfessor.toLowerCase())
-        )
-      );
-      renderFilteredResults(result, `👨‍🏫 ${result.length} cronograma(s) com ${nomeProfessor}`);
-    }
-  });
-
-  // ── Filtro de Pagamento ──
-  document.getElementById('filter-pagamento')?.addEventListener('change', function () {
-    if (!this.value) {
-      renderFilteredResults(AULAS_DATA);
-      return;
-    }
-    resetOtherFilters('filter-pagamento');
-
-    const result = AULAS_DATA.filter(aula => aula.statusPagamento === this.value);
-    const label = this.options[this.selectedIndex]?.textContent || this.value;
-    renderFilteredResults(result, `💰 ${result.length} cronograma(s) — ${label}`);
   });
 
   // ── Filtro de Aulas (status dos cronogramas) ──
-  document.getElementById('filter-aulas')?.addEventListener('change', function () {
-    if (!this.value) {
-      renderFilteredResults(AULAS_DATA);
-      return;
-    }
-    resetOtherFilters('filter-aulas');
+  document.getElementById('filter-aulas')?.addEventListener('change', computeAndRenderFilters);
 
-    if (this.value === 'todos') {
-      renderFilteredResults(AULAS_DATA, `📋 ${AULAS_DATA.length} cronograma(s) no total`);
-    } else if (this.value === 'execucao') {
-      // Cronogramas em execução: pelo menos uma aula com status "Pendente" ou sem status
-      const result = AULAS_DATA.filter(aula => {
-        const aulasInfo = obterAulasContratacao(aula.codigoContratacao || '');
-        if (aulasInfo.total === 0) return false;
-        return aulasInfo.aulas.some(a => {
-          const st = (a.statusAula || '').toLowerCase();
-          return st === 'pendente' || st === 'não informado' || st === '';
-        });
-      });
-      renderFilteredResults(result, `▶️ ${result.length} cronograma(s) em execução`);
-    } else if (this.value === 'completos') {
-      // Cronogramas completos: TODAS as aulas são "Concluída" ou "Reposição"
-      const result = AULAS_DATA.filter(aula => {
-        const aulasInfo = obterAulasContratacao(aula.codigoContratacao || '');
-        if (aulasInfo.total === 0) return false;
-        return aulasInfo.aulas.every(a => {
-          const st = (a.statusAula || '').toLowerCase();
-          return st === 'concluída' || st === 'reposição';
-        });
-      });
-      renderFilteredResults(result, `✅ ${result.length} cronograma(s) completo(s)`);
-    }
-  });
+  // ── Filtro de Pagamento ──
+  document.getElementById('filter-pagamento')?.addEventListener('change', computeAndRenderFilters);
 
-  // ── Filtro de Cliente ──
-  document.getElementById('filter-cliente')?.addEventListener('change', function () {
-    if (!this.value) {
-      renderFilteredResults(AULAS_DATA);
-      return;
-    }
-    resetOtherFilters('filter-cliente');
-
-    const result = AULAS_DATA.filter(aula => aula.cpf === this.value);
-    renderFilteredResults(result, `👤 ${result.length} cronograma(s) do cliente`);
-  });
+  // ── Filtro de Datas ──
+  document.getElementById('filter-datas')?.addEventListener('change', computeAndRenderFilters);
 
   // ── Filtro de Código (Enter) ──
   document.getElementById('filter-codigo')?.addEventListener('keyup', function (e) {
-    if (e.key === 'Enter' && this.value.trim()) {
-      resetOtherFilters('filter-codigo');
-      const termo = this.value.trim().toLowerCase();
-      const result = AULAS_DATA.filter(aula => {
-        const codigo = (aula.codigoContratacao || '').toLowerCase();
-        return codigo.includes(termo);
-      });
-      renderFilteredResults(result, `🔍 ${result.length} cronograma(s) encontrado(s)`);
-    }
+    if (e.key === 'Enter') computeAndRenderFilters();
   });
 
-  // ── Botão Atualizar Dados ──
+  // ── Filtro de Ano (Enter ou ao sair do campo) ──
+  const filterAno = document.getElementById('filter-ano');
+  if (filterAno) {
+    filterAno.addEventListener('keyup', (e) => {
+      if (e.key === 'Enter') commitAnoFilter();
+    });
+    filterAno.addEventListener('blur', commitAnoFilter);
+  }
+
+  // ── Botão Atualizar ──
   document.getElementById('btn-refresh')?.addEventListener('click', () => {
     refreshAulasData();
   });
 
   // ── Botão Limpar Filtros ──
-  document.getElementById('btn-limpar-filtros')?.addEventListener('click', () => {
-    resetOtherFilters(null);
-    renderFilteredResults(AULAS_DATA, '🧹 Filtros limpos');
-  });
+  document.getElementById('btn-limpar-filtros')?.addEventListener('click', limparFiltrosBancoDeAulas);
 
   // ── Botão Mais Filtros (toggle segunda linha) ──
   document.getElementById('btn-mais-filtros')?.addEventListener('click', function () {
@@ -625,7 +750,6 @@ function setupBancoDeAulasEvents() {
       icon.classList.toggle('fa-chevron-down', hidden);
       icon.classList.toggle('fa-chevron-up', !hidden);
     }
-    this.querySelector('span')?.remove();
   });
 }
 
@@ -656,15 +780,23 @@ async function refreshAulasData() {
     CLIENTES_DATA = clientes || [];
     PROFESSORES_DATA = professores || [];
     
-    // Recriar filtros
+    // Recriar filtros (preservando seleção de professores/clientes já marcados)
+    const profSelecionados = getMsSelectedValues('professor');
+    const clientesSelecionados = getMsSelectedValues('cliente');
     populateClienteFilter(CLIENTES_DATA);
     populateProfessorFilter(PROFESSORES_DATA);
-    
-    // Re-renderizar cards
-    if (typeof BancoDeAulasCards !== 'undefined' && BancoDeAulasCards.renderAulasCards) {
-      BancoDeAulasCards.renderAulasCards(AULAS_DATA);
-    }
-    
+    document.querySelectorAll('#ms-professor-options input[type=checkbox]').forEach(cb => {
+      cb.checked = profSelecionados.includes(cb.value);
+    });
+    document.querySelectorAll('#ms-cliente-options input[type=checkbox]').forEach(cb => {
+      cb.checked = clientesSelecionados.includes(cb.value);
+    });
+    updateMsButtonLabel('professor', 'Todos os professores');
+    updateMsButtonLabel('cliente', 'Todos os clientes');
+
+    // Re-renderizar cards respeitando os filtros ativos
+    computeAndRenderFilters();
+
     showToast('✅ Dados atualizados com sucesso', 'success', 2000);
   } catch (error) {
     console.error('❌ Erro ao atualizar dados:', error);
@@ -681,5 +813,6 @@ if (typeof window !== 'undefined') {
   window.loadBancoDeAulas = loadBancoDeAulas;
   window.obterAulasContratacao = obterAulasContratacao;
   window.carregarAulasBatch = carregarAulasBatch;
+  window.limparFiltrosBancoDeAulas = limparFiltrosBancoDeAulas;
   console.log('✅ Funções de Banco de Aulas exportadas para escopo global');
 }

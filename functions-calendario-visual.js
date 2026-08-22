@@ -911,7 +911,9 @@ async function showModalAulasCalendarios(aulaData, onSave, onDelete = null) {
   try {
     if (typeof BANCO !== 'undefined' && BANCO.fetchDataBaseProfessores) {
       const lista = await BANCO.fetchDataBaseProfessores();
-      professores = lista.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+      // Apenas professores ativos podem ser atribuídos a uma aula
+      const listaAtiva = lista.filter(p => (p.status || 'Ativo') === 'Ativo');
+      professores = listaAtiva.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
     }
   } catch (_) {}
 

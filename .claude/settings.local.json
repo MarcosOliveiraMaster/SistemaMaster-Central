@@ -51,7 +51,8 @@
       "Bash(timeout 60 cat \"C:\\\\Users\\\\marco\\\\OneDrive\\\\Documentos\\\\GitHub\\\\MasterEduTech\\\\src\\\\features\\\\painel-central\\\\painel-central.css\")",
       "Bash(echo \"EXIT:$?\")",
       "Bash(node --check functions-fluxo-processos.js)",
-      "Bash(git pull *)"
+      "Bash(git pull *)",
+      "Bash(node --check functions-banco-de-aulas.js)"
     ]
   }
 }
