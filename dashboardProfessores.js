@@ -196,9 +196,10 @@ window.GaleriaProfessores = (function () {
 
 .gp-dropdown-panel { position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:60; background:white; border:1px solid var(--gp-gray-200); border-radius:.6rem; box-shadow:var(--gp-shadow); max-height:240px; overflow-y:auto; padding:.35rem; display:none; }
 .gp-dropdown-panel.gp-open { display:block; }
-.gp-dropdown-item { display:flex; align-items:center; gap:.5rem; padding:.4rem .5rem; border-radius:.4rem; font-size:.8rem; cursor:pointer; }
+.gp-dropdown-item { display:flex; align-items:center; text-align:left; gap:.5rem; padding:.4rem .5rem; border-radius:.4rem; font-size:.8rem; cursor:pointer; }
 .gp-dropdown-item:hover { background:var(--gp-gray-50); }
-.gp-dropdown-item input { accent-color:var(--gp-orange); width:14px; height:14px; flex-shrink:0; }
+.gp-dropdown-item input { accent-color:var(--gp-orange); width:14px; height:14px; flex-shrink:0; margin:0; }
+.gp-dropdown-item span { text-align:left; flex:1; }
 
 .gp-more-btn { justify-content:flex-start; }
 .gp-more-btn > i { position:static; margin-right:.55rem; transform:none; }
@@ -207,6 +208,9 @@ window.GaleriaProfessores = (function () {
 .gp-more-panel.gp-open { display:flex; }
 .gp-more-panel .gp-btn { width:100%; justify-content:flex-start; display:flex; align-items:center; gap:.5rem; }
 .gp-more-panel .gp-btn i { width:16px; text-align:center; }
+/* esconde a engrenagem que authProfessores.js injeta ao lado de #dp-btnGerarContrato —
+   aqui usamos nosso próprio botão "Atualizar Permissões", com rótulo explícito */
+.gp-more-panel #configuracao { display:none !important; }
 
 .gp-avail-wrap { overflow-x:auto; }
 .gp-avail-table { border-collapse:separate; border-spacing:3px; width:100%; min-width:250px; }
@@ -381,6 +385,7 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
       </button>
       <div class="gp-more-panel" id="gp-maisPanel">
         <button type="button" class="gp-btn gp-btn--success" id="dp-btnGerarContrato"><i class="fas fa-file-contract"></i>Gerar Contrato</button>
+        <button type="button" class="gp-btn gp-btn--success" id="gp-btnAtualizarPermissoes"><i class="fas fa-shield-alt"></i>Atualizar Permissões</button>
         <button type="button" class="gp-btn gp-btn--danger" id="gp-btnDesligar"><i class="fas fa-user-slash"></i>Desligar Professores</button>
       </div>
     </div>
@@ -760,13 +765,10 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
       <div class="gp-det-secao">
         <h4>Atuação</h4>
         <div class="gp-det-grid">
-          ${campoTexto(CFG.campoBairros, CFG.masks.bairros, getField(p, CFG.campoBairros))}
-          <div class="gp-info-card" id="gp-detDiscWrap">
+          ${campoTexto(CFG.campoBairros, CFG.masks.bairros, getField(p, CFG.campoBairros), { full: true })}
+          <div class="gp-info-card gp-info-card--full" id="gp-detDiscWrap">
             <span class="gp-info-label">${escapeHtml(CFG.masks.disciplinas)}</span>
-            <button type="button" class="gp-field-btn" id="gp-detDiscBtn" style="padding:.3rem .5rem;font-size:.82rem">
-              <span id="gp-detDiscLabel">Selecionar...</span>
-              <i class="fas fa-chevron-down gp-chev" style="margin-left:auto"></i>
-            </button>
+            <div id="gp-detDiscChips" class="gp-avail-summary" style="cursor:pointer;min-height:1.4rem"></div>
             <div class="gp-dropdown-panel" id="gp-detDiscPanel"></div>
           </div>
           ${campoTexto('nivel', CFG.masks.nivel, getField(p, 'nivel'))}
@@ -816,26 +818,24 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
     const panel = $id('gp-detDiscPanel');
     panel.innerHTML = CFG.disciplinasFixas.map(d => `
       <label class="gp-dropdown-item">
-        <input type="checkbox" value="${escapeHtml(d)}" ${S.detDiscSelecionadas.includes(d) ? 'checked' : ''}>${escapeHtml(d)}
+        <input type="checkbox" value="${escapeHtml(d)}" ${S.detDiscSelecionadas.includes(d) ? 'checked' : ''}><span>${escapeHtml(d)}</span>
       </label>`).join('');
 
-    const atualizarLabel = () => {
-      const lbl = $id('gp-detDiscLabel');
-      lbl.textContent = S.detDiscSelecionadas.length
-        ? (S.detDiscSelecionadas.length === 1 ? S.detDiscSelecionadas[0] : `${S.detDiscSelecionadas.length} disciplinas`)
-        : 'Selecionar...';
+    const chips = $id('gp-detDiscChips');
+    const atualizarChips = () => {
+      chips.innerHTML = S.detDiscSelecionadas.length
+        ? S.detDiscSelecionadas.map(d => `<span class="gp-avail-chip">${escapeHtml(d)}</span>`).join('')
+        : `<span class="gp-info-value" style="color:var(--gp-gray-400)">Clique para selecionar...</span>`;
     };
-    atualizarLabel();
+    atualizarChips();
 
-    const btn = $id('gp-detDiscBtn');
-    btn.onclick = e => {
+    chips.onclick = e => {
       e.stopPropagation();
       panel.classList.toggle('gp-open');
-      btn.classList.toggle('gp-open', panel.classList.contains('gp-open'));
     };
     panel.onchange = () => {
       S.detDiscSelecionadas = Array.from(panel.querySelectorAll('input:checked')).map(i => i.value);
-      atualizarLabel();
+      atualizarChips();
     };
   }
 
@@ -843,7 +843,6 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
     const wrap = $id('gp-detDiscWrap');
     if (wrap && !wrap.contains(e.target)) {
       $id('gp-detDiscPanel')?.classList.remove('gp-open');
-      $id('gp-detDiscBtn')?.classList.remove('gp-open');
     }
   }
 
@@ -1067,7 +1066,7 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
 
     panel.innerHTML = CFG.disciplinasFixas.map(d => `
       <label class="gp-dropdown-item">
-        <input type="checkbox" value="${escapeHtml(d)}">${escapeHtml(d)}
+        <input type="checkbox" value="${escapeHtml(d)}"><span>${escapeHtml(d)}</span>
       </label>`).join('');
 
     btn.addEventListener('click', e => {
@@ -1162,6 +1161,16 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
       abrirModalContrato();
     });
     initModalContrato();
+
+    // Atualizar Permissões (authProfessores.js — mesma função da engrenagem, direto)
+    $id('gp-btnAtualizarPermissoes')?.addEventListener('click', () => {
+      maisPanel?.classList.remove('gp-open');
+      if (typeof window.AuthProfessores !== 'undefined' && window.AuthProfessores.openPermModal) {
+        window.AuthProfessores.openPermModal();
+      } else {
+        toast('Módulo de permissões não encontrado.', 'error');
+      }
+    });
 
     // Desligar Professores
     $id('gp-btnDesligar')?.addEventListener('click', () => {

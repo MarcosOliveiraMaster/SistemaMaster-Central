@@ -1017,7 +1017,7 @@ window.AuthProfessores = (function () {
     injectConfigButton();
   }
 
-  return { init };
+  return { init, openPermModal };
 
 })();
 
