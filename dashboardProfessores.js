@@ -21,6 +21,17 @@ window.GaleriaProfessores = (function () {
     limiteAviso:   700 * 1024,        // aviso se o base64 passar disso (~700KB)
     // mesma lista fixa usada em BD Professores (functions-dashboardProfessor.js)
     disciplinasFixas: ['Ciências', 'Física', 'Geografia', 'História', 'Inglês', 'Literatura', 'Matemática', 'Pedagogia', 'Português', 'Química', 'Biologia'],
+    // rótulos — mesmos de BD Professores (CFG.defaultMasks)
+    masks: {
+      nome: 'Nome', cpf: 'CPF', email: 'E-mail', contato: 'Telefone', apelido: 'Apelido',
+      endereco: 'Endereço', nivel: 'Nível Acadêmico', descricaoExpAulas: 'Descrição — Aulas',
+      bairros: 'Bairros de acesso', disciplinas: 'Disciplinas', curso: 'Curso e Instituição',
+      descricaoExpNeuro: 'Descrição — Alunos Atípicos', descricaoTdics: 'Descrição — TDICs', pix: 'Chave Pix',
+    },
+    diasSemana: [
+      { key: 'seg', label: 'Segunda' }, { key: 'ter', label: 'Terça' }, { key: 'qua', label: 'Quarta' },
+      { key: 'qui', label: 'Quinta' }, { key: 'sex', label: 'Sexta' }, { key: 'sab', label: 'Sábado' },
+    ],
   };
 
   // ─────────────────────────────────────────────────────────────
@@ -36,6 +47,10 @@ window.GaleriaProfessores = (function () {
     slotsSelecionados: [],
     profSelecionado: null,
     pendingDataURL: null,
+    // modal contrato (vínculo/desligamento) — porta a lógica de BD Professores
+    desligamentoSelecionados: [],
+    // modal desligar professores (novo)
+    detalhesTabAtiva: 'gp-det-aulas',
   };
 
   // ─────────────────────────────────────────────────────────────
@@ -64,6 +79,7 @@ window.GaleriaProfessores = (function () {
   // ─────────────────────────────────────────────────────────────
   function $root() { return document.getElementById('galeria-professores'); }
   function $id(id) { return document.getElementById(id); }
+  function $qa(sel) { return Array.from(document.querySelectorAll(sel)); }
 
   function getField(item, key) {
     if (!item || !key) return undefined;
@@ -102,6 +118,18 @@ window.GaleriaProfessores = (function () {
   }
 
   // mesma semântica de BD Professores: aceita boolean, "sim"/"true"/1 etc.
+  function formatCPF(v) {
+    const n = String(v || '').replace(/\D/g, '');
+    return n.length === 11 ? n.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : (v || '');
+  }
+
+  function formatTel(v) {
+    const n = String(v || '').replace(/\D/g, '');
+    if (n.length === 11) return n.replace(/(\d{2})(\d{1})(\d{4})(\d{4})/, '($1) $2.$3-$4');
+    if (n.length === 10) return n.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+    return v || '';
+  }
+
   function isTruthy(v) {
     if (v === undefined || v === null) return false;
     if (typeof v === 'boolean') return v;
@@ -148,10 +176,16 @@ window.GaleriaProfessores = (function () {
 /* ── canal de filtros (3 colunas iguais) ── */
 .gp-filterbar { display:grid; grid-template-columns:repeat(3, 1fr); gap:1rem; padding:1rem; background:white; border-bottom:1px solid var(--gp-gray-200); flex-shrink:0; position:sticky; top:0; z-index:20; }
 .gp-filter-col { display:flex; flex-direction:column; gap:.55rem; min-width:0; }
+/* cada linha da coluna 1/2 cresce para preencher a altura total da coluna —
+   que por sua vez acompanha a altura natural da tabela de disponibilidade
+   (colunas de um grid esticam para a altura da linha mais alta por padrão).
+   flex-basis "auto" preserva a altura natural em telas estreitas, onde as
+   3 colunas empilham e não há uma linha mais alta pra acompanhar. */
+.gp-filter-col > * { flex:1 1 auto; min-height:0; }
 
-.gp-field { position:relative; }
+.gp-field { position:relative; display:flex; }
 .gp-field > i { position:absolute; left:.75rem; top:50%; transform:translateY(-50%); color:var(--gp-gray-400); font-size:.85rem; z-index:1; pointer-events:none; }
-.gp-field input, .gp-field-btn { width:100%; font-family:'Lexend',sans-serif; font-size:.85rem; border:1px solid var(--gp-gray-200); border-radius:.6rem; padding:.55rem .75rem .55rem 2.1rem; background:var(--gp-gray-50); color:var(--gp-gray-800); transition:border-color var(--gp-transition), box-shadow var(--gp-transition), background var(--gp-transition); }
+.gp-field input, .gp-field-btn { width:100%; flex:1; font-family:'Lexend',sans-serif; font-size:.85rem; border:1px solid var(--gp-gray-200); border-radius:.6rem; padding:.55rem .75rem .55rem 2.1rem; background:var(--gp-gray-50); color:var(--gp-gray-800); transition:border-color var(--gp-transition), box-shadow var(--gp-transition), background var(--gp-transition); }
 .gp-field input:focus, .gp-field-btn:focus, .gp-field-btn.gp-open { outline:none; border-color:var(--gp-orange); box-shadow:0 0 0 3px rgba(242,135,5,.12); background:white; }
 .gp-field-btn { display:flex; align-items:center; text-align:left; cursor:pointer; color:var(--gp-gray-600); }
 .gp-field-btn.gp-has-value { color:var(--gp-gray-800); font-weight:600; }
@@ -166,6 +200,11 @@ window.GaleriaProfessores = (function () {
 
 .gp-more-btn { justify-content:flex-start; }
 .gp-more-btn > i { position:static; margin-right:.55rem; transform:none; }
+
+.gp-more-panel { position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:60; background:white; border:1px solid var(--gp-gray-200); border-radius:.6rem; box-shadow:var(--gp-shadow); padding:.5rem; display:none; flex-direction:column; gap:.4rem; }
+.gp-more-panel.gp-open { display:flex; }
+.gp-more-panel .gp-btn { width:100%; justify-content:flex-start; display:flex; align-items:center; gap:.5rem; }
+.gp-more-panel .gp-btn i { width:16px; text-align:center; }
 
 .gp-avail-wrap { overflow-x:auto; }
 .gp-avail-table { border-collapse:separate; border-spacing:3px; width:100%; min-width:250px; }
@@ -225,7 +264,70 @@ window.GaleriaProfessores = (function () {
 .gp-btn--ghost:hover { background:var(--gp-gray-200); }
 .gp-btn--primary { background:var(--gp-orange); color:white; }
 .gp-btn--primary:hover { background:var(--gp-orange-dk); }
+.gp-btn--success { background:#16a34a; color:white; }
+.gp-btn--success:hover { background:#15803d; }
+.gp-btn--danger { background:var(--gp-red); color:white; }
+.gp-btn--danger:hover { background:#b91c1c; }
 .gp-btn:disabled { opacity:.5; cursor:not-allowed; }
+
+/* ── ícone de câmera sobre o card (abre o modal de foto sem abrir Detalhes) ── */
+.gp-card { position:relative; }
+.gp-card__camBtn { position:absolute; top:.4rem; right:.4rem; width:1.9rem; height:1.9rem; border-radius:50%; background:rgba(0,0,0,.55); color:white; border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:.78rem; z-index:2; transition:background var(--gp-transition); }
+.gp-card__camBtn:hover { background:var(--gp-orange); }
+
+/* ── modal Gerar Contrato (portado de BD Professores) ── */
+.gp-modalC-overlay { position:fixed; inset:0; background:rgba(0,0,0,.5); display:none; align-items:center; justify-content:center; z-index:9500; animation:gpFadeIn .15s ease; padding:1rem; }
+.gp-modalC-overlay.gp-open { display:flex; }
+.gp-modalC { background:white; border-radius:1rem; box-shadow:0 24px 48px rgba(0,0,0,.2); width:100%; max-width:600px; max-height:85vh; display:flex; flex-direction:column; overflow:hidden; }
+.gp-modalC-header { display:flex; align-items:center; justify-content:space-between; padding:1rem 1.25rem; border-bottom:1px solid var(--gp-gray-200); }
+.gp-modalC-header h2 { font-size:1.1rem; font-weight:700; margin:0; color:var(--gp-gray-800); }
+.gp-modalC-tabs { display:flex; border-bottom:1px solid var(--gp-gray-200); }
+.gp-modalC-tab { flex:1; padding:.75rem 1rem; font-family:'Comfortaa',cursive; font-size:.85rem; font-weight:600; border:none; cursor:pointer; background:var(--gp-gray-50); color:var(--gp-gray-600); border-bottom:3px solid transparent; }
+.gp-modalC-tab.gp-active { background:white; color:var(--gp-orange); border-bottom-color:var(--gp-orange); }
+.gp-modalC-body { flex:1; overflow-y:auto; padding:1rem 1.25rem; }
+.gp-modalC-panel { display:none; }
+.gp-modalC-panel.gp-active { display:block; }
+.gp-modalC-marcarTodos { display:flex; align-items:center; gap:.5rem; padding:.5rem .75rem; background:var(--gp-gray-50); border-radius:.5rem; margin-bottom:.75rem; cursor:pointer; font-size:.8rem; font-weight:600; color:var(--gp-gray-600); }
+.gp-modalC-lista { display:flex; flex-direction:column; gap:.35rem; max-height:320px; overflow-y:auto; }
+.gp-modalC-item { display:flex; align-items:center; gap:.6rem; padding:.5rem .75rem; border-radius:.5rem; cursor:pointer; font-size:.82rem; }
+.gp-modalC-item:hover { background:var(--gp-gray-50); }
+.gp-modalC-busca { position:relative; margin-bottom:.75rem; }
+.gp-modalC-autocomplete { position:absolute; top:100%; left:0; right:0; background:white; border:1px solid var(--gp-gray-200); border-radius:.5rem; box-shadow:var(--gp-shadow); max-height:200px; overflow-y:auto; z-index:100; margin-top:.25rem; display:none; }
+.gp-modalC-autocomplete.gp-open { display:block; }
+.gp-modalC-autocomplete-item { padding:.5rem .75rem; cursor:pointer; font-size:.82rem; }
+.gp-modalC-autocomplete-item:hover { background:var(--gp-gray-50); }
+.gp-modalC-selecionado { padding:.5rem .75rem; background:var(--gp-orange-light); border-radius:.5rem; font-size:.82rem; display:flex; align-items:center; justify-content:space-between; margin-bottom:.35rem; }
+.gp-modalC-selecionado button { background:none; border:none; color:var(--gp-red); cursor:pointer; font-size:.9rem; }
+.gp-modalC-motivo { display:flex; align-items:center; gap:.6rem; padding:.5rem .75rem; border-radius:.5rem; font-size:.82rem; cursor:pointer; }
+.gp-modalC-footer { padding:1rem 1.25rem; border-top:1px solid var(--gp-gray-200); }
+.gp-modalC-footer .gp-btn { width:100%; }
+
+/* ── modal Desligar Professores (novo) ── */
+.gp-modalD-overlay { position:fixed; inset:0; background:rgba(0,0,0,.5); display:none; align-items:center; justify-content:center; z-index:9500; animation:gpFadeIn .15s ease; padding:1rem; }
+.gp-modalD-overlay.gp-open { display:flex; }
+.gp-modalD { background:white; border-radius:1rem; box-shadow:0 24px 48px rgba(0,0,0,.2); width:100%; max-width:420px; max-height:80vh; display:flex; flex-direction:column; overflow:hidden; }
+
+/* ── modal Detalhes Professor (novo) ── */
+.gp-det-overlay { position:fixed; inset:0; background:rgba(0,0,0,.5); display:none; align-items:center; justify-content:center; z-index:9500; animation:gpFadeIn .15s ease; padding:1rem; }
+.gp-det-overlay.gp-open { display:flex; }
+.gp-det { background:white; border-radius:1rem; box-shadow:0 24px 48px rgba(0,0,0,.2); width:100%; max-width:560px; max-height:88vh; display:flex; flex-direction:column; overflow:hidden; }
+.gp-det-header { display:flex; align-items:center; justify-content:space-between; padding:1rem 1.25rem; border-bottom:1px solid var(--gp-gray-200); }
+.gp-det-header h2 { font-size:1.05rem; font-weight:700; margin:0; color:var(--gp-gray-800); }
+.gp-det-tabs { display:flex; border-bottom:1px solid var(--gp-gray-200); flex-shrink:0; }
+.gp-det-tab { flex:1; padding:.7rem .5rem; font-family:'Comfortaa',cursive; font-size:.8rem; font-weight:600; border:none; cursor:pointer; background:var(--gp-gray-50); color:var(--gp-gray-600); border-bottom:3px solid transparent; }
+.gp-det-tab.gp-active { background:white; color:var(--gp-orange); border-bottom-color:var(--gp-orange); }
+.gp-det-body { flex:1; overflow-y:auto; padding:1.1rem 1.25rem; }
+.gp-det-panel { display:none; flex-direction:column; gap:.9rem; }
+.gp-det-panel.gp-active { display:flex; }
+.gp-det-secao h4 { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--gp-gray-600); margin:0 0 .4rem; }
+.gp-det-grid { display:grid; grid-template-columns:1fr 1fr; gap:.5rem; }
+.gp-info-card { background:var(--gp-gray-50); border:1px solid var(--gp-gray-200); border-radius:.5rem; padding:.5rem .65rem; display:flex; flex-direction:column; gap:.15rem; }
+.gp-info-card--full { grid-column:1/-1; }
+.gp-info-label { font-size:.63rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--gp-gray-400); }
+.gp-info-value { font-size:.82rem; color:var(--gp-gray-800); font-weight:500; word-break:break-word; white-space:pre-wrap; }
+.gp-avail-summary { display:flex; flex-wrap:wrap; gap:.35rem; }
+.gp-avail-chip { background:var(--gp-orange-light); color:var(--gp-orange-dk); border-radius:999px; padding:.2rem .65rem; font-size:.7rem; font-weight:600; }
+.gp-det-empty { text-align:center; color:var(--gp-gray-400); padding:2.5rem 1rem; font-size:.85rem; }
 
 #galeria-professores ::-webkit-scrollbar { width:5px; height:5px; }
 #galeria-professores ::-webkit-scrollbar-track { background:var(--gp-gray-100); }
@@ -264,10 +366,16 @@ window.GaleriaProfessores = (function () {
       <i class="fas fa-map-marker-alt"></i>
       <input type="text" id="gp-fBairro" placeholder="Buscar por bairro...">
     </div>
-    <button type="button" class="gp-field-btn gp-more-btn" id="gp-btnMaisFiltros">
-      <i class="fas fa-sliders-h"></i>
-      <span>Mais filtros e configurações</span>
-    </button>
+    <div class="gp-field" id="gp-maisWrap">
+      <button type="button" class="gp-field-btn gp-more-btn" id="gp-btnMaisFiltros">
+        <i class="fas fa-sliders-h"></i>
+        <span>Mais filtros e configurações</span>
+      </button>
+      <div class="gp-more-panel" id="gp-maisPanel">
+        <button type="button" class="gp-btn gp-btn--success" id="dp-btnGerarContrato"><i class="fas fa-file-contract"></i>Gerar Contrato</button>
+        <button type="button" class="gp-btn gp-btn--danger" id="gp-btnDesligar"><i class="fas fa-user-slash"></i>Desligar Professores</button>
+      </div>
+    </div>
   </div>
 
   <!-- Parte 3: disponibilidade (dia x turno) -->
@@ -329,6 +437,86 @@ window.GaleriaProfessores = (function () {
     </div>
   </div>
 </div>
+
+<!-- Gerar Contrato — portado de BD Professores (vínculo funcional / desligamento é placeholder lá também) -->
+<div id="gp-modalContratoOverlay" class="gp-modalC-overlay">
+  <div class="gp-modalC">
+    <div class="gp-modalC-header">
+      <h2><i class="fas fa-file-contract" style="margin-right:.5rem;color:var(--gp-orange)"></i>Gerar Contrato</h2>
+      <button id="gp-modalContratoClose" class="gp-modal-close" type="button">&times;</button>
+    </div>
+    <div class="gp-modalC-tabs">
+      <button class="gp-modalC-tab gp-active" data-panel="vinculo" type="button">Contratação e Renovação</button>
+      <button class="gp-modalC-tab" data-panel="desligamento" type="button">Desligamento</button>
+    </div>
+    <div class="gp-modalC-body">
+      <div id="gp-panelVinculo" class="gp-modalC-panel gp-active">
+        <label class="gp-modalC-marcarTodos">
+          <input type="checkbox" id="gp-marcarTodosProfessores"> Marcar todos
+        </label>
+        <div id="gp-listaProfessoresVinculo" class="gp-modalC-lista"></div>
+      </div>
+      <div id="gp-panelDesligamento" class="gp-modalC-panel">
+        <div class="gp-modalC-busca">
+          <input type="text" id="gp-buscaProfessorDesligamento" class="gp-input" placeholder="Buscar professor para desligamento...">
+          <div id="gp-autocompleteProfessor" class="gp-modalC-autocomplete"></div>
+        </div>
+        <div id="gp-professorSelecionadoDesligamento"></div>
+        <div id="gp-motivosDesligamento" style="display:none">
+          <p style="font-size:.78rem;color:var(--gp-gray-600);margin-bottom:.5rem;font-weight:600">Motivos do desligamento:</p>
+          ${['Baixo desempenho', 'Falta de comprometimento', 'Pedido de desligamento', 'Quebra de contrato', 'Indisponibilidade de horários', 'Outros motivos'].map(m => `
+          <label class="gp-modalC-motivo"><input type="checkbox" name="gp-motivoDesligamento" value="${m}"> ${m}</label>`).join('')}
+          <textarea id="gp-observacoesDesligamento" class="gp-input" placeholder="Observações adicionais..." style="width:100%;min-height:70px;margin-top:.6rem;resize:vertical"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="gp-modalC-footer">
+      <button id="gp-btnGerarContratoVinculo" class="gp-btn gp-btn--success" type="button"><i class="fas fa-file-signature" style="margin-right:.4rem"></i>Gerar Contrato de Vínculo</button>
+      <button id="gp-btnGerarContratoDesligamento" class="gp-btn gp-btn--danger" type="button" style="display:none"><i class="fas fa-file-signature" style="margin-right:.4rem"></i>Gerar Contrato de Desligamento</button>
+    </div>
+  </div>
+</div>
+
+<!-- Desligar Professores — novo: muda status para Desligado de vez -->
+<div id="gp-modalDesligarOverlay" class="gp-modalD-overlay">
+  <div class="gp-modalD">
+    <div class="gp-modalC-header">
+      <h2><i class="fas fa-user-slash" style="margin-right:.5rem;color:var(--gp-red)"></i>Desligar Professores</h2>
+      <button id="gp-modalDesligarClose" class="gp-modal-close" type="button">&times;</button>
+    </div>
+    <div class="gp-modalC-body">
+      <label class="gp-modalC-marcarTodos">
+        <input type="checkbox" id="gp-marcarTodosDesligar"> Marcar todos
+      </label>
+      <div id="gp-listaDesligar" class="gp-modalC-lista"></div>
+    </div>
+    <div class="gp-modalC-footer">
+      <button id="gp-btnConfirmarDesligar" class="gp-btn gp-btn--danger" type="button"><i class="fas fa-user-slash" style="margin-right:.4rem"></i>Desligar selecionados</button>
+    </div>
+  </div>
+</div>
+
+<!-- Detalhes Professor — novo: 3 abas (Aulas / Perfil / Avaliação de Desempenho) -->
+<div id="gp-detOverlay" class="gp-det-overlay">
+  <div class="gp-det">
+    <div class="gp-det-header">
+      <h2 id="gp-detNome">Professor</h2>
+      <button id="gp-detClose" class="gp-modal-close" type="button">&times;</button>
+    </div>
+    <div class="gp-det-tabs">
+      <button class="gp-det-tab gp-active" data-detpanel="gp-det-aulas" type="button">Aulas</button>
+      <button class="gp-det-tab" data-detpanel="gp-det-perfil" type="button">Perfil</button>
+      <button class="gp-det-tab" data-detpanel="gp-det-avaliacao" type="button">Avaliação de Desempenho</button>
+    </div>
+    <div class="gp-det-body">
+      <div id="gp-det-aulas" class="gp-det-panel gp-active"></div>
+      <div id="gp-det-perfil" class="gp-det-panel"></div>
+      <div id="gp-det-avaliacao" class="gp-det-panel">
+        <div class="gp-det-empty"><i class="fas fa-chart-line" style="font-size:1.8rem;display:block;margin-bottom:.5rem"></i>Em breve — gráficos de desempenho.</div>
+      </div>
+    </div>
+  </div>
+</div>
     `;
   }
 
@@ -358,7 +546,7 @@ window.GaleriaProfessores = (function () {
       }
       if (slots.length && !slots.every(s => isTruthy(getField(p, s)))) return false;
       return true;
-    });
+    }).sort((a, b) => (getField(a, 'nome') || '').localeCompare(getField(b, 'nome') || '', 'pt-BR'));
   }
 
   function renderGrid(lista) {
@@ -381,8 +569,13 @@ window.GaleriaProfessores = (function () {
 
     grid.innerHTML = lista.map(p => cardHTML(p)).join('');
     grid.querySelectorAll('.gp-card').forEach(card => {
+      const id = card.getAttribute('data-id');
       card.addEventListener('click', () => {
-        const id = card.getAttribute('data-id');
+        const prof = S.professores.find(p => p.id === id);
+        if (prof) abrirDetalhes(prof);
+      });
+      card.querySelector('.gp-card__camBtn')?.addEventListener('click', e => {
+        e.stopPropagation();
         const prof = S.professores.find(p => p.id === id);
         if (prof) abrirModal(prof);
       });
@@ -398,6 +591,7 @@ window.GaleriaProfessores = (function () {
 
     return `
       <div class="gp-card" data-id="${p.id}">
+        <button type="button" class="gp-card__camBtn" title="Enviar foto"><i class="fas fa-camera"></i></button>
         <div class="gp-card__img-box">${imgOuFallback}</div>
         <div class="gp-card__label"><span>${escapeHtml(nome)}</span></div>
       </div>`;
@@ -514,6 +708,247 @@ window.GaleriaProfessores = (function () {
   }
 
   // ─────────────────────────────────────────────────────────────
+  // DETALHES PROFESSOR — modal com 3 abas (Aulas / Perfil / Avaliação)
+  // ─────────────────────────────────────────────────────────────
+  function infoCard(label, valor, full) {
+    return `<div class="gp-info-card${full ? ' gp-info-card--full' : ''}">
+      <span class="gp-info-label">${escapeHtml(label)}</span>
+      <span class="gp-info-value">${escapeHtml(valor || '—')}</span>
+    </div>`;
+  }
+
+  function resumoDisponibilidade(p) {
+    const chips = [];
+    CFG.diasSemana.forEach(d => {
+      ['Manha', 'Tarde'].forEach(turno => {
+        if (isTruthy(getField(p, d.key + turno))) chips.push(`${d.label} ${turno === 'Manha' ? 'Manhã' : 'Tarde'}`);
+      });
+    });
+    if (!chips.length) return '<p class="gp-info-value">Nenhuma disponibilidade informada.</p>';
+    return `<div class="gp-avail-summary">${chips.map(c => `<span class="gp-avail-chip">${escapeHtml(c)}</span>`).join('')}</div>`;
+  }
+
+  function renderDetAulas(p) {
+    const disciplinas = listaDisciplinas(getField(p, CFG.campoDisciplinas));
+    return `
+      <div class="gp-det-secao">
+        <h4>Disponibilidade</h4>
+        ${resumoDisponibilidade(p)}
+      </div>
+      <div class="gp-det-secao">
+        <h4>Atuação</h4>
+        <div class="gp-det-grid">
+          ${infoCard(CFG.masks.bairros, getField(p, CFG.campoBairros))}
+          ${infoCard(CFG.masks.disciplinas, disciplinas.length ? getField(p, CFG.campoDisciplinas) : '')}
+          ${infoCard(CFG.masks.nivel, getField(p, 'nivel'))}
+          ${infoCard(CFG.masks.curso, getField(p, 'curso'))}
+        </div>
+      </div>
+      <div class="gp-det-secao">
+        <h4>Experiência</h4>
+        <div class="gp-det-grid">
+          ${infoCard(CFG.masks.descricaoExpAulas, getField(p, 'descricaoExpAulas'), true)}
+          ${infoCard(CFG.masks.descricaoExpNeuro, getField(p, 'descricaoExpNeuro'), true)}
+          ${infoCard(CFG.masks.descricaoTdics, getField(p, 'descricaoTdics'), true)}
+        </div>
+      </div>`;
+  }
+
+  function renderDetPerfil(p) {
+    return `
+      <div class="gp-det-grid">
+        ${infoCard(CFG.masks.nome, getField(p, 'nome'))}
+        ${infoCard(CFG.masks.apelido, getField(p, 'apelido'))}
+        ${infoCard(CFG.masks.email, getField(p, 'email'))}
+        ${infoCard(CFG.masks.contato, formatTel(getField(p, 'contato')))}
+        ${infoCard(CFG.masks.cpf, formatCPF(getField(p, 'cpf')))}
+        ${infoCard(CFG.masks.pix, getField(p, 'pix'))}
+        ${infoCard(CFG.masks.endereco, getField(p, 'endereco'), true)}
+      </div>`;
+  }
+
+  function trocarDetTab(tabId) {
+    $qa('.gp-det-tab').forEach(btn => btn.classList.toggle('gp-active', btn.dataset.detpanel === tabId));
+    $qa('.gp-det-panel').forEach(el => el.classList.toggle('gp-active', el.id === tabId));
+    S.detalhesTabAtiva = tabId;
+  }
+
+  function abrirDetalhes(prof) {
+    $id('gp-detNome').textContent = getField(prof, 'nome') || 'Professor';
+    $id('gp-det-aulas').innerHTML = renderDetAulas(prof);
+    $id('gp-det-perfil').innerHTML = renderDetPerfil(prof);
+    trocarDetTab('gp-det-aulas');
+    $id('gp-detOverlay').classList.add('gp-open');
+  }
+
+  function fecharDetalhes() {
+    $id('gp-detOverlay').classList.remove('gp-open');
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // GERAR CONTRATO — portado de BD Professores (vínculo funcional;
+  // desligamento é apenas rascunho lá também — ver ressalva no README do PR)
+  // ─────────────────────────────────────────────────────────────
+  function popularListaProfessoresVinculo() {
+    const lista = $id('gp-listaProfessoresVinculo');
+    const ativos = [...S.professores].filter(isAtivo).sort((a, b) => (getField(a, 'nome') || '').localeCompare(getField(b, 'nome') || '', 'pt-BR'));
+    lista.innerHTML = ativos.map(p => `
+      <label class="gp-modalC-item">
+        <input type="checkbox" name="gp-professorVinculo" value="${p.id}"> ${escapeHtml(getField(p, 'nome'))}
+      </label>`).join('');
+    $id('gp-marcarTodosProfessores').checked = false;
+  }
+
+  function renderizarSelecionadosDesligamento() {
+    const cont = $id('gp-professorSelecionadoDesligamento');
+    if (!S.desligamentoSelecionados.length) {
+      cont.innerHTML = '';
+      $id('gp-motivosDesligamento').style.display = 'none';
+      return;
+    }
+    cont.innerHTML = S.desligamentoSelecionados.map(p => `
+      <div class="gp-modalC-selecionado" data-id="${p.id}">
+        <span>${escapeHtml(p.nome)}</span>
+        <button type="button" data-id="${p.id}">&times;</button>
+      </div>`).join('');
+    $id('gp-motivosDesligamento').style.display = 'block';
+    cont.querySelectorAll('button[data-id]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        S.desligamentoSelecionados = S.desligamentoSelecionados.filter(p => p.id !== btn.dataset.id);
+        renderizarSelecionadosDesligamento();
+      });
+    });
+  }
+
+  function trocarTabContrato(panel) {
+    $qa('.gp-modalC-tab').forEach(t => t.classList.toggle('gp-active', t.dataset.panel === panel));
+    $id('gp-panelVinculo').classList.toggle('gp-active', panel === 'vinculo');
+    $id('gp-panelDesligamento').classList.toggle('gp-active', panel === 'desligamento');
+    $id('gp-btnGerarContratoVinculo').style.display = panel === 'vinculo' ? 'block' : 'none';
+    $id('gp-btnGerarContratoDesligamento').style.display = panel === 'desligamento' ? 'block' : 'none';
+  }
+
+  function abrirModalContrato() {
+    S.desligamentoSelecionados = [];
+    popularListaProfessoresVinculo();
+    trocarTabContrato('vinculo');
+    $id('gp-buscaProfessorDesligamento').value = '';
+    renderizarSelecionadosDesligamento();
+    $qa('input[name="gp-motivoDesligamento"]').forEach(cb => { cb.checked = false; });
+    $id('gp-observacoesDesligamento').value = '';
+    $id('gp-modalContratoOverlay').classList.add('gp-open');
+  }
+
+  function fecharModalContrato() {
+    $id('gp-modalContratoOverlay').classList.remove('gp-open');
+  }
+
+  function initModalContrato() {
+    $id('gp-modalContratoClose')?.addEventListener('click', fecharModalContrato);
+    $id('gp-modalContratoOverlay')?.addEventListener('click', e => { if (e.target.id === 'gp-modalContratoOverlay') fecharModalContrato(); });
+    $qa('.gp-modalC-tab').forEach(tab => tab.addEventListener('click', () => trocarTabContrato(tab.dataset.panel)));
+
+    $id('gp-marcarTodosProfessores')?.addEventListener('change', e => {
+      $qa('input[name="gp-professorVinculo"]').forEach(cb => { cb.checked = e.target.checked; });
+    });
+
+    const buscaInput = $id('gp-buscaProfessorDesligamento');
+    const autocomplete = $id('gp-autocompleteProfessor');
+    buscaInput?.addEventListener('input', debounce(() => {
+      const termo = normalizeStr(buscaInput.value);
+      if (!termo || termo.length < 2) { autocomplete.classList.remove('gp-open'); return; }
+      const idsSel = S.desligamentoSelecionados.map(p => p.id);
+      const resultados = S.professores
+        .filter(p => getField(p, 'nome') && normalizeStr(getField(p, 'nome')).includes(termo) && !idsSel.includes(p.id))
+        .sort((a, b) => (getField(a, 'nome') || '').localeCompare(getField(b, 'nome') || '', 'pt-BR'))
+        .slice(0, 10);
+      autocomplete.innerHTML = resultados.length
+        ? resultados.map(p => `<div class="gp-modalC-autocomplete-item" data-id="${p.id}" data-nome="${escapeHtml(getField(p, 'nome'))}">${escapeHtml(getField(p, 'nome'))}</div>`).join('')
+        : '<div class="gp-modalC-autocomplete-item" style="color:var(--gp-gray-400);cursor:default">Nenhum professor encontrado</div>';
+      autocomplete.classList.add('gp-open');
+    }, 200));
+    autocomplete?.addEventListener('click', e => {
+      const item = e.target.closest('.gp-modalC-autocomplete-item[data-id]');
+      if (!item) return;
+      if (!S.desligamentoSelecionados.some(p => p.id === item.dataset.id)) {
+        S.desligamentoSelecionados.push({ id: item.dataset.id, nome: item.dataset.nome });
+        renderizarSelecionadosDesligamento();
+      }
+      buscaInput.value = '';
+      autocomplete.classList.remove('gp-open');
+    });
+    document.addEventListener('click', e => {
+      if (buscaInput && !buscaInput.contains(e.target) && !autocomplete.contains(e.target)) autocomplete.classList.remove('gp-open');
+    });
+
+    $id('gp-btnGerarContratoVinculo')?.addEventListener('click', () => {
+      const sel = $qa('input[name="gp-professorVinculo"]:checked');
+      if (!sel.length) { toast('Selecione pelo menos um professor.', 'error'); return; }
+      const profs = sel.map(cb => {
+        const p = S.professores.find(x => x.id === cb.value);
+        return { id: cb.value, nome: getField(p, 'nome') || '', cpf: getField(p, 'cpf') || '', endereco: getField(p, 'endereco') || '' };
+      });
+      fecharModalContrato();
+      if (typeof window.gerarContratosVinculoProfessores === 'function') window.gerarContratosVinculoProfessores(profs);
+      else toast('Função de geração de contratos não encontrada.', 'error');
+    });
+
+    $id('gp-btnGerarContratoDesligamento')?.addEventListener('click', () => {
+      if (!S.desligamentoSelecionados.length) { toast('Selecione pelo menos um professor.', 'error'); return; }
+      const motivos = $qa('input[name="gp-motivoDesligamento"]:checked').map(cb => cb.value);
+      if (!motivos.length) { toast('Selecione pelo menos um motivo.', 'error'); return; }
+      // Igual à BD Professores hoje: a geração do PDF de desligamento ainda não está
+      // implementada — use o botão "Desligar Professores" para mudar o status de fato.
+      toast('Geração de contrato de desligamento ainda não implementada.', 'info');
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // DESLIGAR PROFESSORES — muda status Ativo → Desligado (real)
+  // ─────────────────────────────────────────────────────────────
+  function popularListaDesligar() {
+    const lista = $id('gp-listaDesligar');
+    const ativos = [...S.professores].filter(isAtivo).sort((a, b) => (getField(a, 'nome') || '').localeCompare(getField(b, 'nome') || '', 'pt-BR'));
+    lista.innerHTML = ativos.map(p => `
+      <label class="gp-modalC-item">
+        <input type="checkbox" name="gp-professorDesligar" value="${p.id}"> ${escapeHtml(getField(p, 'nome'))}
+      </label>`).join('');
+    $id('gp-marcarTodosDesligar').checked = false;
+  }
+
+  function abrirModalDesligar() {
+    popularListaDesligar();
+    $id('gp-modalDesligarOverlay').classList.add('gp-open');
+  }
+
+  function fecharModalDesligar() {
+    $id('gp-modalDesligarOverlay').classList.remove('gp-open');
+  }
+
+  async function confirmarDesligamento() {
+    const sel = $qa('input[name="gp-professorDesligar"]:checked').map(cb => cb.value);
+    if (!sel.length) { toast('Selecione pelo menos um professor.', 'error'); return; }
+    const btn = $id('gp-btnConfirmarDesligar');
+    btn.disabled = true;
+    btn.textContent = 'Desligando...';
+    try {
+      await Promise.all(sel.map(id => S.db.collection(CFG.colProfessores).doc(id).update({ status: 'Desligado' })));
+      sel.forEach(id => {
+        const p = S.professores.find(x => x.id === id);
+        if (p) p.status = 'Desligado';
+      });
+      renderGrid(filtrarProfessores());
+      toast(`${sel.length} professor(es) desligado(s).`, 'success');
+      fecharModalDesligar();
+    } catch (err) {
+      toast('Erro ao desligar: ' + err.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Desligar selecionados';
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
   // EVENTOS
   // ─────────────────────────────────────────────────────────────
   function initDisciplinasDropdown() {
@@ -582,8 +1017,18 @@ window.GaleriaProfessores = (function () {
       renderGrid(filtrarProfessores());
     });
 
-    $id('gp-btnMaisFiltros')?.addEventListener('click', () => {
-      toast('Mais filtros e configurações em breve.', 'info');
+    const maisBtn = $id('gp-btnMaisFiltros');
+    const maisPanel = $id('gp-maisPanel');
+    maisBtn?.addEventListener('click', e => {
+      e.stopPropagation();
+      maisPanel.classList.toggle('gp-open');
+      maisBtn.classList.toggle('gp-open', maisPanel.classList.contains('gp-open'));
+    });
+    document.addEventListener('click', e => {
+      if (!$id('gp-maisWrap')?.contains(e.target)) {
+        maisPanel?.classList.remove('gp-open');
+        maisBtn?.classList.remove('gp-open');
+      }
     });
 
     $id('gp-btnLimpar')?.addEventListener('click', limparFiltros);
@@ -595,6 +1040,30 @@ window.GaleriaProfessores = (function () {
     $id('gp-modalOverlay')?.addEventListener('click', e => {
       if (e.target.id === 'gp-modalOverlay') fecharModal();
     });
+
+    // Detalhes Professor
+    $id('gp-detClose')?.addEventListener('click', fecharDetalhes);
+    $id('gp-detOverlay')?.addEventListener('click', e => { if (e.target.id === 'gp-detOverlay') fecharDetalhes(); });
+    $qa('.gp-det-tab').forEach(tab => tab.addEventListener('click', () => trocarDetTab(tab.dataset.detpanel)));
+
+    // Gerar Contrato (abre — lógica interna em initModalContrato)
+    $id('dp-btnGerarContrato')?.addEventListener('click', () => {
+      maisPanel?.classList.remove('gp-open');
+      abrirModalContrato();
+    });
+    initModalContrato();
+
+    // Desligar Professores
+    $id('gp-btnDesligar')?.addEventListener('click', () => {
+      maisPanel?.classList.remove('gp-open');
+      abrirModalDesligar();
+    });
+    $id('gp-modalDesligarClose')?.addEventListener('click', fecharModalDesligar);
+    $id('gp-modalDesligarOverlay')?.addEventListener('click', e => { if (e.target.id === 'gp-modalDesligarOverlay') fecharModalDesligar(); });
+    $id('gp-marcarTodosDesligar')?.addEventListener('change', e => {
+      $qa('input[name="gp-professorDesligar"]').forEach(cb => { cb.checked = e.target.checked; });
+    });
+    $id('gp-btnConfirmarDesligar')?.addEventListener('click', confirmarDesligamento);
   }
 
   // ─────────────────────────────────────────────────────────────
