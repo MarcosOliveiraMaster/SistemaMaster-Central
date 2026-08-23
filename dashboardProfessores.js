@@ -196,7 +196,7 @@ window.GaleriaProfessores = (function () {
 
 .gp-dropdown-panel { position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:60; background:white; border:1px solid var(--gp-gray-200); border-radius:.6rem; box-shadow:var(--gp-shadow); max-height:240px; overflow-y:auto; padding:.35rem; display:none; }
 .gp-dropdown-panel.gp-open { display:block; }
-.gp-dropdown-item { display:flex; align-items:center; text-align:left; gap:.5rem; padding:.4rem .5rem; border-radius:.4rem; font-size:.8rem; cursor:pointer; }
+.gp-dropdown-item { display:flex; align-items:center; text-align:left; gap:1px; padding:.4rem .5rem; border-radius:.4rem; font-size:.8rem; cursor:pointer; }
 .gp-dropdown-item:hover { background:var(--gp-gray-50); }
 .gp-dropdown-item input { accent-color:var(--gp-orange); width:14px; height:14px; flex-shrink:0; margin:0; }
 .gp-dropdown-item span { text-align:left; flex:1; }
