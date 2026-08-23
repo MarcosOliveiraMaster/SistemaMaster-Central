@@ -51,6 +51,8 @@ window.GaleriaProfessores = (function () {
     desligamentoSelecionados: [],
     // modal desligar professores (novo)
     detalhesTabAtiva: 'gp-det-aulas',
+    detProfSelecionado: null,
+    detDiscSelecionadas: [],
   };
 
   // ─────────────────────────────────────────────────────────────
@@ -321,10 +323,16 @@ window.GaleriaProfessores = (function () {
 .gp-det-panel.gp-active { display:flex; }
 .gp-det-secao h4 { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--gp-gray-600); margin:0 0 .4rem; }
 .gp-det-grid { display:grid; grid-template-columns:1fr 1fr; gap:.5rem; }
-.gp-info-card { background:var(--gp-gray-50); border:1px solid var(--gp-gray-200); border-radius:.5rem; padding:.5rem .65rem; display:flex; flex-direction:column; gap:.15rem; }
+.gp-info-card { position:relative; background:var(--gp-gray-50); border:1px solid var(--gp-gray-200); border-radius:.5rem; padding:.5rem .65rem; display:flex; flex-direction:column; gap:.15rem; }
 .gp-info-card--full { grid-column:1/-1; }
 .gp-info-label { font-size:.63rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--gp-gray-400); }
 .gp-info-value { font-size:.82rem; color:var(--gp-gray-800); font-weight:500; word-break:break-word; white-space:pre-wrap; }
+.gp-det-input { display:block; width:100%; font-family:'Lexend',sans-serif; font-size:.82rem; color:var(--gp-gray-800); font-weight:500; border:1px solid transparent; background:transparent; border-radius:.35rem; padding:.15rem .3rem; margin:0 -.3rem; }
+.gp-det-input:hover { background:var(--gp-gray-100); }
+.gp-det-input:focus { outline:none; border-color:var(--gp-orange); background:white; box-shadow:0 0 0 3px rgba(242,135,5,.12); }
+textarea.gp-det-input { resize:vertical; min-height:60px; }
+.gp-det-footer { padding:.85rem 1.25rem; border-top:1px solid var(--gp-gray-200); flex-shrink:0; }
+.gp-det-footer .gp-btn { width:100%; }
 .gp-avail-summary { display:flex; flex-wrap:wrap; gap:.35rem; }
 .gp-avail-chip { background:var(--gp-orange-light); color:var(--gp-orange-dk); border-radius:999px; padding:.2rem .65rem; font-size:.7rem; font-weight:600; }
 .gp-det-empty { text-align:center; color:var(--gp-gray-400); padding:2.5rem 1rem; font-size:.85rem; }
@@ -514,6 +522,9 @@ window.GaleriaProfessores = (function () {
       <div id="gp-det-avaliacao" class="gp-det-panel">
         <div class="gp-det-empty"><i class="fas fa-chart-line" style="font-size:1.8rem;display:block;margin-bottom:.5rem"></i>Em breve — gráficos de desempenho.</div>
       </div>
+    </div>
+    <div class="gp-det-footer">
+      <button type="button" class="gp-btn gp-btn--primary" id="gp-btnSalvarDetalhes"><i class="fas fa-save" style="margin-right:.4rem"></i>Salvar alterações</button>
     </div>
   </div>
 </div>
@@ -710,60 +721,85 @@ window.GaleriaProfessores = (function () {
   // ─────────────────────────────────────────────────────────────
   // DETALHES PROFESSOR — modal com 3 abas (Aulas / Perfil / Avaliação)
   // ─────────────────────────────────────────────────────────────
-  function infoCard(label, valor, full) {
-    return `<div class="gp-info-card${full ? ' gp-info-card--full' : ''}">
+  // campo de texto editável, no formato "card" (rótulo em cima, valor embaixo)
+  function campoTexto(key, label, valor, opts) {
+    opts = opts || {};
+    const full = opts.full ? ' gp-info-card--full' : '';
+    const tag = opts.textarea
+      ? `<textarea class="gp-det-input" data-field="${key}" rows="3">${escapeHtml(valor || '')}</textarea>`
+      : `<input type="text" class="gp-det-input" data-field="${key}" value="${escapeHtml(valor || '')}">`;
+    return `<div class="gp-info-card${full}">
       <span class="gp-info-label">${escapeHtml(label)}</span>
-      <span class="gp-info-value">${escapeHtml(valor || '—')}</span>
+      ${tag}
     </div>`;
   }
 
-  function resumoDisponibilidade(p) {
-    const chips = [];
-    CFG.diasSemana.forEach(d => {
-      ['Manha', 'Tarde'].forEach(turno => {
-        if (isTruthy(getField(p, d.key + turno))) chips.push(`${d.label} ${turno === 'Manha' ? 'Manhã' : 'Tarde'}`);
-      });
-    });
-    if (!chips.length) return '<p class="gp-info-value">Nenhuma disponibilidade informada.</p>';
-    return `<div class="gp-avail-summary">${chips.map(c => `<span class="gp-avail-chip">${escapeHtml(c)}</span>`).join('')}</div>`;
+  // mesma tabela (dia x turno) usada no filtro, agora editável
+  function tabelaDisponibilidade(p) {
+    const linha = turno => CFG.diasSemana.map(d =>
+      `<td class="gp-cell"><input type="checkbox" data-slot="${d.key}${turno}" ${isTruthy(getField(p, d.key + turno)) ? 'checked' : ''}></td>`
+    ).join('');
+    return `
+      <div class="gp-avail-wrap">
+        <table class="gp-avail-table">
+          <thead><tr><th></th>${CFG.diasSemana.map(d => `<th>${d.label.slice(0, 3)}</th>`).join('')}</tr></thead>
+          <tbody>
+            <tr><td class="gp-avail-th-period">Manhã</td>${linha('Manha')}</tr>
+            <tr><td class="gp-avail-th-period">Tarde</td>${linha('Tarde')}</tr>
+          </tbody>
+        </table>
+      </div>`;
   }
 
   function renderDetAulas(p) {
-    const disciplinas = listaDisciplinas(getField(p, CFG.campoDisciplinas));
     return `
       <div class="gp-det-secao">
         <h4>Disponibilidade</h4>
-        ${resumoDisponibilidade(p)}
+        ${tabelaDisponibilidade(p)}
       </div>
       <div class="gp-det-secao">
         <h4>Atuação</h4>
         <div class="gp-det-grid">
-          ${infoCard(CFG.masks.bairros, getField(p, CFG.campoBairros))}
-          ${infoCard(CFG.masks.disciplinas, disciplinas.length ? getField(p, CFG.campoDisciplinas) : '')}
-          ${infoCard(CFG.masks.nivel, getField(p, 'nivel'))}
-          ${infoCard(CFG.masks.curso, getField(p, 'curso'))}
+          ${campoTexto(CFG.campoBairros, CFG.masks.bairros, getField(p, CFG.campoBairros))}
+          <div class="gp-info-card" id="gp-detDiscWrap">
+            <span class="gp-info-label">${escapeHtml(CFG.masks.disciplinas)}</span>
+            <button type="button" class="gp-field-btn" id="gp-detDiscBtn" style="padding:.3rem .5rem;font-size:.82rem">
+              <span id="gp-detDiscLabel">Selecionar...</span>
+              <i class="fas fa-chevron-down gp-chev" style="margin-left:auto"></i>
+            </button>
+            <div class="gp-dropdown-panel" id="gp-detDiscPanel"></div>
+          </div>
+          ${campoTexto('nivel', CFG.masks.nivel, getField(p, 'nivel'))}
+          ${campoTexto('curso', CFG.masks.curso, getField(p, 'curso'))}
         </div>
       </div>
       <div class="gp-det-secao">
         <h4>Experiência</h4>
         <div class="gp-det-grid">
-          ${infoCard(CFG.masks.descricaoExpAulas, getField(p, 'descricaoExpAulas'), true)}
-          ${infoCard(CFG.masks.descricaoExpNeuro, getField(p, 'descricaoExpNeuro'), true)}
-          ${infoCard(CFG.masks.descricaoTdics, getField(p, 'descricaoTdics'), true)}
+          ${campoTexto('descricaoExpAulas', CFG.masks.descricaoExpAulas, getField(p, 'descricaoExpAulas'), { full: true, textarea: true })}
+          ${campoTexto('descricaoExpNeuro', CFG.masks.descricaoExpNeuro, getField(p, 'descricaoExpNeuro'), { full: true, textarea: true })}
+          ${campoTexto('descricaoTdics', CFG.masks.descricaoTdics, getField(p, 'descricaoTdics'), { full: true, textarea: true })}
         </div>
       </div>`;
   }
 
   function renderDetPerfil(p) {
+    const foto = getField(p, CFG.campoFoto);
     return `
+      <div class="gp-det-secao" style="display:flex;flex-direction:column;align-items:center;gap:.6rem">
+        <div class="gp-modal-preview-wrap" style="width:120px;height:120px">
+          ${foto ? `<img src="${foto}" alt="${escapeHtml(getField(p, 'nome'))}" class="gp-show">` : `<i class="fas fa-user" style="font-size:2.4rem;color:var(--gp-orange)"></i>`}
+        </div>
+        <button type="button" class="gp-upload-btn" id="gp-detTrocarFoto"><i class="fas fa-camera" style="margin-right:.35rem"></i>Alterar foto de perfil</button>
+      </div>
       <div class="gp-det-grid">
-        ${infoCard(CFG.masks.nome, getField(p, 'nome'))}
-        ${infoCard(CFG.masks.apelido, getField(p, 'apelido'))}
-        ${infoCard(CFG.masks.email, getField(p, 'email'))}
-        ${infoCard(CFG.masks.contato, formatTel(getField(p, 'contato')))}
-        ${infoCard(CFG.masks.cpf, formatCPF(getField(p, 'cpf')))}
-        ${infoCard(CFG.masks.pix, getField(p, 'pix'))}
-        ${infoCard(CFG.masks.endereco, getField(p, 'endereco'), true)}
+        ${campoTexto('nome', CFG.masks.nome, getField(p, 'nome'))}
+        ${campoTexto('apelido', CFG.masks.apelido, getField(p, 'apelido'))}
+        ${campoTexto('email', CFG.masks.email, getField(p, 'email'))}
+        ${campoTexto('contato', CFG.masks.contato, getField(p, 'contato'))}
+        ${campoTexto('cpf', CFG.masks.cpf, getField(p, 'cpf'))}
+        ${campoTexto('pix', CFG.masks.pix, getField(p, 'pix'))}
+        ${campoTexto('endereco', CFG.masks.endereco, getField(p, 'endereco'), { full: true })}
       </div>`;
   }
 
@@ -773,16 +809,88 @@ window.GaleriaProfessores = (function () {
     S.detalhesTabAtiva = tabId;
   }
 
+  function initDetDisciplinasDropdown(p) {
+    S.detDiscSelecionadas = listaDisciplinas(getField(p, CFG.campoDisciplinas))
+      .map(norm => CFG.disciplinasFixas.find(d => normalizeStr(d) === norm) || norm);
+
+    const panel = $id('gp-detDiscPanel');
+    panel.innerHTML = CFG.disciplinasFixas.map(d => `
+      <label class="gp-dropdown-item">
+        <input type="checkbox" value="${escapeHtml(d)}" ${S.detDiscSelecionadas.includes(d) ? 'checked' : ''}>${escapeHtml(d)}
+      </label>`).join('');
+
+    const atualizarLabel = () => {
+      const lbl = $id('gp-detDiscLabel');
+      lbl.textContent = S.detDiscSelecionadas.length
+        ? (S.detDiscSelecionadas.length === 1 ? S.detDiscSelecionadas[0] : `${S.detDiscSelecionadas.length} disciplinas`)
+        : 'Selecionar...';
+    };
+    atualizarLabel();
+
+    const btn = $id('gp-detDiscBtn');
+    btn.onclick = e => {
+      e.stopPropagation();
+      panel.classList.toggle('gp-open');
+      btn.classList.toggle('gp-open', panel.classList.contains('gp-open'));
+    };
+    panel.onchange = () => {
+      S.detDiscSelecionadas = Array.from(panel.querySelectorAll('input:checked')).map(i => i.value);
+      atualizarLabel();
+    };
+  }
+
+  function fecharDetDiscDropdown(e) {
+    const wrap = $id('gp-detDiscWrap');
+    if (wrap && !wrap.contains(e.target)) {
+      $id('gp-detDiscPanel')?.classList.remove('gp-open');
+      $id('gp-detDiscBtn')?.classList.remove('gp-open');
+    }
+  }
+
   function abrirDetalhes(prof) {
+    S.detProfSelecionado = prof;
     $id('gp-detNome').textContent = getField(prof, 'nome') || 'Professor';
     $id('gp-det-aulas').innerHTML = renderDetAulas(prof);
     $id('gp-det-perfil').innerHTML = renderDetPerfil(prof);
+    initDetDisciplinasDropdown(prof);
+    $id('gp-detTrocarFoto')?.addEventListener('click', () => {
+      fecharDetalhes();
+      abrirModal(prof);
+    });
     trocarDetTab('gp-det-aulas');
     $id('gp-detOverlay').classList.add('gp-open');
   }
 
   function fecharDetalhes() {
     $id('gp-detOverlay').classList.remove('gp-open');
+    S.detProfSelecionado = null;
+  }
+
+  async function salvarDetalhes() {
+    const prof = S.detProfSelecionado;
+    if (!prof) return;
+    const btn = $id('gp-btnSalvarDetalhes');
+    const dados = {};
+    $qa('#gp-detOverlay [data-field]').forEach(el => { dados[el.dataset.field] = el.value.trim(); });
+    dados[CFG.campoDisciplinas] = S.detDiscSelecionadas.join(', ');
+    $qa('#gp-det-aulas .gp-avail-table input[type=checkbox]').forEach(cb => { dados[cb.dataset.slot] = cb.checked; });
+
+    btn.disabled = true;
+    btn.textContent = 'Salvando...';
+    try {
+      await S.db.collection(CFG.colProfessores).doc(prof.id).update(dados);
+      Object.assign(prof, dados);
+      const idx = S.professores.findIndex(x => x.id === prof.id);
+      if (idx > -1) Object.assign(S.professores[idx], dados);
+      $id('gp-detNome').textContent = dados.nome || 'Professor';
+      renderGrid(filtrarProfessores());
+      toast('Dados do professor atualizados!', 'success');
+    } catch (err) {
+      toast('Erro ao salvar: ' + err.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Salvar alterações';
+    }
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -1045,6 +1153,8 @@ window.GaleriaProfessores = (function () {
     $id('gp-detClose')?.addEventListener('click', fecharDetalhes);
     $id('gp-detOverlay')?.addEventListener('click', e => { if (e.target.id === 'gp-detOverlay') fecharDetalhes(); });
     $qa('.gp-det-tab').forEach(tab => tab.addEventListener('click', () => trocarDetTab(tab.dataset.detpanel)));
+    $id('gp-btnSalvarDetalhes')?.addEventListener('click', salvarDetalhes);
+    document.addEventListener('click', fecharDetDiscDropdown);
 
     // Gerar Contrato (abre — lógica interna em initModalContrato)
     $id('dp-btnGerarContrato')?.addEventListener('click', () => {
