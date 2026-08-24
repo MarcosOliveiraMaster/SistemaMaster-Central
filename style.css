@@ -1418,6 +1418,37 @@
   text-align: center;
 }
 
+/* Toggle Ativos/Todos (substitui visualmente o dropdown "Filtro Aulas") */
+.ativos-todos-toggle {
+  display: flex;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-bottom: 6px;
+  border: 2px solid var(--orange);
+}
+
+.ativos-todos-seg {
+  flex: 1;
+  border: none;
+  cursor: pointer;
+  font-family: 'Comfortaa', cursive;
+  font-weight: 700;
+  font-size: 0.75rem;
+  padding: 5px 4px;
+  background: white;
+  color: var(--orange);
+  transition: all 0.2s ease;
+}
+
+.ativos-todos-seg.active {
+  background: var(--orange);
+  color: white;
+}
+
+.ativos-todos-seg:hover:not(.active) {
+  background: #fff7ed;
+}
+
 /* Botão apenas com ícone (ex.: toggle "mais filtros") */
 .btn-icon-toggle {
   width: 38px;

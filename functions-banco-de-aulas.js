@@ -205,19 +205,21 @@ async function loadBancoDeAulas() {
             </div>
           </div>
 
-          <!-- Atualizar -->
-          <div class="filter-group flex-none min-w-[110px] flex items-end">
-            <button id="btn-refresh" class="btn-secondary btn-compact w-full">
-              <i class="fas fa-sync-alt mr-1 text-xs"></i>
-              Atualizar
-            </button>
-          </div>
-
-          <!-- Mais Filtros (toggle, ícone apenas) -->
-          <div class="filter-group flex-none flex items-end">
-            <button id="btn-mais-filtros" class="btn-secondary btn-compact btn-icon-toggle" title="Mais filtros">
-              <i class="fas fa-chevron-down text-xs" id="icon-mais-filtros"></i>
-            </button>
+          <!-- Toggle Ativos/Todos (mesma função do dropdown "Filtro Aulas", oculto abaixo) + Atualizar + Mais Filtros -->
+          <div class="filter-group flex-none min-w-[160px]">
+            <div class="ativos-todos-toggle" id="toggle-status-aulas">
+              <button type="button" class="ativos-todos-seg active" data-value="ativos">Ativos</button>
+              <button type="button" class="ativos-todos-seg" data-value="todos">Todos</button>
+            </div>
+            <div class="flex gap-3">
+              <button id="btn-refresh" class="btn-secondary btn-compact flex-1">
+                <i class="fas fa-sync-alt mr-1 text-xs"></i>
+                Atualizar
+              </button>
+              <button id="btn-mais-filtros" class="btn-secondary btn-compact btn-icon-toggle" title="Mais filtros">
+                <i class="fas fa-chevron-down text-xs" id="icon-mais-filtros"></i>
+              </button>
+            </div>
           </div>
 
         </div>
@@ -225,8 +227,8 @@ async function loadBancoDeAulas() {
         <!-- Segunda linha: filtros extras (oculta por padrão) -->
         <div id="filtros-extras" class="flex flex-wrap gap-3 items-end mt-3 hidden w-full">
 
-          <!-- Filtro Aulas -->
-          <div class="filter-group flex-1 min-w-[150px]">
+          <!-- Filtro Aulas: oculto (substituído pelo toggle Ativos/Todos), mas continua no DOM e funcional -->
+          <div class="filter-group flex-1 min-w-[150px] hidden">
             <label class="filter-label filter-label-compact">
               <i class="fas fa-book-open mr-1 text-orange-400"></i>Filtro Aulas
             </label>
@@ -360,12 +362,8 @@ async function initializeBancoDeAulas() {
     // Configurar eventos
     setupBancoDeAulasEvents();
     
-    // Aplicar filtro padrão: Cronogramas em execução
-    const filterAulas = document.getElementById('filter-aulas');
-    if (filterAulas) {
-      filterAulas.value = 'execucao';
-      filterAulas.dispatchEvent(new Event('change'));
-    }
+    // Aplicar filtro padrão: Ativos (Cronogramas em execução)
+    setStatusAulasToggle('ativos');
     
     showToast(`✅ Carregadas ${AULAS_DATA.length} aulas`, 'success', 3000);
     
@@ -644,6 +642,23 @@ function computeAndRenderFilters() {
   renderFilteredResults(result, msg);
 }
 
+// Sincroniza a aparência do toggle Ativos/Todos com o estado atual
+function syncStatusAulasToggleUI(value) {
+  document.querySelectorAll('.ativos-todos-seg').forEach(seg => {
+    seg.classList.toggle('active', seg.dataset.value === value);
+  });
+}
+
+// Alterna o filtro de status das aulas (Ativos/Todos), reaproveitando o dropdown
+// "Filtro Aulas" (oculto, mas ainda no DOM e funcional)
+function setStatusAulasToggle(value) {
+  syncStatusAulasToggleUI(value);
+  const filterAulas = document.getElementById('filter-aulas');
+  if (!filterAulas) return;
+  filterAulas.value = value === 'ativos' ? 'execucao' : 'todos';
+  filterAulas.dispatchEvent(new Event('change'));
+}
+
 // Commit do filtro de Ano (Enter ou blur)
 function commitAnoFilter() {
   const input = document.getElementById('filter-ano');
@@ -664,8 +679,9 @@ function limparFiltrosBancoDeAulas() {
   updateMsButtonLabel('professor', 'Todos os professores');
   updateMsButtonLabel('cliente', 'Todos os clientes');
 
+  syncStatusAulasToggleUI('todos');
   const filterAulas = document.getElementById('filter-aulas');
-  if (filterAulas) filterAulas.value = '';
+  if (filterAulas) filterAulas.value = 'todos';
 
   const filterPagamento = document.getElementById('filter-pagamento');
   if (filterPagamento) filterPagamento.value = '';
@@ -707,6 +723,11 @@ function setupBancoDeAulasEvents() {
       updateMsButtonLabel('cliente', 'Todos os clientes');
       computeAndRenderFilters();
     }
+  });
+
+  // ── Toggle Ativos/Todos (mesma função do "Filtro de Aulas", agora oculto) ──
+  document.querySelectorAll('.ativos-todos-seg').forEach(seg => {
+    seg.addEventListener('click', () => setStatusAulasToggle(seg.dataset.value));
   });
 
   // ── Filtro de Aulas (status dos cronogramas) ──
