@@ -27,6 +27,7 @@ window.GaleriaProfessores = (function () {
       endereco: 'Endereço', nivel: 'Nível Acadêmico', descricaoExpAulas: 'Descrição — Aulas',
       bairros: 'Bairros de acesso', disciplinas: 'Disciplinas', curso: 'Curso e Instituição',
       descricaoExpNeuro: 'Descrição — Alunos Atípicos', descricaoTdics: 'Descrição — TDICs', pix: 'Chave Pix',
+      dataNascimento: 'Data de Nascimento',
     },
     diasSemana: [
       { key: 'seg', label: 'Segunda' }, { key: 'ter', label: 'Terça' }, { key: 'qua', label: 'Quarta' },
@@ -45,6 +46,7 @@ window.GaleriaProfessores = (function () {
     termoBairro: '',
     discsSelecionadas: [],
     slotsSelecionados: [],
+    filtroRapido: 'todos', // 'todos' | 'tdics' | 'neuro'
     profSelecionado: null,
     pendingDataURL: null,
     // modal contrato (vínculo/desligamento) — porta a lógica de BD Professores
@@ -194,23 +196,38 @@ window.GaleriaProfessores = (function () {
 .gp-field-btn .gp-chev { margin-left:auto; color:var(--gp-gray-400); transition:transform .2s ease; }
 .gp-field-btn.gp-open .gp-chev { transform:rotate(180deg); }
 
-.gp-dropdown-panel { position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:60; background:white; border:1px solid var(--gp-gray-200); border-radius:.6rem; box-shadow:var(--gp-shadow); max-height:240px; overflow-y:auto; padding:.35rem; display:none; }
+.gp-dropdown-panel { position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:60; background:white; border:1px solid var(--gp-gray-200); border-radius:.6rem; box-shadow:var(--gp-shadow); padding:.4rem; display:none; }
 .gp-dropdown-panel.gp-open { display:block; }
-.gp-dropdown-item { display:flex; align-items:center; text-align:left; gap:1px; padding:.4rem .5rem; border-radius:.4rem; font-size:.8rem; cursor:pointer; }
+.gp-dropdown-search { position:relative; margin-bottom:.3rem; }
+.gp-dropdown-search i { position:absolute; left:.6rem; top:50%; transform:translateY(-50%); color:var(--gp-gray-400); font-size:.7rem; }
+.gp-dropdown-search input { width:100%; font-family:'Lexend',sans-serif; font-size:.78rem; border:1px solid var(--gp-gray-200); border-radius:.4rem; padding:.35rem .5rem .35rem 1.7rem; }
+.gp-dropdown-search input:focus { outline:none; border-color:var(--gp-orange); }
+.gp-dropdown-list { max-height:180px; overflow-y:auto; }
+.gp-dropdown-empty { padding:.5rem; font-size:.75rem; color:var(--gp-gray-400); text-align:center; }
+/* coluna do checkbox = 10% da linha, label ocupa o restante */
+.gp-dropdown-item { display:grid; grid-template-columns:10% 1fr; align-items:center; text-align:left; padding:.4rem .5rem; border-radius:.4rem; font-size:.8rem; cursor:pointer; }
 .gp-dropdown-item:hover { background:var(--gp-gray-50); }
-.gp-dropdown-item input { accent-color:var(--gp-orange); width:14px; height:14px; flex-shrink:0; margin:0; }
-.gp-dropdown-item span { text-align:left; flex:1; }
+.gp-dropdown-item input { accent-color:var(--gp-orange); width:14px; height:14px; margin:0; justify-self:start; }
+.gp-dropdown-item span { text-align:left; }
 
 .gp-more-btn { justify-content:flex-start; }
 .gp-more-btn > i { position:static; margin-right:.55rem; transform:none; }
 
-.gp-more-panel { position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:60; background:white; border:1px solid var(--gp-gray-200); border-radius:.6rem; box-shadow:var(--gp-shadow); padding:.5rem; display:none; flex-direction:column; gap:.4rem; }
+.gp-more-panel { position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:60; background:white; border:1px solid var(--gp-gray-200); border-radius:.6rem; box-shadow:var(--gp-shadow); padding:.5rem; display:none; flex-direction:column; gap:.3rem; }
 .gp-more-panel.gp-open { display:flex; }
 .gp-more-panel .gp-btn { width:100%; justify-content:flex-start; display:flex; align-items:center; gap:.5rem; }
 .gp-more-panel .gp-btn i { width:16px; text-align:center; }
 /* esconde a engrenagem que authProfessores.js injeta ao lado de #dp-btnGerarContrato —
    aqui usamos nosso próprio botão "Atualizar Permissões", com rótulo explícito */
 .gp-more-panel #configuracao { display:none !important; }
+.gp-more-section-title { font-size:.63rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--gp-gray-400); padding:.2rem .5rem 0; }
+.gp-more-divider { border-top:1px solid var(--gp-gray-200); margin:.35rem 0; }
+.gp-more-radio { width:100%; display:flex; align-items:center; gap:.5rem; text-align:left; padding:.45rem .6rem; border-radius:.4rem; border:1px solid transparent; background:none; font-family:'Lexend',sans-serif; font-size:.8rem; color:var(--gp-gray-800); cursor:pointer; }
+.gp-more-radio:hover { background:var(--gp-gray-50); }
+.gp-more-radio.gp-active { background:var(--gp-orange-light); color:var(--gp-orange-dk); font-weight:600; border-color:var(--gp-orange); }
+.gp-more-radio i { width:16px; text-align:center; }
+.gp-btn--info { background:#2563eb; color:white; }
+.gp-btn--info:hover { background:#1d4ed8; }
 
 .gp-avail-wrap { overflow-x:auto; }
 .gp-avail-table { border-collapse:separate; border-spacing:3px; width:100%; min-width:250px; }
@@ -277,9 +294,6 @@ window.GaleriaProfessores = (function () {
 .gp-btn:disabled { opacity:.5; cursor:not-allowed; }
 
 /* ── ícone de câmera sobre o card (abre o modal de foto sem abrir Detalhes) ── */
-.gp-card { position:relative; }
-.gp-card__camBtn { position:absolute; top:.4rem; right:.4rem; width:1.9rem; height:1.9rem; border-radius:50%; background:rgba(0,0,0,.55); color:white; border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:.78rem; z-index:2; transition:background var(--gp-transition); }
-.gp-card__camBtn:hover { background:var(--gp-orange); }
 
 /* ── modal Gerar Contrato (portado de BD Professores) ── */
 .gp-modalC-overlay { position:fixed; inset:0; background:rgba(0,0,0,.5); display:none; align-items:center; justify-content:center; z-index:9500; animation:gpFadeIn .15s ease; padding:1rem; }
@@ -384,7 +398,13 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
         <span>Mais filtros e configurações</span>
       </button>
       <div class="gp-more-panel" id="gp-maisPanel">
-        <button type="button" class="gp-btn gp-btn--success" id="dp-btnGerarContrato"><i class="fas fa-file-contract"></i>Gerar Contrato</button>
+        <span class="gp-more-section-title">Filtros</span>
+        <button type="button" class="gp-more-radio gp-active" id="gp-radioTodos" data-quick="todos"><i class="fas fa-users"></i>Todos os professores</button>
+        <button type="button" class="gp-more-radio" id="gp-radioTdics" data-quick="tdics"><i class="fas fa-laptop"></i>Tecnologias Educacionais</button>
+        <button type="button" class="gp-more-radio" id="gp-radioNeuro" data-quick="neuro"><i class="fas fa-puzzle-piece"></i>Alunos Neurodivergentes</button>
+        <div class="gp-more-divider"></div>
+        <span class="gp-more-section-title">Configurações</span>
+        <button type="button" class="gp-btn gp-btn--info" id="dp-btnGerarContrato"><i class="fas fa-file-contract"></i>Gerar Contrato</button>
         <button type="button" class="gp-btn gp-btn--success" id="gp-btnAtualizarPermissoes"><i class="fas fa-shield-alt"></i>Atualizar Permissões</button>
         <button type="button" class="gp-btn gp-btn--danger" id="gp-btnDesligar"><i class="fas fa-user-slash"></i>Desligar Professores</button>
       </div>
@@ -540,10 +560,10 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
   // RENDER
   // ─────────────────────────────────────────────────────────────
   function filtroAtivo() {
-    return !!(S.termoNome || S.termoBairro || S.discsSelecionadas.length || S.slotsSelecionados.length);
+    return !!(S.termoNome || S.termoBairro || S.discsSelecionadas.length || S.slotsSelecionados.length || S.filtroRapido !== 'todos');
   }
 
-  // Combinação entre grupos: E (nome E disciplina E bairro E disponibilidade).
+  // Combinação entre grupos: E (nome E disciplina E bairro E disponibilidade E filtro rápido).
   // Dentro de disciplinas: E — professor precisa lecionar TODAS as marcadas (mesma
   // convenção já usada no filtro de disciplinas da aba BD Professores).
   // Dentro de disponibilidade: E — professor precisa atender TODOS os horários marcados.
@@ -561,6 +581,8 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
         if (!discs.every(d => lista.includes(d))) return false;
       }
       if (slots.length && !slots.every(s => isTruthy(getField(p, s)))) return false;
+      if (S.filtroRapido === 'tdics' && !isTruthy(getField(p, 'expTdics'))) return false;
+      if (S.filtroRapido === 'neuro' && !isTruthy(getField(p, 'expNeuro'))) return false;
       return true;
     }).sort((a, b) => (getField(a, 'nome') || '').localeCompare(getField(b, 'nome') || '', 'pt-BR'));
   }
@@ -590,11 +612,6 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
         const prof = S.professores.find(p => p.id === id);
         if (prof) abrirDetalhes(prof);
       });
-      card.querySelector('.gp-card__camBtn')?.addEventListener('click', e => {
-        e.stopPropagation();
-        const prof = S.professores.find(p => p.id === id);
-        if (prof) abrirModal(prof);
-      });
     });
   }
 
@@ -607,7 +624,6 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
 
     return `
       <div class="gp-card" data-id="${p.id}">
-        <button type="button" class="gp-card__camBtn" title="Enviar foto"><i class="fas fa-camera"></i></button>
         <div class="gp-card__img-box">${imgOuFallback}</div>
         <div class="gp-card__label"><span>${escapeHtml(nome)}</span></div>
       </div>`;
@@ -800,6 +816,7 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
         ${campoTexto('email', CFG.masks.email, getField(p, 'email'))}
         ${campoTexto('contato', CFG.masks.contato, getField(p, 'contato'))}
         ${campoTexto('cpf', CFG.masks.cpf, getField(p, 'cpf'))}
+        ${campoTexto('dataNascimento', CFG.masks.dataNascimento, getField(p, 'dataNascimento'))}
         ${campoTexto('pix', CFG.masks.pix, getField(p, 'pix'))}
         ${campoTexto('endereco', CFG.masks.endereco, getField(p, 'endereco'), { full: true })}
       </div>`;
@@ -811,16 +828,48 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
     S.detalhesTabAtiva = tabId;
   }
 
+  // dropdown de disciplinas reutilizável: busca + ordem alfabética + coluna do
+  // checkbox em 10%. `selecionadasArr` é mutado in-place (push/splice) para
+  // preservar a seleção mesmo com itens escondidos pela busca.
+  function montarDropdownDisciplinas(panel, selecionadasArr, onChange) {
+    const ordenada = [...CFG.disciplinasFixas].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    panel.innerHTML = `
+      <div class="gp-dropdown-search"><i class="fas fa-search"></i><input type="text" placeholder="Buscar disciplina..." autocomplete="off"></div>
+      <div class="gp-dropdown-list"></div>`;
+    const input = panel.querySelector('.gp-dropdown-search input');
+    const list = panel.querySelector('.gp-dropdown-list');
+
+    function render(filtro) {
+      const termo = normalizeStr(filtro);
+      const itens = termo ? ordenada.filter(d => normalizeStr(d).includes(termo)) : ordenada;
+      list.innerHTML = itens.length
+        ? itens.map(d => `
+          <label class="gp-dropdown-item">
+            <input type="checkbox" value="${escapeHtml(d)}" ${selecionadasArr.includes(d) ? 'checked' : ''}><span>${escapeHtml(d)}</span>
+          </label>`).join('')
+        : '<div class="gp-dropdown-empty">Nenhuma disciplina encontrada</div>';
+    }
+    render('');
+
+    input.addEventListener('click', e => e.stopPropagation());
+    input.addEventListener('input', debounce(() => render(input.value), 120));
+
+    list.addEventListener('change', e => {
+      const cb = e.target;
+      if (!cb.matches('input[type=checkbox]')) return;
+      const idx = selecionadasArr.indexOf(cb.value);
+      if (cb.checked && idx === -1) selecionadasArr.push(cb.value);
+      if (!cb.checked && idx > -1) selecionadasArr.splice(idx, 1);
+      onChange();
+    });
+  }
+
   function initDetDisciplinasDropdown(p) {
-    S.detDiscSelecionadas = listaDisciplinas(getField(p, CFG.campoDisciplinas))
-      .map(norm => CFG.disciplinasFixas.find(d => normalizeStr(d) === norm) || norm);
+    S.detDiscSelecionadas.length = 0;
+    S.detDiscSelecionadas.push(...listaDisciplinas(getField(p, CFG.campoDisciplinas))
+      .map(norm => CFG.disciplinasFixas.find(d => normalizeStr(d) === norm) || norm));
 
     const panel = $id('gp-detDiscPanel');
-    panel.innerHTML = CFG.disciplinasFixas.map(d => `
-      <label class="gp-dropdown-item">
-        <input type="checkbox" value="${escapeHtml(d)}" ${S.detDiscSelecionadas.includes(d) ? 'checked' : ''}><span>${escapeHtml(d)}</span>
-      </label>`).join('');
-
     const chips = $id('gp-detDiscChips');
     const atualizarChips = () => {
       chips.innerHTML = S.detDiscSelecionadas.length
@@ -829,13 +878,11 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
     };
     atualizarChips();
 
+    montarDropdownDisciplinas(panel, S.detDiscSelecionadas, atualizarChips);
+
     chips.onclick = e => {
       e.stopPropagation();
       panel.classList.toggle('gp-open');
-    };
-    panel.onchange = () => {
-      S.detDiscSelecionadas = Array.from(panel.querySelectorAll('input:checked')).map(i => i.value);
-      atualizarChips();
     };
   }
 
@@ -1064,10 +1111,16 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
     const wrap = $id('gp-discWrap');
     if (!panel || !btn || !wrap) return;
 
-    panel.innerHTML = CFG.disciplinasFixas.map(d => `
-      <label class="gp-dropdown-item">
-        <input type="checkbox" value="${escapeHtml(d)}"><span>${escapeHtml(d)}</span>
-      </label>`).join('');
+    const atualizarLabel = () => {
+      const label = $id('gp-discLabel');
+      if (!S.discsSelecionadas.length) { label.textContent = 'Disciplinas'; btn.classList.remove('gp-has-value'); }
+      else { label.textContent = S.discsSelecionadas.length === 1 ? S.discsSelecionadas[0] : `${S.discsSelecionadas.length} disciplinas`; btn.classList.add('gp-has-value'); }
+    };
+
+    montarDropdownDisciplinas(panel, S.discsSelecionadas, () => {
+      atualizarLabel();
+      renderGrid(filtrarProfessores());
+    });
 
     btn.addEventListener('click', e => {
       e.stopPropagation();
@@ -1080,24 +1133,17 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
         btn.classList.remove('gp-open');
       }
     });
-
-    panel.addEventListener('change', () => {
-      const checked = Array.from(panel.querySelectorAll('input:checked')).map(i => i.value);
-      S.discsSelecionadas = checked;
-      const label = $id('gp-discLabel');
-      if (!checked.length) { label.textContent = 'Disciplinas'; btn.classList.remove('gp-has-value'); }
-      else { label.textContent = checked.length === 1 ? checked[0] : `${checked.length} disciplinas`; btn.classList.add('gp-has-value'); }
-      renderGrid(filtrarProfessores());
-    });
   }
 
   function limparFiltros() {
-    S.termoNome = ''; S.termoBairro = ''; S.discsSelecionadas = []; S.slotsSelecionados = [];
+    S.termoNome = ''; S.termoBairro = ''; S.discsSelecionadas.length = 0; S.slotsSelecionados = [];
+    S.filtroRapido = 'todos';
     $id('gp-fNome').value = ''; $id('gp-fBairro').value = '';
     $id('gp-discPanel')?.querySelectorAll('input:checked').forEach(i => { i.checked = false; });
     $id('gp-discLabel').textContent = 'Disciplinas';
     $id('gp-discBtn')?.classList.remove('gp-has-value');
     $id('gp-availTable')?.querySelectorAll('input:checked').forEach(i => { i.checked = false; });
+    $qa('.gp-more-radio').forEach(b => b.classList.toggle('gp-active', b.dataset.quick === 'todos'));
     renderGrid(filtrarProfessores());
   }
 
@@ -1139,6 +1185,17 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
     });
 
     $id('gp-btnLimpar')?.addEventListener('click', limparFiltros);
+
+    // Filtros rápidos (tipo rádio: só 1 ativo por vez)
+    $qa('.gp-more-radio').forEach(radio => {
+      radio.addEventListener('click', () => {
+        S.filtroRapido = radio.dataset.quick;
+        $qa('.gp-more-radio').forEach(b => b.classList.toggle('gp-active', b === radio));
+        maisPanel?.classList.remove('gp-open');
+        maisBtn?.classList.remove('gp-open');
+        renderGrid(filtrarProfessores());
+      });
+    });
 
     $id('gp-fileInput')?.addEventListener('change', onFileChange);
     $id('gp-btnSalvar')?.addEventListener('click', salvarFoto);
