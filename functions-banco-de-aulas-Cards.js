@@ -1327,6 +1327,21 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
               if (idAula) docsMap[idAula] = { ref: doc.ref, data: doc.data() };
             });
 
+            // Mapa nome do professor -> {cpf, uid}, usado como fonte confiável de
+            // idProfessor/professorUid ao salvar em lote. O botão de cada linha
+            // (.btn-professor-aula) guarda esses valores em data-attributes, mas eles
+            // só ficam garantidamente corretos logo após escolher o professor por ali
+            // — qualquer edição só de outro campo (data, matéria, etc.) reaproveita o
+            // que já estiver no atributo, e se ele ficar vazio/desatualizado por
+            // qualquer motivo, o lote grava por cima do valor correto que já existia
+            // no documento. Resolver pelo nome (mesmo padrão de fallback já usado em
+            // BANCO.updateProfessorAula) evita essa perda de dado.
+            const listaProfessores = await BANCO.fetchDataBaseProfessores();
+            const profPorNome = {};
+            (listaProfessores || []).forEach(p => {
+              if (p.nome) profPorNome[p.nome.trim()] = { cpf: p.cpf || '', uid: p.uid || '' };
+            });
+
             // Usar batch para eficiência (máx. 500 por batch)
             let batch = db.batch();
             let batchCount = 0;
@@ -1382,6 +1397,26 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
                   }
                 }
               }
+              // idProfessor/professorUid sempre resolvidos a partir do nome do professor
+              // exibido na linha (fonte confiável, cadastro de professores) — não confia
+              // cegamente no data-attribute do botão, que pode ficar desatualizado.
+              const nomeProfessorLinha = btnProfessor ? (btnProfessor.dataset.professor || '') : '';
+              let idProfessorLinha = '';
+              let professorUidLinha = '';
+              if (nomeProfessorLinha && nomeProfessorLinha !== 'A definir') {
+                const infoProf = profPorNome[nomeProfessorLinha.trim()];
+                if (infoProf) {
+                  idProfessorLinha = infoProf.cpf;
+                  professorUidLinha = infoProf.uid;
+                } else {
+                  // Professor não encontrado no cadastro pelo nome — mantém o que já
+                  // estava salvo no documento em vez de apagar por engano.
+                  idProfessorLinha = docData.idProfessor || '';
+                  professorUidLinha = docData.professorUid || '';
+                  console.warn(`[SalvarAulas] Professor "${nomeProfessorLinha}" não encontrado no cadastro — mantendo idProfessor/professorUid já salvos.`);
+                }
+              }
+
               // Montar objeto para atualizar apenas os campos visíveis na tabela
               const dadosAula = {
                 codigoContratacao: codigoDoc,
@@ -1391,11 +1426,9 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
                 horario: btnHorario ? (btnHorario.dataset.horario || '') : '',
                 duracao: btnDuracao ? (btnDuracao.dataset.duracao || '') : '',
                 materia: btnMateria ? (btnMateria.dataset.materia || '') : '',
-                professor: btnProfessor ? (btnProfessor.dataset.professor || '') : '',
-                idProfessor: btnProfessor ? (btnProfessor.dataset.idProfessor || '') : '',
-                professorUid: (btnProfessor && btnProfessor.dataset.professorUid)
-                  ? btnProfessor.dataset.professorUid
-                  : (docData.professorUid || ''),
+                professor: nomeProfessorLinha,
+                idProfessor: idProfessorLinha,
+                professorUid: professorUidLinha,
                 clienteUid: resolvedClienteUid,
                 clientUid:  resolvedClienteUid,
                 estudante: btnEstudante ? (btnEstudante.dataset.estudante || '') : '',

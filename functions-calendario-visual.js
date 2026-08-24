@@ -320,19 +320,19 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
 
       await withTimeoutCal(options.onSave({ updates, creates, deletes, fullAulas }), 30000, 'salvamento do calendário');
 
-      // Força reload do calendário com dados frescos do Firebase
-      // e atualiza o baseline para a próxima Salvar
-      await reloadFromFirebase(true);
-      aulasBaseIds = new Set(
-        Object.values(aulasMap).flat().filter(c => c._idAula).map(c => c._idAula)
-      );
-
       if (typeof showToast === 'function') showToast('✅ Calendário salvo com sucesso', 'success');
+
+      // options.onSave (Detalhes da Contratação / Simulação) já aplica as mudanças
+      // na tela de origem sozinho — recarrega a própria tabela/estado por conta
+      // própria. Não faz sentido continuar com o calendário aberto depois disso:
+      // fecha o modal em vez de recarregar e permanecer na tela.
+      document.getElementById('calSavingOverlay')?.remove();
+      closeModal();
+      return;
     } catch (err) {
       console.error('❌ Erro ao salvar calendário:', err);
       if (typeof showToast === 'function')
         showToast('❌ Erro ao salvar: ' + (err.message || 'verifique o console'), 'error');
-    } finally {
       document.getElementById('calSavingOverlay')?.remove();
       btn.disabled = false;
       btn.innerHTML = '<i class="fas fa-save mr-1"></i>Salvar';
