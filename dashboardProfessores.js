@@ -16,6 +16,7 @@ window.GaleriaProfessores = (function () {
     campoFotoEm:   'fotoUploadEm',    // timestamp do último envio
     campoBairros:     'bairros',      // string livre (mesmo campo usado em BD Professores)
     campoDisciplinas: 'disciplinas',  // string ou array (idem)
+    campoOuro:        'prof_ouro',    // boolean — professor "destaque", vai pro início da lista
     maxDim:        480,               // maior lado da imagem redimensionada (px)
     jpegQuality:   0.82,
     limiteAviso:   700 * 1024,        // aviso se o base64 passar disso (~700KB)
@@ -254,8 +255,13 @@ window.GaleriaProfessores = (function () {
 
 .gp-grid { display:grid; grid-template-columns:repeat(auto-fill, var(--gp-a)); gap:1.1rem; padding:1.1rem; justify-content:start; align-content:start; flex:1; }
 
-.gp-card { width:var(--gp-a); height:calc(var(--gp-a) + var(--gp-b)); display:flex; flex-direction:column; background:white; border:1px solid var(--gp-gray-200); border-radius:.65rem; overflow:hidden; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.05); transition:box-shadow var(--gp-transition), border-color var(--gp-transition), transform .15s ease; }
-.gp-card:hover { box-shadow:0 8px 22px rgba(242,135,5,.18); border-color:var(--gp-orange); transform:translateY(-2px); }
+.gp-card { position:relative; width:var(--gp-a); height:calc(var(--gp-a) + var(--gp-b)); display:flex; flex-direction:column; background:white; border:1px solid var(--gp-gray-200); border-radius:.65rem; overflow:hidden; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.05); transition:box-shadow var(--gp-transition), border-color var(--gp-transition), transform .15s ease; }
+.gp-card:hover { box-shadow:0 8px 22px rgba(242,135,5,.18); border-color:var(--gp-orange); }
+.gp-card__starBtn { position:absolute; top:.4rem; right:.4rem; width:1.9rem; height:1.9rem; border-radius:50%; background:rgba(0,0,0,.45); color:white; border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:.85rem; z-index:2; opacity:.2; transition:background var(--gp-transition), color var(--gp-transition), opacity var(--gp-transition); }
+.gp-card__starBtn:hover { background:rgba(0,0,0,.65); color:#facc15; opacity:1; }
+.gp-card__starBtn:hover i { font-weight:900; } /* hover força visual preenchido mesmo usando o ícone "far" */
+.gp-card__starBtn.gp-is-ouro { background:rgba(0,0,0,.25); color:#facc15; opacity:1; }
+.gp-card__starBtn.gp-is-ouro:hover { background:rgba(0,0,0,.4); }
 .gp-card__img-box { width:100%; height:var(--gp-a); flex-shrink:0; background:var(--gp-gray-100); overflow:hidden; }
 .gp-card__img-box img { width:100%; height:100%; object-fit:cover; display:block; }
 .gp-card__fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:2.3rem; color:var(--gp-orange); background:var(--gp-orange-light); }
@@ -584,7 +590,11 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
       if (S.filtroRapido === 'tdics' && !isTruthy(getField(p, 'expTdics'))) return false;
       if (S.filtroRapido === 'neuro' && !isTruthy(getField(p, 'expNeuro'))) return false;
       return true;
-    }).sort((a, b) => (getField(a, 'nome') || '').localeCompare(getField(b, 'nome') || '', 'pt-BR'));
+    }).sort((a, b) => {
+      const ouroA = isTruthy(getField(a, CFG.campoOuro)), ouroB = isTruthy(getField(b, CFG.campoOuro));
+      if (ouroA !== ouroB) return ouroA ? -1 : 1; // profs de ouro primeiro
+      return (getField(a, 'nome') || '').localeCompare(getField(b, 'nome') || '', 'pt-BR');
+    });
   }
 
   function renderGrid(lista) {
@@ -612,21 +622,44 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
         const prof = S.professores.find(p => p.id === id);
         if (prof) abrirDetalhes(prof);
       });
+      card.querySelector('.gp-card__starBtn')?.addEventListener('click', e => {
+        e.stopPropagation();
+        const prof = S.professores.find(p => p.id === id);
+        if (prof) alternarOuro(prof);
+      });
     });
   }
 
   function cardHTML(p) {
     const nome = getField(p, 'nome') || 'Sem nome';
     const foto = getField(p, CFG.campoFoto);
+    const ouro = isTruthy(getField(p, CFG.campoOuro));
     const imgOuFallback = foto
       ? `<img src="${foto}" alt="${escapeHtml(nome)}">`
       : `<div class="gp-card__fallback"><i class="fas fa-user"></i></div>`;
 
     return `
       <div class="gp-card" data-id="${p.id}">
+        <button type="button" class="gp-card__starBtn${ouro ? ' gp-is-ouro' : ''}" title="${ouro ? 'Remover destaque' : 'Marcar como destaque'}">
+          <i class="${ouro ? 'fas' : 'far'} fa-star"></i>
+        </button>
         <div class="gp-card__img-box">${imgOuFallback}</div>
         <div class="gp-card__label"><span>${escapeHtml(nome)}</span></div>
       </div>`;
+  }
+
+  async function alternarOuro(prof) {
+    const novoValor = !isTruthy(getField(prof, CFG.campoOuro));
+    try {
+      await S.db.collection(CFG.colProfessores).doc(prof.id).update({ [CFG.campoOuro]: novoValor });
+      prof[CFG.campoOuro] = novoValor;
+      const idx = S.professores.findIndex(x => x.id === prof.id);
+      if (idx > -1) S.professores[idx][CFG.campoOuro] = novoValor;
+      renderGrid(filtrarProfessores());
+      toast(novoValor ? 'Professor marcado como destaque!' : 'Destaque removido.', 'success');
+    } catch (err) {
+      toast('Erro ao atualizar destaque: ' + err.message, 'error');
+    }
   }
 
   // ─────────────────────────────────────────────────────────────
