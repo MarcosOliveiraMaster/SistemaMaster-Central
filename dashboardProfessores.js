@@ -48,6 +48,7 @@ window.GaleriaProfessores = (function () {
     discsSelecionadas: [],
     slotsSelecionados: [],
     filtroRapido: 'todos', // 'todos' | 'tdics' | 'neuro'
+    cardsPorLinha: 5,
     profSelecionado: null,
     pendingDataURL: null,
     // modal contrato (vínculo/desligamento) — porta a lógica de BD Professores
@@ -171,9 +172,8 @@ window.GaleriaProfessores = (function () {
   --gp-gray-800:     #1f2937;
   --gp-shadow:       0 4px 16px rgba(0,0,0,.08);
   --gp-transition:   0.2s ease;
-  /* dimensões do card: largura = a · altura = a + b */
-  --gp-a: 160px;
-  --gp-b: 48px;
+  --gp-cols: 5; /* número de cards por linha — ajustável em Mais filtros > Configurações */
+  --gp-b: 48px; /* altura da faixa de nome do card */
   font-family: 'Lexend', sans-serif;
   display: flex; flex-direction: column; height: 100%; overflow: auto; background: var(--gp-gray-100);
 }
@@ -253,16 +253,16 @@ window.GaleriaProfessores = (function () {
   .gp-filterbar { grid-template-columns: 1fr; }
 }
 
-.gp-grid { display:grid; grid-template-columns:repeat(auto-fill, var(--gp-a)); gap:1.1rem; padding:1.1rem; justify-content:start; align-content:start; flex:1; }
+.gp-grid { display:grid; grid-template-columns:repeat(var(--gp-cols, 5), 1fr); gap:1.1rem; padding:1.1rem; align-content:start; flex:1; }
 
-.gp-card { position:relative; width:var(--gp-a); height:calc(var(--gp-a) + var(--gp-b)); display:flex; flex-direction:column; background:white; border:1px solid var(--gp-gray-200); border-radius:.65rem; overflow:hidden; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.05); transition:box-shadow var(--gp-transition), border-color var(--gp-transition), transform .15s ease; }
+.gp-card { position:relative; width:100%; height:auto; display:flex; flex-direction:column; background:white; border:1px solid var(--gp-gray-200); border-radius:.65rem; overflow:hidden; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.05); transition:box-shadow var(--gp-transition), border-color var(--gp-transition), transform .15s ease; }
 .gp-card:hover { box-shadow:0 8px 22px rgba(242,135,5,.18); border-color:var(--gp-orange); }
 .gp-card__starBtn { position:absolute; top:.4rem; right:.4rem; width:1.9rem; height:1.9rem; border-radius:50%; background:rgba(0,0,0,.45); color:white; border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:.85rem; z-index:2; opacity:.2; transition:background var(--gp-transition), color var(--gp-transition), opacity var(--gp-transition); }
 .gp-card__starBtn:hover { background:rgba(0,0,0,.65); color:#facc15; opacity:1; }
 .gp-card__starBtn:hover i { font-weight:900; } /* hover força visual preenchido mesmo usando o ícone "far" */
 .gp-card__starBtn.gp-is-ouro { background:rgba(0,0,0,.25); color:#facc15; opacity:1; }
 .gp-card__starBtn.gp-is-ouro:hover { background:rgba(0,0,0,.4); }
-.gp-card__img-box { width:100%; height:var(--gp-a); flex-shrink:0; background:var(--gp-gray-100); overflow:hidden; }
+.gp-card__img-box { width:100%; aspect-ratio:1/1; flex-shrink:0; background:var(--gp-gray-100); overflow:hidden; }
 .gp-card__img-box img { width:100%; height:100%; object-fit:cover; display:block; }
 .gp-card__fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:2.3rem; color:var(--gp-orange); background:var(--gp-orange-light); }
 .gp-card__label { height:var(--gp-b); flex-shrink:0; display:flex; align-items:center; padding:0 .6rem; font-size:.78rem; font-weight:600; color:var(--gp-gray-800); text-align:left; line-height:1.2; overflow:hidden; }
@@ -413,6 +413,7 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
         <button type="button" class="gp-btn gp-btn--info" id="dp-btnGerarContrato"><i class="fas fa-file-contract"></i>Gerar Contrato</button>
         <button type="button" class="gp-btn gp-btn--success" id="gp-btnAtualizarPermissoes"><i class="fas fa-shield-alt"></i>Atualizar Permissões</button>
         <button type="button" class="gp-btn gp-btn--danger" id="gp-btnDesligar"><i class="fas fa-user-slash"></i>Desligar Professores</button>
+        <button type="button" class="gp-btn gp-btn--ghost" id="gp-btnCardsPorLinha"><i class="fas fa-table-cells"></i>Cards por linha</button>
       </div>
     </div>
   </div>
@@ -531,6 +532,23 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
     </div>
     <div class="gp-modalC-footer">
       <button id="gp-btnConfirmarDesligar" class="gp-btn gp-btn--danger" type="button"><i class="fas fa-user-slash" style="margin-right:.4rem"></i>Desligar selecionados</button>
+    </div>
+  </div>
+</div>
+
+<!-- Cards por linha — slider simples, aplica na hora e salva no navegador -->
+<div id="gp-modalColsOverlay" class="gp-modalD-overlay">
+  <div class="gp-modalD" style="max-width:340px">
+    <div class="gp-modalC-header">
+      <h2><i class="fas fa-table-cells" style="margin-right:.5rem;color:var(--gp-orange)"></i>Cards por linha</h2>
+      <button id="gp-modalColsClose" class="gp-modal-close" type="button">&times;</button>
+    </div>
+    <div class="gp-modalC-body" style="display:flex;flex-direction:column;align-items:center;gap:.9rem;padding:1.4rem 1.25rem">
+      <div id="gp-colsValue" style="font-family:'Comfortaa',cursive;font-size:2.1rem;font-weight:700;color:var(--gp-orange)">5</div>
+      <input type="range" min="3" max="8" step="1" value="5" id="gp-colsSlider" style="width:100%;accent-color:var(--gp-orange)">
+      <div style="display:flex;justify-content:space-between;width:100%;font-size:.7rem;color:var(--gp-gray-400)">
+        <span>3</span><span>8</span>
+      </div>
     </div>
   </div>
 </div>
@@ -1136,6 +1154,25 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
   }
 
   // ─────────────────────────────────────────────────────────────
+  // CARDS POR LINHA — preferência salva no navegador (localStorage)
+  // ─────────────────────────────────────────────────────────────
+  const LS_COLS_KEY = 'gp_cardsPorLinha';
+
+  function lerCardsPorLinha() {
+    try {
+      const v = parseInt(localStorage.getItem(LS_COLS_KEY), 10);
+      if (v >= 3 && v <= 8) return v;
+    } catch (e) { /* localStorage indisponível — usa o padrão */ }
+    return 5;
+  }
+
+  function aplicarCardsPorLinha(n) {
+    S.cardsPorLinha = n;
+    $id('gp-grid')?.style.setProperty('--gp-cols', n);
+    try { localStorage.setItem(LS_COLS_KEY, String(n)); } catch (e) { /* ignora */ }
+  }
+
+  // ─────────────────────────────────────────────────────────────
   // EVENTOS
   // ─────────────────────────────────────────────────────────────
   function initDisciplinasDropdown() {
@@ -1273,6 +1310,21 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
       $qa('input[name="gp-professorDesligar"]').forEach(cb => { cb.checked = e.target.checked; });
     });
     $id('gp-btnConfirmarDesligar')?.addEventListener('click', confirmarDesligamento);
+
+    // Cards por linha
+    $id('gp-btnCardsPorLinha')?.addEventListener('click', () => {
+      maisPanel?.classList.remove('gp-open');
+      $id('gp-colsSlider').value = S.cardsPorLinha;
+      $id('gp-colsValue').textContent = S.cardsPorLinha;
+      $id('gp-modalColsOverlay').classList.add('gp-open');
+    });
+    $id('gp-modalColsClose')?.addEventListener('click', () => $id('gp-modalColsOverlay').classList.remove('gp-open'));
+    $id('gp-modalColsOverlay')?.addEventListener('click', e => { if (e.target.id === 'gp-modalColsOverlay') $id('gp-modalColsOverlay').classList.remove('gp-open'); });
+    $id('gp-colsSlider')?.addEventListener('input', e => {
+      const n = parseInt(e.target.value, 10);
+      $id('gp-colsValue').textContent = n;
+      aplicarCardsPorLinha(n);
+    });
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -1283,6 +1335,7 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
 
     injectStyles();
     injectHTML();
+    aplicarCardsPorLinha(lerCardsPorLinha());
     initEventos();
 
     if (!S.db && !initFirebase()) {
