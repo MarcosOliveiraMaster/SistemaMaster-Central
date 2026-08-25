@@ -196,6 +196,32 @@ function atualizarGrafico(entradas, tipo = 'entradas') {
     fill: false
   });
 
+  // Itens individuais de cada dia (para o tooltip em lista). Aceita entradas de pacote
+  // {raw, valor} (tipo 'entradas'), saídas com {descricao, valor}, ou pontos de saldo
+  // com {itens: [{descricao, valor, tipo}]}.
+  const itensPorData = {};
+  entradas.forEach(e => {
+    if (!itensPorData[e.data]) itensPorData[e.data] = [];
+    if (Array.isArray(e.itens)) {
+      e.itens.forEach(it => itensPorData[e.data].push(it));
+    } else if (tipo === 'entradas') {
+      const rawNome = (e.raw && (e.raw.nome || e.raw.nomeCliente)) || '';
+      const nome    = rawNome.trim().split(/\s+/).slice(0, 2).join(' ') || '-';
+      const horas   = (e.raw && e.raw.SomatorioDuracaoAulas) || '-';
+      itensPorData[e.data].push({ nome, horas, valor: e.valor });
+    } else {
+      itensPorData[e.data].push({ descricao: e.descricao || '-', valor: e.valor });
+    }
+  });
+
+  const formatarLinhaItem = (it) => {
+    if (it.nome !== undefined) return `• ${it.nome} - ${it.horas} - ${moedaFmt(it.valor)}`;
+    if (it.tipo === 'entrada') return `• ${it.descricao} (Entrada) - ${moedaFmt(it.valor)}`;
+    if (it.tipo === 'saida')   return `• ${it.descricao} (Saída) - ${moedaFmt(it.valor)}`;
+    return `• ${it.descricao} - ${moedaFmt(it.valor)}`;
+  };
+  const calcularTotalItens = (itens) => itens.reduce((s, it) => s + (it.tipo === 'saida' ? -it.valor : it.valor), 0);
+
   const options = () => ({
     responsive: true,
     maintainAspectRatio: false,
@@ -203,13 +229,46 @@ function atualizarGrafico(entradas, tipo = 'entradas') {
       legend: { display: false },
       datalabels: { display: false },
       tooltip: {
-        callbacks: { label: ctx => ' ' + (ctx.dataset.label ? ctx.dataset.label + ': ' : '') + moedaFmt(ctx.parsed.y) }
+        displayColors: false,
+        padding: 10,
+        titleMarginBottom: 8,
+        bodySpacing: 6,
+        footerMarginTop: 10,
+        callbacks: {
+          label: function (ctx) {
+            if (ctx.dataset.label) {
+              return ' ' + ctx.dataset.label + ': ' + moedaFmt(ctx.parsed.y);
+            }
+            const itens = itensPorData[ctx.label] || [];
+            if (itens.length === 0) return ' ' + moedaFmt(ctx.parsed.y);
+            return itens.map(formatarLinhaItem);
+          },
+          footer: function (tooltipItems) {
+            const label = tooltipItems && tooltipItems[0] ? tooltipItems[0].label : null;
+            const itens = label ? (itensPorData[label] || []) : [];
+            if (itens.length === 0) return '';
+            return `Total: ${moedaFmt(calcularTotalItens(itens))}`;
+          }
+        }
       }
     },
     scales: {
       x: {
-        grid: { display: false },
-        ticks: { font: fontBase, color: tickColor }
+        grid: {
+          display: true,
+          drawTicks: false,
+          color: 'rgba(0,0,0,0.12)',
+          borderDash: [3, 3]
+        },
+        ticks: {
+          font: fontBase,
+          color: tickColor,
+          callback: function (value) {
+            const label = this.getLabelForValue(value);
+            const dia = (label || '').split('/')[0];
+            return dia;
+          }
+        }
       },
       y: {
         beginAtZero: true,
@@ -220,9 +279,11 @@ function atualizarGrafico(entradas, tipo = 'entradas') {
   });
 
   if (prevModoGrafico === 'individual') {
-    const labels  = entradas.map(e => e.data);
-    const valores = entradas.map(e => e.valor);
-    const media   = entradas.length > 0 ? valores.reduce((s, v) => s + v, 0) / entradas.length : 0;
+    const porDataSoma = {};
+    entradas.forEach(e => { porDataSoma[e.data] = (porDataSoma[e.data] || 0) + e.valor; });
+    const labels  = Object.keys(porDataSoma).sort((a, b) => parseDateBR(a) - parseDateBR(b));
+    const valores = labels.map(d => porDataSoma[d]);
+    const media   = valores.length > 0 ? valores.reduce((s, v) => s + v, 0) / valores.length : 0;
 
     const datasets = [{
       data: valores,
@@ -543,15 +604,24 @@ function atualizarGraficoAtual() {
 
 function atualizarGraficoSaldo() {
   const porDataE = {};
-  prevEntradasCache.forEach(e => { porDataE[e.data] = (porDataE[e.data] || 0) + e.valor; });
+  prevEntradasCache.forEach(e => {
+    if (!porDataE[e.data]) porDataE[e.data] = { total: 0, itens: [] };
+    porDataE[e.data].total += e.valor;
+    porDataE[e.data].itens.push({ descricao: e.descricao || '-', valor: e.valor, tipo: 'entrada' });
+  });
 
   const porDataS = {};
-  prevSaidasCache.forEach(s => { porDataS[s.data] = (porDataS[s.data] || 0) + s.valor; });
+  prevSaidasCache.forEach(s => {
+    if (!porDataS[s.data]) porDataS[s.data] = { total: 0, itens: [] };
+    porDataS[s.data].total += s.valor;
+    porDataS[s.data].itens.push({ descricao: s.descricao || '-', valor: s.valor, tipo: 'saida' });
+  });
 
   const todasDatas = [...new Set([...Object.keys(porDataE), ...Object.keys(porDataS)])];
   const saldoEntries = todasDatas.map(d => ({
     data: d,
-    valor: (porDataE[d] || 0) - (porDataS[d] || 0)
+    valor: (porDataE[d]?.total || 0) - (porDataS[d]?.total || 0),
+    itens: [...(porDataE[d]?.itens || []), ...(porDataS[d]?.itens || [])]
   }));
 
   atualizarGrafico(saldoEntries, 'saldo');
@@ -581,9 +651,16 @@ function carregarSaidasPrevistas(mes, ano) {
 
   const promInvest = window.BANCO.db.collection('investimentos').get();
   const promAulas  = window.BANCO.db.collection('BancoDeAulas-Lista').get();
+  const promProf   = typeof fetchDataBaseProfessores === 'function' ? fetchDataBaseProfessores() : Promise.resolve([]);
 
-  return Promise.all([promInvest, promAulas])
-    .then(([snapInvest, snapAulas]) => {
+  return Promise.all([promInvest, promAulas, promProf])
+    .then(([snapInvest, snapAulas, professores]) => {
+      const cpfsProfessoresAtivos = new Set(
+        (professores || [])
+          .filter(p => (p.status || '').toLowerCase() === 'ativo' && p.cpf)
+          .map(p => p.cpf)
+      );
+
       const saidas      = [];
       const saidasChart = [];
 
@@ -612,13 +689,25 @@ function carregarSaidasPrevistas(mes, ano) {
         if (!match) return;
         const docMes = parseInt(match[2]) - 1;
         const docAno = parseInt(match[3]);
-        if (docMes === mes && docAno === ano) {
+        if (
+          docMes === mes && docAno === ano &&
+          d.StatusAula !== 'Reagendada' &&
+          d.idProfessor && cpfsProfessoresAtivos.has(d.idProfessor)
+        ) {
           const valorAula = parseFloat(d.ValorAula) || 0;
           totalProfessores += valorAula;
-          const dateStr = `${match[1]}/${match[2]}/${match[3]}`;
-          saidasChart.push({ descricao: `Aula - ${d.nomeCliente || ''}`, valor: valorAula, data: dateStr });
         }
       });
+
+      // O gráfico de Saídas reflete apenas o que está de fato cadastrado na coleção
+      // de Saídas (Investimentos e despesas). O pagamento de professores não é um
+      // registro dessa coleção — é calculado a partir das aulas do mês — então entra
+      // no gráfico como um único ponto agregado, sempre no último dia do mês.
+      if (totalProfessores > 0) {
+        const ultimoDiaMes = new Date(ano, mes + 1, 0).getDate();
+        const dataUltimoDia = `${String(ultimoDiaMes).padStart(2, '0')}/${String(mes + 1).padStart(2, '0')}/${ano}`;
+        saidasChart.push({ descricao: 'Pagamento de professores', valor: totalProfessores, data: dataUltimoDia });
+      }
 
       saidasChart.sort((a, b) => parseDateBR(a.data) - parseDateBR(b.data));
       prevSaidasCache = saidasChart;
@@ -698,22 +787,44 @@ function abrirModalPagamentoProfessores(mes, ano) {
           <div class="loading-spinner-small mx-auto mb-2"></div>
           Carregando...
         </div>
-        <div id="modal-prof-content" class="hidden overflow-y-auto" style="max-height: 460px;">
-          <table class="w-full">
-            <thead class="sticky top-0 bg-gray-50">
-              <tr class="border-b border-gray-200">
-                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Nome Cliente</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Duração do Pacote</th>
-                <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600">Aulas no Mês</th>
-                <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600">Valor Direcionado</th>
-              </tr>
-            </thead>
-            <tbody id="modal-prof-tbody"></tbody>
-          </table>
+        <div id="modal-prof-content" class="hidden">
+          <div class="flex gap-0 px-4 pt-4 pb-1">
+            <button class="py-1.5 px-4 text-sm font-medium rounded-l-lg transition-all bg-orange-500 text-white hover:bg-orange-600" id="btn-modal-prof-tab-clientes">
+              Clientes
+            </button>
+            <button class="py-1.5 px-4 text-sm font-medium rounded-r-lg transition-all bg-gray-100 text-gray-700 hover:bg-gray-200" id="btn-modal-prof-tab-professores">
+              Professores
+            </button>
+          </div>
+          <div id="modal-prof-tab-clientes-content" class="overflow-y-auto" style="max-height: 420px;">
+            <table class="w-full">
+              <thead class="sticky top-0 bg-gray-50">
+                <tr class="border-b border-gray-200">
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Nome Cliente</th>
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Duração do Pacote</th>
+                  <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600">Aulas no Mês</th>
+                  <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600">Valor Direcionado</th>
+                </tr>
+              </thead>
+              <tbody id="modal-prof-tbody"></tbody>
+            </table>
+          </div>
+          <div id="modal-prof-tab-professores-content" class="hidden overflow-y-auto" style="max-height: 420px;">
+            <table class="w-full">
+              <thead class="sticky top-0 bg-gray-50">
+                <tr class="border-b border-gray-200">
+                  <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Professor</th>
+                  <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600">Aulas no Mês</th>
+                  <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600">Valor Direcionado</th>
+                </tr>
+              </thead>
+              <tbody id="modal-prof-professores-tbody"></tbody>
+            </table>
+          </div>
         </div>
       </div>
       <div class="modal-footer" style="justify-content: space-between; align-items: center;">
-        <p class="text-xs text-gray-400">Clique em um cliente para ver os detalhes da contratação</p>
+        <p id="modal-prof-footer-hint" class="text-xs text-gray-400">Clique em um cliente para ver os detalhes da contratação</p>
         <button id="btn-fechar-modal-prof-footer" class="py-2 px-4 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all">
           Fechar
         </button>
@@ -727,6 +838,21 @@ function abrirModalPagamentoProfessores(mes, ano) {
   document.getElementById('btn-fechar-modal-prof-footer').addEventListener('click', fecharModal);
   modalEl.addEventListener('click', e => { if (e.target === modalEl) fecharModal(); });
 
+  const setModalProfTab = (tab) => {
+    const ativo   = 'py-1.5 px-4 text-sm font-medium transition-all bg-orange-500 text-white hover:bg-orange-600';
+    const inativo = 'py-1.5 px-4 text-sm font-medium transition-all bg-gray-100 text-gray-700 hover:bg-gray-200';
+    document.getElementById('btn-modal-prof-tab-clientes').className    = (tab === 'clientes'    ? ativo : inativo) + ' rounded-l-lg';
+    document.getElementById('btn-modal-prof-tab-professores').className = (tab === 'professores' ? ativo : inativo) + ' rounded-r-lg';
+    document.getElementById('modal-prof-tab-clientes-content').classList.toggle('hidden', tab !== 'clientes');
+    document.getElementById('modal-prof-tab-professores-content').classList.toggle('hidden', tab !== 'professores');
+    const hint = document.getElementById('modal-prof-footer-hint');
+    if (hint) hint.textContent = tab === 'clientes'
+      ? 'Clique em um cliente para ver os detalhes da contratação'
+      : 'Clique em um professor para ver as aulas do mês';
+  };
+  document.getElementById('btn-modal-prof-tab-clientes')?.addEventListener('click', () => setModalProfTab('clientes'));
+  document.getElementById('btn-modal-prof-tab-professores')?.addEventListener('click', () => setModalProfTab('professores'));
+
   if (!window.BANCO || !window.BANCO.db) {
     document.getElementById('modal-prof-loading').innerHTML =
       '<p class="text-red-500 text-sm">Firebase não disponível</p>';
@@ -735,27 +861,61 @@ function abrirModalPagamentoProfessores(mes, ano) {
 
   Promise.all([
     window.BANCO.db.collection('BancoDeAulas-Lista').get(),
-    window.BANCO.db.collection('BancoDeAulas').get()
-  ]).then(([snapLista, snapBanco]) => {
+    window.BANCO.db.collection('BancoDeAulas').get(),
+    typeof fetchDataBaseProfessores === 'function' ? fetchDataBaseProfessores() : Promise.resolve([])
+  ]).then(([snapLista, snapBanco, professores]) => {
     const mapPacotes = {};
     snapBanco.forEach(doc => { mapPacotes[doc.id] = doc.data(); });
 
-    const grupos = {};
+    const cpfsProfessoresAtivos = new Set(
+      (professores || [])
+        .filter(p => (p.status || '').toLowerCase() === 'ativo' && p.cpf)
+        .map(p => p.cpf)
+    );
+    const nomeProfessorPorCpf = {};
+    (professores || []).forEach(p => { if (p.cpf) nomeProfessorPorCpf[p.cpf] = p.nome || ''; });
+
+    const grupos     = {};
+    const gruposProf = {};
     snapLista.forEach(doc => {
       const d = doc.data();
       if (!d.data) return;
       const match = d.data.match(/(\d{2})\/(\d{2})\/(\d{4})/);
       if (!match) return;
       if (parseInt(match[2]) - 1 !== mes || parseInt(match[3]) !== ano) return;
+      if (d.StatusAula === 'Reagendada') return;
+      if (!d.idProfessor || !cpfsProfessoresAtivos.has(d.idProfessor)) return;
 
       const codigo = d.codigoContratacao || (d['id-Aula'] || '').substring(0, 4);
       if (!codigo) return;
+
+      const valorAula = parseFloat(d.ValorAula) || 0;
 
       if (!grupos[codigo]) {
         grupos[codigo] = { nomeCliente: d.nomeCliente || '', quantidade: 0, totalValor: 0 };
       }
       grupos[codigo].quantidade++;
-      grupos[codigo].totalValor += parseFloat(d.ValorAula) || 0;
+      grupos[codigo].totalValor += valorAula;
+
+      const cpfProf = d.idProfessor;
+      if (!gruposProf[cpfProf]) {
+        gruposProf[cpfProf] = {
+          nome: nomeProfessorPorCpf[cpfProf] || 'Professor não identificado',
+          quantidade: 0,
+          totalValor: 0,
+          aulas: []
+        };
+      }
+      gruposProf[cpfProf].quantidade++;
+      gruposProf[cpfProf].totalValor += valorAula;
+      gruposProf[cpfProf].aulas.push({
+        codigo,
+        data: `${match[1]}/${match[2]}/${match[3]}`,
+        nomeCliente: d.nomeCliente || '-',
+        duracao: d.duracao || '-',
+        valor: valorAula,
+        status: d.StatusAula || '-'
+      });
     });
 
     const loading = document.getElementById('modal-prof-loading');
@@ -807,6 +967,40 @@ function abrirModalPagamentoProfessores(mes, ano) {
       });
     });
 
+    // ─── Aba Professores ───
+    const tbodyProf = document.getElementById('modal-prof-professores-tbody');
+    const listaProf = Object.keys(gruposProf)
+      .map(cpf => ({ cpf, ...gruposProf[cpf] }))
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+
+    let totalGeralProf = 0;
+    let htmlProf = '';
+
+    listaProf.forEach(p => {
+      totalGeralProf += p.totalValor;
+      htmlProf += `
+        <tr class="border-b border-gray-100 hover:bg-orange-50 cursor-pointer transition-colors" data-cpf-prof="${p.cpf}">
+          <td class="px-4 py-3 text-sm font-medium text-gray-800">${p.nome}</td>
+          <td class="px-4 py-3 text-sm text-gray-600 text-center">${p.quantidade}</td>
+          <td class="px-4 py-3 text-sm font-semibold text-red-600 text-right">${formatarMoeda(p.totalValor)}</td>
+        </tr>`;
+    });
+
+    htmlProf += `
+      <tr class="bg-gray-50 border-t-2 border-gray-300">
+        <td class="px-4 py-3 text-sm font-bold text-gray-800" colspan="2">Total</td>
+        <td class="px-4 py-3 text-sm font-bold text-red-600 text-right">${formatarMoeda(totalGeralProf)}</td>
+      </tr>`;
+
+    tbodyProf.innerHTML = htmlProf;
+
+    tbodyProf.querySelectorAll('tr[data-cpf-prof]').forEach(tr => {
+      tr.addEventListener('click', () => {
+        const p = gruposProf[tr.dataset.cpfProf];
+        abrirModalAulasProfessor(p.nome, mes, ano, p.aulas);
+      });
+    });
+
     loading.classList.add('hidden');
     content.classList.remove('hidden');
   }).catch(err => {
@@ -814,6 +1008,110 @@ function abrirModalPagamentoProfessores(mes, ano) {
     document.getElementById('modal-prof-loading').innerHTML =
       '<p class="text-red-500 text-sm">Erro ao carregar dados</p>';
   });
+}
+
+// ─── Modal Aulas do Professor (detalhe, aberto a partir da aba Professores) ──
+
+function abrirModalAulasProfessor(nomeProfessor, mes, ano, aulas) {
+  const existing = document.getElementById('modal-aulas-professor');
+  if (existing) existing.remove();
+
+  let sortKey = 'data';
+  let sortAsc = true;
+
+  const modalEl = document.createElement('div');
+  modalEl.id = 'modal-aulas-professor';
+  modalEl.className = 'modal-overlay';
+  modalEl.style.zIndex = '1100';
+  modalEl.innerHTML = `
+    <div class="modal-container" style="max-width: 760px;">
+      <div class="modal-header">
+        <div>
+          <h3 class="text-lg font-lexend font-bold text-gray-800">${nomeProfessor}</h3>
+          <p class="text-sm text-gray-500 mt-0.5">${PREV_MESES[mes]} ${ano} — Aulas do mês</p>
+        </div>
+        <button id="btn-fechar-modal-aulas-prof" class="text-gray-400 hover:text-gray-600 transition-colors p-1">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body" style="padding: 0;">
+        <div class="overflow-y-auto" style="max-height: 460px;">
+          <table class="w-full">
+            <thead class="sticky top-0 bg-gray-50">
+              <tr class="border-b border-gray-200">
+                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 cursor-pointer select-none" data-sort-key="codigo">Nº Pacote<span class="sort-arrow"></span></th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 cursor-pointer select-none" data-sort-key="data">Data da Aula<span class="sort-arrow"></span></th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 cursor-pointer select-none" data-sort-key="nomeCliente">Nome Cliente<span class="sort-arrow"></span></th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 cursor-pointer select-none" data-sort-key="duracao">Duração<span class="sort-arrow"></span></th>
+                <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 cursor-pointer select-none" data-sort-key="valor">Valor da Aula<span class="sort-arrow"></span></th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 cursor-pointer select-none" data-sort-key="status">Status<span class="sort-arrow"></span></th>
+              </tr>
+            </thead>
+            <tbody id="modal-aulas-prof-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer" style="justify-content: space-between; align-items: center;">
+        <p id="modal-aulas-prof-total" class="text-sm font-lexend font-bold text-gray-800">TOTAL: R$ 0,00</p>
+        <button id="btn-fechar-modal-aulas-prof-footer" class="py-2 px-4 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all">
+          Fechar
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modalEl);
+
+  const fecharModal = () => modalEl.remove();
+  document.getElementById('btn-fechar-modal-aulas-prof').addEventListener('click', fecharModal);
+  document.getElementById('btn-fechar-modal-aulas-prof-footer').addEventListener('click', fecharModal);
+  modalEl.addEventListener('click', e => { if (e.target === modalEl) fecharModal(); });
+
+  function renderLinhas() {
+    const ordenadas = [...aulas].sort((a, b) => {
+      let cmp;
+      if (sortKey === 'data')       cmp = parseDateBR(a.data) - parseDateBR(b.data);
+      else if (sortKey === 'valor') cmp = a.valor - b.valor;
+      else                          cmp = String(a[sortKey]).localeCompare(String(b[sortKey]), 'pt-BR');
+      return sortAsc ? cmp : -cmp;
+    });
+
+    const tbody = document.getElementById('modal-aulas-prof-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = ordenadas.map(a => `
+      <tr class="border-b border-gray-100">
+        <td class="px-4 py-2.5 text-sm text-gray-700">${a.codigo || '-'}</td>
+        <td class="px-4 py-2.5 text-sm text-gray-700">${a.data}</td>
+        <td class="px-4 py-2.5 text-sm text-gray-800">${a.nomeCliente}</td>
+        <td class="px-4 py-2.5 text-sm text-gray-600">${a.duracao}</td>
+        <td class="px-4 py-2.5 text-sm font-medium text-red-600 text-right">${formatarMoeda(a.valor)}</td>
+        <td class="px-4 py-2.5 text-sm text-gray-600">${a.status}</td>
+      </tr>`).join('');
+
+    const totalEl = document.getElementById('modal-aulas-prof-total');
+    if (totalEl) {
+      const total = aulas.reduce((soma, a) => soma + a.valor, 0);
+      totalEl.textContent = `TOTAL: ${formatarMoeda(total)}`;
+    }
+
+    modalEl.querySelectorAll('th[data-sort-key]').forEach(th => {
+      const arrow = th.querySelector('.sort-arrow');
+      if (!arrow) return;
+      arrow.textContent = th.dataset.sortKey === sortKey ? (sortAsc ? ' ▲' : ' ▼') : '';
+    });
+  }
+
+  modalEl.querySelectorAll('th[data-sort-key]').forEach(th => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.sortKey;
+      if (sortKey === key) sortAsc = !sortAsc;
+      else { sortKey = key; sortAsc = true; }
+      renderLinhas();
+    });
+  });
+
+  renderLinhas();
 }
 
 // ─── Toast ────────────────────────────────────────────────────────────────────

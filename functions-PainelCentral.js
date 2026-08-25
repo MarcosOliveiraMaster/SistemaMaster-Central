@@ -41,7 +41,7 @@ let semanaGraficoAtual = calcularSemanaAtual(); // Calcula a semana atual do mê
 let diaConsultaAulasAtual = new Date(); // Data atual para a tabela
 
 // ===== VARIÁVEIS GLOBAIS DE FILTRO (TABELA DE PAGAMENTO) =====
-let pgtoContratosDoMes = [];  // cache do mês atual, evita refetch a cada filtro/busca/ordenação
+let pgtoContratosCache = [];  // cache dos contratos, evita refetch a cada filtro/busca/ordenação
 let pgtoTextoBusca = '';
 let pgtoSituacaoAtiva = { contrato: false, pagamento: true };
 let pgtoMetodoSelecionado = 'todos';
@@ -1148,8 +1148,8 @@ function mudarMesPagamento(direcao) {
   }
 
   atualizarExibicaoMesPagamento();
-  carregarCardsPagamento();
-  
+  aplicarFiltrosPagamento();
+
   console.log(`📅 Mês selecionado para pagamento: ${mesPagamentoAtual}`);
 }
 
@@ -1312,16 +1312,9 @@ async function carregarCardsPagamento() {
 
     console.log(`📊 Total de contratos encontrados: ${contratos.length}`);
 
-    // Filtrar contratos por mês/ano do timestamp de criação — cacheia pro mês atual,
-    // pra não precisar refazer a busca no Firestore a cada mudança de filtro/busca/ordenação
-    pgtoContratosDoMes = contratos.filter(contrato => {
-      const dataContrato = _pgtoTimestampToDate(contrato.timestamp);
-      return !!dataContrato &&
-             dataContrato.getMonth() === mesPagamentoAtual &&
-             dataContrato.getFullYear() === new Date().getFullYear();
-    });
-
-    console.log(`✅ Contratos do mês: ${pgtoContratosDoMes.length}`);
+    // Cacheia todos os contratos uma única vez — a navegação por mês (mesPagamentoAtual) e os
+    // demais filtros são aplicados depois, em aplicarFiltrosPagamento, sem refazer a busca no Firestore.
+    pgtoContratosCache = contratos;
 
     aplicarFiltrosPagamento();
   } catch (error) {
@@ -1354,13 +1347,33 @@ function _pgtoTimestampToDate(valor) {
 }
 
 // Classifica um contrato em 'contrato' | 'pagamento' | null.
-// Contrato pendente de assinatura é o bloqueio mais urgente, por isso tem prioridade sobre pagamento pendente.
+// Pagamento pendente tem prioridade: um contrato com "Aguardando 1º/2º Pagamento" é sempre
+// mostrado como pagamento pendente, mesmo que a assinatura do contrato também esteja pendente.
 function classificarSituacaoPagamento(contrato) {
-  const statusCt = (contrato.statusContrato || '').toLowerCase();
-  if (statusCt.includes('pendente de assinatura')) return 'contrato';
   const statusPg = (contrato.statusPagamento || '').toLowerCase();
   if (statusPg.includes('aguardando 1º pagamento') || statusPg.includes('aguardando 2º pagamento')) return 'pagamento';
+  const statusCt = (contrato.statusContrato || '').toLowerCase();
+  if (statusCt.includes('pendente de assinatura')) return 'contrato';
   return null;
+}
+
+// Um contrato "pertence" ao mês navegável do painel quando alguma das suas datas relevantes
+// cai nesse mês — igual ao Calendário Master, que soma dataPrimeiraParcela e dataSegundaParcela
+// como dois eventos independentes, sem se basear no texto de `statusPagamento` (que é preenchido
+// manualmente e pode estar desatualizado em relação às datas de vencimento).
+function _pgtoDataNoMesSelecionado(d) {
+  return !!d && d.getMonth() === mesPagamentoAtual && d.getFullYear() === new Date().getFullYear();
+}
+
+function _pgtoContratoNoMesSelecionado(contrato, situacao) {
+  if (situacao === 'pagamento') {
+    return _pgtoDataNoMesSelecionado(_pgtoTimestampToDate(contrato.dataPrimeiraParcela)) ||
+           _pgtoDataNoMesSelecionado(_pgtoTimestampToDate(contrato.dataSegundaParcela));
+  }
+  // 'contrato' (pendente de assinatura): usa a data de assinatura prevista, com fallback pro timestamp
+  const dAssinatura = _pgtoTimestampToDate(contrato.dataAssinaturaContrato);
+  if (dAssinatura) return _pgtoDataNoMesSelecionado(dAssinatura);
+  return _pgtoDataNoMesSelecionado(_pgtoTimestampToDate(contrato.timestamp));
 }
 
 function ordenarLinhasPagamento(linhas, campo) {
@@ -1375,7 +1388,7 @@ function ordenarLinhasPagamento(linhas, campo) {
   return arr;
 }
 
-// Aplica busca/situação/método/ordenação sobre o cache do mês (pgtoContratosDoMes) e renderiza a tabela.
+// Aplica busca/situação/método/ordenação sobre o cache de contratos (pgtoContratosCache) e renderiza a tabela.
 // Chamada a cada mudança de filtro — não refaz a busca no Firestore.
 function aplicarFiltrosPagamento() {
   const areaCards = document.getElementById('areaCardsPagamento');
@@ -1384,9 +1397,11 @@ function aplicarFiltrosPagamento() {
   const contadores = { contrato: 0, pagamento: 0 };
   const buscaLower = pgtoTextoBusca.toLowerCase();
 
-  const linhas = pgtoContratosDoMes.reduce((acc, contrato) => {
+  const linhas = pgtoContratosCache.reduce((acc, contrato) => {
     const situacao = classificarSituacaoPagamento(contrato);
     if (!situacao) return acc;
+
+    if (!_pgtoContratoNoMesSelecionado(contrato, situacao)) return acc;
 
     if (pgtoMetodoSelecionado !== 'todos' && (contrato.modoPagamento || '').toLowerCase().trim() !== pgtoMetodoSelecionado) return acc;
     const nomeCliente = contrato.nome || contrato.nomeCliente || '';

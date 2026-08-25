@@ -1365,12 +1365,15 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
 
               const switchEl = row.querySelector('.switch-toggle');
 
-              // Capturar ValorAula da célula da tabela (coluna 5, texto formatado em BRL)
-              const cells = row.querySelectorAll('td');
+              // Capturar ValorAula a partir do data-attribute gravado na linha ao renderizar
+              // (já computado como duração × valor-hora do contrato). Antes lia-se o texto
+              // da célula pelo índice fixo cells[5], mas essa posição é o ícone "🎓" de
+              // verificação de datas — não a coluna "Valor da Aula" (índice 6, oculta por
+              // padrão) —, então o texto vazio virava 0 e zerava o valor salvo a cada clique.
               let valorAulaCelula = undefined;
-              if (cells.length > 5) {
-                const txtValor = cells[5].textContent.trim();
-                const numVal = Number(txtValor.replace(/[^0-9,.-]/g, '').replace('.', '').replace(',', '.'));
+              const valorAulaAttr = row.dataset.valorAulaComputado;
+              if (valorAulaAttr !== undefined) {
+                const numVal = Number(valorAulaAttr);
                 if (Number.isFinite(numVal)) valorAulaCelula = numVal;
               }
 
@@ -2477,7 +2480,7 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
         valoresComputados.push({ docId: aula.id, valor: valorAulaComputado });
         
         html += `
-          <tr>
+          <tr data-valor-aula-computado="${valorAulaComputado}">
             <td>
               <button type="button" class="btn-data-aula text-sm px-2 py-1 cursor-pointer hover:bg-orange-50 rounded transition-colors" data-id-aula="${aula['id-Aula']}" data-data="${aula.data || ''}" title="Clique para alterar a data">
                 ${aula.data || '--'}
@@ -2632,8 +2635,12 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
       }
 
       // Persistir ValorAula computado em cada documento da BancoDeAulas-Lista
+      // Só persiste se o valor-hora do contrato já foi lido corretamente (> 0) —
+      // se "display-hora-aula-contrato" ainda não tinha renderizado quando este cálculo
+      // rodou, valorHoraContratoAtual fica 0 e zeraria o ValorAula de todas as aulas,
+      // mesmo as que já tinham um valor correto salvo anteriormente.
       try {
-        if (valoresComputados.length > 0 && BANCO && BANCO.db) {
+        if (valoresComputados.length > 0 && BANCO && BANCO.db && valorHoraContratoAtual > 0) {
           const batch = BANCO.db.batch();
           valoresComputados.forEach(item => {
             const docRef = BANCO.db.collection('BancoDeAulas-Lista').doc(item.docId);
@@ -2645,6 +2652,8 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
           batch.commit()
             .then(() => console.log(`✅ ValorAula persistido em ${valoresComputados.length} aulas`))
             .catch(err => console.warn('⚠️ Erro ao persistir ValorAula:', err));
+        } else if (valoresComputados.length > 0 && valorHoraContratoAtual <= 0) {
+          console.warn('⚠️ Valor-hora do contrato indisponível no momento do cálculo — ValorAula NÃO foi persistido para evitar zerar valores já salvos.');
         }
       } catch (errBatch) {
         console.warn('⚠️ Erro ao preparar batch de ValorAula:', errBatch);

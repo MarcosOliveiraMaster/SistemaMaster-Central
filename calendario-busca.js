@@ -50,11 +50,13 @@ const CalendarioBusca = (function () {
   const LARGURA_DROPDOWN_EXTRA = 76;
 
   const estado = {
-    modo: 'professor',            // 'professor' | 'cliente'
+    modo: null,                   // null | 'professor' | 'cliente' — definido pela primeira seleção
     selecionados: new Set(),
     mes: new Date().getMonth(),   // 0-11
     ano: new Date().getFullYear(),
-    termoBusca: '',
+    termoBusca: { cliente: '', professor: '' },
+    mostrarHoras: false,
+    mostrarValor: false,
     aulas: null,                  // cache local do batch
     carregando: false,
     erro: null
@@ -91,6 +93,10 @@ const CalendarioBusca = (function () {
   function _cbHorarioMinutos(hhmm) {
     const m = String(hhmm || '').match(/(\d{1,2}):(\d{2})/);
     return m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : 0;
+  }
+
+  function _cbMoeda(v) {
+    return 'R$ ' + (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
   // Nome pelo qual a aula é agrupada, conforme o lado ativo do toggle.
@@ -142,20 +148,16 @@ const CalendarioBusca = (function () {
   }
 
   // Nomes distintos com aula no mês exibido, ordenados em pt-BR.
-  function opcoesDoMes() {
+  function opcoesDoMes(tipo) {
     const nomes = new Set();
-    aulasDoMes().forEach(aula => nomes.add(_cbNomeChave(aula, estado.modo)));
+    aulasDoMes().forEach(aula => nomes.add(_cbNomeChave(aula, tipo)));
     return [...nomes].sort((a, b) => a.localeCompare(b, 'pt-BR'));
   }
 
-  // Anos com alguma aula, sempre incluindo o ano corrente e o exibido.
-  function anosDisponiveis() {
-    const anos = new Set([new Date().getFullYear(), estado.ano]);
-    (estado.aulas || []).forEach(aula => {
-      const d = _cbParseData(aula.data);
-      if (d) anos.add(d.getFullYear());
-    });
-    return [...anos].sort((a, b) => a - b);
+  // Seleção "ativa" para o tipo pedido: só o modo corrente carrega seleção de fato,
+  // o outro dropdown (inativo) sempre mostra tudo desmarcado.
+  function selecionadosDoTipo(tipo) {
+    return estado.modo === tipo ? estado.selecionados : new Set();
   }
 
   function corDoNome(nome) {
@@ -166,49 +168,71 @@ const CalendarioBusca = (function () {
 
   /* ──────────────── shell da seção ──────────────── */
 
+  function dropdownHtml(tipo, rotulo) {
+    return `
+      <div class="cbusca-campo cbusca-campo-flex">
+        <label class="cbusca-label">${rotulo}</label>
+        <div class="cbusca-dd-wrapper" id="cbusca-dd-wrapper-${tipo}">
+          <button type="button" class="cbusca-dd-btn" id="cbusca-dd-btn-${tipo}">
+            <span id="cbusca-dd-texto-${tipo}">Selecione...</span>
+            <i class="fas fa-chevron-down text-xs ml-2"></i>
+          </button>
+          <div class="cbusca-dd-menu hidden" id="cbusca-dd-menu-${tipo}">
+            <div class="cbusca-dd-busca-wrap">
+              <i class="fas fa-search text-xs text-gray-400"></i>
+              <input type="text" id="cbusca-dd-busca-${tipo}" class="cbusca-dd-busca"
+                     placeholder="Buscar..." autocomplete="off">
+            </div>
+            <div class="cbusca-dd-lista" id="cbusca-dd-lista-${tipo}"></div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   function montarShell(container) {
     container.innerHTML = `
       <div class="cbusca-wrapper">
         <div class="cbusca-filtros">
 
           <div class="cbusca-campo">
-            <label class="cbusca-label">Filtrar por</label>
-            <div class="cbusca-toggle" id="cbusca-toggle">
-              <button type="button" class="cbusca-toggle-opt" data-modo="professor">
-                <i class="fas fa-chalkboard-teacher mr-1"></i>Professor
+            <label class="cbusca-label">&nbsp;</label>
+            <div class="cbusca-mesnav" id="cbusca-mesnav">
+              <button type="button" id="cbusca-mes-anterior" class="cbusca-mesnav-btn" aria-label="Mês anterior">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"></path>
+                </svg>
               </button>
-              <button type="button" class="cbusca-toggle-opt" data-modo="cliente">
-                <i class="fas fa-user mr-1"></i>Cliente
+              <span id="cbusca-mes-label" class="cbusca-mesnav-label"></span>
+              <button type="button" id="cbusca-mes-proximo" class="cbusca-mesnav-btn" aria-label="Próximo mês">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"></path>
+                </svg>
               </button>
             </div>
           </div>
 
+          <div class="cbusca-separador"></div>
+
+          ${dropdownHtml('cliente', 'Clientes')}
+          ${dropdownHtml('professor', 'Professores')}
+
+          <div class="cbusca-separador"></div>
+
           <div class="cbusca-campo">
-            <label class="cbusca-label" id="cbusca-dd-label">Professores</label>
-            <div class="cbusca-dd-wrapper" id="cbusca-dd-wrapper">
-              <button type="button" class="cbusca-dd-btn" id="cbusca-dd-btn">
-                <span id="cbusca-dd-texto">Selecione...</span>
-                <i class="fas fa-chevron-down text-xs ml-2"></i>
-              </button>
-              <div class="cbusca-dd-menu hidden" id="cbusca-dd-menu">
-                <div class="cbusca-dd-busca-wrap">
-                  <i class="fas fa-search text-xs text-gray-400"></i>
-                  <input type="text" id="cbusca-dd-busca" class="cbusca-dd-busca"
-                         placeholder="Buscar..." autocomplete="off">
-                </div>
-                <div class="cbusca-dd-lista" id="cbusca-dd-lista"></div>
-              </div>
-            </div>
+            <label class="cbusca-label">&nbsp;</label>
+            <label class="cbusca-chk-wrap" id="cbusca-chk-horas-wrap">
+              <input type="checkbox" id="cbusca-chk-horas" class="cbusca-chk-input">
+              <span>Horas</span>
+            </label>
           </div>
 
           <div class="cbusca-campo">
-            <label class="cbusca-label">Mês</label>
-            <select id="cbusca-mes" class="cbusca-select"></select>
-          </div>
-
-          <div class="cbusca-campo">
-            <label class="cbusca-label">Ano</label>
-            <select id="cbusca-ano" class="cbusca-select"></select>
+            <label class="cbusca-label">&nbsp;</label>
+            <label class="cbusca-chk-wrap" id="cbusca-chk-valor-wrap">
+              <input type="checkbox" id="cbusca-chk-valor" class="cbusca-chk-input">
+              <span>Valor</span>
+            </label>
           </div>
 
           <div class="cbusca-campo">
@@ -228,40 +252,37 @@ const CalendarioBusca = (function () {
 
   /* ──────────────── filtros ──────────────── */
 
-  function renderToggle() {
-    document.querySelectorAll('#cbusca-toggle .cbusca-toggle-opt').forEach(btn => {
-      btn.classList.toggle('cbusca-toggle-ativo', btn.dataset.modo === estado.modo);
-    });
-    const label = document.getElementById('cbusca-dd-label');
-    if (label) label.textContent = estado.modo === 'professor' ? 'Professores' : 'Clientes';
+  function renderMesLabel() {
+    const label = document.getElementById('cbusca-mes-label');
+    if (label) label.textContent = `${MESES[estado.mes]} ${estado.ano}`;
   }
 
-  function renderSelectsData() {
-    const selMes = document.getElementById('cbusca-mes');
-    const selAno = document.getElementById('cbusca-ano');
-    if (selMes) {
-      selMes.innerHTML = MESES
-        .map((m, i) => `<option value="${i}"${i === estado.mes ? ' selected' : ''}>${m}</option>`)
-        .join('');
+  function renderChecks() {
+    const chkHoras = document.getElementById('cbusca-chk-horas');
+    if (chkHoras) chkHoras.checked = estado.mostrarHoras;
+
+    const chkValor = document.getElementById('cbusca-chk-valor');
+    const wrapValor = document.getElementById('cbusca-chk-valor-wrap');
+    const desabilitado = estado.modo === 'cliente';
+    if (chkValor) {
+      chkValor.disabled = desabilitado;
+      chkValor.checked = estado.mostrarValor;
     }
-    if (selAno) {
-      selAno.innerHTML = anosDisponiveis()
-        .map(a => `<option value="${a}"${a === estado.ano ? ' selected' : ''}>${a}</option>`)
-        .join('');
-    }
+    if (wrapValor) wrapValor.classList.toggle('cbusca-chk-wrap-disabled', desabilitado);
   }
 
-  function renderDropdown() {
-    const lista = document.getElementById('cbusca-dd-lista');
-    const menu = document.getElementById('cbusca-dd-menu');
-    const texto = document.getElementById('cbusca-dd-texto');
+  function renderDropdown(tipo) {
+    const lista = document.getElementById(`cbusca-dd-lista-${tipo}`);
+    const menu = document.getElementById(`cbusca-dd-menu-${tipo}`);
+    const texto = document.getElementById(`cbusca-dd-texto-${tipo}`);
     if (!lista) return;
 
-    const opcoes = opcoesDoMes();
+    const selecionados = selecionadosDoTipo(tipo);
+    const opcoes = opcoesDoMes(tipo);
 
     // Selecionados que não têm aula no mês exibido continuam na lista, marcados.
     // Trocar de mês não deve destruir o filtro que o usuário montou.
-    const orfaos = [...estado.selecionados].filter(n => opcoes.indexOf(n) === -1);
+    const orfaos = [...selecionados].filter(n => opcoes.indexOf(n) === -1);
     const todas = opcoes.concat(orfaos.sort((a, b) => a.localeCompare(b, 'pt-BR')));
 
     // Largura acompanha o maior nome da lista.
@@ -274,7 +295,7 @@ const CalendarioBusca = (function () {
       menu.style.width = largura + 'px';
     }
 
-    const termo = estado.termoBusca.trim().toLowerCase();
+    const termo = (estado.termoBusca[tipo] || '').trim().toLowerCase();
     const visiveis = termo
       ? todas.filter(n => n.toLowerCase().indexOf(termo) !== -1)
       : todas;
@@ -285,13 +306,13 @@ const CalendarioBusca = (function () {
       lista.innerHTML = `<div class="cbusca-dd-vazio">Nenhum nome corresponde à busca</div>`;
     } else {
       lista.innerHTML = visiveis.map(nome => {
-        const marcado = estado.selecionados.has(nome);
+        const marcado = selecionados.has(nome);
         const semAulas = opcoes.indexOf(nome) === -1;
         const cor = marcado ? corDoNome(nome) : 'transparent';
         return `
           <label class="cbusca-dd-item${semAulas ? ' cbusca-dd-item-vazio' : ''}"
                  title="${_cbEsc(nome)}${semAulas ? ' — sem aulas neste mês' : ''}">
-            <input type="checkbox" class="cbusca-dd-chk" data-nome="${_cbEsc(nome)}"${marcado ? ' checked' : ''}>
+            <input type="checkbox" class="cbusca-dd-chk" data-tipo="${tipo}" data-nome="${_cbEsc(nome)}"${marcado ? ' checked' : ''}>
             <span class="cbusca-dd-cor" style="background:${cor}"></span>
             <span class="cbusca-dd-nome">${_cbEsc(nome)}</span>
             ${semAulas ? '<span class="cbusca-dd-tag">sem aulas</span>' : ''}
@@ -301,10 +322,10 @@ const CalendarioBusca = (function () {
     }
 
     if (texto) {
-      const n = estado.selecionados.size;
+      const n = selecionados.size;
       texto.textContent = n === 0
         ? 'Selecione...'
-        : (n === 1 ? [...estado.selecionados][0] : `${n} selecionados`);
+        : (n === 1 ? [...selecionados][0] : `${n} selecionados`);
     }
   }
 
@@ -352,12 +373,11 @@ const CalendarioBusca = (function () {
 
     // Sem seleção, nada de grade.
     if (estado.selecionados.size === 0) {
-      const alvoTexto = estado.modo === 'professor' ? 'um ou mais professores' : 'um ou mais clientes';
       alvo.innerHTML = `
         <div class="cbusca-placeholder">
           <i class="fas fa-calendar-days text-3xl text-gray-300 mb-3"></i>
-          <h3 class="font-lexend text-base mb-1">Selecione ${alvoTexto}</h3>
-          <p class="text-sm text-gray-500">O calendário aparece assim que houver uma seleção.</p>
+          <h3 class="font-lexend text-base mb-1">Selecione um ou mais clientes ou professores</h3>
+          <p class="text-sm text-gray-500">O calendário aparece assim que houver uma seleção. Não é possível misturar clientes e professores na mesma busca.</p>
         </div>`;
       return;
     }
@@ -441,12 +461,29 @@ const CalendarioBusca = (function () {
       aula.StatusAula || ''
     ].filter(Boolean).join(' • ');
 
+    // Horas: duração da aula, sempre no canto inferior esquerdo do card.
+    // Valor: quanto o professor recebe por essa aula, canto inferior direito —
+    // só faz sentido no modo professor (checkbox fica desabilitado em modo cliente).
+    const mostrarHoras = estado.mostrarHoras;
+    const mostrarValor = estado.mostrarValor && estado.modo === 'professor';
+    let rodape = '';
+    if (mostrarHoras || mostrarValor) {
+      const horasTxt = mostrarHoras ? _cbEsc(aula.duracao || '--') : '';
+      const valorTxt = mostrarValor ? _cbMoeda(parseFloat(aula.ValorAula) || 0) : '';
+      rodape = `
+        <div class="cbusca-event-rodape">
+          <span class="cbusca-event-rodape-esq">${horasTxt}</span>
+          <span class="cbusca-event-rodape-dir">${valorTxt}</span>
+        </div>`;
+    }
+
     return `
       <div class="cal-master-event cbusca-event${inativa ? ' cbusca-event-inativo' : ''}${codigo ? '' : ' cbusca-event-sem-codigo'}"
            style="background:${cor}"
            data-codigo="${_cbEsc(codigo)}"
            title="${_cbEsc(titulo)}">
         ${linhas.map(l => `<span class="cal-master-event-line">${_cbEsc(l)}</span>`).join('')}
+        ${rodape}
       </div>`;
   }
 
@@ -564,97 +601,127 @@ const CalendarioBusca = (function () {
   /* ──────────────── eventos ──────────────── */
 
   function atualizarTudo() {
-    renderToggle();
-    renderDropdown();
+    renderMesLabel();
+    renderDropdown('cliente');
+    renderDropdown('professor');
+    renderChecks();
     renderResumo();
     renderConteudo();
   }
 
   function ligarEventos(container) {
-    // Toggle professor/cliente: exclusivo, e trocar de lado limpa a seleção.
-    container.querySelectorAll('#cbusca-toggle .cbusca-toggle-opt').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const novo = btn.dataset.modo;
-        if (novo === estado.modo) return;
-        estado.modo = novo;
-        estado.selecionados.clear();
-        estado.termoBusca = '';
-        const inputBusca = document.getElementById('cbusca-dd-busca');
-        if (inputBusca) inputBusca.value = '';
-        atualizarTudo();
-      });
+    document.getElementById('cbusca-mes-anterior')?.addEventListener('click', () => {
+      estado.mes--;
+      if (estado.mes < 0) { estado.mes = 11; estado.ano--; }
+      atualizarTudo();
+    });
+    document.getElementById('cbusca-mes-proximo')?.addEventListener('click', () => {
+      estado.mes++;
+      if (estado.mes > 11) { estado.mes = 0; estado.ano++; }
+      atualizarTudo();
     });
 
-    const ddBtn = document.getElementById('cbusca-dd-btn');
-    const ddMenu = document.getElementById('cbusca-dd-menu');
-    if (ddBtn && ddMenu) {
-      ddBtn.addEventListener('click', e => {
-        e.stopPropagation();
-        ddMenu.classList.toggle('hidden');
-        if (!ddMenu.classList.contains('hidden')) {
-          const inputBusca = document.getElementById('cbusca-dd-busca');
-          if (inputBusca) inputBusca.focus();
-        }
-      });
-      if (!_fechaDropdownAoClicarFora) {
-        _fechaDropdownAoClicarFora = true;
-        document.addEventListener('click', e => {
-          const menu = document.getElementById('cbusca-dd-menu');
-          if (!menu || menu.classList.contains('hidden')) return;
-          const wrapper = document.getElementById('cbusca-dd-wrapper');
-          if (wrapper && !wrapper.contains(e.target)) menu.classList.add('hidden');
+    ['cliente', 'professor'].forEach(tipo => {
+      const ddBtn = document.getElementById(`cbusca-dd-btn-${tipo}`);
+      const ddMenu = document.getElementById(`cbusca-dd-menu-${tipo}`);
+      if (ddBtn && ddMenu) {
+        ddBtn.addEventListener('click', e => {
+          e.stopPropagation();
+          // Só um dropdown aberto por vez.
+          const outroTipo = tipo === 'cliente' ? 'professor' : 'cliente';
+          const outroMenu = document.getElementById(`cbusca-dd-menu-${outroTipo}`);
+          if (outroMenu) outroMenu.classList.add('hidden');
+
+          ddMenu.classList.toggle('hidden');
+          if (!ddMenu.classList.contains('hidden')) {
+            const inputBusca = document.getElementById(`cbusca-dd-busca-${tipo}`);
+            if (inputBusca) inputBusca.focus();
+          }
         });
       }
-    }
 
-    const inputBusca = document.getElementById('cbusca-dd-busca');
-    if (inputBusca) {
-      inputBusca.addEventListener('input', function () {
-        estado.termoBusca = this.value || '';
-        renderDropdown();
+      const inputBusca = document.getElementById(`cbusca-dd-busca-${tipo}`);
+      if (inputBusca) {
+        inputBusca.addEventListener('input', function () {
+          estado.termoBusca[tipo] = this.value || '';
+          renderDropdown(tipo);
+        });
+      }
+    });
+
+    if (!_fechaDropdownAoClicarFora) {
+      _fechaDropdownAoClicarFora = true;
+      document.addEventListener('click', e => {
+        ['cliente', 'professor'].forEach(tipo => {
+          const menu = document.getElementById(`cbusca-dd-menu-${tipo}`);
+          if (!menu || menu.classList.contains('hidden')) return;
+          const wrapper = document.getElementById(`cbusca-dd-wrapper-${tipo}`);
+          if (wrapper && !wrapper.contains(e.target)) menu.classList.add('hidden');
+        });
       });
     }
 
-    // Delegação: a lista é reconstruída a cada render.
-    const lista = document.getElementById('cbusca-dd-lista');
-    if (lista) {
-      lista.addEventListener('change', e => {
+    // Delegação num container comum aos dois dropdowns: cada lista é reconstruída a
+    // cada render, então os listeners individuais se perderiam a cada atualização.
+    const filtros = container.querySelector('.cbusca-filtros');
+    if (filtros) {
+      filtros.addEventListener('change', e => {
         const chk = e.target.closest ? e.target.closest('.cbusca-dd-chk') : null;
-        const alvo = chk || (e.target.classList && e.target.classList.contains('cbusca-dd-chk') ? e.target : null);
-        if (!alvo) return;
-        const nome = alvo.dataset.nome;
-        if (!nome) return;
-        if (alvo.checked) estado.selecionados.add(nome);
-        else estado.selecionados.delete(nome);
-        renderDropdown();
+        if (!chk) return;
+        const tipo = chk.dataset.tipo;
+        const nome = chk.dataset.nome;
+        if (!tipo || !nome) return;
+
+        if (estado.modo !== tipo) {
+          // Primeiro item do outro tipo: limpa a seleção anterior, troca o modo e já
+          // aplica esse item como selecionado.
+          estado.modo = tipo;
+          estado.selecionados = new Set([nome]);
+          // "Valor" só existe para professores — some ao entrar em modo cliente.
+          if (tipo === 'cliente') estado.mostrarValor = false;
+        } else {
+          if (chk.checked) estado.selecionados.add(nome);
+          else estado.selecionados.delete(nome);
+          if (estado.selecionados.size === 0) estado.modo = null;
+        }
+
+        renderDropdown('cliente');
+        renderDropdown('professor');
+        renderChecks();
         renderResumo();
         renderConteudo();
       });
     }
 
-    const selMes = document.getElementById('cbusca-mes');
-    if (selMes) {
-      selMes.addEventListener('change', function () {
-        estado.mes = parseInt(this.value, 10);
-        atualizarTudo();
+    const chkHoras = document.getElementById('cbusca-chk-horas');
+    if (chkHoras) {
+      chkHoras.addEventListener('change', function () {
+        estado.mostrarHoras = this.checked;
+        renderConteudo();
       });
     }
 
-    const selAno = document.getElementById('cbusca-ano');
-    if (selAno) {
-      selAno.addEventListener('change', function () {
-        estado.ano = parseInt(this.value, 10);
-        atualizarTudo();
+    const chkValor = document.getElementById('cbusca-chk-valor');
+    if (chkValor) {
+      chkValor.addEventListener('change', function () {
+        if (this.disabled) return;
+        estado.mostrarValor = this.checked;
+        renderConteudo();
       });
     }
 
     const btnLimpar = document.getElementById('cbusca-limpar');
     if (btnLimpar) {
       btnLimpar.addEventListener('click', () => {
+        estado.modo = null;
         estado.selecionados.clear();
-        estado.termoBusca = '';
-        const busca = document.getElementById('cbusca-dd-busca');
-        if (busca) busca.value = '';
+        estado.termoBusca = { cliente: '', professor: '' };
+        estado.mostrarHoras = false;
+        estado.mostrarValor = false;
+        ['cliente', 'professor'].forEach(tipo => {
+          const busca = document.getElementById(`cbusca-dd-busca-${tipo}`);
+          if (busca) busca.value = '';
+        });
         atualizarTudo();
       });
     }
@@ -687,7 +754,7 @@ const CalendarioBusca = (function () {
 
     estado.carregando = true;
     estado.erro = null;
-    renderToggle();
+    renderMesLabel();
     renderConteudo();
 
     try {
@@ -699,7 +766,6 @@ const CalendarioBusca = (function () {
       estado.carregando = false;
     }
 
-    renderSelectsData();
     atualizarTudo();
   }
 
