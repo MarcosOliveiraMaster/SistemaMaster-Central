@@ -1252,13 +1252,17 @@ function initNavegacaoConsultaAulas() {
   }
 
   btnAnterior.addEventListener('click', () => {
-    diaConsultaAulasAtual.setDate(diaConsultaAulasAtual.getDate() - 1);
-    atualizarConsultaAulas();
+    const novaData = new Date(diaConsultaAulasAtual);
+    novaData.setDate(novaData.getDate() - 1);
+    ativarBotao(null); // nenhum dos atalhos Ontem/Hoje/Amanhã corresponde mais a essa data
+    atualizarDataSelecionada(novaData);
   });
 
   btnProximo.addEventListener('click', () => {
-    diaConsultaAulasAtual.setDate(diaConsultaAulasAtual.getDate() + 1);
-    atualizarConsultaAulas();
+    const novaData = new Date(diaConsultaAulasAtual);
+    novaData.setDate(novaData.getDate() + 1);
+    ativarBotao(null);
+    atualizarDataSelecionada(novaData);
   });
 }
 
@@ -1998,9 +2002,11 @@ window.updateAulaStatus = async function (id, newStatus) {
     const modal = document.querySelector('.modal-overlay');
     if (modal) modal.remove();
     
-    // Recarregar tabela com a mesma data selecionada
+    // Recarregar tabela com a mesma data selecionada — usa diaConsultaAulasAtual
+    // (não dataSelecionada, que fica desatualizada quando se navega pelas setas
+    // ◀/▶ e não é atualizada por elas; ver initNavegacaoConsultaAulas)
     setTimeout(() => {
-      loadAulasPainel(formatarDataInput(dataSelecionada));
+      atualizarConsultaAulas();
     }, 300);
     
   } catch (error) {
