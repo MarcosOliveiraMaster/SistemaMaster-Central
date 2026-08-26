@@ -4027,6 +4027,1036 @@ h2, h3, h4, h5, h6 {
   background: #8B5CF6;
 }
 
+/* ===== Barra de progresso de tarefas do dia (acima do quadrado, no grid) ===== */
+.cm-barra-slot {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 2px;
+  padding: 0 2px 2px;
+  margin-top: 5px;
+}
+
+.cm-barra-slot.cm-barra-clicavel {
+  cursor: pointer;
+}
+
+.cm-barra-linha {
+  display: flex;
+  gap: 2px;
+}
+
+.cm-fatia {
+  flex: 1;
+  height: 6px;
+  min-width: 3px;
+  border-radius: 999px;
+  background: #d1d5db;
+  transition: background-color 0.2s;
+}
+
+.cm-fatia-concluida {
+  background: #10B981;
+}
+
+.cm-fatia-urgente {
+  background: #ef4444;
+}
+
+/* ===== Modal "Criar tarefas" (checklist do Calendário Master) ===== */
+.cm-tarefas-modal {
+  width: 85vw;
+  max-width: 85vw;
+  height: 80vh;
+  max-height: 80vh;
+}
+
+/* ---- Navegador de dia (seta anterior/próximo, acima da toolbar) ---- */
+.cm-dia-navegador {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.cm-dia-navegador-btn {
+  border: 1px solid #e5e7eb;
+  background: white;
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #6b7280;
+}
+
+.cm-dia-navegador-btn:hover {
+  border-color: var(--orange);
+  color: var(--orange-dark);
+}
+
+.cm-dia-navegador-label {
+  font-family: 'Lexend', sans-serif;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #1f2937;
+  min-width: 220px;
+  text-align: center;
+}
+
+/* ---- Barra de ferramentas (data, filtros, editando como, nova tarefa) ---- */
+.cm-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+/* "Cartão" que agrupa um bloco de controles relacionados (filtros, editor...) */
+.cm-toolbar-secao {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  background: #f9fafb;
+  border: 1px solid #f0f1f3;
+  border-radius: 10px;
+  padding: 5px 8px;
+  height: 38px;
+}
+
+.cm-toolbar-secao-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-right: 2px;
+  white-space: nowrap;
+}
+
+/* Agrupa "Responsável" e "Tags" mantendo-os como cartões separados, com 15px entre eles */
+.cm-toolbar-par {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.cm-toolbar-secao-tags {
+  min-width: 190px;
+}
+
+.cm-toolbar-secao-tags .cm-buscar-tags-wrap {
+  width: 100%;
+}
+
+.cm-toolbar-secao-tags #cmBtnBuscarTags {
+  width: 100%;
+  justify-content: center;
+}
+
+/* Cartão compacto só com o ícone de olho, separado de "Editando como" */
+.cm-toolbar-secao-olho {
+  padding: 5px;
+  gap: 0;
+}
+
+/* Empurra "Nova Tarefa" pra ponta direita da barra */
+#cmTarefasBtnNova {
+  margin-left: auto;
+}
+
+.cm-toolbar-btn {
+  border: none;
+  background: transparent;
+  border-radius: 7px;
+  padding: 5px 10px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  color: #6b7280;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+}
+
+.cm-toolbar-btn:hover {
+  background: #f1f2f4;
+}
+
+.cm-toolbar-btn.ativo {
+  background: #fdf2f8;
+  color: #be185d;
+}
+
+/* ---- Popover genérico (data / buscar tags / tags do item) ---- */
+.cm-popover {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 60;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(17, 24, 39, 0.14);
+}
+
+.cm-popover.aberto {
+  display: block;
+}
+
+/* ---- Seletor de data (mini-calendário com feriados) ---- */
+.cm-data-picker-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 25px;
+}
+
+.cm-data-picker-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 0 14px;
+  height: 38px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: white;
+  cursor: pointer;
+  color: #374151;
+}
+
+.cm-data-picker-btn i {
+  color: var(--orange);
+}
+
+.cm-data-picker-btn:hover {
+  border-color: var(--orange);
+}
+
+.cm-data-picker-popover {
+  width: 250px;
+  padding: 10px;
+}
+
+.cm-data-picker-weekday {
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: #9ca3af;
+  text-transform: uppercase;
+}
+
+.cm-data-picker-day {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  color: #374151;
+}
+
+.cm-data-picker-day-hoje {
+  border: 1px solid var(--orange);
+  color: #F2870C;
+  font-weight: 700;
+}
+
+/* ---- Buscar Tags (filtro do topo) ---- */
+.cm-buscar-tags-wrap {
+  position: relative;
+}
+
+.cm-tag-filtro-popover {
+  width: 220px;
+  padding: 8px;
+}
+
+.cm-tag-filtro-busca {
+  width: 100%;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 0.75rem;
+  margin-bottom: 6px;
+}
+
+.cm-tag-filtro-busca:focus {
+  outline: none;
+  border-color: #EC4899;
+}
+
+.cm-tag-filtro-lista {
+  max-height: 200px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cm-tag-filtro-vazio {
+  font-size: 0.72rem;
+  color: #9ca3af;
+  padding: 6px 2px;
+}
+
+.cm-tag-opcao {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: #374151;
+  padding: 4px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.cm-tag-opcao:hover {
+  background: #f9fafb;
+}
+
+/* ---- Editando como / filtro por responsável (segmentado, dentro do cartão da seção) ---- */
+.cm-editor-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cm-editor-btn {
+  border: none;
+  background: transparent;
+  border-radius: 7px;
+  padding: 0 10px;
+  height: 28px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: #6b7280;
+}
+
+.cm-editor-btn:hover {
+  background: #f1f2f4;
+}
+
+.cm-editor-btn[data-pessoa="Marcos"].ativo {
+  background: #3B82F6;
+  color: white;
+}
+
+.cm-editor-btn[data-pessoa="Ester"].ativo {
+  background: #EC4899;
+  color: white;
+}
+
+/* Botão de olho — mostra/oculta "Editado em ..." de todas as tarefas listadas */
+.cm-eye-btn {
+  border: none;
+  background: transparent;
+  border-radius: 7px;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+.cm-eye-btn:hover {
+  background: #f1f2f4;
+}
+
+.cm-eye-btn.ativo {
+  color: var(--orange-dark);
+  background: #fff7ed;
+}
+
+.cm-filtro-pessoa-btn {
+  border: none;
+  background: transparent;
+  border-radius: 7px;
+  padding: 0 10px;
+  height: 28px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #6b7280;
+}
+
+.cm-filtro-pessoa-btn:hover {
+  background: #f1f2f4;
+}
+
+.cm-filtro-pessoa-btn.ativo-marcos {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.cm-filtro-pessoa-btn.ativo-ester {
+  background: #fdf2f8;
+  color: #be185d;
+}
+
+.cm-tarefa-item {
+  margin-bottom: 6px;
+}
+
+.cm-tarefa-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* Grupo de ícones de ação (prazo, comentário, responsável, subtarefa, excluir) —
+   10px de distância horizontal entre cada um, separado do gap mais apertado do
+   resto da linha (handle/checkbox/texto) */
+.cm-tarefa-funcoes {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Divisores entre tag/hora, comentário, responsável, subtarefa e excluir — o
+   próprio gap de 10px do grupo já garante 10px de cada lado, sem margem extra */
+.cm-tarefa-funcoes > .cm-tarefa-divisor {
+  margin: 0;
+}
+
+.cm-tarefa-item.cm-tarefa-arrastando {
+  opacity: 0.4;
+}
+
+.cm-tarefa-item.cm-tarefa-drop-antes > .cm-tarefa-row {
+  box-shadow: inset 0 2px 0 0 #EC4899;
+}
+
+.cm-tarefa-item.cm-tarefa-drop-depois > .cm-tarefa-row {
+  box-shadow: inset 0 -2px 0 0 #EC4899;
+}
+
+/* Clone flutuante usado como imagem customizada do arraste (setDragImage) —
+   fica fora da tela e some logo depois, o navegador só precisa do "retrato" dele */
+.cm-tarefa-drag-preview {
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(17, 24, 39, 0.22);
+  padding: 6px 10px;
+  pointer-events: none;
+  opacity: 0.95;
+}
+
+.cm-tarefa-handle {
+  cursor: grab;
+  color: #c7cbd1;
+  padding: 2px 3px;
+  flex-shrink: 0;
+}
+
+.cm-tarefa-handle:active {
+  cursor: grabbing;
+}
+
+.cm-tarefa-btn-colapsar {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 2px 4px;
+  width: 18px;
+  flex-shrink: 0;
+}
+
+.cm-tarefa-colapsar-espaco {
+  display: inline-block;
+  width: 18px;
+  flex-shrink: 0;
+}
+
+.cm-tarefa-checkbox {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.cm-tarefa-texto {
+  flex: 1;
+  min-width: 120px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  line-height: 1.3;
+  resize: none;
+  overflow-y: hidden;
+}
+
+.cm-tarefa-texto.cm-tarefa-texto-scroll {
+  overflow-y: auto;
+}
+
+.cm-tarefa-texto:focus {
+  outline: none;
+  border-color: #EC4899;
+}
+
+/* Divisores "|" (entre o texto e o resto, e entre a tag e o horário) — 5px de
+   respiro pra cada lado, em vez de encostar nos elementos vizinhos */
+.cm-tarefa-divisor {
+  width: 1px;
+  height: 20px;
+  background: #e5e7eb;
+  flex-shrink: 0;
+  margin: 0 5px;
+}
+
+.cm-tarefa-area-prazo {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.cm-tarefa-btn-hora {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  background: white;
+  color: #374151;
+  cursor: pointer;
+}
+
+/* Só o botão de horário fica destacado quando o prazo está perto/vencido —
+   o ícone de tag ao lado não deve ser marcado junto */
+.cm-tarefa-btn-hora-urgente {
+  border-color: #fca5a5;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.cm-tarefa-btn-hora:hover {
+  border-color: var(--orange);
+  color: var(--orange-dark);
+}
+
+/* ---- Copiar para o dia seguinte / para um dia específico (só no item de nível 1) ---- */
+.cm-tarefa-btn-copiar-amanha {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.cm-tarefa-btn-copiar-amanha:hover {
+  color: #0ea5e9;
+  background: #eff6ff;
+}
+
+.cm-tarefa-copiar-data-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* Esse botão costuma ficar perto da borda direita da linha — abrir o popover
+   alinhado à direita (em vez de à esquerda, padrão de .cm-popover) evita que
+   ele estoure a borda do modal e crie uma barra de rolagem horizontal */
+.cm-tarefa-copiar-data-wrap .cm-popover {
+  left: auto;
+  right: 0;
+}
+
+.cm-tarefa-btn-copiar-data {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+
+.cm-tarefa-btn-copiar-data:hover {
+  color: #0ea5e9;
+  background: #eff6ff;
+}
+
+/* ---- Tags (só no item de nível 1) ---- */
+.cm-tarefa-tag-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.cm-tarefa-btn-tag {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+
+.cm-tarefa-btn-tag:hover {
+  color: #F2870C;
+  background: #fff7ed;
+}
+
+.cm-tag-popover {
+  width: 210px;
+  padding: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.cm-tarefa-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.cm-tag-chip {
+  font-size: 0.65rem;
+  color: #9a3412;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.cm-tarefa-btn-comentario {
+  background: none;
+  border: none;
+  color: #fb923c;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.cm-tarefa-btn-comentario:hover,
+.cm-tarefa-btn-comentario-ativo {
+  color: #ea580c;
+  background: #fff7ed;
+}
+
+.cm-tarefa-pessoas {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.cm-tarefa-pessoa {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: white;
+  font-size: 0.65rem;
+  padding: 0;
+  opacity: 0.35;
+}
+
+.cm-tarefa-pessoa-marcos {
+  background: #3B82F6;
+}
+
+.cm-tarefa-pessoa-ester {
+  background: #EC4899;
+}
+
+.cm-tarefa-pessoa.ativo {
+  opacity: 1;
+}
+
+.cm-tarefa-pessoa:hover,
+.cm-tarefa-pessoa:focus-visible {
+  border-color: var(--orange);
+  opacity: 1;
+  outline: none;
+}
+
+.cm-tarefa-btn-subtarefa,
+.cm-tarefa-btn-excluir {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.cm-tarefa-btn-subtarefa:hover {
+  color: #EC4899;
+  background: #fdf2f8;
+}
+
+.cm-tarefa-btn-excluir:hover {
+  color: #dc2626;
+  background: #fef2f2;
+}
+
+/* Barra lateral discreta que abre/fecha cm-tarefa-funcoes (só 1 item aberto por vez) */
+.cm-tarefa-btn-funcoes-toggle {
+  background: none;
+  border: none;
+  color: #d1d5db;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.cm-tarefa-btn-funcoes-toggle:hover {
+  color: #6b7280;
+  background: #f3f4f6;
+}
+
+.cm-tarefa-btn-funcoes-toggle.ativo {
+  color: var(--orange);
+  background: #fff7ed;
+}
+
+.cm-tarefa-meta {
+  font-size: 0.68rem;
+  color: #9ca3af;
+  text-align: right;
+  margin-top: 2px;
+  /* margin-right é calculado via JS (posicionarMetas) pra acompanhar a borda
+     direita do campo de texto atual, que muda de largura conforme os ícones
+     de cm-tarefa-funcoes estão abertos ou fechados */
+}
+
+.cm-ocultar-meta .cm-tarefa-meta {
+  display: none;
+}
+
+.cm-tarefa-comentario-wrap {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  margin-top: 0;
+  transition: max-height 0.25s ease, opacity 0.2s ease, margin-top 0.25s ease;
+}
+
+.cm-tarefa-comentario-wrap.aberto {
+  max-height: 300px;
+  opacity: 1;
+  margin-top: 6px;
+}
+
+.cm-tarefa-comentario-texto {
+  width: 100%;
+  resize: none;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 0.8rem;
+  min-height: 40px;
+  max-height: 100px;
+  overflow-y: hidden;
+}
+
+.cm-tarefa-comentario-texto.cm-tarefa-comentario-scroll {
+  overflow-y: auto;
+}
+
+.cm-tarefa-comentario-texto:focus {
+  outline: none;
+  border-color: #fb923c;
+}
+
+/* Recuo só entre item e subitens — a caixa de comentário fica alinhada ao item */
+.cm-tarefa-filhos {
+  margin-left: 26px;
+  margin-top: 6px;
+  padding-left: 10px;
+  border-left: 2px solid #f3f4f6;
+}
+
+.cm-tarefa-nivel-2 .cm-tarefa-texto {
+  font-size: 0.8rem;
+}
+
+.cm-tarefa-nivel-3 .cm-tarefa-texto {
+  font-size: 0.78rem;
+}
+
+/* ===== Seletor de hora circular (mostrador estilo relógio) ===== */
+.cm-hora-overlay {
+  z-index: 10050;
+}
+
+.cm-hora-container {
+  background: white;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  width: 480px;
+  max-width: 92vw;
+  overflow: hidden;
+}
+
+.cm-hora-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid #f3f4f6;
+  font-family: 'Lexend', sans-serif;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #1f2937;
+}
+
+.cm-hora-fechar {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.cm-hora-corpo {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 20px;
+}
+
+.cm-hora-lado-esquerdo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+  width: 140px;
+}
+
+.cm-hora-digital {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-family: 'Lexend', sans-serif;
+}
+
+.cm-hora-digito {
+  border: none;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 2.1rem;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.cm-hora-digito.ativo {
+  background: #fff2e0;
+  color: var(--orange-dark);
+}
+
+.cm-hora-dois-pontos {
+  font-size: 2.1rem;
+  font-weight: 700;
+  color: #9ca3af;
+}
+
+.cm-hora-ampm {
+  position: relative;
+  display: flex;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  padding: 3px;
+  width: 100%;
+  overflow: hidden;
+}
+
+.cm-hora-ampm-slider {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  height: calc(100% - 6px);
+  background: var(--orange);
+  border-radius: 999px;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 0;
+}
+
+.cm-hora-ampm-btn {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  border: none;
+  background: none;
+  padding: 6px 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: color 0.2s;
+}
+
+.cm-hora-ampm-btn.ativo {
+  color: white;
+}
+
+.cm-hora-lado-direito {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.cm-hora-relogio {
+  position: relative;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: #f9fafb;
+  touch-action: none;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.cm-hora-centro {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  background: var(--orange);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+}
+
+.cm-hora-ponteiro {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2px;
+  height: 88px;
+  background: var(--orange);
+  transform-origin: bottom center;
+  border-radius: 2px;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.cm-hora-ponteiro::after {
+  content: '';
+  position: absolute;
+  top: -15px;
+  left: 50%;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--orange);
+  opacity: 0.16;
+  transform: translateX(-50%);
+}
+
+.cm-hora-ponteiro.cm-hora-ponteiro-minuto {
+  background: var(--orange-dark);
+}
+
+.cm-hora-numeros {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+
+/* Anima a troca dos números do mostrador (hora ↔ minuto, ou AM ↔ PM) */
+@keyframes cmHoraTrocaNumeros {
+  0% { opacity: 0; transform: scale(0.82); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.cm-hora-numeros.cm-hora-anim {
+  animation: cmHoraTrocaNumeros 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.cm-hora-num {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  margin: -16px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #374151;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.cm-hora-num-minuto {
+  font-size: 0.68rem;
+  font-weight: 500;
+  width: 26px;
+  height: 26px;
+  margin: -13px;
+}
+
+.cm-hora-num.ativo {
+  background: var(--orange);
+  color: white;
+}
+
+.cm-hora-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 18px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.cm-hora-btn-limpar {
+  margin-right: auto;
+  color: #b91c1c;
+}
+
+.cm-hora-btn-limpar:hover {
+  background: #fef2f2;
+  border-color: #fca5a5;
+}
+
 /* -------------------- CALENDÁRIO MASTER (calendario-busca.js) -------------------- */
 .cbusca-filtros {
   display: flex;

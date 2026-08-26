@@ -52,7 +52,13 @@
       "Bash(echo \"EXIT:$?\")",
       "Bash(node --check functions-fluxo-processos.js)",
       "Bash(git pull *)",
-      "Bash(node --check functions-banco-de-aulas.js)"
+      "Bash(node --check functions-banco-de-aulas.js)",
+      "Bash(node --check calendario-master-tarefas.js)",
+      "Read(//tmp/**)",
+      "Bash(python -c \"print\\('python works'\\)\")",
+      "Bash(node _teste_server.js)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8743/teste-tarefas.html)",
+      "PowerShell(Get-NetTCPConnection *)"
     ]
   }
 }

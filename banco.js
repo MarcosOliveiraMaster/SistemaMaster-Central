@@ -767,6 +767,157 @@ async function deleteEventoCalendario(eventoId) {
   }
 }
 
+// ─────────────────────────────────────────────────────────────
+// Coleção "listasTarefas" — checklists de tarefas por data, criados
+// pela função "Criar tarefas" do Calendário Master. Cada lista tem uma
+// subcoleção "itens" (até 3 níveis: tarefa > subitem > sub-subitem),
+// identificados por nivel (1/2/3) e parentId (null no nível 1). Contadores
+// agregados (totalItens/itensConcluidos) ficam no doc da lista para o grid
+// não precisar ler a subcoleção inteira a cada render.
+// ─────────────────────────────────────────────────────────────
+
+// Função para criar uma nova lista de tarefas (checklist) para uma data
+async function addListaTarefas(data) {
+  try {
+    const docRef = await db.collection("listasTarefas").add({
+      data,
+      totalItens: 0,
+      itensConcluidos: 0,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    return docRef.id;
+  } catch (error) {
+    console.error('❌ Erro ao criar lista de tarefas:', error.message);
+    throw error;
+  }
+}
+
+// Função para buscar todas as listas de tarefas (usado no grid do Calendário Master)
+async function fetchListasTarefas() {
+  try {
+    const querySnapshot = await db.collection("listasTarefas").get();
+    const listas = [];
+    querySnapshot.forEach(doc => { listas.push({ id: doc.id, ...doc.data() }); });
+    return listas;
+  } catch (error) {
+    console.error('❌ Erro ao buscar listas de tarefas:', error.message);
+    return [];
+  }
+}
+
+// Função para atualizar a data de uma lista de tarefas
+async function updateListaTarefasData(listaId, novaData) {
+  try {
+    await db.collection("listasTarefas").doc(listaId).update({ data: novaData });
+    return true;
+  } catch (error) {
+    console.error('❌ Erro ao atualizar data da lista de tarefas:', error.message);
+    throw error;
+  }
+}
+
+// Função para atualizar os contadores agregados (total/concluídos) da lista de tarefas
+async function atualizarAgregadosListaTarefas(listaId, totalItens, itensConcluidos) {
+  try {
+    await db.collection("listasTarefas").doc(listaId).update({
+      totalItens,
+      itensConcluidos,
+      ultimaAtualizacao: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    return true;
+  } catch (error) {
+    console.error('❌ Erro ao atualizar agregados da lista de tarefas:', error.message);
+    throw error;
+  }
+}
+
+// Função para excluir uma lista de tarefas inteira (doc + subcoleção "itens")
+async function deleteListaTarefas(listaId) {
+  try {
+    const itensSnap = await db.collection("listasTarefas").doc(listaId).collection("itens").get();
+    const batch = db.batch();
+    itensSnap.forEach(doc => batch.delete(doc.ref));
+    batch.delete(db.collection("listasTarefas").doc(listaId));
+    await batch.commit();
+    return true;
+  } catch (error) {
+    console.error('❌ Erro ao excluir lista de tarefas:', error.message);
+    throw error;
+  }
+}
+
+// Função para buscar todos os itens (tarefas/subitens/sub-subitens) de uma lista
+async function fetchItensTarefa(listaId) {
+  try {
+    const querySnapshot = await db.collection("listasTarefas").doc(listaId).collection("itens").get();
+    const itens = [];
+    querySnapshot.forEach(doc => { itens.push({ id: doc.id, ...doc.data() }); });
+    return itens;
+  } catch (error) {
+    console.error('❌ Erro ao buscar itens da lista de tarefas:', error.message);
+    return [];
+  }
+}
+
+// Função para adicionar um item (tarefa/subitem/sub-subitem) a uma lista de tarefas
+async function addItemTarefa(listaId, itemData) {
+  try {
+    const docRef = await db.collection("listasTarefas").doc(listaId).collection("itens").add({
+      ...itemData,
+      concluido: false,
+      criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+      ultimaEdicao: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    return docRef.id;
+  } catch (error) {
+    console.error('❌ Erro ao adicionar item da lista de tarefas:', error.message);
+    throw error;
+  }
+}
+
+// Função para atualizar um item (texto e/ou concluido) de uma lista de tarefas
+async function updateItemTarefa(listaId, itemId, updatedData) {
+  try {
+    await db.collection("listasTarefas").doc(listaId).collection("itens").doc(itemId).update({
+      ...updatedData,
+      ultimaEdicao: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    return true;
+  } catch (error) {
+    console.error('❌ Erro ao atualizar item da lista de tarefas:', error.message);
+    throw error;
+  }
+}
+
+// Função para persistir a nova ordem dos itens depois de um arrastar-e-soltar
+// (recebe [{id, ordem}, ...] e grava o campo "ordem" de cada um em lote)
+async function reordenarItensTarefa(listaId, itensComOrdem) {
+  try {
+    const batch = db.batch();
+    itensComOrdem.forEach(({ id, ordem }) => {
+      batch.update(db.collection("listasTarefas").doc(listaId).collection("itens").doc(id), { ordem });
+    });
+    await batch.commit();
+    return true;
+  } catch (error) {
+    console.error('❌ Erro ao reordenar itens da lista de tarefas:', error.message);
+    throw error;
+  }
+}
+
+// Função para excluir um ou mais itens (usado para excluir um item + seus descendentes de uma vez)
+async function deleteItensTarefa(listaId, itemIds) {
+  try {
+    const batch = db.batch();
+    itemIds.forEach(id => batch.delete(db.collection("listasTarefas").doc(listaId).collection("itens").doc(id)));
+    await batch.commit();
+    return true;
+  } catch (error) {
+    console.error('❌ Erro ao excluir itens da lista de tarefas:', error.message);
+    throw error;
+  }
+}
+
 // Forçar atualização do cache
 function forceCacheRefresh() {
   CACHE.bancoDeAulas.timestamp      = null;
@@ -811,6 +962,16 @@ if (typeof window !== 'undefined') {
     fetchEventosCalendario,
     updateEventoCalendario,
     deleteEventoCalendario,
+    addListaTarefas,
+    fetchListasTarefas,
+    updateListaTarefasData,
+    atualizarAgregadosListaTarefas,
+    deleteListaTarefas,
+    fetchItensTarefa,
+    addItemTarefa,
+    updateItemTarefa,
+    reordenarItensTarefa,
+    deleteItensTarefa,
     forceCacheRefresh,
     isCacheValid
   };

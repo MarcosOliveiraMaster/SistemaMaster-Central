@@ -55,6 +55,7 @@ let calMasterExibirPagamentos = true;
 let calMasterExibirRenovacoes = true;
 let calMasterExibirFeriados = true;   // feriados nacionais, de Alagoas e de Maceió
 let calMasterEventosCache = []; // cache dos eventos customizados carregados no mês atual
+// Cache das listas de tarefas (checklists) fica em calendario-master-tarefas.js (CalMasterTarefas)
 
 // Cache local do cálculo de renovações (evita recomputar a cada troca de mês
 // dentro da mesma janela de cache do BANCO.fetchBancoDeAulasListaBatch)
@@ -2310,6 +2311,10 @@ function carregarCalendarioMaster() {
           <i class="fas fa-plus mr-2"></i>
           Criar evento
         </button>
+        <button type="button" id="calMaster-btn-criar-tarefas" class="btn-primary btn-compact" style="height: 34px;">
+          <i class="fas fa-list-check mr-2"></i>
+          Criar tarefas
+        </button>
       </div>
     </div>
 
@@ -2321,6 +2326,7 @@ function carregarCalendarioMaster() {
   const chkRenovacoes = document.getElementById('calMaster-chk-renovacoes');
   const chkFeriados = document.getElementById('calMaster-chk-feriados');
   const btnCriarEvento = document.getElementById('calMaster-btn-criar-evento');
+  const btnCriarTarefas = document.getElementById('calMaster-btn-criar-tarefas');
   const btnMesAnterior = document.getElementById('calMaster-btn-mes-anterior');
   const btnMesProximo = document.getElementById('calMaster-btn-mes-proximo');
 
@@ -2341,6 +2347,7 @@ function carregarCalendarioMaster() {
     renderGradeCalendarioMaster();
   });
   btnCriarEvento.addEventListener('click', () => abrirModalCriarEvento());
+  btnCriarTarefas.addEventListener('click', () => CalMasterTarefas.abrirModalCriarTarefas());
   btnMesAnterior.addEventListener('click', () => mudarMesCalMaster(-1));
   btnMesProximo.addEventListener('click', () => mudarMesCalMaster(1));
 
@@ -2537,6 +2544,16 @@ async function renderGradeCalendarioMaster() {
     }).catch(err => console.error('❌ Erro ao carregar eventos do Calendário Master:', err))
   );
 
+  // Listas de tarefas — não viram card dentro do dia; renderizam como barra de
+  // progresso acima do quadrado do dia (ver CalMasterTarefas.renderizarBarraDia,
+  // carregado a partir do cache preenchido logo abaixo).
+  if (typeof CalMasterTarefas !== 'undefined') {
+    promessas.push(
+      CalMasterTarefas.carregarCacheDoMes(calMasterMes, calMasterAno)
+        .catch(err => console.error('❌ Erro ao carregar listas de tarefas do Calendário Master:', err))
+    );
+  }
+
   // Feriados (verde) — nacionais, de Alagoas e de Maceió. Vêm de feriados.js, que é
   // cálculo puro: nada de rede nem de Firestore, por isso não entram em "promessas".
   // minutos -1 mantém o feriado no topo do dia, antes de qualquer evento com horário.
@@ -2598,37 +2615,54 @@ async function renderGradeCalendarioMaster() {
     `;
   };
 
-  // Padding: dias do mês anterior
+  // Monta a lista completa de células (mês anterior + mês atual + próximo mês) e
+  // agrupa de 7 em 7 (semanas) pra intercalar, antes de cada semana de quadrados,
+  // uma linha de "barras de progresso" das tarefas do dia. Isso usa o comportamento
+  // nativo do CSS Grid — a altura de cada linha do grid se ajusta ao maior conteúdo
+  // dela — pra garantir que os 7 dias de uma mesma semana fiquem com a mesma altura
+  // reservada acima do quadrado, mesmo que só um deles tenha tarefas naquele dia.
+  const celulas = [];
   for (let i = diaSemanaInicio - 1; i >= 0; i--) {
-    const dia = diasNoMesAnterior - i;
-    html += `<div class="cal-master-day cal-master-day-other"><div class="cal-master-day-num">${dia}</div></div>`;
+    celulas.push({ dia: diasNoMesAnterior - i, outroMes: true });
   }
-
-  // Dias do mês atual
-  const hoje = new Date();
-  const isMesAtualHoje = hoje.getFullYear() === calMasterAno && hoje.getMonth() === calMasterMes;
-
   for (let dia = 1; dia <= diasNoMes; dia++) {
-    const eventosDoDia = eventosPorDia[dia] || [];
-    const classeHoje = (isMesAtualHoje && dia === hoje.getDate()) ? ' cal-master-day-hoje' : '';
-    html += `
-      <div class="cal-master-day${classeHoje}">
-        <div class="cal-master-day-num">${dia}</div>
-        <div class="cal-master-day-events">
-          ${eventosDoDia.map(renderEventoHtml).join('')}
-        </div>
-      </div>
-    `;
+    celulas.push({ dia, outroMes: false, eventosDoDia: eventosPorDia[dia] || [] });
   }
-
-  // Padding: dias do próximo mês (completar última semana)
   const totalCelulas = diaSemanaInicio + diasNoMes;
   const restante = (7 - (totalCelulas % 7)) % 7;
   for (let dia = 1; dia <= restante; dia++) {
-    html += `<div class="cal-master-day cal-master-day-other"><div class="cal-master-day-num">${dia}</div></div>`;
+    celulas.push({ dia, outroMes: true });
+  }
+
+  const hoje = new Date();
+  const isMesAtualHoje = hoje.getFullYear() === calMasterAno && hoje.getMonth() === calMasterMes;
+
+  for (let i = 0; i < celulas.length; i += 7) {
+    const semana = celulas.slice(i, i + 7);
+
+    html += semana.map(c => {
+      if (c.outroMes || typeof CalMasterTarefas === 'undefined') return '<div class="cm-barra-slot"></div>';
+      return CalMasterTarefas.renderizarBarraDia(c.dia);
+    }).join('');
+
+    html += semana.map(c => {
+      if (c.outroMes) {
+        return `<div class="cal-master-day cal-master-day-other"><div class="cal-master-day-num">${c.dia}</div></div>`;
+      }
+      const classeHoje = (isMesAtualHoje && c.dia === hoje.getDate()) ? ' cal-master-day-hoje' : '';
+      return `
+        <div class="cal-master-day${classeHoje}">
+          <div class="cal-master-day-num">${c.dia}</div>
+          <div class="cal-master-day-events">
+            ${c.eventosDoDia.map(renderEventoHtml).join('')}
+          </div>
+        </div>
+      `;
+    }).join('');
   }
 
   grid.innerHTML = html;
+  if (typeof CalMasterTarefas !== 'undefined') CalMasterTarefas.iniciarAtualizacaoCores();
 }
 
 function abrirModalCriarEvento() {
