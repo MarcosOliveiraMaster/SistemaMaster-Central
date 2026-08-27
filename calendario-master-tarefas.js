@@ -235,7 +235,12 @@ function _cmAbrirSeletorHora(valorAtual, onConfirmar) {
   });
 
   const atualizarDigital = () => {
-    digitoHH.textContent = String(hora12).padStart(2, '0');
+    // Mostra a hora em 24h (13, 14...23) quando o período é PM — igual ao rótulo
+    // que o próprio número já exibe na roda do relógio — em vez do valor cru de
+    // 12h (hora12), que fazia o mostrador digital exibir "01" pra 1PM/13h.
+    let h24 = hora12 % 12;
+    if (periodo === 'PM') h24 += 12;
+    digitoHH.textContent = String(h24).padStart(2, '0');
     digitoMM.textContent = String(minuto).padStart(2, '0');
     digitoHH.classList.toggle('ativo', modoAtual === 'hora');
     digitoMM.classList.toggle('ativo', modoAtual === 'minuto');
@@ -347,6 +352,217 @@ function _cmAbrirSeletorHora(valorAtual, onConfirmar) {
 }
 
 // ============================================================
+// MENÇÃO A CLIENTES (@) — autocomplete de clientes ativos nos campos de
+// texto da tarefa e de comentário. O texto salvo no Firestore continua sendo
+// uma string simples; a menção vira um token embutido "@[Nome](clienteId)"
+// nela, convertido pra um <span> não-editável (chip) só na hora de exibir, e
+// reconvertido de volta pro token ao salvar. Os campos em si viram <div
+// contenteditable> (uma textarea não pode conter um elemento embutido).
+// ============================================================
+
+const CM_MENCAO_REGEX = /@\[([^\]\n]+)\]\(([^)\n]+)\)/g;
+const CM_MENCAO_MAX_SUGESTOES = 8;
+
+let cmClientesAtivosCache = null;
+let cmClientesAtivosCacheTimestamp = 0;
+const CM_CLIENTES_ATIVOS_TTL = 5 * 60 * 1000;
+
+function _cmNormalizarStatusCliente(raw) {
+  const map = {
+    'cliente ativo': 'Ativo', 'ativo': 'Ativo',
+    'cliente potencial': 'Potencial', 'potencial': 'Potencial',
+    'cliente inativo': 'Inativo', 'inativo': 'Inativo'
+  };
+  return map[String(raw || '').toLowerCase().trim()] || raw || '';
+}
+
+// Sem acento e minúsculo, pra comparar nomes ignorando acentuação/caixa
+function _cmNormalizarBusca(s) {
+  // Remove os diacríticos (marcas de acento, U+0300-U+036F) que sobram depois do
+  // normalize('NFD') separar "á" em "a" + acento — comparado por código numérico
+  // em vez de um intervalo unicode literal na regex, pra não depender de como o
+  // editor/arquivo grava esses caracteres de combinação.
+  const semAcento = String(s || '').normalize('NFD').split('').filter(ch => {
+    const code = ch.charCodeAt(0);
+    return code < 0x0300 || code > 0x036f;
+  }).join('');
+  return semAcento.toLowerCase();
+}
+
+async function _cmBuscarClientesAtivos() {
+  const agora = Date.now();
+  if (cmClientesAtivosCache && (agora - cmClientesAtivosCacheTimestamp) < CM_CLIENTES_ATIVOS_TTL) {
+    return cmClientesAtivosCache;
+  }
+  try {
+    const clientes = await BANCO.fetchCadastroClientes();
+    cmClientesAtivosCache = clientes.filter(c => _cmNormalizarStatusCliente(c.status) === 'Ativo');
+    cmClientesAtivosCacheTimestamp = agora;
+  } catch (error) {
+    console.error('❌ Erro ao carregar clientes ativos para menção:', error);
+    cmClientesAtivosCache = cmClientesAtivosCache || [];
+  }
+  return cmClientesAtivosCache;
+}
+
+// "Qualquer palavra do nome começa com o texto digitado" — ex.: "sil" acha "Maria Silva"
+function _cmFiltrarClientesPorNome(clientes, query) {
+  const ordenados = [...clientes].sort((a, b) =>
+    String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR', { sensitivity: 'base' })
+  );
+  const termo = _cmNormalizarBusca(query);
+  if (!termo) return ordenados.slice(0, CM_MENCAO_MAX_SUGESTOES);
+  return ordenados
+    .filter(c => _cmNormalizarBusca(c.nome).split(/\s+/).some(palavra => palavra.startsWith(termo)))
+    .slice(0, CM_MENCAO_MAX_SUGESTOES);
+}
+
+// String salva -> HTML pra exibir (token "@[Nome](id)" vira chip não-editável)
+function _cmRenderConteudoComMencoes(texto) {
+  const str = String(texto || '');
+  let html = '';
+  let ultimoIndex = 0;
+  CM_MENCAO_REGEX.lastIndex = 0;
+  let m;
+  while ((m = CM_MENCAO_REGEX.exec(str))) {
+    html += escapeHtml(str.slice(ultimoIndex, m.index));
+    const nome = m[1];
+    const clienteId = m[2];
+    html += `<span class="cm-mention-chip" contenteditable="false" data-cliente-id="${escapeHtml(clienteId)}" data-nome-cliente="${escapeHtml(nome)}">@${escapeHtml(nome)}</span>`;
+    ultimoIndex = CM_MENCAO_REGEX.lastIndex;
+  }
+  html += escapeHtml(str.slice(ultimoIndex));
+  return html;
+}
+
+// String salva -> texto plano (pra tooltip/confirm/toast — nunca deve exibir o token cru)
+function _cmTextoPlano(texto) {
+  CM_MENCAO_REGEX.lastIndex = 0;
+  return String(texto || '').replace(CM_MENCAO_REGEX, (_, nome) => `@${nome}`);
+}
+
+// DOM do campo editável -> string pra salvar (chip vira token "@[Nome](id)" de novo)
+function _cmSerializarConteudoEditavel(el) {
+  let out = '';
+  el.childNodes.forEach(node => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      out += node.textContent;
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      if (node.classList && node.classList.contains('cm-mention-chip')) {
+        out += `@[${node.dataset.nomeCliente || ''}](${node.dataset.clienteId || ''})`;
+      } else if (node.tagName === 'BR') {
+        out += '\n';
+      } else {
+        out += node.textContent;
+      }
+    }
+  });
+  return out;
+}
+
+// Tamanho (em "caracteres salvos") que um nó ocupa na string serializada — usado
+// pra converter offset de cursor entre DOM e string nos dois sentidos.
+function _cmTamanhoSerializado(node) {
+  if (node.nodeType === Node.TEXT_NODE) return node.textContent.length;
+  if (node.classList && node.classList.contains('cm-mention-chip')) {
+    return `@[${node.dataset.nomeCliente || ''}](${node.dataset.clienteId || ''})`.length;
+  }
+  if (node.tagName === 'BR') return 1;
+  return node.textContent.length;
+}
+
+// Posição do cursor contada na "string salva" (não em nós do DOM) — pra poder
+// recolocar o cursor no lugar certo depois de o campo ser reconstruído do zero
+// (ex.: quando o render() do resto da lista dispara enquanto o usuário ainda
+// está digitando neste campo — ver comentário grande perto da função render()).
+function _cmOffsetTextoAntesDoCursor(el) {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return null;
+  const range = sel.getRangeAt(0);
+  if (!el.contains(range.startContainer)) return null;
+  let offset = 0;
+  for (const filho of Array.from(el.childNodes)) {
+    if (filho === range.startContainer) {
+      if (filho.nodeType === Node.TEXT_NODE) offset += range.startOffset;
+      return offset;
+    }
+    offset += _cmTamanhoSerializado(filho);
+  }
+  return offset;
+}
+
+function _cmRestaurarCursorNoOffset(el, offsetAlvo) {
+  let restante = offsetAlvo;
+  const range = document.createRange();
+  let posicionado = false;
+  for (const filho of Array.from(el.childNodes)) {
+    const tamanho = _cmTamanhoSerializado(filho);
+    if (filho.nodeType === Node.TEXT_NODE && restante <= tamanho) {
+      range.setStart(filho, restante);
+      posicionado = true;
+      break;
+    }
+    if (filho.nodeType !== Node.TEXT_NODE && restante <= tamanho) {
+      range.setStartAfter(filho); // chip/BR não-editável: cursor logo depois
+      posicionado = true;
+      break;
+    }
+    restante -= tamanho;
+  }
+  if (posicionado) {
+    range.collapse(true);
+  } else {
+    range.selectNodeContents(el);
+    range.collapse(false);
+  }
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+function _cmFocarFimDoCampo(el) {
+  el.focus();
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  range.collapse(false);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+// Insere uma quebra de linha manual (Ctrl+Enter na tarefa, Enter no comentário)
+// via <br> — não deixa o navegador decidir sozinho (contenteditable costuma criar
+// <div>/<p> imprevisíveis, de um jeito diferente em cada navegador).
+function _cmInserirQuebraLinha() {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  range.deleteContents();
+  const br = document.createElement('br');
+  range.insertNode(br);
+  range.setStartAfter(br);
+  range.setEndAfter(br);
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+// A partir do cursor atual dentro de "el", acha um "@consulta" em digitação (sem
+// espaço entre o @ e o cursor) — só olha o nó de texto onde o cursor está, que é
+// sempre onde a digitação ao vivo acontece.
+function _cmDetectarConsultaMencao(el) {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return null;
+  const range = sel.getRangeAt(0);
+  if (!range.collapsed) return null;
+  const node = range.startContainer;
+  if (node.nodeType !== Node.TEXT_NODE || !el.contains(node)) return null;
+  const antes = node.textContent.slice(0, range.startOffset);
+  const m = antes.match(/(?:^|\s)@([^\s@]*)$/);
+  if (!m) return null;
+  return { node, offsetArroba: range.startOffset - m[1].length - 1, query: m[1] };
+}
+
+// ============================================================
 // GRID DO CALENDÁRIO — barra de progresso acima do quadrado do dia
 // ============================================================
 
@@ -398,7 +614,7 @@ function renderizarBarraDia(dia) {
       ${linha.map(item => {
         const urgente = _cmEhUrgente(item, info.dataBR);
         const classe = item.concluido ? 'cm-fatia-concluida' : (urgente ? 'cm-fatia-urgente' : '');
-        return `<span class="cm-fatia ${classe}" data-item-id="${item.id}" data-dia="${dia}" title="${escapeHtml(item.texto || '')}"></span>`;
+        return `<span class="cm-fatia ${classe}" data-item-id="${item.id}" data-dia="${dia}" title="${escapeHtml(_cmTextoPlano(item.texto))}"></span>`;
       }).join('')}
     </div>
   `).join('');
@@ -467,6 +683,9 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
   let copiarAno = 0;
   let dataPickerMes = 0;
   let dataPickerAno = 0;
+  // Consulta "@..." em digitação num campo de texto/comentário — null quando o
+  // popover de sugestão de clientes não está aberto
+  let mencaoState = null;
 
   const modalHtml = `
     <div class="modal-overlay" id="modalTarefasCalendario">
@@ -588,8 +807,18 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
   };
   document.addEventListener('click', onClickForaDoPopover, true);
 
+  // Popover de sugestão de menção (@) — fica fora do listaEl (position:fixed
+  // no body, seguindo o cursor), então precisa da própria remoção explícita.
+  const fecharMencaoPopover = () => {
+    if (!mencaoState) return;
+    if (mencaoState.popoverEl) mencaoState.popoverEl.remove();
+    if (popoverAberto && popoverAberto.wrap === mencaoState.popoverEl) popoverAberto = null;
+    mencaoState = null;
+  };
+
   const closeModal = () => {
     document.removeEventListener('click', onClickForaDoPopover, true);
+    fecharMencaoPopover();
     if (cmModalIntervaloUrgencia) clearInterval(cmModalIntervaloUrgencia);
     container.remove();
     if (typeof renderGradeCalendarioMaster === 'function') renderGradeCalendarioMaster();
@@ -863,7 +1092,7 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
       const nivel1Finais = itensFinaisDestino.filter(i => i.nivel === 1);
       await BANCO.atualizarAgregadosListaTarefas(listaDestinoId, nivel1Finais.length, nivel1Finais.filter(i => i.concluido).length);
 
-      showToast(`✅ "${itemOrigem.texto}" copiada para ${dataDestinoBR}!`, 'success');
+      showToast(`✅ "${_cmTextoPlano(itemOrigem.texto)}" copiada para ${dataDestinoBR}!`, 'success');
 
       // se o destino é o próprio dia aberto no modal agora, reflete os itens novos na tela
       if (listaDestinoId === listaIdAtual) {
@@ -881,7 +1110,7 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
     const filhos = filhosOrdenados(item.id);
     const temFilhos = filhos.length > 0;
     const podeVirarSubtarefa = item.nivel < 3;
-    const desabilitarCheckbox = temFilhos || !item._persisted;
+    const desabilitarCheckbox = !item._persisted;
     const meta = item._persisted ? _cmFormatarMeta(item) : '';
     const responsavelAtual = item.responsavel || '';
     const recolhido = recolhidos.has(item.id);
@@ -940,6 +1169,19 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
       `<button type="button" class="cm-tarefa-btn-excluir" data-item-id="${item.id}" title="Excluir"><i class="fas fa-trash"></i></button>`
     ].join('<span class="cm-tarefa-divisor"></span>');
 
+    // Com a barra de ações fechada, horário e comentário continuam visíveis (sozinhos,
+    // na mesma ordem em que apareceriam dentro da barra) se o item tiver algum valor
+    // definido — lembra o usuário que existe prazo/comentário sem precisar abrir a
+    // barra inteira. Mesmos botões/classes dos de dentro da barra, então o clique já
+    // funciona igual (abre o seletor de hora / abre-fecha o campo de comentário).
+    const horaFixoHtml = (!funcoesAberto && item.prazo) ? `
+      <button type="button" class="cm-tarefa-btn-hora${urgente ? ' cm-tarefa-btn-hora-urgente' : ''}" data-item-id="${item.id}" title="Prazo">${escapeHtml(item.prazo)}</button>` : '';
+    const comentarioFixoHtml = (!funcoesAberto && item.comentario) ? `
+      <button type="button" class="cm-tarefa-btn-comentario cm-tarefa-btn-comentario-ativo" data-item-id="${item.id}" title="Comentário">
+        <i class="fas fa-comment-alt"></i>
+      </button>` : '';
+    const fixosHtml = [horaFixoHtml, comentarioFixoHtml].filter(Boolean).join('<span class="cm-tarefa-divisor"></span>');
+
     return `
       <div class="cm-tarefa-item cm-tarefa-nivel-${item.nivel}" data-item-id="${item.id}">
         <div class="cm-tarefa-row">
@@ -948,8 +1190,8 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
             ? `<button type="button" class="cm-tarefa-btn-colapsar" data-item-id="${item.id}" title="${recolhido ? 'Expandir' : 'Recolher'}"><i class="fas fa-chevron-${recolhido ? 'right' : 'down'}"></i></button>`
             : '<span class="cm-tarefa-colapsar-espaco"></span>'}
           <input type="checkbox" class="cm-tarefa-checkbox" data-item-id="${item.id}" ${item.concluido ? 'checked' : ''} ${desabilitarCheckbox ? 'disabled' : ''}>
-          <textarea class="cm-tarefa-texto" data-item-id="${item.id}" placeholder="Descreva a tarefa..." rows="1">${escapeHtml(item.texto || '')}</textarea>
-          ${funcoesAberto ? `<span class="cm-tarefa-divisor"></span><div class="cm-tarefa-funcoes">${funcoesHtml}</div>` : ''}
+          <div class="cm-tarefa-texto" contenteditable="true" data-item-id="${item.id}" data-placeholder="Descreva a tarefa...">${_cmRenderConteudoComMencoes(item.texto)}</div>
+          ${funcoesAberto ? `<span class="cm-tarefa-divisor"></span><div class="cm-tarefa-funcoes">${funcoesHtml}</div>` : fixosHtml}
           <button type="button" class="cm-tarefa-btn-funcoes-toggle${funcoesAberto ? ' ativo' : ''}" data-item-id="${item.id}" title="${funcoesAberto ? 'Esconder ações' : 'Mostrar ações'}">
             <i class="fas fa-grip-lines-vertical"></i>
           </button>
@@ -957,7 +1199,7 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
         ${(item.nivel === 1 && tags.length) ? `<div class="cm-tarefa-tags">${tags.map(t => `<span class="cm-tag-chip">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
         ${meta ? `<div class="cm-tarefa-meta">${escapeHtml(meta)}</div>` : ''}
         <div class="cm-tarefa-comentario-wrap${comentarioAberto ? ' aberto' : ''}" data-item-id="${item.id}">
-          <textarea class="cm-tarefa-comentario-texto" data-item-id="${item.id}" placeholder="Escreva um comentário...">${escapeHtml(item.comentario || '')}</textarea>
+          <div class="cm-tarefa-comentario-texto" contenteditable="true" data-item-id="${item.id}" data-placeholder="Escreva um comentário...">${_cmRenderConteudoComMencoes(item.comentario)}</div>
         </div>
         ${(temFilhos && !recolhido) ? `<div class="cm-tarefa-filhos">${filhos.map(renderNode).join('')}</div>` : ''}
       </div>
@@ -972,9 +1214,18 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
   // — daí o "seleciona e desseleciona". Por isso o próprio render() sempre guarda
   // e restaura foco+cursor do campo de texto ativo, não importa quem o chamou.
   const render = () => {
+    // Um popover de menção aberto referencia nós de texto de um campo que está
+    // prestes a ser destruído (innerHTML da lista inteira é reconstruído abaixo)
+    // — sem isso ficaria um popover "fantasma" apontando pra um nó desconectado.
+    fecharMencaoPopover();
+
     const ativo = document.activeElement;
-    const focoAtivo = (ativo && ativo.classList && ativo.classList.contains('cm-tarefa-texto') && listaEl.contains(ativo))
-      ? { id: ativo.dataset.itemId, cursor: ativo.selectionStart }
+    const classeAtiva = ativo && ativo.classList && listaEl.contains(ativo)
+      ? (ativo.classList.contains('cm-tarefa-texto') ? 'cm-tarefa-texto'
+        : ativo.classList.contains('cm-tarefa-comentario-texto') ? 'cm-tarefa-comentario-texto' : null)
+      : null;
+    const focoAtivo = classeAtiva
+      ? { id: ativo.dataset.itemId, classe: classeAtiva, offset: _cmOffsetTextoAntesDoCursor(ativo) }
       : null;
 
     let raiz = filhosOrdenados(null);
@@ -988,11 +1239,10 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
     posicionarMetas();
 
     if (focoAtivo) {
-      const el = listaEl.querySelector(`.cm-tarefa-texto[data-item-id="${focoAtivo.id}"]`);
+      const el = listaEl.querySelector(`.${focoAtivo.classe}[data-item-id="${focoAtivo.id}"]`);
       if (el) {
         el.focus();
-        const pos = focoAtivo.cursor != null ? Math.min(focoAtivo.cursor, el.value.length) : el.value.length;
-        el.setSelectionRange(pos, pos);
+        if (focoAtivo.offset != null) _cmRestaurarCursorNoOffset(el, focoAtivo.offset);
       }
     }
   };
@@ -1060,6 +1310,27 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
     }
   };
 
+  // Marcar/desmarcar um item que tem subitens propaga o mesmo valor pra toda a
+  // subárvore abaixo dele (qualquer profundidade) — o checkbox do item nunca fica
+  // desabilitado por ter filhos, essa é a forma de manter os dois em sincronia.
+  const aplicarConclusaoCascata = async (itemRaiz, concluido) => {
+    const alvos = [itemRaiz, ...coletarSubarvoreObjetos(itemRaiz.id)].filter(i => i._persisted);
+    const agora = new Date();
+    alvos.forEach(i => {
+      i.concluido = concluido;
+      i.ultimaEdicao = agora;
+      i.ultimaEdicaoPor = editorAtual;
+    });
+    try {
+      await Promise.all(alvos.map(i =>
+        BANCO.updateItemTarefa(listaIdAtual, i.id, { concluido, ultimaEdicaoPor: editorAtual })
+      ));
+    } catch (error) {
+      console.error('❌ Erro ao atualizar tarefas em cascata:', error);
+      showToast('❌ Erro ao atualizar tarefas', 'error');
+    }
+  };
+
   // ---- Cascata de auto-conclusão bidirecional ----
   const recalcularCascata = (node) => {
     if (!node) return;
@@ -1087,9 +1358,7 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
   const focarItem = (id) => {
     const inputNovo = listaEl.querySelector(`.cm-tarefa-texto[data-item-id="${id}"]`);
     if (!inputNovo) return;
-    inputNovo.focus();
-    const posicao = inputNovo.value.length;
-    inputNovo.setSelectionRange(posicao, posicao);
+    _cmFocarFimDoCampo(inputNovo);
   };
 
   // ---- Criação de item local ----
@@ -1207,8 +1476,113 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
   const persistirComentario = async (item) => {
     if (!item._persisted) return;
     const campoTexto = listaEl.querySelector(`.cm-tarefa-comentario-texto[data-item-id="${item.id}"]`);
-    const valor = campoTexto ? campoTexto.value : (item.comentario || '');
+    const valor = campoTexto ? _cmSerializarConteudoEditavel(campoTexto) : (item.comentario || '');
     await persistirCampoSimples(item, 'comentario', valor);
+  };
+
+  // ---- Popover de sugestão de menção (@) ----
+  const renderizarPopoverMencao = () => {
+    if (!mencaoState) return;
+    // Fecha qualquer OUTRO popover do modal (tag, data, copiar-para-dia etc.) —
+    // mas não passa pelo fecharPopoverAberto genérico quando o que já está aberto
+    // é a própria sessão de menção atual, senão o callback (fecharMencaoPopover)
+    // anularia o mencaoState que acabamos de montar pra este re-render.
+    if (popoverAberto && popoverAberto.fechar !== fecharMencaoPopover) {
+      fecharPopoverAberto();
+    }
+
+    if (mencaoState.popoverEl) mencaoState.popoverEl.remove();
+
+    const sel = window.getSelection();
+    const rect = (sel && sel.rangeCount) ? sel.getRangeAt(0).getClientRects()[0] : null;
+    const ancora = rect || mencaoState.el.getBoundingClientRect();
+
+    const popoverEl = document.createElement('div');
+    popoverEl.className = 'cm-mencao-popover';
+    popoverEl.style.left = `${ancora.left}px`;
+    popoverEl.style.top = `${ancora.bottom + 4}px`;
+    popoverEl.innerHTML = mencaoState.sugestoes.length
+      ? mencaoState.sugestoes.map((c, i) => `
+          <button type="button" class="cm-mencao-opcao${i === mencaoState.indiceAtivo ? ' ativo' : ''}" data-indice="${i}">
+            <span class="cm-mencao-opcao-nome">${escapeHtml(c.nome || '')}</span>
+            ${c.contato ? `<span class="cm-mencao-opcao-tel">${escapeHtml(c.contato)}</span>` : ''}
+          </button>
+        `).join('')
+      : '<p class="cm-mencao-vazio">Nenhum cliente ativo encontrado.</p>';
+
+    // mousedown (não click) + preventDefault: escolher uma sugestão não pode tirar
+    // o foco/seleção do campo de texto, senão perdemos a referência de onde o "@"
+    // está pra substituir pelo chip.
+    popoverEl.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      const opcao = e.target.closest('.cm-mencao-opcao');
+      if (!opcao || !mencaoState) return;
+      const cliente = mencaoState.sugestoes[Number(opcao.dataset.indice)];
+      if (cliente) confirmarMencao(cliente);
+    });
+
+    document.body.appendChild(popoverEl);
+    mencaoState.popoverEl = popoverEl;
+    popoverAberto = { wrap: popoverEl, fechar: fecharMencaoPopover };
+  };
+
+  const confirmarMencao = (cliente) => {
+    if (!mencaoState) return;
+    const { node, offsetArroba, query, el, item, campo } = mencaoState;
+    const fimQuery = Math.min(offsetArroba + 1 + query.length, node.textContent.length);
+    const range = document.createRange();
+    range.setStart(node, offsetArroba);
+    range.setEnd(node, fimQuery);
+    range.deleteContents();
+
+    const chip = document.createElement('span');
+    chip.className = 'cm-mention-chip';
+    chip.contentEditable = 'false';
+    chip.dataset.clienteId = cliente.id;
+    chip.dataset.nomeCliente = cliente.nome || '';
+    chip.textContent = `@${cliente.nome || ''}`;
+    range.insertNode(chip);
+
+    const espaco = document.createTextNode(' ');
+    chip.after(espaco);
+
+    const novoRange = document.createRange();
+    novoRange.setStartAfter(espaco);
+    novoRange.collapse(true);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(novoRange);
+
+    fecharMencaoPopover();
+    el.focus();
+
+    item[campo] = _cmSerializarConteudoEditavel(el);
+    if (campo === 'texto') {
+      ajustarAlturaTexto(el);
+      debounce(`texto-${item.id}`, () => persistirTexto(item), 700);
+    } else {
+      ajustarAlturaComentario(el);
+      debounce(`comentario-${item.id}`, () => persistirComentario(item), 700);
+    }
+  };
+
+  // Chamado a cada "input" nos campos de texto/comentário — detecta um "@consulta"
+  // sendo digitado perto do cursor e abre/atualiza/fecha o popover de sugestão.
+  const atualizarMencao = async (el, item, campo) => {
+    const consulta = _cmDetectarConsultaMencao(el);
+    if (!consulta) { fecharMencaoPopover(); return; }
+    const clientes = await _cmBuscarClientesAtivos();
+    // O usuário pode ter fechado o campo ou apagado o "@" enquanto a busca rodava
+    if (!el.isConnected || document.activeElement !== el) return;
+    const consultaAtual = _cmDetectarConsultaMencao(el);
+    if (!consultaAtual) { fecharMencaoPopover(); return; }
+    const sugestoes = _cmFiltrarClientesPorNome(clientes, consultaAtual.query);
+    mencaoState = {
+      el, item, campo,
+      node: consultaAtual.node, offsetArroba: consultaAtual.offsetArroba, query: consultaAtual.query,
+      sugestoes, indiceAtivo: 0, popoverEl: mencaoState ? mencaoState.popoverEl : null
+    };
+    renderizarPopoverMencao();
   };
 
   listaEl.addEventListener('input', (e) => {
@@ -1217,8 +1591,9 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
       ajustarAlturaTexto(txt);
       const item = itens.find(i => i.id === txt.dataset.itemId);
       if (!item) return;
-      item.texto = txt.value;
+      item.texto = _cmSerializarConteudoEditavel(txt);
       debounce(`texto-${item.id}`, () => persistirTexto(item), 700);
+      atualizarMencao(txt, item, 'texto');
       return;
     }
     const comentario = e.target.closest('.cm-tarefa-comentario-texto');
@@ -1226,8 +1601,9 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
       ajustarAlturaComentario(comentario);
       const item = itens.find(i => i.id === comentario.dataset.itemId);
       if (!item) return;
-      item.comentario = comentario.value;
+      item.comentario = _cmSerializarConteudoEditavel(comentario);
       debounce(`comentario-${item.id}`, () => persistirComentario(item), 700);
+      atualizarMencao(comentario, item, 'comentario');
     }
   });
 
@@ -1264,25 +1640,74 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
   });
 
   // Enter no campo de texto cria uma nova tarefa/subitem logo abaixo, no mesmo
-  // nível — Ctrl+Enter (ou Cmd+Enter no Mac) insere uma quebra de linha normalmente.
+  // nível — Ctrl+Enter (ou Cmd+Enter no Mac) insere uma quebra de linha manual, e
+  // Enter simples no campo de comentário também insere quebra de linha (não tem
+  // "criar próximo" no comentário). Quando o popover de menção (@) está aberto no
+  // campo, essas teclas pertencem a ele (navegar/confirmar/cancelar a sugestão).
   listaEl.addEventListener('keydown', async (e) => {
-    if (e.key !== 'Enter') return;
-    const txt = e.target.closest('.cm-tarefa-texto');
-    if (!txt) return;
-    if (e.ctrlKey || e.metaKey) return; // deixa o textarea quebrar a linha normalmente
+    const alvo = e.target.closest('.cm-tarefa-texto, .cm-tarefa-comentario-texto');
+    if (!alvo) return;
 
-    e.preventDefault();
-    const item = itens.find(i => i.id === txt.dataset.itemId);
-    if (!item || !txt.value.trim()) return;
-
-    if (pendentes[`texto-${item.id}`]) {
-      clearTimeout(pendentes[`texto-${item.id}`].timeoutId);
-      delete pendentes[`texto-${item.id}`];
+    if (mencaoState && mencaoState.el === alvo) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        const total = mencaoState.sugestoes.length;
+        if (total) {
+          mencaoState.indiceAtivo = (mencaoState.indiceAtivo + (e.key === 'ArrowDown' ? 1 : -1) + total) % total;
+          renderizarPopoverMencao();
+        }
+        return;
+      }
+      if (e.key === 'Tab' || e.key === 'Enter') {
+        e.preventDefault();
+        const cliente = mencaoState.sugestoes[mencaoState.indiceAtivo];
+        if (cliente) confirmarMencao(cliente); else fecharMencaoPopover();
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        fecharMencaoPopover();
+        return;
+      }
+      // qualquer outra tecla (letras, backspace...) segue o fluxo normal — o
+      // próprio "input" que vem em seguida recalcula a consulta de menção
     }
-    await persistirTexto(item);
-    if (!item._persisted) return; // sem data selecionada ou falha ao salvar — não cria o próximo
 
-    criarItemAposIrmao(item);
+    if (e.key !== 'Enter') return;
+
+    const éCampoTexto = alvo.classList.contains('cm-tarefa-texto');
+    if (éCampoTexto && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      const item = itens.find(i => i.id === alvo.dataset.itemId);
+      if (!item) return;
+      item.texto = _cmSerializarConteudoEditavel(alvo);
+      if (!item.texto.trim()) return;
+
+      if (pendentes[`texto-${item.id}`]) {
+        clearTimeout(pendentes[`texto-${item.id}`].timeoutId);
+        delete pendentes[`texto-${item.id}`];
+      }
+      await persistirTexto(item);
+      if (!item._persisted) return; // sem data selecionada ou falha ao salvar — não cria o próximo
+
+      criarItemAposIrmao(item);
+      return;
+    }
+
+    // Ctrl+Enter no campo de tarefa, ou Enter puro no campo de comentário
+    e.preventDefault();
+    _cmInserirQuebraLinha();
+    const item = itens.find(i => i.id === alvo.dataset.itemId);
+    if (!item) return;
+    const campo = éCampoTexto ? 'texto' : 'comentario';
+    item[campo] = _cmSerializarConteudoEditavel(alvo);
+    if (campo === 'texto') {
+      ajustarAlturaTexto(alvo);
+      debounce(`texto-${item.id}`, () => persistirTexto(item), 700);
+    } else {
+      ajustarAlturaComentario(alvo);
+      debounce(`comentario-${item.id}`, () => persistirComentario(item), 700);
+    }
   });
 
   const persistirCampoSimples = async (item, campo, valor) => {
@@ -1303,15 +1728,7 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
     if (chk) {
       const item = itens.find(i => i.id === chk.dataset.itemId);
       if (!item || !item._persisted) return;
-      item.concluido = chk.checked;
-      item.ultimaEdicao = new Date();
-      item.ultimaEdicaoPor = editorAtual;
-      try {
-        await BANCO.updateItemTarefa(listaIdAtual, item.id, { concluido: item.concluido, ultimaEdicaoPor: editorAtual });
-      } catch (error) {
-        console.error('❌ Erro ao atualizar tarefa:', error);
-        showToast('❌ Erro ao atualizar tarefa', 'error');
-      }
+      await aplicarConclusaoCascata(item, chk.checked);
       if (item.parentId) recalcularCascata(itens.find(i => i.id === item.parentId));
       await salvarAgregados();
       render();
@@ -1490,7 +1907,7 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
       if (item._persisted) {
         const confirmou = await showConfirmDialog(
           'Excluir tarefa',
-          `Tem certeza que deseja excluir "${escapeHtml(item.texto || '')}"${idsRemover.length > 1 ? ' e suas subtarefas' : ''}?`
+          `Tem certeza que deseja excluir "${escapeHtml(_cmTextoPlano(item.texto))}"${idsRemover.length > 1 ? ' e suas subtarefas' : ''}?`
         );
         if (!confirmou) return;
         const idsPersistidos = itens.filter(i => idsRemover.includes(i.id) && i._persisted).map(i => i.id);

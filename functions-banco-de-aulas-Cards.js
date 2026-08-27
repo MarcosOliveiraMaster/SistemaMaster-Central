@@ -380,7 +380,7 @@ const BancoDeAulasCards = (function() {
           <div class="modal-header">
             <h3 class="font-lexend font-bold text-lg text-gray-800">
               <i class="fas fa-file-contract text-orange-500 mr-2"></i>
-              Detalhes da Contratação - ${aula.codigoContratacao || 'Sem código'}${(typeof formatDateLong === 'function' && formatDateLong(aula.dataContratacao)) ? ' — ' + formatDateLong(aula.dataContratacao) : ''}
+              Detalhes da Contratação - ${aula.codigoContratacao || 'Sem código'}${(aula.nome || aula.nomeCliente) ? ' - ' + (aula.nome || aula.nomeCliente) : ''}
             </h3>
             <div class="flex items-center gap-2">
               <button class="modal-fullscreen-toggle text-gray-400 hover:text-gray-600" title="Alternar tela cheia">
@@ -402,7 +402,7 @@ const BancoDeAulasCards = (function() {
 
               <div id="body-info-cliente" class="hidden">
               <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <!-- Coluna 1: Dados básicos -->
+                <!-- Coluna 1 -->
                 <div class="space-y-3">
                   <div>
                     <div class="text-xs font-medium text-gray-500 mb-1">Nome do Cliente</div>
@@ -416,14 +416,14 @@ const BancoDeAulasCards = (function() {
                     <div class="text-xs font-medium text-gray-500 mb-1">Estudante</div>
                     <div class="text-sm text-gray-800" id="modal-estudantes">--</div>
                   </div>
+                </div>
+
+                <!-- Coluna 2 -->
+                <div class="space-y-3">
                   <div>
                     <div class="text-xs font-medium text-gray-500 mb-1">Série</div>
                     <div class="text-sm text-gray-800" id="modal-series">--</div>
                   </div>
-                </div>
-                
-                <!-- Coluna 2: Status do contrato -->
-                <div class="space-y-3">
                   <div>
                     <div class="text-xs font-medium text-gray-500 mb-1">Status do Contrato</div>
                     <div class="text-sm">
@@ -436,6 +436,10 @@ const BancoDeAulasCards = (function() {
                     <div class="text-xs font-medium text-gray-500 mb-1">Assinatura do Contrato</div>
                     <div class="text-sm text-gray-800">${fmtData(aula.dataAssinaturaContrato)}</div>
                   </div>
+                </div>
+
+                <!-- Coluna 3 -->
+                <div class="space-y-3">
                   <div>
                     <div class="text-xs font-medium text-gray-500 mb-1">Método de pagamento</div>
                     <div class="text-sm text-gray-800">${aula.modoPagamento || '--'}</div>
@@ -444,10 +448,6 @@ const BancoDeAulasCards = (function() {
                     <div class="text-xs font-medium text-gray-500 mb-1">Código da Contratação</div>
                     <div class="text-sm text-gray-800 font-mono">${aula.codigoContratacao || '--'}</div>
                   </div>
-                </div>
-                
-                <!-- Coluna 3: Status do pagamento -->
-                <div class="space-y-3">
                   <div>
                     <div class="text-xs font-medium text-gray-500 mb-1">Status do Pagamento</div>
                     <div class="text-sm">
@@ -456,6 +456,10 @@ const BancoDeAulasCards = (function() {
                       </span>
                     </div>
                   </div>
+                </div>
+
+                <!-- Coluna 4 -->
+                <div class="space-y-3">
                   <div>
                     <div class="text-xs font-medium text-gray-500 mb-1">Data da primeira parcela</div>
                     <div class="text-sm text-gray-800">${fmtData(aula.dataPrimeiraParcela)}</div>
@@ -467,41 +471,6 @@ const BancoDeAulasCards = (function() {
                   <div>
                     <div class="text-xs font-medium text-gray-500 mb-1">Tipo de Equipe</div>
                     <div class="text-sm text-gray-800">${aula.equipe || '--'}</div>
-                  </div>
-                </div>
-                
-                <!-- Coluna 4: Botões de ação -->
-                <div class="space-y-3">
-                  <div class="text-xs font-medium text-gray-500 mb-1">Ações</div>
-                  <div class="space-y-1.5">
-                    <button id="btn-editar-contratacao" class="btn-secondary text-xs py-1.5 px-2 w-full">
-                      <i class="fas fa-edit mr-1 text-xs"></i>
-                      <span class="text-xs">Editar</span>
-                    </button>
-                    <button id="btn-gerar-contrato" class="btn-primary text-xs py-1.5 px-2 w-full" disabled>
-                      <i class="fas fa-file-pdf mr-1 text-xs"></i>
-                      <span class="text-xs">Contrato</span>
-                    </button>
-                    <button id="btn-gerar-solicitacao" class="btn-secondary text-xs py-1.5 px-2 w-full">
-                      <i class="fas fa-calendar-plus mr-1 text-xs"></i>
-                      <span class="text-xs">Solicitação Cliente</span>
-                    </button>
-                    <button id="btn-gerar-solicitacao-professor" class="btn-secondary text-xs py-1.5 px-2 w-full">
-                      <i class="fas fa-chalkboard-teacher mr-1 text-xs"></i>
-                      <span class="text-xs">Solicitação Professor</span>
-                    </button>
-                    <button id="btn-ver-observacoes" class="btn-secondary text-xs py-1.5 px-2 w-full">
-                      <i class="fas fa-eye mr-1 text-xs"></i>
-                      <span class="text-xs">Observações</span>
-                    </button>
-                    <button id="btn-ver-dados-cliente" class="btn-secondary text-xs py-1.5 px-2 w-full">
-                      <i class="fas fa-user mr-1 text-xs"></i>
-                      <span class="text-xs">Ver cliente</span>
-                    </button>
-                    <button id="btn-gerar-nfe" class="btn-secondary text-xs py-1.5 px-2 w-full">
-                      <i class="fas fa-file-invoice mr-1 text-xs"></i>
-                      <span class="text-xs">Gerar msg NF-e</span>
-                    </button>
                   </div>
                 </div>
               </div>
@@ -516,6 +485,43 @@ const BancoDeAulasCards = (function() {
                   <span class="text-gray-400">Carregando...</span>
                 </div>
               </div>
+              </div>
+            </div>
+
+            <!-- Ações -->
+            <div class="mb-6">
+              <h4 class="font-lexend font-bold text-base mb-3 text-gray-700">
+                <i class="fas fa-bolt text-orange-500 mr-2"></i>Ações
+              </h4>
+              <div class="flex gap-2">
+                <button id="btn-editar-contratacao" class="btn-secondary flex-1 flex items-center py-[7.68px] px-1 text-xs">
+                  <span class="w-[30%] flex items-center justify-center"><i class="fas fa-edit text-xl"></i></span>
+                  <span class="w-[70%] text-xs leading-tight text-center">Editar</span>
+                </button>
+                <button id="btn-gerar-contrato" class="btn-primary flex-1 flex items-center py-[7.68px] px-1 text-xs" disabled>
+                  <span class="w-[30%] flex items-center justify-center"><i class="fas fa-file-pdf text-xl"></i></span>
+                  <span class="w-[70%] text-xs leading-tight text-center">Contrato</span>
+                </button>
+                <button id="btn-gerar-solicitacao" class="btn-secondary flex-1 flex items-center py-[7.68px] px-1 text-xs">
+                  <span class="w-[30%] flex items-center justify-center"><i class="fas fa-calendar-plus text-xl"></i></span>
+                  <span class="w-[70%] text-xs leading-tight text-center">Solicitação Cliente</span>
+                </button>
+                <button id="btn-gerar-solicitacao-professor" class="btn-secondary flex-1 flex items-center py-[7.68px] px-1 text-xs">
+                  <span class="w-[30%] flex items-center justify-center"><i class="fas fa-chalkboard-teacher text-xl"></i></span>
+                  <span class="w-[70%] text-xs leading-tight text-center">Solicitação Professor</span>
+                </button>
+                <button id="btn-ver-observacoes" class="btn-secondary flex-1 flex items-center py-[7.68px] px-1 text-xs">
+                  <span class="w-[30%] flex items-center justify-center"><i class="fas fa-eye text-xl"></i></span>
+                  <span class="w-[70%] text-xs leading-tight text-center">Observações</span>
+                </button>
+                <button id="btn-ver-dados-cliente" class="btn-secondary flex-1 flex items-center py-[7.68px] px-1 text-xs">
+                  <span class="w-[30%] flex items-center justify-center"><i class="fas fa-user text-xl"></i></span>
+                  <span class="w-[70%] text-xs leading-tight text-center">Ver cliente</span>
+                </button>
+                <button id="btn-gerar-nfe" class="btn-secondary flex-1 flex items-center py-[7.68px] px-1 text-xs">
+                  <span class="w-[30%] flex items-center justify-center"><i class="fas fa-file-invoice text-xl"></i></span>
+                  <span class="w-[70%] text-xs leading-tight text-center">Gerar msg NF-e</span>
+                </button>
               </div>
             </div>
 
@@ -560,6 +566,15 @@ const BancoDeAulasCards = (function() {
                   Aulas Agendadas
                 </h4>
                 <div class="flex gap-2">
+                  <button
+                    type="button"
+                    id="btnMatchProfessor"
+                    class="btn-secondary btn-compact"
+                    title="Rankear professores compatíveis com as aulas desta contratação"
+                  >
+                    <i class="fas fa-people-arrows mr-2"></i>
+                    Match
+                  </button>
                   <button
                     id="btnVisualizacaoCalendario"
                     class="btn-secondary btn-compact"
@@ -2105,6 +2120,9 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
           if (typeof loadBancoDeAulas === 'function') {
             loadBancoDeAulas();
           }
+          if (typeof carregarCardsPagamento === 'function') {
+            carregarCardsPagamento();
+          }
         } catch (error) {
           console.error('❌ Erro ao atualizar contratação:', error);
           showToast('❌ Erro ao atualizar contratação', 'error');
@@ -2942,6 +2960,19 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
         } finally {
           btnVerificarDatas.disabled = false;
           btnVerificarDatas.innerHTML = originalHTML;
+        }
+      });
+    }
+
+    // Botão "Match" — ranking de professores por disciplina
+    const btnMatchProfessor = document.getElementById('btnMatchProfessor');
+    if (btnMatchProfessor) {
+      btnMatchProfessor.addEventListener('click', function(e) {
+        e.stopPropagation();
+        if (window.Match && typeof window.Match.abrirModalMatch === 'function') {
+          window.Match.abrirModalMatch(_aulaDetalhesAtual);
+        } else {
+          showToast('Módulo de Match não carregado.', 'error');
         }
       });
     }

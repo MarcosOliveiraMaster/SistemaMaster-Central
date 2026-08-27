@@ -1351,29 +1351,49 @@ function _pgtoTimestampToDate(valor) {
   return null;
 }
 
-// Classifica um contrato em 'contrato' | 'pagamento' | null.
-// Pagamento pendente tem prioridade: um contrato com "Aguardando 1º/2º Pagamento" é sempre
-// mostrado como pagamento pendente, mesmo que a assinatura do contrato também esteja pendente.
-function classificarSituacaoPagamento(contrato) {
+// Situação de pagamento pendente é definida pelo campo "Método de Pagamento" (modoPagamento),
+// cujas únicas opções válidas na plataforma são "Pix dividido", "Pix completo" e "Cartão de crédito":
+// - "Pix completo" / "Cartão de crédito" -> pagamento único, considerado completo, nunca pendente.
+// - "Pix dividido" -> pendente só quando statusPagamento for "Aguardando 1º/2º Pagamento"
+//   (qualquer outro valor, incluindo "Pagamento completo" ou algo não reconhecido, não é pendente).
+// - vazio ou qualquer valor fora dessas 3 opções -> método ainda não definido, sempre pendente.
+function _pgtoPagamentoEstaPendente(contrato) {
+  const modoPg = (contrato.modoPagamento || '').trim().toLowerCase();
+  if (modoPg === 'pix completo' || modoPg === 'cartão de crédito') return false;
+  if (modoPg !== 'pix dividido') return true;
   const statusPg = (contrato.statusPagamento || '').toLowerCase();
-  if (statusPg.includes('aguardando 1º pagamento') || statusPg.includes('aguardando 2º pagamento')) return 'pagamento';
+  return statusPg.includes('aguardando 1º pagamento') || statusPg.includes('aguardando 2º pagamento');
+}
+
+// Classifica um contrato em 'contrato' | 'pagamento' | null.
+// Pagamento pendente tem prioridade sobre a assinatura do contrato pendente.
+function classificarSituacaoPagamento(contrato) {
+  if (_pgtoPagamentoEstaPendente(contrato)) return 'pagamento';
   const statusCt = (contrato.statusContrato || '').toLowerCase();
   if (statusCt.includes('pendente de assinatura')) return 'contrato';
   return null;
 }
 
-// Um contrato "pertence" ao mês navegável do painel quando alguma das suas datas relevantes
-// cai nesse mês — igual ao Calendário Master, que soma dataPrimeiraParcela e dataSegundaParcela
-// como dois eventos independentes, sem se basear no texto de `statusPagamento` (que é preenchido
-// manualmente e pode estar desatualizado em relação às datas de vencimento).
+// Um contrato "pertence" ao mês navegável do painel quando sua data relevante cai nesse mês.
 function _pgtoDataNoMesSelecionado(d) {
   return !!d && d.getMonth() === mesPagamentoAtual && d.getFullYear() === new Date().getFullYear();
 }
 
 function _pgtoContratoNoMesSelecionado(contrato, situacao) {
   if (situacao === 'pagamento') {
-    return _pgtoDataNoMesSelecionado(_pgtoTimestampToDate(contrato.dataPrimeiraParcela)) ||
-           _pgtoDataNoMesSelecionado(_pgtoTimestampToDate(contrato.dataSegundaParcela));
+    const modoPg = (contrato.modoPagamento || '').trim().toLowerCase();
+
+    // Método ainda não definido: usa a data de criação da contratação como mês de referência
+    // (não há dataPrimeiraParcela/dataSegundaParcela confiável antes do método ser escolhido).
+    if (modoPg !== 'pix dividido') {
+      return _pgtoDataNoMesSelecionado(_pgtoTimestampToDate(contrato.timestamp));
+    }
+
+    // "Pix dividido": usa apenas a data da parcela indicada por statusPagamento — "aguardando 2º
+    // pagamento" já significa que a 1ª foi paga, então o card deve aparecer no mês da 2ª.
+    const statusPg = (contrato.statusPagamento || '').toLowerCase();
+    const dataRelevante = statusPg.includes('aguardando 2º pagamento') ? contrato.dataSegundaParcela : contrato.dataPrimeiraParcela;
+    return _pgtoDataNoMesSelecionado(_pgtoTimestampToDate(dataRelevante));
   }
   // 'contrato' (pendente de assinatura): usa a data de assinatura prevista, com fallback pro timestamp
   const dAssinatura = _pgtoTimestampToDate(contrato.dataAssinaturaContrato);
@@ -1448,13 +1468,12 @@ function renderTabelaPagamento(linhas) {
 
   const linhasHtml = linhas.map(({ contrato, situacao }) => {
     const nomeCliente = contrato.nome || contrato.nomeCliente || 'Cliente não identificado';
-    const statusPagamento = contrato.statusPagamento || 'Não informado';
+    const { texto: statusPagamento, cor: colorPagamento } = _pgtoLabelStatusPagamento(contrato);
     const statusContrato = contrato.statusContrato || 'Não informado';
     const metodoPagamento = contrato.modoPagamento || 'Não informado';
     const dataPrimeiraParcela = limparDadosInvalidos(formatarDataContrato(contrato.dataPrimeiraParcela));
     const dataSegundaParcela = limparDadosInvalidos(formatarDataContrato(contrato.dataSegundaParcela));
     const dataContratacao = formatarDataContrato(contrato.timestamp);
-    const colorPagamento = getCorStatusPagamento(statusPagamento);
     const colorContrato = getCorStatusPagamento(statusContrato);
     const cfg = PGTO_SITUACAO_CONFIG[situacao] || PGTO_SITUACAO_CONFIG.pagamento;
 
@@ -1544,6 +1563,20 @@ function formatarDataContrato(timestamp) {
   const yyyy = data.getFullYear();
   
   return `${dia} - ${dd}/${mm}/${yyyy}`;
+}
+
+// Rótulo e cor exibidos na coluna "Pagamento", derivados de modoPagamento (+ statusPagamento
+// quando o método for "Pix dividido") — mesma regra usada em _pgtoPagamentoEstaPendente.
+function _pgtoLabelStatusPagamento(contrato) {
+  const modoPg = (contrato.modoPagamento || '').trim().toLowerCase();
+  if (modoPg === 'pix completo' || modoPg === 'cartão de crédito') {
+    return { texto: 'Pagamento completo', cor: 'bg-green-100 text-green-700' };
+  }
+  if (modoPg === 'pix dividido') {
+    const statusPg = contrato.statusPagamento || 'Não informado';
+    return { texto: statusPg, cor: getCorStatusPagamento(statusPg) };
+  }
+  return { texto: 'Pendente', cor: 'bg-red-100 text-red-700' };
 }
 
 function getCorStatusPagamento(status) {

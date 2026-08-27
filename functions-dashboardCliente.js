@@ -121,6 +121,8 @@ class DashboardCliente {
         endereco: 'Av. Paulista, 1000',
         cidadeUF: 'São Paulo / SP',
         complemento: 'Apto 42',
+        linkEndereco1: '',
+        linkEndereco2: '',
         status: 'Ativo',
         dataCadastroLegivel: '01/03/2026',
         mesmoEndereco: true,
@@ -147,6 +149,8 @@ class DashboardCliente {
         endereco: 'Rua da Assembléia, 200',
         cidadeUF: 'Rio de Janeiro / RJ',
         complemento: '',
+        linkEndereco1: '',
+        linkEndereco2: '',
         status: 'Potencial',
         dataCadastroLegivel: '15/02/2026',
         mesmoEndereco: false,
@@ -231,6 +235,13 @@ class DashboardCliente {
     const c = String(cep).replace(/\D/g, '');
     if (c.length !== 8) return cep;
     return `${c.slice(0, 5)}-${c.slice(5)}`;
+  }
+
+  _renderAddressLink(url) {
+    if (!url) return '—';
+    return `<a href="${this.escapeHTML(url)}" target="_blank" rel="noopener" class="dc-link">
+      <i class="fas fa-map-location-dot"></i> Abrir link
+    </a>`;
   }
 
   // Validação de CPF
@@ -749,6 +760,8 @@ class DashboardCliente {
         <div class="dc-info-item"><label>Endereço</label><span>${this.escapeHTML(client.endereco)}</span></div>
         <div class="dc-info-item"><label>Cidade / UF</label><span>${this.escapeHTML(client.cidadeUF)}</span></div>
         <div class="dc-info-item"><label>Complemento</label><span>${this.escapeHTML(client.complemento)}</span></div>
+        <div class="dc-info-item"><label>Link de Endereço 01</label><span>${this._renderAddressLink(client.linkEndereco1)}</span></div>
+        <div class="dc-info-item"><label>Link de Endereço 02</label><span>${this._renderAddressLink(client.linkEndereco2)}</span></div>
 
         <div class="dc-info-section"><h4><i class="fas fa-chart-bar"></i> Situação</h4></div>
         <div class="dc-info-item"><label>Status</label><span>${this.escapeHTML(client.status)}</span></div>
@@ -1010,6 +1023,14 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
           <div class="dc-form-group">
             <label class="dc-form-label">Complemento</label>
             <input class="dc-form-input" name="complemento" value="${this.escapeHTMLForInput(c.complemento || '')}">
+          </div>
+          <div class="dc-form-group">
+            <label class="dc-form-label">Link de Endereço 01</label>
+            <input class="dc-form-input" name="linkEndereco1" value="${this.escapeHTMLForInput(c.linkEndereco1 || '')}">
+          </div>
+          <div class="dc-form-group">
+            <label class="dc-form-label">Link de Endereço 02</label>
+            <input class="dc-form-input" name="linkEndereco2" value="${this.escapeHTMLForInput(c.linkEndereco2 || '')}">
           </div>
         </div>
         <label class="dc-checkbox-label" style="margin-top:10px">
@@ -1394,6 +1415,8 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
       endereco: getData('endereco'),
       cidadeUF: getData('cidadeUF'),
       complemento: getData('complemento'),
+      linkEndereco1: getData('linkEndereco1'),
+      linkEndereco2: getData('linkEndereco2'),
       mesmoEndereco: getCheck('mesmoEndereco'),
       cepAulas: getData('cepAulas').replace(/\D/g, ''),
       enderecoAulas: getData('enderecoAulas'),
