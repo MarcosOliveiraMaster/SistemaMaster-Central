@@ -13,6 +13,8 @@ let mesPagamentoAtual = new Date().getMonth(); // 0-11
 
 // ===== VARIÁVEL GLOBAL PARA CONTROLE DE MÊS (GRÁFICO) =====
 let mesGraficoAtual = new Date().getMonth(); // 0-11
+let aulasPorIndice  = {}; // { dataIndex: [aula, ...] } — usado pelo tooltip do gráfico
+let clienteApelidos = {}; // { nomeCliente: apelido }   — carregado junto com o gráfico
 
 // ===== FUNÇÃO PARA CALCULAR A SEMANA ATUAL DO MÊS =====
 function calcularSemanaAtual(data = new Date()) {
@@ -146,6 +148,10 @@ function loadPainelCentral() {
       <div class="flex justify-between items-center mb-4">
         <h2 class="text-lg font-lexend font-bold text-gray-800">Consulta de Aulas do dia</h2>
         <div id="navegacao-consulta-aulas" class="flex items-center gap-2">
+          <button id="btn-enviar-mensagens" class="flex items-center gap-1.5 px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold rounded-lg transition-colors">
+            <i class="fab fa-whatsapp text-sm"></i>
+            Enviar mensagens
+          </button>
           <button id="btn-consulta-aulas-anterior" class="px-2 py-1 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-800">
             <i class="fas fa-chevron-left text-lg"></i>
           </button>
@@ -1713,11 +1719,19 @@ async function carregarDadosGrafico() {
   // Como o canvas é transparente, talvez só logar.
 
   try {
-    // Busca todas as aulas da coleção BancoDeAulas-Lista
-    // Em produção, isso deveria ser filtrado no back-end se possível.
-    const snapshot = await firebase.firestore().collection('BancoDeAulas-Lista').get();
+    const [aulasSnap, clientesSnap] = await Promise.all([
+      firebase.firestore().collection('BancoDeAulas-Lista').get(),
+      firebase.firestore().collection('cadastroClientes').get()
+    ]);
+
     const aulas = [];
-    snapshot.forEach(doc => aulas.push(doc.data()));
+    aulasSnap.forEach(doc => aulas.push(doc.data()));
+
+    clienteApelidos = {};
+    clientesSnap.forEach(doc => {
+      const d = doc.data();
+      if (d.nome && d.apelido) clienteApelidos[d.nome] = d.apelido;
+    });
 
     processarDadosGrafico(aulas);
 
@@ -1731,6 +1745,7 @@ function processarDadosGrafico(aulas) {
   const labels = [];
   const dados = [];
   const contagem = {}; // Data -> Quantidade
+  aulasPorIndice = {};
 
   if (periodoAtual === 'Mensal') {
     // Eixo X: Dias do mês atual
@@ -1755,7 +1770,12 @@ function processarDadosGrafico(aulas) {
           const y = parseInt(partes[2]);
 
           if (m === mes && y === ano) {
-            if (contagem[d] !== undefined) contagem[d]++;
+            if (contagem[d] !== undefined) {
+              contagem[d]++;
+              const idx = d - 1;
+              if (!aulasPorIndice[idx]) aulasPorIndice[idx] = [];
+              aulasPorIndice[idx].push(aula);
+            }
           }
         }
       }
@@ -1811,6 +1831,8 @@ function processarDadosGrafico(aulas) {
           const diaIdx = Math.floor((dataAula - primeiroDiaSemana) / (1000 * 60 * 60 * 24)); // Índice 0-6
           if (diaIdx >= 0 && diaIdx < 7) {
             contagem[diaIdx]++;
+            if (!aulasPorIndice[diaIdx]) aulasPorIndice[diaIdx] = [];
+            aulasPorIndice[diaIdx].push(aula);
           }
         }
       }
@@ -1932,7 +1954,38 @@ function renderGrafico(labels, data) {
           }
         },
         tooltip: {
-          enabled: true
+          enabled: true,
+          displayColors: false,
+          callbacks: {
+            title: function(items) {
+              if (!items.length) return '';
+              const idx = items[0].dataIndex;
+              const diasNomes = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+              if (periodoAtual === 'Mensal') {
+                const dia = idx + 1;
+                const date = new Date(new Date().getFullYear(), mesGraficoAtual, dia);
+                return `${diasNomes[date.getDay()]} (${dia})`;
+              }
+              return items[0].label;
+            },
+            label: function() { return ''; },
+            afterBody: function(items) {
+              if (!items.length) return [];
+              const idx = items[0].dataIndex;
+              const aulas = (aulasPorIndice[idx] || [])
+                .slice()
+                .sort((a, b) => (a.horario || '').localeCompare(b.horario || ''));
+              if (!aulas.length) return [];
+              const linhas = aulas.map(a => {
+                const apelido = clienteApelidos[a.nomeCliente] || _calMasterDoisNomes(a.nomeCliente);
+                const prof = _calMasterDoisNomes(a.professor);
+                return `• ${apelido} - ${prof} - ${a.horario || '--'}`;
+              });
+              linhas.push('________________');
+              linhas.push(`Total: ${aulas.length} aula${aulas.length !== 1 ? 's' : ''}`);
+              return linhas;
+            }
+          }
         }
       },
       scales: {
