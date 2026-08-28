@@ -4702,6 +4702,25 @@ h2, h3, h4, h5, h6 {
   font-weight: 600;
   line-height: 1.5;
   user-select: none;
+  cursor: pointer;
+}
+
+.cm-mention-chip:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
+/* Menção a professor — mesma família azul do cliente, só um tom mais escuro,
+   pra dar pra distinguir de relance qual chip é qual dentro do texto */
+.cm-mention-chip-professor {
+  background: #dbeafe;
+  color: #1e3a8a;
+  border-color: #93c5fd;
+}
+
+.cm-mention-chip-professor:hover {
+  background: #bfdbfe;
+  border-color: #60a5fa;
 }
 
 /* Popover de sugestão de clientes — position:fixed (não fica dentro de um wrap
@@ -4723,9 +4742,9 @@ h2, h3, h4, h5, h6 {
 
 .cm-mencao-opcao {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 1px;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   background: none;
   border: none;
@@ -4735,18 +4754,34 @@ h2, h3, h4, h5, h6 {
   cursor: pointer;
 }
 
+.cm-mencao-opcao-icone {
+  flex-shrink: 0;
+  width: 18px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 0.75rem;
+}
+
+.cm-mencao-opcao-textos {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  min-width: 0;
+}
+
 .cm-mencao-opcao:hover,
 .cm-mencao-opcao.ativo {
   background: #eff6ff;
 }
 
-.cm-mencao-opcao-nome {
+.cm-mencao-opcao-apelido {
   font-size: 0.8rem;
   color: #1f2937;
   font-weight: 600;
 }
 
-.cm-mencao-opcao-tel {
+.cm-mencao-opcao-completo {
   font-size: 0.7rem;
   color: #9ca3af;
 }

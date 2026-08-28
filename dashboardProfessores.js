@@ -1358,5 +1358,5 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
     }
   }
 
-  return { init };
+  return { init, abrirDetalhes };
 })();

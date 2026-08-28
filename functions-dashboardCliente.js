@@ -751,6 +751,7 @@ class DashboardCliente {
       <div class="dc-info-grid">
         <div class="dc-info-section"><h4><i class="fas fa-user"></i> Dados Pessoais</h4></div>
         <div class="dc-info-item"><label>Nome</label><span>${this.escapeHTML(client.nome)}</span></div>
+        <div class="dc-info-item"><label>Apelido</label><span>${this.escapeHTML(client.apelido || '')}</span></div>
         <div class="dc-info-item"><label>CPF</label><span>${this.formatCPF(client.cpf)}</span></div>
         <div class="dc-info-item"><label>Email</label><span>${this.escapeHTML(client.email)}</span></div>
         <div class="dc-info-item"><label>Contato</label><span>${this.formatPhone(client.contato)}</span></div>
@@ -985,6 +986,10 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
             <label class="dc-form-label">Nome <span class="dc-required">*</span></label>
             <input class="dc-form-input" name="nome" value="${this.escapeHTMLForInput(c.nome || '')}" required>
             <span class="dc-field-error" data-field="nome"></span>
+          </div>
+          <div class="dc-form-group">
+            <label class="dc-form-label">Apelido</label>
+            <input class="dc-form-input" name="apelido" value="${this.escapeHTMLForInput(c.apelido || '')}">
           </div>
           <div class="dc-form-group">
             <label class="dc-form-label">CPF <span class="dc-required">*</span></label>
@@ -1408,6 +1413,7 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
 
     const updatedData = {
       nome: getData('nome'),
+      apelido: getData('apelido'),
       cpf: getData('cpf').replace(/\D/g, ''),
       email: getData('email'),
       contato: getData('contato').replace(/\D/g, ''),

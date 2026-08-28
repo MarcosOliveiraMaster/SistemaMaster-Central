@@ -405,9 +405,46 @@ async function _cmBuscarClientesAtivos() {
   return cmClientesAtivosCache;
 }
 
+let cmProfessoresAtivosCache = null;
+let cmProfessoresAtivosCacheTimestamp = 0;
+const CM_PROFESSORES_ATIVOS_TTL = 5 * 60 * 1000;
+
+// Mesmo critério usado em "BD professores" (dashboardProfessores.js): sem status
+// definido conta como ativo, só "Desligado" (sem acento/caixa) é excluído.
+function _cmProfessorEstaAtivo(p) {
+  return _cmNormalizarBusca(p.status || '') !== 'desligado';
+}
+
+async function _cmBuscarProfessoresAtivos() {
+  const agora = Date.now();
+  if (cmProfessoresAtivosCache && (agora - cmProfessoresAtivosCacheTimestamp) < CM_PROFESSORES_ATIVOS_TTL) {
+    return cmProfessoresAtivosCache;
+  }
+  try {
+    const professores = await BANCO.fetchDataBaseProfessores();
+    cmProfessoresAtivosCache = professores.filter(_cmProfessorEstaAtivo);
+    cmProfessoresAtivosCacheTimestamp = agora;
+  } catch (error) {
+    console.error('❌ Erro ao carregar professores ativos para menção:', error);
+    cmProfessoresAtivosCache = cmProfessoresAtivosCache || [];
+  }
+  return cmProfessoresAtivosCache;
+}
+
+// Lista unificada pra sugestão do "@" — clientes ativos + professores ativos,
+// cada um marcado com "tipo" pra saber qual chip/modal usar depois.
+async function _cmBuscarEntidadesMencionaveis() {
+  const [clientes, professores] = await Promise.all([_cmBuscarClientesAtivos(), _cmBuscarProfessoresAtivos()]);
+  return [
+    ...clientes.map(c => ({ tipo: 'cliente', id: c.id, nome: c.nome, apelido: c.apelido })),
+    ...professores.map(p => ({ tipo: 'professor', id: p.id, nome: p.nome, apelido: p.apelido }))
+  ];
+}
+
 // "Qualquer palavra do nome começa com o texto digitado" — ex.: "sil" acha "Maria Silva"
-function _cmFiltrarClientesPorNome(clientes, query) {
-  const ordenados = [...clientes].sort((a, b) =>
+// (funciona tanto pra clientes quanto professores — a lista já vem misturada)
+function _cmFiltrarMencoesPorNome(entidades, query) {
+  const ordenados = [...entidades].sort((a, b) =>
     String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR', { sensitivity: 'base' })
   );
   const termo = _cmNormalizarBusca(query);
@@ -417,7 +454,11 @@ function _cmFiltrarClientesPorNome(clientes, query) {
     .slice(0, CM_MENCAO_MAX_SUGESTOES);
 }
 
-// String salva -> HTML pra exibir (token "@[Nome](id)" vira chip não-editável)
+// Prefixo gravado dentro do "(id)" do token só pra menções de professor — sem
+// prefixo continua sendo cliente (formato antigo, já salvo, continua funcionando)
+const CM_MENCAO_PREFIXO_PROFESSOR = 'professor:';
+
+// String salva -> HTML pra exibir (token "@[Nome](id)" ou "@[Nome](professor:id)" vira chip não-editável)
 function _cmRenderConteudoComMencoes(texto) {
   const str = String(texto || '');
   let html = '';
@@ -427,8 +468,11 @@ function _cmRenderConteudoComMencoes(texto) {
   while ((m = CM_MENCAO_REGEX.exec(str))) {
     html += escapeHtml(str.slice(ultimoIndex, m.index));
     const nome = m[1];
-    const clienteId = m[2];
-    html += `<span class="cm-mention-chip" contenteditable="false" data-cliente-id="${escapeHtml(clienteId)}" data-nome-cliente="${escapeHtml(nome)}">@${escapeHtml(nome)}</span>`;
+    const idBruto = m[2];
+    const ehProfessor = idBruto.startsWith(CM_MENCAO_PREFIXO_PROFESSOR);
+    const id = ehProfessor ? idBruto.slice(CM_MENCAO_PREFIXO_PROFESSOR.length) : idBruto;
+    const classeTipo = ehProfessor ? ' cm-mention-chip-professor' : '';
+    html += `<span class="cm-mention-chip${classeTipo}" contenteditable="false" data-cliente-id="${escapeHtml(id)}" data-mencao-tipo="${ehProfessor ? 'professor' : 'cliente'}" data-nome-cliente="${escapeHtml(nome)}">@${escapeHtml(nome)}</span>`;
     ultimoIndex = CM_MENCAO_REGEX.lastIndex;
   }
   html += escapeHtml(str.slice(ultimoIndex));
@@ -441,6 +485,12 @@ function _cmTextoPlano(texto) {
   return String(texto || '').replace(CM_MENCAO_REGEX, (_, nome) => `@${nome}`);
 }
 
+// Reconstrói o "(id)" do token a partir do chip, incluindo o prefixo de professor
+function _cmIdComTipoDoChip(node) {
+  const id = node.dataset.clienteId || '';
+  return node.dataset.mencaoTipo === 'professor' ? `${CM_MENCAO_PREFIXO_PROFESSOR}${id}` : id;
+}
+
 // DOM do campo editável -> string pra salvar (chip vira token "@[Nome](id)" de novo)
 function _cmSerializarConteudoEditavel(el) {
   let out = '';
@@ -449,7 +499,7 @@ function _cmSerializarConteudoEditavel(el) {
       out += node.textContent;
     } else if (node.nodeType === Node.ELEMENT_NODE) {
       if (node.classList && node.classList.contains('cm-mention-chip')) {
-        out += `@[${node.dataset.nomeCliente || ''}](${node.dataset.clienteId || ''})`;
+        out += `@[${node.dataset.nomeCliente || ''}](${_cmIdComTipoDoChip(node)})`;
       } else if (node.tagName === 'BR') {
         out += '\n';
       } else {
@@ -465,7 +515,7 @@ function _cmSerializarConteudoEditavel(el) {
 function _cmTamanhoSerializado(node) {
   if (node.nodeType === Node.TEXT_NODE) return node.textContent.length;
   if (node.classList && node.classList.contains('cm-mention-chip')) {
-    return `@[${node.dataset.nomeCliente || ''}](${node.dataset.clienteId || ''})`.length;
+    return `@[${node.dataset.nomeCliente || ''}](${_cmIdComTipoDoChip(node)})`.length;
   }
   if (node.tagName === 'BR') return 1;
   return node.textContent.length;
@@ -560,6 +610,74 @@ function _cmDetectarConsultaMencao(el) {
   const m = antes.match(/(?:^|\s)@([^\s@]*)$/);
   if (!m) return null;
   return { node, offsetArroba: range.startOffset - m[1].length - 1, query: m[1] };
+}
+
+// Clique no chip de menção (@) — acha a contratação mais recente do cliente
+// (BancoDeAulas, cruzado por CPF, já vem ordenado por timestamp desc) e abre o
+// modal "Detalhes da contratação" padrão do sistema (o mesmo do Painel Central/
+// Banco de Aulas, sem nenhuma alteração visual).
+async function _cmAbrirContratacaoDoCliente(clienteId) {
+  if (!clienteId) return;
+  try {
+    let cliente = (cmClientesAtivosCache || []).find(c => c.id === clienteId);
+    if (!cliente) {
+      const todos = await BANCO.fetchCadastroClientes();
+      cliente = todos.find(c => c.id === clienteId);
+    }
+    if (!cliente || !cliente.cpf) {
+      showToast('Cliente sem CPF cadastrado — não foi possível localizar a contratação', 'error');
+      return;
+    }
+    const aulas = await BANCO.fetchBancoDeAulas();
+    const contratacao = aulas.find(a => a.cpf === cliente.cpf);
+    if (!contratacao) {
+      showToast('Nenhuma contratação encontrada para este cliente', 'error');
+      return;
+    }
+    if (typeof abrirDetalhesContratacaoPainelCentral === 'function') {
+      abrirDetalhesContratacaoPainelCentral(contratacao.id);
+    } else {
+      showToast('Módulo de contratações não carregado', 'error');
+    }
+  } catch (error) {
+    console.error('❌ Erro ao abrir contratação do cliente mencionado:', error);
+    showToast('❌ Erro ao abrir contratação do cliente', 'error');
+  }
+}
+
+// Clique no chip de menção (@) a um PROFESSOR — abre o modal "Detalhes do
+// professor", o mesmo de "BD professores" (GaleriaProfessores.abrirDetalhes).
+// Esse modal vive dentro de #galeria-professores (display:none quando a aba não
+// está ativa), então precisa do mesmo truque de reparentar pro body usado pro
+// modal de contratação/cliente em outras áreas do sistema.
+async function _cmAbrirDetalhesProfessor(professorId) {
+  if (!professorId) return;
+  try {
+    if (typeof GaleriaProfessores === 'undefined' || typeof GaleriaProfessores.abrirDetalhes !== 'function') {
+      showToast('Módulo de professores não carregado', 'error');
+      return;
+    }
+    let professor = (cmProfessoresAtivosCache || []).find(p => p.id === professorId);
+    if (!professor) {
+      const todos = await BANCO.fetchDataBaseProfessores();
+      professor = todos.find(p => p.id === professorId);
+    }
+    if (!professor) {
+      showToast('Professor não encontrado', 'error');
+      return;
+    }
+    if (!document.getElementById('gp-detOverlay') && typeof GaleriaProfessores.init === 'function') {
+      await GaleriaProfessores.init();
+    }
+    const overlay = document.getElementById('gp-detOverlay');
+    if (overlay && overlay.parentElement !== document.body) {
+      document.body.appendChild(overlay);
+    }
+    GaleriaProfessores.abrirDetalhes(professor);
+  } catch (error) {
+    console.error('❌ Erro ao abrir detalhes do professor mencionado:', error);
+    showToast('❌ Erro ao abrir detalhes do professor', 'error');
+  }
 }
 
 // ============================================================
@@ -1501,14 +1619,23 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
     popoverEl.className = 'cm-mencao-popover';
     popoverEl.style.left = `${ancora.left}px`;
     popoverEl.style.top = `${ancora.bottom + 4}px`;
+    // Ícone à esquerda indica se é cliente ou professor (a lista vem misturada).
+    // Linha de cima: apelido (ou nome completo, se não tiver apelido cadastrado).
+    // Linha de baixo: nome completo, só exibida quando já apareceu o apelido em cima
+    // (senão ficaria repetido — o nome completo já está sendo mostrado como título).
     popoverEl.innerHTML = mencaoState.sugestoes.length
       ? mencaoState.sugestoes.map((c, i) => `
           <button type="button" class="cm-mencao-opcao${i === mencaoState.indiceAtivo ? ' ativo' : ''}" data-indice="${i}">
-            <span class="cm-mencao-opcao-nome">${escapeHtml(c.nome || '')}</span>
-            ${c.contato ? `<span class="cm-mencao-opcao-tel">${escapeHtml(c.contato)}</span>` : ''}
+            <span class="cm-mencao-opcao-icone" title="${c.tipo === 'professor' ? 'Professor' : 'Cliente'}">
+              <i class="fas ${c.tipo === 'professor' ? 'fa-chalkboard-teacher' : 'fa-user'}"></i>
+            </span>
+            <span class="cm-mencao-opcao-textos">
+              <span class="cm-mencao-opcao-apelido">${escapeHtml(c.apelido || c.nome || '')}</span>
+              ${c.apelido ? `<span class="cm-mencao-opcao-completo">${escapeHtml(c.nome || '')}</span>` : ''}
+            </span>
           </button>
         `).join('')
-      : '<p class="cm-mencao-vazio">Nenhum cliente ativo encontrado.</p>';
+      : '<p class="cm-mencao-vazio">Nenhum cliente ou professor encontrado.</p>';
 
     // mousedown (não click) + preventDefault: escolher uma sugestão não pode tirar
     // o foco/seleção do campo de texto, senão perdemos a referência de onde o "@"
@@ -1517,8 +1644,8 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
       e.preventDefault();
       const opcao = e.target.closest('.cm-mencao-opcao');
       if (!opcao || !mencaoState) return;
-      const cliente = mencaoState.sugestoes[Number(opcao.dataset.indice)];
-      if (cliente) confirmarMencao(cliente);
+      const entidade = mencaoState.sugestoes[Number(opcao.dataset.indice)];
+      if (entidade) confirmarMencao(entidade);
     });
 
     document.body.appendChild(popoverEl);
@@ -1526,7 +1653,7 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
     popoverAberto = { wrap: popoverEl, fechar: fecharMencaoPopover };
   };
 
-  const confirmarMencao = (cliente) => {
+  const confirmarMencao = (entidade) => {
     if (!mencaoState) return;
     const { node, offsetArroba, query, el, item, campo } = mencaoState;
     const fimQuery = Math.min(offsetArroba + 1 + query.length, node.textContent.length);
@@ -1535,12 +1662,15 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
     range.setEnd(node, fimQuery);
     range.deleteContents();
 
+    const ehProfessor = entidade.tipo === 'professor';
+    const nomeExibicaoChip = entidade.apelido || entidade.nome || '';
     const chip = document.createElement('span');
-    chip.className = 'cm-mention-chip';
+    chip.className = 'cm-mention-chip' + (ehProfessor ? ' cm-mention-chip-professor' : '');
     chip.contentEditable = 'false';
-    chip.dataset.clienteId = cliente.id;
-    chip.dataset.nomeCliente = cliente.nome || '';
-    chip.textContent = `@${cliente.nome || ''}`;
+    chip.dataset.clienteId = entidade.id;
+    chip.dataset.mencaoTipo = ehProfessor ? 'professor' : 'cliente';
+    chip.dataset.nomeCliente = nomeExibicaoChip;
+    chip.textContent = `@${nomeExibicaoChip}`;
     range.insertNode(chip);
 
     const espaco = document.createTextNode(' ');
@@ -1571,12 +1701,12 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
   const atualizarMencao = async (el, item, campo) => {
     const consulta = _cmDetectarConsultaMencao(el);
     if (!consulta) { fecharMencaoPopover(); return; }
-    const clientes = await _cmBuscarClientesAtivos();
+    const entidades = await _cmBuscarEntidadesMencionaveis();
     // O usuário pode ter fechado o campo ou apagado o "@" enquanto a busca rodava
     if (!el.isConnected || document.activeElement !== el) return;
     const consultaAtual = _cmDetectarConsultaMencao(el);
     if (!consultaAtual) { fecharMencaoPopover(); return; }
-    const sugestoes = _cmFiltrarClientesPorNome(clientes, consultaAtual.query);
+    const sugestoes = _cmFiltrarMencoesPorNome(entidades, consultaAtual.query);
     mencaoState = {
       el, item, campo,
       node: consultaAtual.node, offsetArroba: consultaAtual.offsetArroba, query: consultaAtual.query,
@@ -1660,8 +1790,8 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
       }
       if (e.key === 'Tab' || e.key === 'Enter') {
         e.preventDefault();
-        const cliente = mencaoState.sugestoes[mencaoState.indiceAtivo];
-        if (cliente) confirmarMencao(cliente); else fecharMencaoPopover();
+        const entidade = mencaoState.sugestoes[mencaoState.indiceAtivo];
+        if (entidade) confirmarMencao(entidade); else fecharMencaoPopover();
         return;
       }
       if (e.key === 'Escape') {
@@ -1754,6 +1884,17 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
   });
 
   listaEl.addEventListener('click', async (e) => {
+    const chipMencao = e.target.closest('.cm-mention-chip');
+    if (chipMencao) {
+      e.preventDefault();
+      if (chipMencao.dataset.mencaoTipo === 'professor') {
+        _cmAbrirDetalhesProfessor(chipMencao.dataset.clienteId);
+      } else {
+        _cmAbrirContratacaoDoCliente(chipMencao.dataset.clienteId);
+      }
+      return;
+    }
+
     const handlePessoa = e.target.closest('.cm-tarefa-pessoa');
     if (handlePessoa) {
       const item = itens.find(i => i.id === handlePessoa.dataset.itemId);

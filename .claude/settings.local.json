@@ -58,7 +58,8 @@
       "Bash(python -c \"print\\('python works'\\)\")",
       "Bash(node _teste_server.js)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8743/teste-tarefas.html)",
-      "PowerShell(Get-NetTCPConnection *)"
+      "PowerShell(Get-NetTCPConnection *)",
+      "Bash(grep -n \"professor\\\\\\\\.nome\\\\|professor\\\\\\\\.cpf\\\\|professor\\\\\\\\.contato\\\\|professor\\\\\\\\.disciplinas\" match.js)"
     ]
   }
 }
