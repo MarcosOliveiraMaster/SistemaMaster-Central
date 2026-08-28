@@ -1856,6 +1856,10 @@ function renderGrafico(labels, data) {
     chartInstance.destroy();
   }
 
+  // Remove tooltip HTML anterior se existir
+  const tooltipAntigo = document.getElementById('grafico-tooltip-custom');
+  if (tooltipAntigo) tooltipAntigo.remove();
+
   // Registrar plugin datalabels se disponível
   if (typeof ChartDataLabels !== 'undefined') {
     Chart.register(ChartDataLabels);
@@ -1954,37 +1958,63 @@ function renderGrafico(labels, data) {
           }
         },
         tooltip: {
-          enabled: true,
-          displayColors: false,
-          callbacks: {
-            title: function(items) {
-              if (!items.length) return '';
-              const idx = items[0].dataIndex;
-              const diasNomes = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-              if (periodoAtual === 'Mensal') {
-                const dia = idx + 1;
-                const date = new Date(new Date().getFullYear(), mesGraficoAtual, dia);
-                return `${diasNomes[date.getDay()]} (${dia})`;
-              }
-              return items[0].label;
-            },
-            label: function() { return ''; },
-            afterBody: function(items) {
-              if (!items.length) return [];
-              const idx = items[0].dataIndex;
-              const aulas = (aulasPorIndice[idx] || [])
-                .slice()
-                .sort((a, b) => (a.horario || '').localeCompare(b.horario || ''));
-              if (!aulas.length) return [];
-              const linhas = aulas.map(a => {
-                const apelido = clienteApelidos[a.nomeCliente] || _calMasterDoisNomes(a.nomeCliente);
-                const prof = _calMasterDoisNomes(a.professor);
-                return `• ${apelido} - ${prof} - ${a.horario || '--'}`;
-              });
-              linhas.push('________________');
-              linhas.push(`Total: ${aulas.length} aula${aulas.length !== 1 ? 's' : ''}`);
-              return linhas;
+          enabled: false,
+          external: function({ chart, tooltip }) {
+            let el = document.getElementById('grafico-tooltip-custom');
+            if (!el) {
+              el = document.createElement('div');
+              el.id = 'grafico-tooltip-custom';
+              el.style.cssText = [
+                'position:absolute',
+                'background:rgba(17,24,39,0.88)',
+                'color:#f9fafb',
+                'border-radius:8px',
+                'padding:8px 12px',
+                'font-size:12px',
+                'font-family:inherit',
+                'pointer-events:none',
+                'white-space:nowrap',
+                'z-index:999',
+                'transition:opacity .1s',
+                'box-shadow:0 4px 12px rgba(0,0,0,.25)'
+              ].join(';');
+              chart.canvas.parentNode.style.position = 'relative';
+              chart.canvas.parentNode.appendChild(el);
             }
+
+            if (tooltip.opacity === 0) { el.style.opacity = '0'; return; }
+
+            const idx  = tooltip.dataPoints[0].dataIndex;
+            const dias = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+            let titulo;
+            if (periodoAtual === 'Mensal') {
+              const d = new Date(new Date().getFullYear(), mesGraficoAtual, idx + 1);
+              titulo = `${dias[d.getDay()]} (${idx + 1})`;
+            } else {
+              titulo = tooltip.dataPoints[0].label;
+            }
+
+            const aulas = (aulasPorIndice[idx] || [])
+              .slice()
+              .sort((a, b) => (a.horario || '').localeCompare(b.horario || ''));
+
+            const itens = aulas.map(a => {
+              const apelido = clienteApelidos[a.nomeCliente] || _calMasterDoisNomes(a.nomeCliente);
+              const prof    = _calMasterDoisNomes(a.professor);
+              return `<div style="margin:2px 0">• ${apelido} - ${prof} - ${a.horario || '--'}</div>`;
+            }).join('');
+
+            const rodape = aulas.length
+              ? `<hr style="border:none;border-top:1px solid rgba(255,255,255,0.3);margin:6px 0">
+                 <div style="color:#d1d5db">Total: ${aulas.length} aula${aulas.length !== 1 ? 's' : ''}</div>`
+              : '';
+
+            el.innerHTML = `<div style="font-weight:700;margin-bottom:5px">${titulo}</div>${itens}${rodape}`;
+
+            el.style.opacity  = '1';
+            el.style.left     = tooltip.caretX + 'px';
+            el.style.top      = (tooltip.caretY - 8) + 'px';
+            el.style.transform = 'translate(-50%, -100%)';
           }
         }
       },
