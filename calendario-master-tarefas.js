@@ -441,7 +441,8 @@ async function _cmBuscarEntidadesMencionaveis() {
   ];
 }
 
-// "Qualquer palavra do nome começa com o texto digitado" — ex.: "sil" acha "Maria Silva"
+// "Qualquer palavra do nome COMPLETO ou do APELIDO começa com o texto digitado"
+// — ex.: "sil" acha "Maria Silva" (nome) e também quem tem apelido "Silvinha"
 // (funciona tanto pra clientes quanto professores — a lista já vem misturada)
 function _cmFiltrarMencoesPorNome(entidades, query) {
   const ordenados = [...entidades].sort((a, b) =>
@@ -449,8 +450,9 @@ function _cmFiltrarMencoesPorNome(entidades, query) {
   );
   const termo = _cmNormalizarBusca(query);
   if (!termo) return ordenados.slice(0, CM_MENCAO_MAX_SUGESTOES);
+  const bateNaPalavra = (texto) => _cmNormalizarBusca(texto).split(/\s+/).some(palavra => palavra.startsWith(termo));
   return ordenados
-    .filter(c => _cmNormalizarBusca(c.nome).split(/\s+/).some(palavra => palavra.startsWith(termo)))
+    .filter(c => bateNaPalavra(c.nome) || (c.apelido && bateNaPalavra(c.apelido)))
     .slice(0, CM_MENCAO_MAX_SUGESTOES);
 }
 
@@ -1335,6 +1337,13 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
     // Um popover de menção aberto referencia nós de texto de um campo que está
     // prestes a ser destruído (innerHTML da lista inteira é reconstruído abaixo)
     // — sem isso ficaria um popover "fantasma" apontando pra um nó desconectado.
+    // Mas se o campo com a menção ainda está em foco, esse render() não é uma
+    // ação do usuário fechando a menção — é só o autosave (debounce de texto)
+    // disparando no meio da digitação. Guarda a intenção aqui pra reabrir a
+    // sugestão no campo restaurado logo abaixo, em vez de deixá-la sumir sozinha.
+    const mencaoAtivaAntes = (mencaoState && mencaoState.el === document.activeElement)
+      ? { item: mencaoState.item, campo: mencaoState.campo, entidadeSelecionada: mencaoState.sugestoes[mencaoState.indiceAtivo] || null }
+      : null;
     fecharMencaoPopover();
 
     const ativo = document.activeElement;
@@ -1361,6 +1370,11 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
       if (el) {
         el.focus();
         if (focoAtivo.offset != null) _cmRestaurarCursorNoOffset(el, focoAtivo.offset);
+        // Reabre a sugestão de menção no nó novo (o de antes foi destruído pelo
+        // innerHTML acima) — re-detecta o "@query" a partir do cursor já restaurado,
+        // então continua funcionando mesmo se o usuário tiver digitado mais letras
+        // entre o disparo do autosave e este ponto.
+        if (mencaoAtivaAntes) atualizarMencao(el, mencaoAtivaAntes.item, mencaoAtivaAntes.campo, mencaoAtivaAntes.entidadeSelecionada);
       }
     }
   };
@@ -1548,6 +1562,19 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
     showToast('✅ Alterações salvas!', 'success');
   });
 
+  // Item recém-criado troca de id temporário (client-side) pelo id real do
+  // Firestore ao ser persistido pela 1ª vez. Sem isso, o campo "perde a seleção"
+  // na primeira pausa de digitação: render() (chamado logo depois) captura o
+  // foco lendo data-item-id do DOM ANTES desse patch (ainda com o id antigo),
+  // mas reconstrói a lista já com item.id novo — a busca pós-rebuild não acha
+  // o elemento e o foco não é restaurado.
+  const sincronizarIdNoDom = (idAntigo, idNovo) => {
+    const itemEl = listaEl.querySelector(`.cm-tarefa-item[data-item-id="${idAntigo}"]`);
+    if (!itemEl) return;
+    itemEl.dataset.itemId = idNovo;
+    itemEl.querySelectorAll(`[data-item-id="${idAntigo}"]`).forEach(el => { el.dataset.itemId = idNovo; });
+  };
+
   // ---- Persistência do texto (cria o item — e a lista, se ainda não existir — ao sair do campo) ----
   const persistirTexto = async (item) => {
     const textoLimpo = (item.texto || '').trim();
@@ -1578,6 +1605,7 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
         item.ultimaEdicao = new Date();
         item.ultimaEdicaoPor = editorAtual;
         itens.forEach(i => { if (i.parentId === idAntigo) i.parentId = novoId; });
+        sincronizarIdNoDom(idAntigo, novoId);
       } else {
         await BANCO.updateItemTarefa(listaIdAtual, item.id, { texto: textoLimpo, ultimaEdicaoPor: editorAtual });
         item.ultimaEdicao = new Date();
@@ -1698,7 +1726,11 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
 
   // Chamado a cada "input" nos campos de texto/comentário — detecta um "@consulta"
   // sendo digitado perto do cursor e abre/atualiza/fecha o popover de sugestão.
-  const atualizarMencao = async (el, item, campo) => {
+  // "entidadeParaManterSelecionada" é usado só no reabrimento silencioso feito por
+  // render() (ver mencaoAtivaAntes): sem isso, toda vez que o autosave reabre o
+  // popover sem o usuário ter digitado nada novo, a navegação por seta feita antes
+  // (indiceAtivo) seria perdida e a seleção voltaria pro primeiro item da lista.
+  const atualizarMencao = async (el, item, campo, entidadeParaManterSelecionada) => {
     const consulta = _cmDetectarConsultaMencao(el);
     if (!consulta) { fecharMencaoPopover(); return; }
     const entidades = await _cmBuscarEntidadesMencionaveis();
@@ -1707,10 +1739,13 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
     const consultaAtual = _cmDetectarConsultaMencao(el);
     if (!consultaAtual) { fecharMencaoPopover(); return; }
     const sugestoes = _cmFiltrarMencoesPorNome(entidades, consultaAtual.query);
+    const indicePreservado = entidadeParaManterSelecionada
+      ? sugestoes.findIndex(s => s.tipo === entidadeParaManterSelecionada.tipo && s.id === entidadeParaManterSelecionada.id)
+      : -1;
     mencaoState = {
       el, item, campo,
       node: consultaAtual.node, offsetArroba: consultaAtual.offsetArroba, query: consultaAtual.query,
-      sugestoes, indiceAtivo: 0, popoverEl: mencaoState ? mencaoState.popoverEl : null
+      sugestoes, indiceAtivo: indicePreservado >= 0 ? indicePreservado : 0, popoverEl: mencaoState ? mencaoState.popoverEl : null
     };
     renderizarPopoverMencao();
   };
