@@ -148,6 +148,10 @@ extensao-master-wpp/
 │   ├── icon16.png              → ícone da barra de ferramentas
 │   ├── icon48.png              → ícone da página chrome://extensions
 │   └── icon128.png             → ícone de instalação/detalhe
+│                                  (placeholder genérico: monograma "M" branco sobre fundo
+│                                  verde-azulado, gerado programaticamente — sem logo de
+│                                  terceiros. Substituir por identidade visual oficial
+│                                  quando disponível.)
 ├── src/
 │   ├── background/
 │   │   └── background.js       → orquestra a fila de contatos, abre/navega abas, comunica com o content script
