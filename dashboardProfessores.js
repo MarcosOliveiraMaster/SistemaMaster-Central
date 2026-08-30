@@ -12,14 +12,15 @@ window.GaleriaProfessores = (function () {
   // ─────────────────────────────────────────────────────────────
   const CFG = {
     colProfessores: 'dataBaseProfessores',
-    campoFoto:     'fotoUpload',      // data URL (base64) da foto enviada
+    campoFoto:     'fotoUpload',      // URL da foto no Firebase Storage (fallback: data URL base64 legado)
     campoFotoEm:   'fotoUploadEm',    // timestamp do último envio
     campoBairros:     'bairros',      // string livre (mesmo campo usado em BD Professores)
     campoDisciplinas: 'disciplinas',  // string ou array (idem)
     campoOuro:        'prof_ouro',    // boolean — professor "destaque", vai pro início da lista
-    maxDim:        480,               // maior lado da imagem redimensionada (px)
-    jpegQuality:   0.82,
-    limiteAviso:   700 * 1024,        // aviso se o base64 passar disso (~700KB)
+    storagePasta:  'fotos-professores', // pasta no Firebase Storage
+    maxDim:        1600,              // maior lado da imagem redimensionada (px) — única cópia, boa resolução
+    jpegQuality:   0.9,
+    limiteAviso:   1.5 * 1024 * 1024, // aviso se o arquivo passar disso (~1.5MB) — só um alerta de upload lento
     // mesma lista fixa usada em BD Professores (functions-dashboardProfessor.js)
     disciplinasFixas: ['Ciências', 'Física', 'Geografia', 'História', 'Inglês', 'Literatura', 'Matemática', 'Pedagogia', 'Português', 'Química', 'Biologia'],
     // rótulos — mesmos de BD Professores (CFG.defaultMasks)
@@ -50,7 +51,8 @@ window.GaleriaProfessores = (function () {
     filtroRapido: 'todos', // 'todos' | 'tdics' | 'neuro'
     cardsPorLinha: 5,
     profSelecionado: null,
-    pendingDataURL: null,
+    pendingBlob: null,
+    pendingPreviewUrl: null,
     // modal contrato (vínculo/desligamento) — porta a lógica de BD Professores
     desligamentoSelecionados: [],
     // modal desligar professores (novo)
@@ -68,6 +70,7 @@ window.GaleriaProfessores = (function () {
       if (typeof FIREBASE_CONFIG === 'undefined') throw new Error('FIREBASE_CONFIG não encontrado.');
       if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
       S.db = firebase.firestore();
+      S.storage = firebase.storage();
       return true;
     } catch (e) {
       console.error('❌ GaleriaProfessores — Firebase init error:', e);
@@ -267,6 +270,11 @@ window.GaleriaProfessores = (function () {
 .gp-card__fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:2.3rem; color:var(--gp-orange); background:var(--gp-orange-light); }
 .gp-card__label { height:var(--gp-b); flex-shrink:0; display:flex; align-items:center; padding:0 .6rem; font-size:.78rem; font-weight:600; color:var(--gp-gray-800); text-align:left; line-height:1.2; overflow:hidden; }
 .gp-card__label span { overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+
+.gp-context-menu { position:fixed; z-index:9999; background:white; border:1px solid var(--gp-gray-200); border-radius:.5rem; box-shadow:var(--gp-shadow); padding:.35rem 0; min-width:190px; font-size:.85rem; font-family:'Lexend', sans-serif; }
+.gp-context-menu__item { padding:.5rem 1rem; cursor:pointer; display:flex; align-items:center; gap:.5rem; color:var(--gp-gray-800); }
+.gp-context-menu__item:hover { background:var(--gp-orange-light); color:var(--gp-orange-dk); }
+.gp-context-menu__item i { width:1rem; text-align:center; color:var(--gp-orange); }
 
 .gp-empty { grid-column:1/-1; text-align:center; padding:3rem 1rem; color:var(--gp-gray-400); }
 .gp-empty i { font-size:2.2rem; margin-bottom:.6rem; display:block; }
@@ -645,7 +653,91 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
         const prof = S.professores.find(p => p.id === id);
         if (prof) alternarOuro(prof);
       });
+      card.addEventListener('contextmenu', e => {
+        e.preventDefault();
+        const prof = S.professores.find(p => p.id === id);
+        if (prof) abrirMenuContexto(e, prof);
+      });
     });
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // MENU DE CONTEXTO (botão direito no card)
+  // ─────────────────────────────────────────────────────────────
+  // itens em lista — para adicionar mais opções no futuro, basta empurrar
+  // novos objetos {label, icon, action} aqui.
+  function itensMenuContexto(prof) {
+    return [
+      { label: 'Compartilhar professor', icon: 'fa-share-nodes', action: () => compartilharProfessor(prof) },
+    ];
+  }
+
+  function fecharMenuContexto() {
+    const menu = $id('gp-context-menu');
+    if (menu) menu.remove();
+    document.removeEventListener('click', fecharMenuContexto);
+    document.removeEventListener('scroll', fecharMenuContexto, true);
+  }
+
+  function abrirMenuContexto(e, prof) {
+    fecharMenuContexto();
+    const menu = document.createElement('div');
+    menu.id = 'gp-context-menu';
+    menu.className = 'gp-context-menu';
+    menu.style.top = e.clientY + 'px';
+    menu.style.left = e.clientX + 'px';
+    menu.innerHTML = itensMenuContexto(prof).map((item, i) =>
+      `<div class="gp-context-menu__item" data-idx="${i}"><i class="fas ${item.icon}"></i>${escapeHtml(item.label)}</div>`
+    ).join('');
+    document.body.appendChild(menu);
+
+    itensMenuContexto(prof).forEach((item, i) => {
+      menu.querySelector(`[data-idx="${i}"]`).addEventListener('click', ev => {
+        ev.stopPropagation();
+        fecharMenuContexto();
+        item.action();
+      });
+    });
+
+    setTimeout(() => {
+      document.addEventListener('click', fecharMenuContexto);
+      document.addEventListener('scroll', fecharMenuContexto, true);
+    }, 0);
+  }
+
+  // converte a foto do professor (URL do Storage ou data URL legada) em PNG
+  // e copia pra área de transferência junto com um texto — pronto pra colar no WhatsApp
+  async function compartilharProfessor(prof) {
+    const nome = getField(prof, 'nome') || 'Professor';
+    const foto = getField(prof, CFG.campoFoto);
+    if (!foto) { toast('Esse professor ainda não tem foto cadastrada.', 'error'); return; }
+
+    try {
+      const resp = await fetch(foto);
+      if (!resp.ok) throw new Error('Não foi possível carregar a foto.');
+      const origemBlob = await resp.blob();
+      const bitmap = await createImageBitmap(origemBlob);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = bitmap.width; canvas.height = bitmap.height;
+      canvas.getContext('2d').drawImage(bitmap, 0, 0);
+
+      const pngBlob = await new Promise((resolve, reject) =>
+        canvas.toBlob(b => b ? resolve(b) : reject(new Error('Falha ao gerar imagem.')), 'image/png')
+      );
+
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'image/png': pngBlob,
+          'text/plain': new Blob(['oi'], { type: 'text/plain' }),
+        }),
+      ]);
+
+      toast(`Foto de ${nome} copiada! Cole (Ctrl+V) na conversa.`, 'success');
+    } catch (err) {
+      console.error('❌ Compartilhar professor — erro:', err);
+      toast('Erro ao copiar a foto: ' + (err.message || err), 'error');
+    }
   }
 
   function cardHTML(p) {
@@ -685,7 +777,7 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
   // ─────────────────────────────────────────────────────────────
   function abrirModal(prof) {
     S.profSelecionado = prof;
-    S.pendingDataURL = null;
+    limparPendingFoto();
 
     $id('gp-modalNome').textContent = getField(prof, 'nome') || 'Professor';
 
@@ -709,10 +801,17 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
   function fecharModal() {
     $id('gp-modalOverlay').style.display = 'none';
     S.profSelecionado = null;
-    S.pendingDataURL = null;
+    limparPendingFoto();
   }
 
-  function resizeImageToDataURL(file) {
+  function limparPendingFoto() {
+    if (S.pendingPreviewUrl) URL.revokeObjectURL(S.pendingPreviewUrl);
+    S.pendingBlob = null;
+    S.pendingPreviewUrl = null;
+  }
+
+  // redimensiona pro maior lado configurado e comprime — uma única cópia, em boa resolução
+  function resizeImageToBlob(file) {
     return new Promise((resolve, reject) => {
       if (!file.type || !file.type.startsWith('image/')) {
         reject(new Error('Selecione um arquivo de imagem válido.')); return;
@@ -732,7 +831,10 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
           const canvas = document.createElement('canvas');
           canvas.width = width; canvas.height = height;
           canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL('image/jpeg', CFG.jpegQuality));
+          canvas.toBlob(blob => {
+            if (!blob) { reject(new Error('Não foi possível processar essa imagem.')); return; }
+            resolve(blob);
+          }, 'image/jpeg', CFG.jpegQuality);
         };
         img.src = reader.result;
       };
@@ -748,16 +850,18 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
     btnSalvar.disabled = true;
     info.textContent = 'Processando imagem...';
     try {
-      const dataURL = await resizeImageToDataURL(file);
-      S.pendingDataURL = dataURL;
+      const blob = await resizeImageToBlob(file);
+      limparPendingFoto();
+      S.pendingBlob = blob;
+      S.pendingPreviewUrl = URL.createObjectURL(blob);
 
       const img = $id('gp-modalPreview');
-      img.src = dataURL; img.classList.add('gp-show');
+      img.src = S.pendingPreviewUrl; img.classList.add('gp-show');
       $id('gp-modalIconeFallback').style.display = 'none';
 
-      const kb = Math.round(dataURL.length / 1024);
-      info.textContent = kb > (CFG.limiteAviso / 1024)
-        ? `Pronto (${kb} KB — imagem grande, pode demorar um pouco a salvar)`
+      const kb = Math.round(blob.size / 1024);
+      info.textContent = blob.size > CFG.limiteAviso
+        ? `Pronto (${kb} KB — imagem grande, pode demorar um pouco a enviar)`
         : `Pronto para salvar (${kb} KB)`;
       btnSalvar.disabled = false;
     } catch (err) {
@@ -767,18 +871,23 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
   }
 
   async function salvarFoto() {
-    if (!S.profSelecionado || !S.pendingDataURL) return;
+    if (!S.profSelecionado || !S.pendingBlob) return;
     const btn = $id('gp-btnSalvar');
     btn.disabled = true;
     btn.textContent = 'Salvando...';
     try {
+      const path = `${CFG.storagePasta}/${S.profSelecionado.id}.jpg`;
+      const ref = S.storage.ref(path);
+      await ref.put(S.pendingBlob, { contentType: 'image/jpeg' });
+      const url = await ref.getDownloadURL();
+
       await S.db.collection(CFG.colProfessores).doc(S.profSelecionado.id).update({
-        [CFG.campoFoto]: S.pendingDataURL,
+        [CFG.campoFoto]: url,
         [CFG.campoFotoEm]: Date.now(),
       });
 
       const idx = S.professores.findIndex(p => p.id === S.profSelecionado.id);
-      if (idx > -1) S.professores[idx][CFG.campoFoto] = S.pendingDataURL;
+      if (idx > -1) S.professores[idx][CFG.campoFoto] = url;
 
       renderGrid(filtrarProfessores());
       toast('Foto atualizada com sucesso!', 'success');
