@@ -41,6 +41,7 @@ let semanaGraficoAtual = calcularSemanaAtual(); // Calcula a semana atual do mê
 
 // ===== VARIÁVEL GLOBAL PARA CONTROLE DE DIA (TABELA CONSULTA AULAS) =====
 let diaConsultaAulasAtual = new Date(); // Data atual para a tabela
+let aulasConsultaAtual = []; // aulas carregadas na tabela "Consulta de Aulas do dia" — usado pelo botão "Enviar mensagens"
 
 // ===== VARIÁVEIS GLOBAIS DE FILTRO (TABELA DE PAGAMENTO) =====
 let pgtoContratosCache = [];  // cache dos contratos, evita refetch a cada filtro/busca/ordenação
@@ -144,7 +145,7 @@ function loadPainelCentral() {
     </div>
 
     <!-- Consulta de Aulas -->
-    <div class="bg-white rounded-lg border border-gray-300 p-4">
+    <div id="painel-consulta-aulas-card" class="bg-white rounded-lg border border-gray-300 p-4">
       <div class="flex justify-between items-center mb-4">
         <h2 class="text-lg font-lexend font-bold text-gray-800">Consulta de Aulas do dia</h2>
         <div id="navegacao-consulta-aulas" class="flex items-center gap-2">
@@ -296,6 +297,9 @@ function loadPainelCentral() {
   // Inicializar navegação de consulta de aulas
   initNavegacaoConsultaAulas();
 
+  // Inicializar botão "Enviar mensagens" (WhatsApp) da tabela de consulta de aulas
+  initBtnEnviarMensagens();
+
   // Carregar tabela de consulta de aulas com o dia de hoje
   atualizarConsultaAulas();
 
@@ -434,6 +438,7 @@ async function loadAulasPainel(dataFiltro) {
     });
 
     console.log(`✅ ${aulas.length} aulas encontradas para ${dataFiltro}`);
+    aulasConsultaAtual = aulas;
 
     if (aulas.length === 0) {
       tbody.innerHTML = `
@@ -527,6 +532,7 @@ async function loadAulasPainel(dataFiltro) {
 
   } catch (error) {
     console.error('❌ Erro ao buscar aulas:', error);
+    aulasConsultaAtual = [];
     tbody.innerHTML = `
       <tr>
         <td colspan="9" class="px-4 py-8 text-center text-red-500 text-sm">
@@ -1270,6 +1276,110 @@ function initNavegacaoConsultaAulas() {
     ativarBotao(null);
     atualizarDataSelecionada(novaData);
   });
+}
+
+// ===== BOTÃO "ENVIAR MENSAGENS" (WhatsApp) — piloto do componente genérico =====
+// Ver functions-enviarWhatsApp.js (window.abrirEnvioWhatsApp) e extensao-master-wpp/README.md.
+
+function initBtnEnviarMensagens() {
+  const btn = document.getElementById('btn-enviar-mensagens');
+  if (!btn) {
+    console.error('Botão "Enviar mensagens" não encontrado');
+    return;
+  }
+  btn.addEventListener('click', enviarMensagensConsultaAulas);
+}
+
+// Resolve a lista de contatos (cliente + professor, únicos por telefone) das aulas
+// carregadas na tabela — cruza BancoDeAulas (cpf do cliente na contratação) com
+// cadastroClientes, e o nome do professor com dataBaseProfessores (mesmo padrão já
+// usado em functions-banco-de-aulas-Cards.js).
+async function resolverContatosConsultaAulas(aulas) {
+  const [contratos, professores] = await Promise.all([
+    BANCO.fetchBancoDeAulas(),
+    BANCO.fetchDataBaseProfessores(),
+  ]);
+
+  const contratoPorCodigo = {};
+  contratos.forEach(c => { contratoPorCodigo[c.id] = c; });
+
+  const profPorNome = {};
+  professores.forEach(p => { if (p.nome) profPorNome[p.nome.trim()] = p; });
+
+  const contatosMap = new Map(); // telefone (só dígitos) -> { nome, telefone }
+  const clientesPorCpf = new Map(); // cpf -> Promise<cliente|null>, evita refetch repetido no mesmo dia
+
+  function buscarClientePorCpf(cpf) {
+    if (!clientesPorCpf.has(cpf)) clientesPorCpf.set(cpf, BANCO.fetchClienteByCPF(cpf));
+    return clientesPorCpf.get(cpf);
+  }
+
+  for (const aula of aulas) {
+    const contrato = contratoPorCodigo[aula.codigoContratacao];
+    const cpf = contrato && contrato.cpf;
+    if (cpf) {
+      try {
+        const cliente = await buscarClientePorCpf(cpf);
+        const telefoneCliente = cliente && String(cliente.contato || '').replace(/\D/g, '');
+        if (telefoneCliente && !contatosMap.has(telefoneCliente)) {
+          contatosMap.set(telefoneCliente, { nome: aula.nomeCliente || cliente.nome || 'Cliente', telefone: telefoneCliente });
+        }
+      } catch (e) {
+        console.error('❌ Erro ao buscar cliente por CPF:', e);
+      }
+    }
+
+    const professor = profPorNome[String(aula.professor || '').trim()];
+    const telefoneProfessor = professor && String(professor.contato || '').replace(/\D/g, '');
+    if (telefoneProfessor && !contatosMap.has(telefoneProfessor)) {
+      contatosMap.set(telefoneProfessor, { nome: aula.professor || professor.nome || 'Professor', telefone: telefoneProfessor });
+    }
+  }
+
+  return Array.from(contatosMap.values());
+}
+
+async function enviarMensagensConsultaAulas() {
+  if (!aulasConsultaAtual.length) {
+    if (typeof showToast === 'function') showToast('Nenhuma aula carregada para esta data.', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('btn-enviar-mensagens');
+  const conteudoOriginal = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin text-sm"></i> Buscando contatos...';
+
+  try {
+    const contatos = await resolverContatosConsultaAulas(aulasConsultaAtual);
+    if (!contatos.length) {
+      if (typeof showToast === 'function') {
+        showToast('Nenhum contato com telefone cadastrado encontrado para esta data.', 'error');
+      }
+      return;
+    }
+
+    const dataLabel = formatarDataInput(diaConsultaAulasAtual);
+    const texto1Template = `Olá, [nome]! Segue o cronograma de aulas de ${dataLabel}.`;
+    const texto2Template = 'Qualquer dúvida estamos à disposição!';
+
+    const elemento = document.getElementById('painel-consulta-aulas-card');
+    const nav = document.getElementById('navegacao-consulta-aulas');
+    const navDisplayOriginal = nav ? nav.style.display : '';
+    if (nav) nav.style.display = 'none';
+
+    try {
+      await window.abrirEnvioWhatsApp({ contatos, texto1Template, texto2Template, elementoParaCaptura: elemento });
+    } finally {
+      if (nav) nav.style.display = navDisplayOriginal;
+    }
+  } catch (err) {
+    console.error('❌ Erro ao preparar envio de mensagens:', err);
+    if (typeof showToast === 'function') showToast('Erro ao preparar envio: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = conteudoOriginal;
+  }
 }
 
 function atualizarConsultaAulas() {
