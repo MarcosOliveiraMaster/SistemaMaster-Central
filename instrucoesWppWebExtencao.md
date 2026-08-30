@@ -156,50 +156,49 @@ chrome.runtime.sendMessage(EXTENSION_ID, {
 
 ---
 
-## Perguntas em aberto para continuidade do desenvolvimento
-
-As respostas a estas perguntas são necessárias para finalizar a especificação e iniciar a implementação.
+## Decisões consolidadas (respostas às perguntas em aberto)
 
 ### Bloco 1 — Gatilho e seleção de contatos
 
-1. O botão de disparo fica em qual modal exatamente? No modal do **Match**, no modal de **Detalhes da Contratação**, ou em ambos?
+1. **Onde fica o botão**: não é um botão único fixo em um modal específico. É um **componente reutilizável**, chamado "**Enviar mensagem para WhatsApp**", que será inserido em vários modais do Central, em momentos diferentes, à medida que a funcionalidade for evoluindo. Primeiro implementa-se o núcleo básico e genérico do botão; depois ele é plugado nos modais específicos.
 
-2. Como o usuário seleciona os contatos para o disparo?
-   - Checkboxes ao lado de cada professor/cliente listado no modal?
-   - Uma lista separada que abre após clicar no botão?
-   - Outro formato?
+2. **Seleção de contatos**: varia por modal. Cada modal em que o botão for inserido define sua própria forma de seleção (checkboxes na lista existente, lista separada, etc.), conforme o contexto daquele modal.
 
-3. Os contatos disponíveis para seleção são sempre o **cliente daquela contratação** + os **professores vinculados a ela** — ou pode incluir outros contatos externos não ligados àquela contratação?
+3. **Escopo dos contatos disponíveis**: depende do modal. Não há uma regra única — cada modal decide se os contatos são só o cliente + professores da contratação em questão, ou se pode incluir outros contatos.
 
 ### Bloco 2 — Conteúdo do que é enviado
 
-4. A sequência é sempre **texto 1 → imagem → texto 2**? Ou pode variar (só texto, só imagem, texto + imagem sem segundo texto)?
+4. **Sequência de envio**: não é fixa globalmente. Cada modal em que o botão for aplicado terá sua própria sequência (podendo ser configurável), mas a função central do botão é sempre a mesma: capturar a imagem/texto específicos daquele contexto e repassar à extensão para o envio.
 
-5. O **Texto 1** tem um modelo fixo com variáveis (ex: *"Olá, [Nome]! Segue o cronograma de aulas."*) ou o usuário digita livremente a cada envio?
+5. **Texto 1**: modelo **editável por modal** — vem pré-preenchido com um template padrão daquele contexto, mas o usuário pode ajustar antes de enviar.
 
-6. O **Texto 2** também tem modelo? Qual seria o conteúdo típico — uma despedida, um aviso, informação de pagamento?
+6. **Texto 2**: segue a mesma lógica do Texto 1 (modelo editável por modal).
 
-7. A **imagem** capturada é a mesma que já existe nos botões "Solicitação Cliente" / "Solicitação Professor" — ou é uma captura nova de outro elemento da tela?
+7. **Imagem enviada**: depende do modal. Em alguns casos reaproveita a mesma imagem já gerada pelos botões existentes ("Solicitação Cliente" / "Solicitação Professor"); em outros, será uma captura nova específica daquele contexto.
 
-8. Os textos são **personalizados por contato** (inserindo o nome de cada um) ou a mesma mensagem vai igual para todos os selecionados?
+8. **Personalização por contato**: sim, sempre. Os textos são personalizados inserindo o nome de cada destinatário — nunca é enviada a mesma mensagem 100% idêntica em série (alinhado ao requisito anti-detecção do WhatsApp).
 
 ### Bloco 3 — Comportamento durante o envio
 
-9. O usuário vê uma **prévia** antes do envio começar (imagem + textos + lista de contatos) para confirmar — ou o envio começa direto ao clicar?
+9. **Prévia antes do envio**: sim, sempre. O usuário vê imagem + textos + lista de contatos antes de o envio real começar.
 
-10. Durante o envio, o sistema mostra **progresso em tempo real**? Ex: *"Enviando para João (2 de 7)..."* com status de cada contato ao final?
+10. **Progresso em tempo real**: sim, com status por contato durante o processamento da fila.
 
-11. Após finalizar todos os contatos, o que acontece? O modal fecha, exibe um resumo ou apenas um toast de confirmação?
+11. **Ao final do envio**: exibe um **resumo** com o status de cada contato (enviado / erro / pulado).
 
 ### Bloco 4 — Erros e casos extremos
 
-12. Se um número **não existe no WhatsApp**, o que o sistema deve fazer? Pular e continuar para o próximo? Parar tudo e avisar?
+12. **Número inexistente no WhatsApp**: pula o contato, registra o erro, e continua a fila normalmente.
 
-13. Se o usuário **não tem o WhatsApp Web aberto ou não está logado**, o sistema deve abrir automaticamente e aguardar o login — ou exibir um aviso pedindo para logar antes de disparar?
+13. **WhatsApp Web não aberto ou não logado**: exibe um pop-up avisando que as mensagens não podem ser enviadas porque o WhatsApp não está aberto/logado, e aguarda a confirmação do usuário após ele abrir e logar no WhatsApp Web.
 
-14. Se a **extensão não estiver instalada** no Chrome, qual mensagem o sistema exibe e como orienta o usuário?
+14. **Extensão não instalada**: exibe mensagem com link/instrução de instalação.
 
-15. O cadastro de **telefone de alguns professores ou clientes pode estar vazio** no Firestore. Nesse caso, o contato aparece na lista desabilitado ou é omitido completamente?
+15. **Telefone ausente no Firestore**: não é um caso a ser tratado pela extensão. Cada modal já entrega à extensão apenas a lista de contatos elegíveis para aquele envio (filtro de telefone/elegibilidade é responsabilidade do modal, não da extensão).
+
+### Ponto adicional levantado — restrição de usuário autenticado (item para sessão futura)
+
+A extensão deve, futuramente, restringir o envio apenas aos usuários autenticados no próprio Central (os logins configurados como responsáveis pela extensão). A extensão deve identificar quem está logado na plataforma Central e só permitir o disparo se for um desses usuários dedicados. **Esse refinamento fica registrado para ser detalhado e implementado em uma etapa futura**, não faz parte do escopo inicial básico do botão.
 
 ---
 
@@ -210,9 +209,9 @@ As respostas a estas perguntas são necessárias para finalizar a especificaçã
 - [x] Critérios de segurança definidos
 - [x] Requisitos funcionais mapeados
 - [x] Stack de compatibilidade documentada
-- [ ] Perguntas do Bloco 1 respondidas
-- [ ] Perguntas do Bloco 2 respondidas
-- [ ] Perguntas do Bloco 3 respondidas
-- [ ] Perguntas do Bloco 4 respondidas
-- [ ] Especificação final consolidada
+- [x] Perguntas do Bloco 1 respondidas
+- [x] Perguntas do Bloco 2 respondidas
+- [x] Perguntas do Bloco 3 respondidas
+- [x] Perguntas do Bloco 4 respondidas
+- [x] Especificação final consolidada
 - [ ] Implementação iniciada
