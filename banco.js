@@ -847,11 +847,17 @@ async function deleteListaTarefas(listaId) {
 }
 
 // Função para buscar todos os itens (tarefas/subitens/sub-subitens) de uma lista
+// "status" substitui o antigo booleano "concluido" (pendente/andamento/concluido/cancelado).
+// Itens antigos só têm "concluido" gravado — normaliza pra "status" aqui, num único lugar.
 async function fetchItensTarefa(listaId) {
   try {
     const querySnapshot = await db.collection("listasTarefas").doc(listaId).collection("itens").get();
     const itens = [];
-    querySnapshot.forEach(doc => { itens.push({ id: doc.id, ...doc.data() }); });
+    querySnapshot.forEach(doc => {
+      const data = doc.data();
+      const status = data.status || (data.concluido ? 'concluido' : 'pendente');
+      itens.push({ id: doc.id, ...data, status });
+    });
     return itens;
   } catch (error) {
     console.error('❌ Erro ao buscar itens da lista de tarefas:', error.message);
@@ -864,7 +870,7 @@ async function addItemTarefa(listaId, itemData) {
   try {
     const docRef = await db.collection("listasTarefas").doc(listaId).collection("itens").add({
       ...itemData,
-      concluido: false,
+      status: 'pendente',
       criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
       ultimaEdicao: firebase.firestore.FieldValue.serverTimestamp()
     });

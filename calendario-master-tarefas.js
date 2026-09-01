@@ -9,13 +9,24 @@
 //
 // Modelo de dados (Firestore):
 //   listasTarefas/{listaId}            { data, totalItens, itensConcluidos, timestamp }
-//   listasTarefas/{listaId}/itens/{id} { texto, concluido, nivel(1-3), parentId,
+//   listasTarefas/{listaId}/itens/{id} { texto, status('pendente'|'andamento'|'concluido'|'cancelado'),
+//                                        nivel(1-3), parentId,
 //                                        responsavel('Marcos'|'Ester'|''), prazo('HH:MM'|''),
 //                                        comentario, tags(string[], só nível 1), ordem,
 //                                        ultimaEdicao, ultimaEdicaoPor, criadoEm }
 // "totalItens"/"itensConcluidos" contam só os itens de nível 1 (são o que vira
-// fatia na barra de progresso do dia).
+// fatia na barra de progresso do dia); "itensConcluidos" só soma status==='concluido'.
+//
+// Checkbox de status: cada clique avança um ciclo independente por item (pai e
+// subtarefas não se propagam mais entre si) — vazio(pendente) → amarelo(andamento,
+// ampulheta) → verde(concluido, check) → vermelho(cancelado, x) → volta pro vazio.
 // ============================================================
+
+const CM_TAREFAS_STATUS_CICLO = ['pendente', 'andamento', 'concluido', 'cancelado'];
+function _cmProximoStatusTarefa(status) {
+  const idx = CM_TAREFAS_STATUS_CICLO.indexOf(status);
+  return CM_TAREFAS_STATUS_CICLO[(idx + 1) % CM_TAREFAS_STATUS_CICLO.length];
+}
 
 const CM_TAREFAS_PESSOAS = ['Marcos', 'Ester'];
 const CM_TAREFAS_MAX_FATIAS = 20;
@@ -119,9 +130,10 @@ function _cmFormatarMeta(item) {
   return `Editado em ${dia}/${mes}/${ano} às ${hh}:${mm}${autor}`;
 }
 
-// Verdadeiro quando falta <= 2h pro prazo ou o prazo já passou (e o item não está concluído)
+// Verdadeiro quando falta <= 2h pro prazo ou o prazo já passou (e o item ainda está
+// ativo — pendente ou em andamento; concluído/cancelado nunca fica urgente)
 function _cmEhUrgente(item, dataBR) {
-  if (!item || item.concluido || !item.prazo || !dataBR) return false;
+  if (!item || item.status === 'concluido' || item.status === 'cancelado' || !item.prazo || !dataBR) return false;
   const m = String(dataBR).match(/(\d{2})\/(\d{2})\/(\d{4})/);
   if (!m) return false;
   const partesHora = String(item.prazo).match(/(\d{1,2}):(\d{2})/);
@@ -720,6 +732,16 @@ async function carregarCacheDoMes(mes, ano) {
   iniciarAtualizacaoCores();
 }
 
+// Classe de cor da fatia da barra de progresso: concluído(verde) > cancelado(vermelho)
+// > vencido/urgente(vermelho, tem prioridade sobre "em andamento") > andamento(amarelo) > pendente(cinza)
+function _cmClasseFatia(item, dataBR) {
+  if (item.status === 'concluido') return 'cm-fatia-concluida';
+  if (item.status === 'cancelado') return 'cm-fatia-cancelada';
+  if (_cmEhUrgente(item, dataBR)) return 'cm-fatia-urgente';
+  if (item.status === 'andamento') return 'cm-fatia-andamento';
+  return '';
+}
+
 function renderizarBarraDia(dia) {
   const info = cmTarefasCacheDia[dia];
   if (!info || !info.itens.length) return '<div class="cm-barra-slot"></div>';
@@ -732,8 +754,7 @@ function renderizarBarraDia(dia) {
   const linhasHtml = linhas.map(linha => `
     <div class="cm-barra-linha">
       ${linha.map(item => {
-        const urgente = _cmEhUrgente(item, info.dataBR);
-        const classe = item.concluido ? 'cm-fatia-concluida' : (urgente ? 'cm-fatia-urgente' : '');
+        const classe = _cmClasseFatia(item, info.dataBR);
         return `<span class="cm-fatia ${classe}" data-item-id="${item.id}" data-dia="${dia}" title="${escapeHtml(_cmTextoPlano(item.texto))}"></span>`;
       }).join('')}
     </div>
@@ -751,7 +772,9 @@ function iniciarAtualizacaoCores() {
       if (!info) return;
       const item = info.itens.find(i => i.id === el.dataset.itemId);
       if (!item) return;
-      el.classList.toggle('cm-fatia-urgente', !item.concluido && _cmEhUrgente(item, info.dataBR));
+      const ehUrgente = _cmEhUrgente(item, info.dataBR);
+      el.classList.toggle('cm-fatia-urgente', ehUrgente);
+      el.classList.toggle('cm-fatia-andamento', item.status === 'andamento' && !ehUrgente);
     });
   }, 60000);
 }
@@ -1176,7 +1199,7 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
 
   // ---- Copiar tarefa (nível 1) + toda a subárvore pra outro dia ----
   // Sempre copia (não move): o item original continua no dia atual. A cópia nasce
-  // sempre desmarcada (BANCO.addItemTarefa já força concluido:false) e entra no fim
+  // sempre desmarcada (BANCO.addItemTarefa já força status:'pendente') e entra no fim
   // da lista de nível 1 do dia de destino, seja ele um dia com lista existente ou não.
   const copiarItemParaData = async (itemOrigem, dataDestinoBR) => {
     try {
@@ -1210,7 +1233,7 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
 
       const itensFinaisDestino = await BANCO.fetchItensTarefa(listaDestinoId);
       const nivel1Finais = itensFinaisDestino.filter(i => i.nivel === 1);
-      await BANCO.atualizarAgregadosListaTarefas(listaDestinoId, nivel1Finais.length, nivel1Finais.filter(i => i.concluido).length);
+      await BANCO.atualizarAgregadosListaTarefas(listaDestinoId, nivel1Finais.length, nivel1Finais.filter(i => i.status === 'concluido').length);
 
       showToast(`✅ "${_cmTextoPlano(itemOrigem.texto)}" copiada para ${dataDestinoBR}!`, 'success');
 
@@ -1302,6 +1325,18 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
       </button>` : '';
     const fixosHtml = [horaFixoHtml, comentarioFixoHtml].filter(Boolean).join('<span class="cm-tarefa-divisor"></span>');
 
+    const statusIconHtml = {
+      andamento: '<i class="fas fa-hourglass-half"></i>',
+      concluido: '<i class="fas fa-check"></i>',
+      cancelado: '<i class="fas fa-times"></i>'
+    }[item.status] || '';
+    const statusTitle = {
+      pendente: 'Marcar como em andamento',
+      andamento: 'Marcar como concluída',
+      concluido: 'Marcar como cancelada',
+      cancelado: 'Voltar para pendente'
+    }[item.status] || '';
+
     return `
       <div class="cm-tarefa-item cm-tarefa-nivel-${item.nivel}" data-item-id="${item.id}">
         <div class="cm-tarefa-row">
@@ -1309,7 +1344,7 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
           ${temFilhos
             ? `<button type="button" class="cm-tarefa-btn-colapsar" data-item-id="${item.id}" title="${recolhido ? 'Expandir' : 'Recolher'}"><i class="fas fa-chevron-${recolhido ? 'right' : 'down'}"></i></button>`
             : '<span class="cm-tarefa-colapsar-espaco"></span>'}
-          <input type="checkbox" class="cm-tarefa-checkbox" data-item-id="${item.id}" ${item.concluido ? 'checked' : ''} ${desabilitarCheckbox ? 'disabled' : ''}>
+          <button type="button" class="cm-tarefa-checkbox cm-tarefa-checkbox-${item.status}" data-item-id="${item.id}" ${desabilitarCheckbox ? 'disabled' : ''} title="${statusTitle}">${statusIconHtml}</button>
           <div class="cm-tarefa-texto" contenteditable="true" data-item-id="${item.id}" data-placeholder="Descreva a tarefa...">${_cmRenderConteudoComMencoes(item.texto)}</div>
           ${funcoesAberto ? `<span class="cm-tarefa-divisor"></span><div class="cm-tarefa-funcoes">${funcoesHtml}</div>` : fixosHtml}
           <button type="button" class="cm-tarefa-btn-funcoes-toggle${funcoesAberto ? ' ativo' : ''}" data-item-id="${item.id}" title="${funcoesAberto ? 'Esconder ações' : 'Mostrar ações'}">
@@ -1420,7 +1455,7 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
     if (!listaIdAtual) return;
     const persistidosNivel1 = itens.filter(i => i._persisted && i.nivel === 1);
     const total = persistidosNivel1.length;
-    const concluidos = persistidosNivel1.filter(i => i.concluido).length;
+    const concluidos = persistidosNivel1.filter(i => i.status === 'concluido').length;
     if (total === 0 && itens.filter(i => i._persisted).length === 0) {
       try {
         await BANCO.deleteListaTarefas(listaIdAtual);
@@ -1442,44 +1477,24 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
     }
   };
 
-  // Marcar/desmarcar um item que tem subitens propaga o mesmo valor pra toda a
-  // subárvore abaixo dele (qualquer profundidade) — o checkbox do item nunca fica
-  // desabilitado por ter filhos, essa é a forma de manter os dois em sincronia.
-  const aplicarConclusaoCascata = async (itemRaiz, concluido) => {
-    const alvos = [itemRaiz, ...coletarSubarvoreObjetos(itemRaiz.id)].filter(i => i._persisted);
-    const agora = new Date();
-    alvos.forEach(i => {
-      i.concluido = concluido;
-      i.ultimaEdicao = agora;
-      i.ultimaEdicaoPor = editorAtual;
-    });
+  // Avança o status de um item (ciclo vazio → andamento → concluido → cancelado → vazio).
+  // Independente por item: tarefa principal e subtarefas não se propagam mais entre si.
+  // Otimista, como persistirCampoSimples: muda local antes do await, desfaz e
+  // re-renderiza só se a gravação falhar.
+  const avancarStatusTarefa = async (item) => {
+    const statusAnterior = item.status;
+    const novoStatus = _cmProximoStatusTarefa(item.status);
+    item.status = novoStatus;
+    item.ultimaEdicao = new Date();
+    item.ultimaEdicaoPor = editorAtual;
     try {
-      await Promise.all(alvos.map(i =>
-        BANCO.updateItemTarefa(listaIdAtual, i.id, { concluido, ultimaEdicaoPor: editorAtual })
-      ));
+      await BANCO.updateItemTarefa(listaIdAtual, item.id, { status: novoStatus, ultimaEdicaoPor: editorAtual });
     } catch (error) {
-      console.error('❌ Erro ao atualizar tarefas em cascata:', error);
-      showToast('❌ Erro ao atualizar tarefas', 'error');
+      console.error('❌ Erro ao atualizar status da tarefa:', error);
+      showToast('❌ Erro ao atualizar tarefa', 'error');
+      item.status = statusAnterior;
+      render();
     }
-  };
-
-  // ---- Cascata de auto-conclusão bidirecional ----
-  const recalcularCascata = (node) => {
-    if (!node) return;
-    const filhos = itens.filter(i => i.parentId === node.id);
-    if (filhos.length > 0) {
-      const todosConcluidos = filhos.every(f => f.concluido);
-      if (node.concluido !== todosConcluidos) {
-        node.concluido = todosConcluidos;
-        node.ultimaEdicao = new Date();
-        node.ultimaEdicaoPor = editorAtual;
-        if (node._persisted) {
-          BANCO.updateItemTarefa(listaIdAtual, node.id, { concluido: node.concluido, ultimaEdicaoPor: editorAtual })
-            .catch(err => console.error('❌ Erro ao atualizar tarefa:', err));
-        }
-      }
-    }
-    if (node.parentId) recalcularCascata(itens.find(i => i.id === node.parentId));
   };
 
   // Foca (e posiciona o cursor no fim de) o campo de texto do item recém-criado.
@@ -1497,7 +1512,7 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
   const criarItemLocal = (nivel, parentId) => {
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     itens.push({
-      id: tempId, texto: '', concluido: false, nivel, parentId,
+      id: tempId, texto: '', status: 'pendente', nivel, parentId,
       responsavel: '', prazo: '', comentario: '', tags: [], ordem: proximaOrdem(parentId),
       ultimaEdicao: null, ultimaEdicaoPor: '', _persisted: false
     });
@@ -1511,7 +1526,7 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
   const criarItemAposIrmao = (itemAtual) => {
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const novoItem = {
-      id: tempId, texto: '', concluido: false, nivel: itemAtual.nivel, parentId: itemAtual.parentId,
+      id: tempId, texto: '', status: 'pendente', nivel: itemAtual.nivel, parentId: itemAtual.parentId,
       responsavel: '', prazo: '', comentario: '', tags: [], ordem: 0,
       ultimaEdicao: null, ultimaEdicaoPor: '', _persisted: false
     };
@@ -1875,7 +1890,12 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
     }
   });
 
+  // Atualização otimista: muda o valor local (síncrono, antes do 1º await) e devolve
+  // a Promise sem que o chamador precise esperá-la — a tela já reflete o novo valor
+  // no mesmo tick, e a gravação no Firestore acontece em paralelo, em segundo plano.
+  // Se a gravação falhar, desfaz o valor local e re-renderiza pra não ficar dessincronizado.
   const persistirCampoSimples = async (item, campo, valor) => {
+    const valorAnterior = item[campo];
     item[campo] = valor;
     item.ultimaEdicao = new Date();
     item.ultimaEdicaoPor = editorAtual;
@@ -1885,28 +1905,19 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
     } catch (error) {
       console.error(`❌ Erro ao atualizar ${campo} da tarefa:`, error);
       showToast(`❌ Erro ao atualizar ${campo}`, 'error');
+      item[campo] = valorAnterior;
+      render();
     }
   };
 
   listaEl.addEventListener('change', async (e) => {
-    const chk = e.target.closest('.cm-tarefa-checkbox');
-    if (chk) {
-      const item = itens.find(i => i.id === chk.dataset.itemId);
-      if (!item || !item._persisted) return;
-      await aplicarConclusaoCascata(item, chk.checked);
-      if (item.parentId) recalcularCascata(itens.find(i => i.id === item.parentId));
-      await salvarAgregados();
-      render();
-      return;
-    }
-
     const tagChk = e.target.closest('.cm-tag-checkbox');
     if (tagChk) {
       const item = itens.find(i => i.id === tagChk.dataset.itemId);
       if (!item) return;
       const tags = new Set(item.tags || []);
       tagChk.checked ? tags.add(tagChk.value) : tags.delete(tagChk.value);
-      await persistirCampoSimples(item, 'tags', Array.from(tags));
+      persistirCampoSimples(item, 'tags', Array.from(tags));
       render();
       // render() recria o DOM do popover de tags — se ele continuar aberto, a
       // referência guardada em popoverAberto.wrap precisa apontar pro nó novo,
@@ -1919,6 +1930,16 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
   });
 
   listaEl.addEventListener('click', async (e) => {
+    const chk = e.target.closest('.cm-tarefa-checkbox');
+    if (chk) {
+      const item = itens.find(i => i.id === chk.dataset.itemId);
+      if (!item || !item._persisted) return;
+      avancarStatusTarefa(item);
+      salvarAgregados();
+      render();
+      return;
+    }
+
     const chipMencao = e.target.closest('.cm-mention-chip');
     if (chipMencao) {
       e.preventDefault();
@@ -1936,7 +1957,7 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
       if (!item) return;
       const pessoa = handlePessoa.dataset.pessoa;
       const novoValor = item.responsavel === pessoa ? '' : pessoa;
-      await persistirCampoSimples(item, 'responsavel', novoValor);
+      persistirCampoSimples(item, 'responsavel', novoValor);
       render();
       return;
     }
@@ -1985,8 +2006,8 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
     if (btnHora) {
       const item = itens.find(i => i.id === btnHora.dataset.itemId);
       if (!item) return;
-      _cmAbrirSeletorHora(item.prazo, async (novoValor) => {
-        await persistirCampoSimples(item, 'prazo', novoValor);
+      _cmAbrirSeletorHora(item.prazo, (novoValor) => {
+        persistirCampoSimples(item, 'prazo', novoValor);
         render();
       });
       return;
@@ -2096,9 +2117,7 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
         }
       }
 
-      const paiId = item.parentId;
       itens = itens.filter(i => !idsRemover.includes(i.id));
-      if (paiId) recalcularCascata(itens.find(i => i.id === paiId));
       await salvarAgregados();
       render();
     }
