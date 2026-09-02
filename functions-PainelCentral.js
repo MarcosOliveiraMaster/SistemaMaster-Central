@@ -2709,21 +2709,24 @@ async function calcularAniversariosDoMes() {
 
   const aniversariantes = [];
 
+  // clienteId: id do cliente em cadastroClientes — usado pra abrir o modal "Detalhes do
+  // Cliente" ao clicar no card (aluno usa o id do cliente responsável por ele; professor
+  // fica null, já que não tem modal de detalhes equivalente ligado ao Calendário Master).
   professores.forEach(p => {
     const d = _parseDataAula(p.dataNascimento);
     if (!d) return;
-    aniversariantes.push({ nome: p.nome || '', rotulo: 'Professor', dia: d.getDate(), mes: d.getMonth() });
+    aniversariantes.push({ nome: p.nome || '', rotulo: 'Professor', clienteId: null, dia: d.getDate(), mes: d.getMonth() });
   });
 
   clientes.forEach(c => {
     const dCliente = _parseDataAula(c.dataNascimento);
     if (dCliente) {
-      aniversariantes.push({ nome: c.nome || '', rotulo: 'Cliente', dia: dCliente.getDate(), mes: dCliente.getMonth() });
+      aniversariantes.push({ nome: c.nome || '', rotulo: 'Cliente', clienteId: c.id, dia: dCliente.getDate(), mes: dCliente.getMonth() });
     }
     (c.estudantes || []).forEach(e => {
       const dAluno = _parseDataAula(e.aniversario);
       if (!dAluno) return;
-      aniversariantes.push({ nome: e.nome || '', rotulo: 'Aluno', dia: dAluno.getDate(), mes: dAluno.getMonth() });
+      aniversariantes.push({ nome: e.nome || '', rotulo: 'Aluno', clienteId: c.id, dia: dAluno.getDate(), mes: dAluno.getMonth() });
     });
   });
 
@@ -2891,12 +2894,16 @@ async function renderGradeCalendarioMaster() {
       calcularAniversariosDoMes().then(aniversariantes => {
         aniversariantes.forEach(a => {
           if (a.mes !== calMasterMes) return;
+          // Só cliente/aluno abrem o modal "Detalhes do Cliente" (aluno usa o cliente responsável).
+          const onclickAttr = a.clienteId
+            ? `calMasterAbrirClienteAniversario('${escapeHtml(String(a.clienteId))}')`
+            : '';
           addEvento(a.dia, {
             tipo: 'aniversario',
             minutos: 0,
             titulo: 'Aniversário',
             subtitulo: `${_calMasterDoisNomes(a.nome)} (${a.rotulo})`,
-            onclickAttr: ''
+            onclickAttr
           });
         });
       }).catch(err => console.error('❌ Erro ao calcular aniversários do Calendário Master:', err))
@@ -2935,8 +2942,11 @@ async function renderGradeCalendarioMaster() {
     const tituloTxt = escapeHtml(String(evento.titulo || ''));
     const subtituloTxt = escapeHtml(String(evento.subtitulo || ''));
     const tooltip = escapeHtml(`${evento.titulo || ''} • ${evento.subtitulo || ''}`);
+    // Aniversário de professor não tem onclickAttr (sem modal de detalhes equivalente) —
+    // nesse caso o card fica com cursor normal em vez de indicar que é clicável.
+    const classeSemClique = evento.onclickAttr ? '' : ' cal-master-event-sem-clique';
     return `
-      <div class="cal-master-event cal-master-event-${evento.tipo}" onclick="${evento.onclickAttr}" title="${tooltip}">
+      <div class="cal-master-event cal-master-event-${evento.tipo}${classeSemClique}" onclick="${evento.onclickAttr}" title="${tooltip}">
         <div class="cal-master-event-icon"><i class="fas ${icone}"></i></div>
         <div class="cal-master-event-titulo">${tituloTxt}</div>
         <div class="cal-master-event-subtitulo">${subtituloTxt}</div>
@@ -2992,6 +3002,19 @@ async function renderGradeCalendarioMaster() {
 
   grid.innerHTML = html;
   if (typeof CalMasterTarefas !== 'undefined') CalMasterTarefas.iniciarAtualizacaoCores();
+}
+
+// Aniversário de cliente/aluno (card do Calendário Master) abre o modal "Detalhes do
+// Cliente" na hora, sem trocar de seção — mesmo espírito de
+// abrirDetalhesContratacaoPainelCentral() (ver acima). A implementação (que injeta só
+// os modais em document.body e reaproveita a classe DashboardCliente) mora em
+// functions-dashboardCliente.js, junto do resto do código do modal.
+function calMasterAbrirClienteAniversario(clientId) {
+  if (typeof abrirDetalhesClienteStandalone !== 'function') {
+    console.error('❌ abrirDetalhesClienteStandalone não disponível (functions-dashboardCliente.js não carregado?).');
+    return;
+  }
+  abrirDetalhesClienteStandalone(clientId);
 }
 
 function abrirModalCriarEvento() {

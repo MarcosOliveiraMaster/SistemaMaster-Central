@@ -4198,7 +4198,12 @@ h2, h3, h4, h5, h6 {
 
 .cal-master-event-aniversario {
   background: #EC4899;
-  cursor: default; /* não abre detalhes ao clicar, ao contrário dos demais tipos */
+}
+
+/* Aniversário de professor (sem modal de detalhes equivalente) — cursor normal em vez
+   do ponteiro padrão de card clicável. */
+.cal-master-event-sem-clique {
+  cursor: default;
 }
 
 /* Matriz 2x2 (ícone mesclado na 1ª coluna, 30%/70%) — todos os tipos, exceto "aula"

@@ -2300,97 +2300,12 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
 }
 
 // ============================================================
-// FUNÇÃO DE CARREGAMENTO PARA SEÇÃO
+// HTML DOS MODAIS (toast + Detalhes/NF/Aula/Estudante/Editar)
+// Extraído em função à parte porque também é usado "standalone" (fora da seção
+// "clientes"), por abrirDetalhesClienteStandalone() — ver mais abaixo.
 // ============================================================
-function loadDashboardCliente() {
-  const section = document.getElementById('clientes');
-  if (!section) {
-    console.error('[DashboardCliente] Section #clientes não encontrada');
-    return;
-  }
-
-  // Renderizar HTML da estrutura
-  section.innerHTML = `
-    <!-- Container Principal -->
-    <div class="dc-container">
-      <!-- Header Compacto -->
-      <div class="dc-header dc-header-compact">
-        <div class="dc-filters-inline">
-          <div class="dc-filter-group dc-filter-search">
-            <label class="dc-filter-label">Buscar</label>
-            <div class="dc-search-wrapper">
-              <i class="fas fa-search"></i>
-              <input type="text" id="dc-search" class="dc-form-input dc-input-sm" placeholder="Nome do cliente...">
-            </div>
-          </div>
-          <div class="dc-filter-group dc-filter-status">
-            <label class="dc-filter-label">Status</label>
-            <select id="dc-filter-status" class="dc-form-select dc-input-sm">
-              <option value="">Todos</option>
-              <option value="Ativo">Ativo</option>
-              <option value="Potencial">Potencial</option>
-              <option value="Inativo">Inativo</option>
-            </select>
-          </div>
-          <div class="dc-filter-group dc-filter-cidade">
-            <label class="dc-filter-label">Cidade</label>
-            <input type="text" id="dc-filter-cidade" class="dc-form-input dc-input-sm" placeholder="Cidade...">
-          </div>
-          <div class="dc-filter-group dc-filter-btns">
-            <label class="dc-filter-label">&nbsp;</label>
-            <div class="dc-filter-btn-group">
-              <button id="dc-btn-potencial" class="dc-btn dc-btn-icon dc-btn-toggle" title="Filtrar Clientes em Potencial">
-                <i class="fas fa-eye"></i>
-              </button>
-              <button id="dc-btn-clear-filters" class="dc-btn dc-btn-icon dc-btn-ghost" title="Limpar filtros">
-                <i class="fas fa-times"></i>
-              </button>
-              <button id="dc-btn-refresh" class="dc-btn dc-btn-icon dc-btn-ghost" title="Atualizar">
-                <i class="fas fa-sync-alt"></i>
-              </button>
-              <button id="dc-btn-csv" class="dc-btn dc-btn-icon dc-btn-secondary" title="Exportar CSV">
-                <i class="fas fa-file-csv"></i>
-              </button>
-              <button id="dc-configuracao" class="dc-btn dc-btn-icon dc-btn-ghost" title="Configurações">
-                <i class="fas fa-cog"></i>
-              </button>
-              <span id="dc-client-count" class="dc-count-badge">0</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Loading -->
-      <div id="dc-loading" class="dc-loading" style="display: none;">
-        <div class="dc-spinner"></div>
-        <p>Carregando clientes...</p>
-      </div>
-
-      <!-- Estado vazio -->
-      <div id="dc-empty" class="dc-empty-state" style="display: none;">
-        <i class="fas fa-users-slash"></i>
-        <h3>Nenhum cliente encontrado</h3>
-        <p>Tente ajustar os filtros ou cadastrar novos clientes.</p>
-      </div>
-
-      <!-- Tabela de Clientes -->
-      <div class="dc-table-wrapper">
-        <table id="dc-clients-table" class="dc-table dc-table-main">
-          <thead>
-            <tr>
-              <th><i class="fas fa-user"></i> Nome do Cliente</th>
-              <th class="dc-th-center"><i class="fas fa-circle-info"></i> Detalhes</th>
-              <th class="dc-th-center"><i class="fas fa-file-invoice"></i> Dados NF</th>
-              <th class="dc-th-center"><i class="fas fa-map-location-dot"></i> Local Aula</th>
-              <th class="dc-th-center"><i class="fas fa-user-graduate"></i> Estudantes</th>
-              <th class="dc-th-center"><i class="fas fa-edit"></i> Editar</th>
-            </tr>
-          </thead>
-          <tbody id="dc-table-body"></tbody>
-        </table>
-      </div>
-    </div>
-
+function buildDashboardClienteModaisHTML() {
+  return `
     <!-- Toast Container -->
     <div id="dc-toast-container" class="dc-toast-container"></div>
 
@@ -2482,6 +2397,152 @@ function loadDashboardCliente() {
         <div id="dc-modal-editar-footer" class="dc-modal-footer"></div>
       </div>
     </div>
+  `;
+}
+
+// ============================================================
+// ABERTURA "STANDALONE" (sem navegar até a seção "BD Clientes")
+// Usado pelo card de aniversário do Calendário Master (Painel Central), no mesmo
+// espírito de abrirDetalhesContratacaoPainelCentral(): abre o modal na hora, sem trocar
+// de seção. Injeta só os modais (não a lista/tabela) num container próprio em
+// document.body — loadDashboardCliente() remove esse container assim que a seção
+// "clientes" é carregada de verdade, pra nunca existirem dois elementos com os mesmos
+// ids ao mesmo tempo.
+// ============================================================
+async function abrirDetalhesClienteStandalone(clientId) {
+  if (!clientId) return;
+
+  if (!document.getElementById('dc-modal-detalhes')) {
+    const container = document.createElement('div');
+    container.id = 'dc-standalone-modais';
+    container.innerHTML = buildDashboardClienteModaisHTML();
+    document.body.appendChild(container);
+  }
+
+  if (!window.dashboardCliente) {
+    window.dashboardCliente = new DashboardCliente();
+  } else {
+    // Reata os listeners aos elementos recém-criados acima (os antigos, da seção
+    // "clientes", já foram destruídos quando o usuário saiu de lá).
+    window.dashboardCliente.setupUI();
+    window.dashboardCliente.setupEventListeners();
+  }
+
+  const inicio = Date.now();
+  const TIMEOUT_MS = 8000;
+  const tentarAbrir = () => {
+    const cliente = window.dashboardCliente.getClientData(clientId);
+    if (cliente) {
+      window.dashboardCliente.openModalDetalhes(clientId);
+      return;
+    }
+    if (Date.now() - inicio > TIMEOUT_MS) {
+      console.error('❌ Tempo esgotado carregando os dados do cliente', clientId);
+      if (typeof showToast === 'function') showToast('❌ Não foi possível abrir os detalhes do cliente', 'error');
+      return;
+    }
+    setTimeout(tentarAbrir, 150);
+  };
+  tentarAbrir();
+}
+
+// ============================================================
+// FUNÇÃO DE CARREGAMENTO PARA SEÇÃO
+// ============================================================
+function loadDashboardCliente() {
+  const section = document.getElementById('clientes');
+  if (!section) {
+    console.error('[DashboardCliente] Section #clientes não encontrada');
+    return;
+  }
+
+  // Remove o container standalone (se existir) — evita ids duplicados com a cópia
+  // "de verdade" que será montada agora dentro da seção #clientes.
+  document.getElementById('dc-standalone-modais')?.remove();
+
+  // Renderizar HTML da estrutura
+  section.innerHTML = `
+    <!-- Container Principal -->
+    <div class="dc-container">
+      <!-- Header Compacto -->
+      <div class="dc-header dc-header-compact">
+        <div class="dc-filters-inline">
+          <div class="dc-filter-group dc-filter-search">
+            <label class="dc-filter-label">Buscar</label>
+            <div class="dc-search-wrapper">
+              <i class="fas fa-search"></i>
+              <input type="text" id="dc-search" class="dc-form-input dc-input-sm" placeholder="Nome do cliente...">
+            </div>
+          </div>
+          <div class="dc-filter-group dc-filter-status">
+            <label class="dc-filter-label">Status</label>
+            <select id="dc-filter-status" class="dc-form-select dc-input-sm">
+              <option value="">Todos</option>
+              <option value="Ativo">Ativo</option>
+              <option value="Potencial">Potencial</option>
+              <option value="Inativo">Inativo</option>
+            </select>
+          </div>
+          <div class="dc-filter-group dc-filter-cidade">
+            <label class="dc-filter-label">Cidade</label>
+            <input type="text" id="dc-filter-cidade" class="dc-form-input dc-input-sm" placeholder="Cidade...">
+          </div>
+          <div class="dc-filter-group dc-filter-btns">
+            <label class="dc-filter-label">&nbsp;</label>
+            <div class="dc-filter-btn-group">
+              <button id="dc-btn-potencial" class="dc-btn dc-btn-icon dc-btn-toggle" title="Filtrar Clientes em Potencial">
+                <i class="fas fa-eye"></i>
+              </button>
+              <button id="dc-btn-clear-filters" class="dc-btn dc-btn-icon dc-btn-ghost" title="Limpar filtros">
+                <i class="fas fa-times"></i>
+              </button>
+              <button id="dc-btn-refresh" class="dc-btn dc-btn-icon dc-btn-ghost" title="Atualizar">
+                <i class="fas fa-sync-alt"></i>
+              </button>
+              <button id="dc-btn-csv" class="dc-btn dc-btn-icon dc-btn-secondary" title="Exportar CSV">
+                <i class="fas fa-file-csv"></i>
+              </button>
+              <button id="dc-configuracao" class="dc-btn dc-btn-icon dc-btn-ghost" title="Configurações">
+                <i class="fas fa-cog"></i>
+              </button>
+              <span id="dc-client-count" class="dc-count-badge">0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading -->
+      <div id="dc-loading" class="dc-loading" style="display: none;">
+        <div class="dc-spinner"></div>
+        <p>Carregando clientes...</p>
+      </div>
+
+      <!-- Estado vazio -->
+      <div id="dc-empty" class="dc-empty-state" style="display: none;">
+        <i class="fas fa-users-slash"></i>
+        <h3>Nenhum cliente encontrado</h3>
+        <p>Tente ajustar os filtros ou cadastrar novos clientes.</p>
+      </div>
+
+      <!-- Tabela de Clientes -->
+      <div class="dc-table-wrapper">
+        <table id="dc-clients-table" class="dc-table dc-table-main">
+          <thead>
+            <tr>
+              <th><i class="fas fa-user"></i> Nome do Cliente</th>
+              <th class="dc-th-center"><i class="fas fa-circle-info"></i> Detalhes</th>
+              <th class="dc-th-center"><i class="fas fa-file-invoice"></i> Dados NF</th>
+              <th class="dc-th-center"><i class="fas fa-map-location-dot"></i> Local Aula</th>
+              <th class="dc-th-center"><i class="fas fa-user-graduate"></i> Estudantes</th>
+              <th class="dc-th-center"><i class="fas fa-edit"></i> Editar</th>
+            </tr>
+          </thead>
+          <tbody id="dc-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    ${buildDashboardClienteModaisHTML()}
   `;
 
   // Inicializar o Dashboard
