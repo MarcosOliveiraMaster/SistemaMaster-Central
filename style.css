@@ -4307,15 +4307,16 @@ h2, h3, h4, h5, h6 {
 }
 
 /* Centralizado pelo flex do próprio checkbox (não por left/top manuais) — a rotação
-   de 45° acontece em torno do centro da caixa, então o "✓" fica sempre no meio,
-   independente do tamanho/borda do checkbox. */
+   de 45° acontece em torno do centro da caixa. O translateY(-1px) é um ajuste óptico:
+   como só as bordas direita/inferior são desenhadas, a "tinta" do "✓" fica concentrada
+   perto do canto inferior, então sem o nudge ele parece ~1px mais baixo que o centro. */
 .cm-chk-item input[type="checkbox"]:checked::after {
   content: "";
   width: 4px;
   height: 8px;
   border: solid #ffffff;
   border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
+  transform: translateY(-1px) rotate(45deg);
 }
 
 .cm-btn-stack {
