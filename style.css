@@ -4108,6 +4108,7 @@ h2, h3, h4, h5, h6 {
   grid-template-columns: repeat(7, 1fr);
   gap: 6px;
   width: 100%;
+  margin-top: 2.25vh;
 }
 
 .cal-master-loading {
@@ -4130,7 +4131,9 @@ h2, h3, h4, h5, h6 {
 .cal-master-day {
   border: 1px solid #e5e7eb;
   border-radius: 10px;
-  aspect-ratio: 3 / 2;
+  /* Sem aspect-ratio: a largura fica só por conta do grid-template-columns (repeat(7, 1fr)),
+     assim as 7 colunas continuam cabendo dentro do card independente da altura. */
+  min-height: 140px; /* +30px sobre a altura típica anterior (~110px, quando ainda usava aspect-ratio 3/2) */
   overflow-y: auto;
   padding: 6px;
   display: flex;
@@ -4190,7 +4193,133 @@ h2, h3, h4, h5, h6 {
 }
 
 .cal-master-event-renovacao {
-  background: #8B5CF6;
+  background: #1E3A8A;
+}
+
+.cal-master-event-aniversario {
+  background: #EC4899;
+  cursor: default; /* não abre detalhes ao clicar, ao contrário dos demais tipos */
+}
+
+/* Matriz 2x2 (ícone mesclado na 1ª coluna, 30%/70%) — todos os tipos, exceto "aula"
+   (que mantém o formato antigo de linhas empilhadas via .cal-master-event-line) */
+.cal-master-event:not(.cal-master-event-aula) {
+  display: grid;
+  grid-template-columns: 20% 80%;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 5px;
+}
+
+.cal-master-event-icon {
+  grid-row: 1 / 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
+.cal-master-event-titulo {
+  grid-column: 2;
+  grid-row: 1;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cal-master-event-subtitulo {
+  grid-column: 2;
+  grid-row: 2;
+  font-size: 0.92em;
+  opacity: 0.85;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- Checkboxes de filtro do Calendário Master ("chips" lado a lado + botões empilhados) ---- */
+.cm-chk-grid {
+  display: flex;
+  gap: 6px 10px;
+}
+
+.cm-chk-item {
+  display: flex;
+  align-items: center;
+  flex: 1 1 0;
+  gap: 8px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: border-color 0.15s, background-color 0.15s, color 0.15s;
+}
+
+.cm-chk-item:hover {
+  border-color: var(--orange);
+  background: #fff7ed;
+}
+
+/* Marcado ("true"): chip fica laranja sólido, texto e ícone de check em branco */
+.cm-chk-item:has(input[type="checkbox"]:checked) {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: #ffffff;
+}
+
+/* Checkbox customizado (appearance:none) — permite forçar o "✓" em branco, já que o
+   navegador escolhe a cor do check automaticamente com accent-color e, no laranja
+   do app, escolhia preto. */
+.cm-chk-item input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #9ca3af;
+  border-radius: 4px;
+  background: #ffffff;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.cm-chk-item input[type="checkbox"]:checked {
+  background: transparent;
+  border-color: #ffffff;
+}
+
+/* Centralizado pelo flex do próprio checkbox (não por left/top manuais) — a rotação
+   de 45° acontece em torno do centro da caixa, então o "✓" fica sempre no meio,
+   independente do tamanho/borda do checkbox. */
+.cm-chk-item input[type="checkbox"]:checked::after {
+  content: "";
+  width: 4px;
+  height: 8px;
+  border: solid #ffffff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.cm-btn-stack {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 6px;
+  padding-left: 16px;
+  border-left: 1px solid #e5e7eb;
 }
 
 /* ===== Barra de progresso de tarefas do dia (acima do quadrado, no grid) ===== */
@@ -5634,14 +5763,8 @@ h2, h3, h4, h5, h6 {
 }
 
 /* Feriado no Calendário Master do Painel Central.
-   Verde mais fechado que o de pagamento (#10B981) e com estrela via ::before,
-   já que renderEventoHtml() escapa o texto e não aceita ícone embutido. */
+   Verde mais fechado que o de pagamento (#10B981); ícone de estrela vem da
+   coluna .cal-master-event-icon (matriz 2x2), ver renderEventoHtml(). */
 .cal-master-event-feriado {
   background: #16A34A;
-  font-weight: 700;
-}
-
-.cal-master-event-feriado::before {
-  content: "\2605\00a0";
-  font-size: 0.55rem;
 }

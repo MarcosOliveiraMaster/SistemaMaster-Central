@@ -57,7 +57,18 @@ let calMasterExibirAulas = false;
 let calMasterExibirPagamentos = true;
 let calMasterExibirRenovacoes = true;
 let calMasterExibirFeriados = true;   // feriados nacionais, de Alagoas e de Maceió
+let calMasterExibirAniversarios = true; // aniversários de clientes, professores e alunos
 let calMasterEventosCache = []; // cache dos eventos customizados carregados no mês atual
+
+// Ícone (FontAwesome) de cada tipo de card do Calendário Master — usado na matriz 2x2
+// (coluna 1, mesclada). "aula" não entra aqui: mantém o formato antigo de linhas.
+const CAL_MASTER_ICONES = {
+  feriado: 'fa-star',
+  evento: 'fa-flag',
+  renovacao: 'fa-money-bill-wave',
+  pagamento: 'fa-money-bill-wave',
+  aniversario: 'fa-cake-candles'
+};
 // Cache das listas de tarefas (checklists) fica em calendario-master-tarefas.js (CalMasterTarefas)
 
 // Cache local do cálculo de renovações (evita recomputar a cada troca de mês
@@ -2509,7 +2520,7 @@ function carregarCalendarioMaster() {
   }
 
   area.innerHTML = `
-    <div class="flex items-center flex-wrap justify-between gap-4 mb-3 pb-3 border-b border-gray-200">
+    <div class="flex items-center flex-wrap justify-between gap-4 mb-3 border-b border-gray-200" style="padding-bottom: 2.25vh;">
       <!-- Navegação de Mês -->
       <div class="flex items-center gap-1 border border-gray-300 rounded-lg px-1" style="height: 34px;">
         <button type="button" id="calMaster-btn-mes-anterior" class="px-1.5 hover:bg-gray-100 rounded transition-colors text-gray-600 hover:text-gray-800" style="height: 26px;">
@@ -2521,32 +2532,40 @@ function carregarCalendarioMaster() {
         </button>
       </div>
 
-      <!-- Checkboxes + Criar evento -->
+      <!-- Checkboxes (grid) + botões empilhados -->
       <div class="flex items-center flex-wrap gap-4">
-        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none" style="height: 34px;">
-          <input type="checkbox" id="calMaster-chk-aulas" class="w-4 h-4">
-          Exibir aulas
-        </label>
-        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none" style="height: 34px;">
-          <input type="checkbox" id="calMaster-chk-pagamentos" class="w-4 h-4" checked>
-          Datas de pagamento
-        </label>
-        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none" style="height: 34px;">
-          <input type="checkbox" id="calMaster-chk-renovacoes" class="w-4 h-4" checked>
-          Mostrar renovações
-        </label>
-        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none" style="height: 34px;">
-          <input type="checkbox" id="calMaster-chk-feriados" class="w-4 h-4" checked>
-          Exibir feriados
-        </label>
-        <button type="button" id="calMaster-btn-criar-evento" class="btn-primary btn-compact" style="height: 34px;">
-          <i class="fas fa-plus mr-2"></i>
-          Criar evento
-        </button>
-        <button type="button" id="calMaster-btn-criar-tarefas" class="btn-primary btn-compact" style="height: 34px;">
-          <i class="fas fa-list-check mr-2"></i>
-          Criar tarefas
-        </button>
+        <div class="cm-chk-grid">
+          <label class="cm-chk-item">
+            <input type="checkbox" id="calMaster-chk-aulas">
+            Exibir aulas
+          </label>
+          <label class="cm-chk-item">
+            <input type="checkbox" id="calMaster-chk-pagamentos" checked>
+            Datas de pagamento
+          </label>
+          <label class="cm-chk-item">
+            <input type="checkbox" id="calMaster-chk-renovacoes" checked>
+            Mostrar renovações
+          </label>
+          <label class="cm-chk-item">
+            <input type="checkbox" id="calMaster-chk-feriados" checked>
+            Exibir feriados
+          </label>
+          <label class="cm-chk-item">
+            <input type="checkbox" id="calMaster-chk-aniversarios" checked>
+            Exibir aniversários
+          </label>
+        </div>
+        <div class="cm-btn-stack">
+          <button type="button" id="calMaster-btn-criar-evento" class="btn-primary btn-compact" style="height: 34px;">
+            <i class="fas fa-plus mr-2"></i>
+            Criar evento
+          </button>
+          <button type="button" id="calMaster-btn-criar-tarefas" class="btn-primary btn-compact" style="height: 34px;">
+            <i class="fas fa-list-check mr-2"></i>
+            Criar tarefas
+          </button>
+        </div>
       </div>
     </div>
 
@@ -2557,6 +2576,7 @@ function carregarCalendarioMaster() {
   const chkPagamentos = document.getElementById('calMaster-chk-pagamentos');
   const chkRenovacoes = document.getElementById('calMaster-chk-renovacoes');
   const chkFeriados = document.getElementById('calMaster-chk-feriados');
+  const chkAniversarios = document.getElementById('calMaster-chk-aniversarios');
   const btnCriarEvento = document.getElementById('calMaster-btn-criar-evento');
   const btnCriarTarefas = document.getElementById('calMaster-btn-criar-tarefas');
   const btnMesAnterior = document.getElementById('calMaster-btn-mes-anterior');
@@ -2576,6 +2596,10 @@ function carregarCalendarioMaster() {
   });
   chkFeriados.addEventListener('change', () => {
     calMasterExibirFeriados = chkFeriados.checked;
+    renderGradeCalendarioMaster();
+  });
+  chkAniversarios.addEventListener('change', () => {
+    calMasterExibirAniversarios = chkAniversarios.checked;
     renderGradeCalendarioMaster();
   });
   btnCriarEvento.addEventListener('click', () => abrirModalCriarEvento());
@@ -2673,6 +2697,39 @@ async function calcularRenovacoesPacotes() {
   return renovacoes;
 }
 
+// Aniversários de professores, clientes e alunos (estudantes de cada cliente).
+// Só o dia/mês da data importa (o ano de nascimento é irrelevante pra decidir em que
+// dia do mês exibido o card aparece). Reaproveita fetchDataBaseProfessores/
+// fetchCadastroClientes, já cacheados por BANCO — nenhuma leitura extra do Firestore.
+async function calcularAniversariosDoMes() {
+  const [professores, clientes] = await Promise.all([
+    BANCO.fetchDataBaseProfessores(),
+    BANCO.fetchCadastroClientes()
+  ]);
+
+  const aniversariantes = [];
+
+  professores.forEach(p => {
+    const d = _parseDataAula(p.dataNascimento);
+    if (!d) return;
+    aniversariantes.push({ nome: p.nome || '', rotulo: 'Professor', dia: d.getDate(), mes: d.getMonth() });
+  });
+
+  clientes.forEach(c => {
+    const dCliente = _parseDataAula(c.dataNascimento);
+    if (dCliente) {
+      aniversariantes.push({ nome: c.nome || '', rotulo: 'Cliente', dia: dCliente.getDate(), mes: dCliente.getMonth() });
+    }
+    (c.estudantes || []).forEach(e => {
+      const dAluno = _parseDataAula(e.aniversario);
+      if (!dAluno) return;
+      aniversariantes.push({ nome: e.nome || '', rotulo: 'Aluno', dia: dAluno.getDate(), mes: dAluno.getMonth() });
+    });
+  });
+
+  return aniversariantes;
+}
+
 // Converte "yyyy-mm-dd" (input type=date) para "dd/mm/yyyy" (padrão de data usado no resto do sistema)
 function _calMasterISOparaBR(iso) {
   if (!iso) return '';
@@ -2740,7 +2797,8 @@ async function renderGradeCalendarioMaster() {
             addEvento(d1.getDate(), {
               tipo: 'pagamento',
               minutos: 0,
-              linhas: ['Pagamento 1ª parcela', `(${nomePrimeiro})`],
+              titulo: 'Pagamento',
+              subtitulo: `${nomePrimeiro} — 1ª parcela`,
               onclickAttr
             });
           }
@@ -2750,7 +2808,8 @@ async function renderGradeCalendarioMaster() {
             addEvento(d2.getDate(), {
               tipo: 'pagamento',
               minutos: 0,
-              linhas: ['Pagamento 2ª parcela', `(${nomePrimeiro})`],
+              titulo: 'Pagamento',
+              subtitulo: `${nomePrimeiro} — 2ª parcela`,
               onclickAttr
             });
           }
@@ -2769,7 +2828,8 @@ async function renderGradeCalendarioMaster() {
         addEvento(d.getDate(), {
           tipo: 'evento',
           minutos: _calMasterHorarioToMinutos(evento.hora),
-          linhas: [evento.nome || '--', evento.hora || '--'],
+          titulo: 'Evento',
+          subtitulo: `${evento.nome || '--'} • ${evento.hora || '--'}`,
           onclickAttr: `calMasterAbrirDetalhesEvento('${escapeHtml(String(evento.id))}')`
         });
       });
@@ -2799,7 +2859,8 @@ async function renderGradeCalendarioMaster() {
       addEvento(parseInt(dia, 10), {
         tipo: 'feriado',
         minutos: -1,
-        linhas: [rotulo],
+        titulo: 'Feriado',
+        subtitulo: rotulo,
         onclickAttr: `CalendarioBusca.abrirModalFeriado(${parseInt(dia, 10)}, ${calMasterMes}, ${calMasterAno})`
       });
     });
@@ -2814,11 +2875,31 @@ async function renderGradeCalendarioMaster() {
           addEvento(r.dataRenovacao.getDate(), {
             tipo: 'renovacao',
             minutos: 0,
-            linhas: ['Renovação pacote', `(${_calMasterDoisNomes(r.nomeCliente)})`],
+            titulo: 'Renovação',
+            subtitulo: _calMasterDoisNomes(r.nomeCliente),
             onclickAttr: `abrirDetalhesContratacaoPainelCentral('${escapeHtml(String(r.codigoContratacao))}')`
           });
         });
       }).catch(err => console.error('❌ Erro ao calcular renovações do Calendário Master:', err))
+    );
+  }
+
+  // Aniversários (rosa) — professor.dataNascimento, cliente.dataNascimento e
+  // estudantes[].aniversario (aluno). Registros sem a data preenchida são ignorados.
+  if (calMasterExibirAniversarios) {
+    promessas.push(
+      calcularAniversariosDoMes().then(aniversariantes => {
+        aniversariantes.forEach(a => {
+          if (a.mes !== calMasterMes) return;
+          addEvento(a.dia, {
+            tipo: 'aniversario',
+            minutos: 0,
+            titulo: 'Aniversário',
+            subtitulo: `${_calMasterDoisNomes(a.nome)} (${a.rotulo})`,
+            onclickAttr: ''
+          });
+        });
+      }).catch(err => console.error('❌ Erro ao calcular aniversários do Calendário Master:', err))
     );
   }
 
@@ -2839,10 +2920,26 @@ async function renderGradeCalendarioMaster() {
   let html = diasSemana.map(d => `<div class="cal-master-weekday">${d}</div>`).join('');
 
   const renderEventoHtml = (evento) => {
-    const linhasHtml = evento.linhas.map(l => `<span class="cal-master-event-line">${escapeHtml(String(l))}</span>`).join('');
+    // "Aula" mantém o formato antigo: linhas de texto empilhadas, sem ícone.
+    if (evento.tipo === 'aula') {
+      const linhasHtml = evento.linhas.map(l => `<span class="cal-master-event-line">${escapeHtml(String(l))}</span>`).join('');
+      return `
+        <div class="cal-master-event cal-master-event-${evento.tipo}" onclick="${evento.onclickAttr}" title="${escapeHtml(evento.linhas.join(' • '))}">
+          ${linhasHtml}
+        </div>
+      `;
+    }
+
+    // Demais tipos: matriz 2x2 (ícone mesclado na 1ª coluna + título/subtítulo na 2ª).
+    const icone = CAL_MASTER_ICONES[evento.tipo] || 'fa-circle';
+    const tituloTxt = escapeHtml(String(evento.titulo || ''));
+    const subtituloTxt = escapeHtml(String(evento.subtitulo || ''));
+    const tooltip = escapeHtml(`${evento.titulo || ''} • ${evento.subtitulo || ''}`);
     return `
-      <div class="cal-master-event cal-master-event-${evento.tipo}" onclick="${evento.onclickAttr}" title="${escapeHtml(evento.linhas.join(' • '))}">
-        ${linhasHtml}
+      <div class="cal-master-event cal-master-event-${evento.tipo}" onclick="${evento.onclickAttr}" title="${tooltip}">
+        <div class="cal-master-event-icon"><i class="fas ${icone}"></i></div>
+        <div class="cal-master-event-titulo">${tituloTxt}</div>
+        <div class="cal-master-event-subtitulo">${subtituloTxt}</div>
       </div>
     `;
   };

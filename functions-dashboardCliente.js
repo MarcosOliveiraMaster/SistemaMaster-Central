@@ -755,6 +755,7 @@ class DashboardCliente {
         <div class="dc-info-item"><label>CPF</label><span>${this.formatCPF(client.cpf)}</span></div>
         <div class="dc-info-item"><label>Email</label><span>${this.escapeHTML(client.email)}</span></div>
         <div class="dc-info-item"><label>Contato</label><span>${this.formatPhone(client.contato)}</span></div>
+        <div class="dc-info-item"><label>Data de Nascimento</label><span>${this.escapeHTML(client.dataNascimento || '')}</span></div>
 
         <div class="dc-info-section"><h4><i class="fas fa-house"></i> Endereço</h4></div>
         <div class="dc-info-item"><label>CEP</label><span>${this.formatCEP(client.cep)}</span></div>
@@ -1005,6 +1006,10 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
             <label class="dc-form-label">Contato <span class="dc-required">*</span></label>
             <input class="dc-form-input dc-mask-phone" name="contato" value="${this.formatPhoneForInput(c.contato || '')}">
             <span class="dc-field-error" data-field="contato"></span>
+          </div>
+          <div class="dc-form-group">
+            <label class="dc-form-label">Data de Nascimento</label>
+            <input class="dc-form-input dc-mask-date" name="dataNascimento" value="${this.escapeHTMLForInput(c.dataNascimento || '')}" placeholder="DD/MM/AAAA">
           </div>
         </div>
       </div>
@@ -1417,6 +1422,7 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
       cpf: getData('cpf').replace(/\D/g, ''),
       email: getData('email'),
       contato: getData('contato').replace(/\D/g, ''),
+      dataNascimento: getData('dataNascimento'),
       cep: getData('cep').replace(/\D/g, ''),
       endereco: getData('endereco'),
       cidadeUF: getData('cidadeUF'),
