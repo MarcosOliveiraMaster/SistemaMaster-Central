@@ -57,7 +57,11 @@ async function processarContato(contato, payload) {
     if (!carregou) throw new Error('WhatsApp Web não carregou a tempo.');
 
     await delayAleatorio();
-    const statusChat = await enviarParaContentScript(tabId, { tipo: 'VERIFICAR_CHAT' });
+    // Timeout maior que o padrão: verificarChat() observa QR/popup/caixa em paralelo com
+    // janela de 30s (ver content.js) — dá margem por rodar em aba de segundo plano, que o
+    // Chrome renderiza com prioridade reduzida.
+    const statusChat = await enviarParaContentScript(tabId, { tipo: 'VERIFICAR_CHAT' }, 35000);
+    console.log('[MasterWpp][DEBUG] statusChat recebido:', statusChat); // TEMP — remover após diagnosticar Parte 6
     if (!statusChat || statusChat.status === 'nao_logado') {
       throw new Error('WhatsApp Web não está logado.');
     }
@@ -66,20 +70,34 @@ async function processarContato(contato, payload) {
       resultado.detalhe = 'Número não existe no WhatsApp.';
       return resultado;
     }
+    if (statusChat.status !== 'ok') {
+      // Qualquer status não reconhecido explicitamente (ex.: 'erro' — chat não carregou a
+      // tempo) é tratado como bloqueio, nunca como sucesso implícito.
+      throw new Error(statusChat.detalhe || 'Não foi possível confirmar o estado do chat.');
+    }
 
     if (payload.texto1) {
       await delayAleatorio();
-      await enviarParaContentScript(tabId, { tipo: 'ENVIAR_TEXTO', texto: personalizarTexto(payload.texto1, contato.nome) });
+      const respTexto1 = await enviarParaContentScript(tabId, { tipo: 'ENVIAR_TEXTO', texto: personalizarTexto(payload.texto1, contato.nome) });
+      if (!respTexto1 || respTexto1.status !== 'ok') {
+        throw new Error((respTexto1 && respTexto1.detalhe) || 'Falha ao enviar texto 1.');
+      }
     }
 
     if (payload.imagem) {
       await delayAleatorio();
-      await enviarParaContentScript(tabId, { tipo: 'ENVIAR_IMAGEM' });
+      const respImagem = await enviarParaContentScript(tabId, { tipo: 'ENVIAR_IMAGEM', imagem: payload.imagem });
+      if (!respImagem || respImagem.status !== 'ok') {
+        throw new Error((respImagem && respImagem.detalhe) || 'Falha ao enviar imagem.');
+      }
     }
 
     if (payload.texto2) {
       await delayAleatorio();
-      await enviarParaContentScript(tabId, { tipo: 'ENVIAR_TEXTO', texto: personalizarTexto(payload.texto2, contato.nome) });
+      const respTexto2 = await enviarParaContentScript(tabId, { tipo: 'ENVIAR_TEXTO', texto: personalizarTexto(payload.texto2, contato.nome) });
+      if (!respTexto2 || respTexto2.status !== 'ok') {
+        throw new Error((respTexto2 && respTexto2.detalhe) || 'Falha ao enviar texto 2.');
+      }
     }
 
     resultado.status = 'enviado';
@@ -87,7 +105,8 @@ async function processarContato(contato, payload) {
     resultado.status = 'erro';
     resultado.detalhe = err.message || String(err);
   } finally {
-    if (tabId) { try { await chrome.tabs.remove(tabId); } catch (_) { /* aba já pode ter sido fechada */ } }
+    // TEMP — DEBUG Parte 8: não fecha a aba, para dar tempo de inspecionar a tela de
+    // preview de imagem. Reverter para "if (tabId) { ... chrome.tabs.remove(tabId) ... }" depois.
   }
   return resultado;
 }

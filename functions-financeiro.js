@@ -2161,8 +2161,8 @@ function renderizarGraficoVendas(dadosMeses) {
   datasets.push({
     label: 'Faturamento',
     data: Object.values(dadosMeses).map(d => d.faturamento),
-    backgroundColor: '#f28705', // Orange-500
-    borderColor: '#d97804', // Orange-600
+    backgroundColor: temaAtualCor('#f28705', '#5291bb'), // Orange-500 / Azul claro (tema azul)
+    borderColor: temaAtualCor('#d97804', '#3d7599'), // Orange-600 / Azul escuro (tema azul)
     borderWidth: 1,
     borderRadius: 4,
     datalabels: { display: true },
@@ -2840,7 +2840,7 @@ async function criarGraficosNoPDF(container, mesesSelecionados, dadosMeses) {
       data: {
         labels,
         datasets: [
-          { label: 'Faturamento', data: mesesSelecionados.map(m => dadosMeses[m].indicadores.faturamento), backgroundColor: '#f28705', borderRadius: 4 },
+          { label: 'Faturamento', data: mesesSelecionados.map(m => dadosMeses[m].indicadores.faturamento), backgroundColor: temaAtualCor('#f28705', '#5291bb'), borderRadius: 4 },
           { label: 'Lucro Líquido', data: mesesSelecionados.map(m => dadosMeses[m].indicadores.lucroLiquido), backgroundColor: '#22c55e', borderRadius: 4 },
           { label: 'Despesas', data: mesesSelecionados.map(m => dadosMeses[m].indicadores.despesasTotais), backgroundColor: '#ef4444', borderRadius: 4 }
         ]
@@ -2869,7 +2869,7 @@ async function criarGraficosNoPDF(container, mesesSelecionados, dadosMeses) {
       data: {
         labels,
         datasets: [
-          { label: 'Faturamento', data: mesesSelecionados.map(m => dadosMeses[m].indicadores.faturamento), borderColor: '#f28705', backgroundColor: '#f2870520', tension: 0.3, fill: false, pointRadius: 4 },
+          { label: 'Faturamento', data: mesesSelecionados.map(m => dadosMeses[m].indicadores.faturamento), borderColor: temaAtualCor('#f28705', '#5291bb'), backgroundColor: temaAtualCor('#f2870520', '#5291bb20'), tension: 0.3, fill: false, pointRadius: 4 },
           { label: 'Repasse para Equipe', data: mesesSelecionados.map(m => dadosMeses[m].indicadores.repasseEquipe), borderColor: '#6366f1', backgroundColor: '#6366f120', tension: 0.3, fill: false, pointRadius: 4 }
         ]
       },

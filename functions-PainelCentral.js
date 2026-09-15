@@ -2039,11 +2039,11 @@ function renderGrafico(labels, data) {
       datasets: [{
         label: 'Aulas',
         data: data,
-        borderColor: '#F97316', // Orange-500
+        borderColor: temaAtualCor('#F97316', '#5291bb'), // Orange-500 / Azul claro (tema azul)
         backgroundColor: 'transparent',
         borderWidth: 3,
         tension: 0.4, // Suave
-        pointBackgroundColor: '#F97316',
+        pointBackgroundColor: temaAtualCor('#F97316', '#5291bb'),
         pointBorderColor: '#fff',
         pointBorderWidth: 2,
         pointRadius: 4,

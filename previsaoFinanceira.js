@@ -179,9 +179,9 @@ function atualizarGrafico(entradas, tipo = 'entradas') {
   const fontBase = { family: 'Lexend', size: 11 };
   const tickColor = '#6b7280';
   const moedaFmt  = v => 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-  const corBorda  = tipo === 'saidas' ? 'rgba(239,68,68,1)'    : tipo === 'saldo' ? 'rgba(34,197,94,1)'    : 'rgba(249,115,22,1)';
-  const corFundo  = tipo === 'saidas' ? 'rgba(239,68,68,0.08)' : tipo === 'saldo' ? 'rgba(34,197,94,0.08)' : 'rgba(249,115,22,0.08)';
-  const corFill   = tipo === 'saidas' ? 'rgba(239,68,68,0.12)' : tipo === 'saldo' ? 'rgba(34,197,94,0.12)' : 'rgba(249,115,22,0.12)';
+  const corBorda  = tipo === 'saidas' ? 'rgba(239,68,68,1)'    : tipo === 'saldo' ? 'rgba(34,197,94,1)'    : temaAtualCor('rgba(249,115,22,1)', 'rgba(82,145,187,1)');
+  const corFundo  = tipo === 'saidas' ? 'rgba(239,68,68,0.08)' : tipo === 'saldo' ? 'rgba(34,197,94,0.08)' : temaAtualCor('rgba(249,115,22,0.08)', 'rgba(82,145,187,0.08)');
+  const corFill   = tipo === 'saidas' ? 'rgba(239,68,68,0.12)' : tipo === 'saldo' ? 'rgba(34,197,94,0.12)' : temaAtualCor('rgba(249,115,22,0.12)', 'rgba(82,145,187,0.12)');
 
   const linhaConstante = (labels, valor, cor, label) => ({
     label,

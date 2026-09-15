@@ -33,7 +33,7 @@ chrome.runtime.sendMessage(EXTENSION_ID, {
     { nome: 'Prof. Ana', telefone: '5521888888888' },
   ],
   texto1: 'Olá, [nome]! Segue o cronograma...', // "[nome]" é substituído pelo nome de cada contato
-  imagem: true,   // true = a extensão espera encontrar uma imagem no clipboard (copiada pelo Central antes da chamada)
+  imagem: 'data:image/png;base64,iVBORw0KGgo...',   // opcional — data URL da imagem já codificada pelo Central
   texto2: 'Qualquer dúvida estamos à disposição!',
 }, resposta => {
   // resposta = { ok: true, resumo: [{ nome, telefone, status: 'enviado'|'erro'|'pulado', detalhe }] }
@@ -46,7 +46,10 @@ Regras de validação (ver `app/shared/validation.js` e `app/shared/constants.js
   vazia) e `telefone` (10 a 13 dígitos, com ou sem formatação/DDI).
 - `texto1`: obrigatório, string não vazia, até 4096 caracteres.
 - `texto2`: opcional, mesmas regras de `texto1` se enviado.
-- `imagem`: opcional, deve ser `boolean` se enviado.
+- `imagem`: opcional; quando enviado, precisa ser uma data URL de imagem em base64
+  (`data:image/png;base64,...`, `image/jpeg`, `image/gif` ou `image/webp`), até ~8MB de
+  texto codificado. A extensão não lê o clipboard — o Central precisa ler/codificar a
+  imagem e mandá-la já pronta no payload.
 
 Só a origem `https://master-ecossistemaprofessor.web.app` pode chamar a extensão
 (`externally_connectable` no `manifest.json`); qualquer outra origem recebe

@@ -11,7 +11,7 @@ versionamento seguindo [SemVer](https://semver.org/lang/pt-BR/).
 - `app/background/background.js`: recebe payload via `onMessageExternal`/`onConnectExternal`,
   valida, orquesta a fila de envio por contato (abre aba, delay aleatório 1–3s, fecha aba).
 - `app/content/content.js`: injetado em `web.whatsapp.com` — verifica login/número
-  existente, simula digitação, cola imagem do clipboard, envia.
+  existente, simula digitação, cola imagem recebida como data URL no payload, envia.
 - `app/shared/validation.js` e `app/shared/constants.js`: validação de telefone/texto/payload.
 - `tests/validation.test.js`: testes unitários (`node --test`) das funções de validação.
 - `README.md`, `SECURITY.md`.

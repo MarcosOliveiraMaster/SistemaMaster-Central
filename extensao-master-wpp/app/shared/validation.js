@@ -26,6 +26,15 @@
     return true;
   }
 
+  // "imagem" é opcional; quando presente, precisa ser uma data URL de imagem (base64)
+  // dentro do limite de tamanho — não um simples boolean (a extensão não lê mais o
+  // clipboard, o Central manda os bytes da imagem já codificados no payload).
+  function validarImagem(imagem) {
+    if (typeof imagem !== 'string') return false;
+    if (imagem.length > C.IMAGEM_MAX_LEN) return false;
+    return C.REGEX_IMAGEM_DATA_URL.test(imagem);
+  }
+
   // Valida o payload completo recebido via chrome.runtime.onMessageExternal.
   // Retorna { valido: boolean, erro?: string }
   function validarPayload(payload) {
@@ -47,13 +56,13 @@
     if (payload.texto2 !== undefined && payload.texto2 !== null && !validarTexto(payload.texto2)) {
       return { valido: false, erro: 'Texto 2 inválido.' };
     }
-    if (payload.imagem !== undefined && typeof payload.imagem !== 'boolean') {
-      return { valido: false, erro: 'Campo "imagem" deve ser boolean.' };
+    if (payload.imagem !== undefined && payload.imagem !== null && payload.imagem !== false && !validarImagem(payload.imagem)) {
+      return { valido: false, erro: 'Campo "imagem" deve ser uma data URL de imagem válida (base64), dentro do limite de tamanho.' };
     }
     return { valido: true };
   }
 
-  const api = { validarTelefone, validarTexto, validarContato, validarPayload };
+  const api = { validarTelefone, validarTexto, validarContato, validarImagem, validarPayload };
 
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = api;

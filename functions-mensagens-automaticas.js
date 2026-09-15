@@ -79,7 +79,7 @@
     toast.textContent = msg;
     Object.assign(toast.style, {
       position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)',
-      padding: '12px 24px', background: '#f28705', color: '#fff',
+      padding: '12px 24px', background: 'var(--orange, #f28705)', color: '#fff',
       borderRadius: '6px', zIndex: 9999, fontWeight: 'bold'
     });
     document.body.appendChild(toast);
@@ -137,7 +137,7 @@
 
         const btnCopiar = document.createElement('button');
         btnCopiar.innerText = 'Copiar mensagem';
-        Object.assign(btnCopiar.style, { background: '#f28705', color: '#fff', marginTop: '6px' });
+        Object.assign(btnCopiar.style, { background: 'var(--orange, #f28705)', color: '#fff', marginTop: '6px' });
         btnCopiar.onclick = (e) => { e.stopPropagation(); copiarParaClipboard(gerarMensagem(aula)); };
         card.appendChild(btnCopiar);
 

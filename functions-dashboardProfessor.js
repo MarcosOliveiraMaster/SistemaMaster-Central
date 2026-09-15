@@ -132,6 +132,9 @@ window.DashboardProfessores = (function () {
     aulasEquipe       : [],
     professoresEquipe : [],
     chartRankingMes   : null,
+    // Tab5 — Agendamento de Entrevistas (módulo autocontido, ver
+    // functions-agendamento-entrevistas.js — conecta direto no Supabase)
+    t5Loaded : false,
   };
 
   // ─────────────────────────────────────────────────────────────
@@ -559,6 +562,7 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
   <button class="dp-tab"               data-dptab="dp-tab-edicao">✏️ Edição de Professores</button>
   <button class="dp-tab"               data-dptab="dp-tab-candidatos">👥 Avaliação de Candidatos</button>
   <button class="dp-tab"               data-dptab="dp-tab-equipe">📊 Análise e Desempenho de Equipe</button>
+  <button class="dp-tab"               data-dptab="dp-tab-agendamento">📅 Agendamento de Entrevistas</button>
 </div>
 
 <!-- ═══ TAB 1 — BANCO DE DADOS ═══════════════════════════════ -->
@@ -822,6 +826,12 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
 
   </div>
 </div>
+
+<!-- ═══ TAB 5 — AGENDAMENTO DE ENTREVISTAS ═══════════════════
+     Vazio de propósito: renderizado inteiramente por
+     functions-agendamento-entrevistas.js (window.AgendamentoEntrevistas),
+     módulo autocontido que conecta direto no Supabase. ═══════ -->
+<div id="dp-tab-agendamento" class="dp-tab-content"></div>
 
 <!-- TOAST -->
 <div id="dp-toast" style="position:fixed;top:1.2rem;right:1.2rem;z-index:9999;display:flex;flex-direction:column;gap:.4rem;pointer-events:none"></div>
@@ -1165,6 +1175,18 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
     if (tabId === 'dp-tab-edicao'     && !S.t2Loaded) { S.t2Loaded = true; carregarT2(); }
     if (tabId === 'dp-tab-candidatos' && !S.t3Loaded) { S.t3Loaded = true; carregarT3(); }
     if (tabId === 'dp-tab-equipe'     && !S.t4Loaded) { S.t4Loaded = true; carregarT4(); }
+    if (tabId === 'dp-tab-agendamento' && !S.t5Loaded) { S.t5Loaded = true; carregarT5(); }
+  }
+
+  // Tab5 — delega inteiramente ao módulo autocontido AgendamentoEntrevistas
+  // (functions-agendamento-entrevistas.js), que fala direto com o Supabase.
+  function carregarT5() {
+    if (typeof window.AgendamentoEntrevistas === 'undefined') {
+      const el = $id('dp-tab-agendamento');
+      if (el) el.innerHTML = '<p style="padding:1rem;color:var(--dp-gray-600)">functions-agendamento-entrevistas.js não carregado.</p>';
+      return;
+    }
+    window.AgendamentoEntrevistas.init($id('dp-tab-agendamento'));
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -2406,7 +2428,7 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
         datasets: [{
           label: 'Aulas dadas',
           data: lista.map(i => i.total),
-          backgroundColor: '#f28705',
+          backgroundColor: temaAtualCor('#f28705', '#5291bb'),
           borderRadius: 6,
         }]
       },

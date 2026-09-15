@@ -23,7 +23,10 @@
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-storage-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-check-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-functions-compat.js"></script>
-  
+
+  <!-- Supabase JS (aba Agendamento de Entrevistas — projeto separado do Firebase) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
   <!-- Ícones -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
@@ -139,6 +142,9 @@
             <button class="menu-item-submenu-leaf" data-section="professores" data-tab="dp-tab-equipe" data-title="Análise e Desempenho de Equipe">
               <i class="fas fa-chart-line mr-3"></i><span>Análise e Desempenho de Equipe</span>
             </button>
+            <button class="menu-item-submenu-leaf" data-section="professores" data-tab="dp-tab-agendamento" data-title="Agendamento de Entrevistas">
+              <i class="fas fa-calendar-check mr-3"></i><span>Agendamento de Entrevistas</span>
+            </button>
           </div>
         </div>
         <button class="menu-item" data-section="area-pagamento">
@@ -183,11 +189,28 @@
 
     <!-- Conteúdo Principal -->
     <main class="flex-1 overflow-auto">
-      <header class="bg-white shadow-sm border-b px-4 py-3">
+      <header class="bg-white shadow-sm border-b px-4 py-3" id="app-header">
         <div class="flex justify-between items-center">
           <h1 id="section-title" class="text-xl font-lexend font-bold text-gray-800">Painel Central</h1>
+          <button id="btn-theme-toggle" type="button" class="theme-toggle-btn" title="Alternar tema de cores (azul)">
+            <i class="fas fa-palette"></i>
+          </button>
         </div>
       </header>
+      <script>
+        // Usado pelos gráficos (Chart.js) para escolher a cor certa conforme o tema ativo.
+        window.temaAtualCor = function (corPadrao, corAzul) {
+          return document.body.classList.contains('theme-blue') ? corAzul : corPadrao;
+        };
+        (function () {
+          var btn = document.getElementById('btn-theme-toggle');
+          if (!btn) return;
+          btn.addEventListener('click', function () {
+            var ativo = document.body.classList.toggle('theme-blue');
+            btn.classList.toggle('active', ativo);
+          });
+        })();
+      </script>
 
       <div id="content-area" class="p-4">
         <section id="painel-central"   class="section-content active"></section>
@@ -287,6 +310,8 @@
   <script src="authProfessores.js"></script>
 
   <script src="functions-dashboardCliente.js"></script>
+  <script src="supabase-config.js"></script>
+  <script src="functions-agendamento-entrevistas.js"></script>
   <script src="functions-dashboardProfessor.js"></script>
   <script src="dashboardProfessores.js"></script>
   <script src="functions-exportar-dados.js"></script>

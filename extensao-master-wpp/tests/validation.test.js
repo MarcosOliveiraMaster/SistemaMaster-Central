@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { validarTelefone, validarTexto, validarContato, validarPayload } = require('../app/shared/validation.js');
+const { validarTelefone, validarTexto, validarContato, validarImagem, validarPayload } = require('../app/shared/validation.js');
 
 test('validarTelefone — aceita 10 a 13 dígitos, com ou sem formatação', () => {
   assert.equal(validarTelefone('11999999999'), true);      // 11 dígitos (DDD + 9)
@@ -41,14 +41,33 @@ test('validarContato — rejeita nome vazio, ausente ou telefone inválido', () 
   assert.equal(validarContato(null), false);
 });
 
+test('validarImagem — aceita data URL de imagem válida', () => {
+  assert.equal(validarImagem('data:image/png;base64,aGVsbG8='), true);
+  assert.equal(validarImagem('data:image/jpeg;base64,aGVsbG8='), true);
+});
+
+test('validarImagem — rejeita tipo errado, formato errado ou acima do limite', () => {
+  assert.equal(validarImagem(true), false); // formato antigo (boolean) não é mais aceito
+  assert.equal(validarImagem('sim'), false);
+  assert.equal(validarImagem('data:text/plain;base64,aGVsbG8='), false);
+  assert.equal(validarImagem('data:image/png;base64,' + 'a'.repeat(9 * 1024 * 1024)), false);
+});
+
 test('validarPayload — aceita payload completo e válido', () => {
   const resultado = validarPayload({
     contatos: [{ nome: 'João', telefone: '11999999999' }],
     texto1: 'Olá, [nome]!',
-    imagem: true,
+    imagem: 'data:image/png;base64,aGVsbG8=',
     texto2: 'Qualquer dúvida estamos à disposição!',
   });
   assert.equal(resultado.valido, true);
+});
+
+test('validarPayload — aceita payload sem imagem (omitida, null ou false)', () => {
+  const base = { contatos: [{ nome: 'João', telefone: '11999999999' }], texto1: 'Olá!' };
+  assert.equal(validarPayload(base).valido, true);
+  assert.equal(validarPayload({ ...base, imagem: null }).valido, true);
+  assert.equal(validarPayload({ ...base, imagem: false }).valido, true);
 });
 
 test('validarPayload — aceita payload sem texto2 (opcional)', () => {

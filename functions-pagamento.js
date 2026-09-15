@@ -1622,8 +1622,8 @@ async function renderizarGraficoPagamentoGrupo() {
       datasets: [{
         label: `Pagamento ${nomeMes}/${ano}`,
         data: valores,
-        backgroundColor: 'rgba(242, 135, 5, 0.85)',
-        borderColor: 'rgba(234, 88, 12, 1)',
+        backgroundColor: temaAtualCor('rgba(242, 135, 5, 0.85)', 'rgba(82, 145, 187, 0.85)'),
+        borderColor: temaAtualCor('rgba(234, 88, 12, 1)', 'rgba(61, 117, 153, 1)'),
         borderWidth: 1,
         borderRadius: 4,
         barPercentage: 0.7,

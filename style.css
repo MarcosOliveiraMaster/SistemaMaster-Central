@@ -5774,3 +5774,233 @@ h2, h3, h4, h5, h6 {
 .cal-master-event-feriado {
   background: #16A34A;
 }
+
+/* ==================== TOGGLE DE TEMA (botão no topo) ==================== */
+.theme-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  color: #f28705;
+  cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s, transform .15s;
+}
+.theme-toggle-btn:hover { transform: scale(1.06); }
+.theme-toggle-btn.active {
+  background: #00255f;
+  color: #fff;
+  border-color: #00255f;
+}
+
+/* ==================== TEMA AZUL (masteredutech_central) ====================
+   Ativado via body.theme-blue. Reskin de cores apenas — nenhum layout,
+   estrutura ou função é alterado; apenas cores, bordas, fundos e
+   transparência recebem os equivalentes em tons de azul. */
+
+body.theme-blue {
+  --orange: #00255f;
+  --orange-light: #4d668f;
+  --orange-dark: #001a43;
+}
+
+body.theme-blue #professores {
+  --dp-orange: #00255f;
+  --dp-orange-light: rgba(0, 37, 95, 0.14);
+  --dp-orange-dk: #001330;
+}
+
+body.theme-blue #galeria-professores {
+  --gp-orange: #00255f;
+  --gp-orange-light: rgba(0, 37, 95, 0.14);
+  --gp-orange-dk: #001330;
+}
+
+/* ---- Utilitários Tailwind "orange-*" ---- */
+body.theme-blue .bg-orange-50  { background-color: rgba(0, 37, 95, 0.08) !important; }
+body.theme-blue .bg-orange-500 { background-color: rgba(0, 37, 95, 0.94) !important; }
+body.theme-blue .hover\:bg-orange-50:hover  { background-color: rgba(0, 37, 95, 0.08) !important; }
+body.theme-blue .hover\:bg-orange-100:hover { background-color: rgba(0, 37, 95, 0.12) !important; }
+body.theme-blue .hover\:bg-orange-500:hover { background-color: rgba(0, 37, 95, 0.94) !important; }
+body.theme-blue .hover\:bg-orange-600:hover { background-color: #001a43 !important; }
+
+body.theme-blue .text-orange-300 { color: #b3becf !important; }
+body.theme-blue .text-orange-400 { color: #4d668f !important; }
+body.theme-blue .text-orange-500 { color: #00255f !important; }
+body.theme-blue .text-orange-600 { color: #001a43 !important; }
+body.theme-blue .hover\:text-orange-500:hover { color: #00255f !important; }
+body.theme-blue .hover\:text-orange-600:hover { color: #001a43 !important; }
+body.theme-blue .hover\:text-orange-700:hover { color: #001330 !important; }
+
+body.theme-blue .border-orange-100 { border-color: rgba(0, 37, 95, 0.25) !important; }
+body.theme-blue .border-orange-200 { border-color: rgba(0, 37, 95, 0.35) !important; }
+body.theme-blue .border-orange-400 { border-color: #4d668f !important; }
+body.theme-blue .border-orange-500 { border-color: #00255f !important; }
+body.theme-blue .focus\:border-orange-400:focus { border-color: #4d668f !important; }
+body.theme-blue .focus\:border-orange-500:focus { border-color: #00255f !important; }
+body.theme-blue .hover\:border-orange-300:hover { border-color: #b3becf !important; }
+body.theme-blue .hover\:border-orange-400:hover { border-color: #4d668f !important; }
+body.theme-blue .hover\:border-orange-500:hover { border-color: #00255f !important; }
+
+body.theme-blue .ring-orange-300,
+body.theme-blue .focus\:ring-orange-300:focus { --tw-ring-color: rgba(0, 37, 95, 0.5) !important; }
+body.theme-blue .ring-orange-500,
+body.theme-blue .focus\:ring-orange-500:focus { --tw-ring-color: rgba(0, 37, 95, 0.5) !important; }
+body.theme-blue .focus\:ring-orange-200:focus { --tw-ring-color: rgba(0, 37, 95, 0.35) !important; }
+
+body.theme-blue .from-orange-50  { --tw-gradient-from: #ebeef2 !important; }
+body.theme-blue .from-orange-500 { --tw-gradient-from: #00255f !important; }
+body.theme-blue .to-orange-100   { --tw-gradient-to: #d9dee7 !important; }
+body.theme-blue .to-orange-600   { --tw-gradient-to: #001a43 !important; }
+
+body.theme-blue .accent-orange-500 { accent-color: #00255f !important; }
+
+/* ---- Cores fixas específicas deste arquivo ---- */
+body.theme-blue .tb-btn.active {
+  background: rgba(0, 37, 95, 0.12);
+  border-color: #00255f;
+  color: #00255f;
+}
+body.theme-blue .tb-select:focus { border-color: #00255f; }
+body.theme-blue .demanda-editor blockquote {
+  border-left-color: #00255f;
+  background: rgba(0, 37, 95, 0.08);
+}
+body.theme-blue .demanda-editor a { color: #00255f; }
+body.theme-blue .link-url-field:focus { border-color: #00255f; }
+body.theme-blue .link-btn-apply { background: #00255f; }
+body.theme-blue .btn-demanda-salvar { background: #00255f; }
+body.theme-blue .filter-text-input:focus { border-color: #00255f; }
+body.theme-blue .filter-date-input:focus { border-color: #00255f; }
+body.theme-blue #btn-gerar-contrato.btn-primary {
+  color: #00255f;
+  border-color: #00255f;
+}
+body.theme-blue #btn-gerar-contrato.btn-primary:hover,
+body.theme-blue #btn-gerar-contrato.btn-primary:focus {
+  background: #00255f;
+}
+body.theme-blue .btn-data-aula:hover { background-color: rgba(0, 37, 95, 0.08) !important; }
+body.theme-blue .calendar-day:hover:not(.bg-orange-500) {
+  background-color: rgba(0, 37, 95, 0.08);
+  color: #001a43;
+}
+body.theme-blue .ms-option:hover { background: rgba(0, 37, 95, 0.08); }
+body.theme-blue .ativos-todos-seg:hover:not(.active) { background: rgba(0, 37, 95, 0.08); }
+body.theme-blue .cal-day-today {
+  border-color: #00255f;
+  background: rgba(0, 37, 95, 0.05);
+}
+body.theme-blue .cal-day.cal-drag-over {
+  background: rgba(0, 37, 95, 0.12);
+  border-color: #00255f;
+}
+body.theme-blue .cal-day-today .cal-day-num { color: #00255f; }
+body.theme-blue .cal-aula-card { background: linear-gradient(135deg, #00255f 0%, #4d668f 100%); }
+body.theme-blue .cal-week-handle:hover {
+  color: #00255f;
+  border-color: #00255f;
+  background: rgba(0, 37, 95, 0.08);
+}
+body.theme-blue .cal-week-handle.cal-drag-over-week {
+  background: rgba(0, 37, 95, 0.12);
+  border-color: #00255f;
+  color: #00255f;
+}
+body.theme-blue .cal-disciplina-card:hover {
+  border-color: #00255f;
+  background: rgba(0, 37, 95, 0.08);
+}
+body.theme-blue .cal-scope-btn:hover {
+  border-color: #00255f;
+  background: rgba(0, 37, 95, 0.08);
+}
+body.theme-blue .cal-scope-btn.cal-scope-sel { background: #00255f; }
+body.theme-blue .mac-materia-btn:hover {
+  border-color: #00255f;
+  background: rgba(0, 37, 95, 0.08);
+}
+body.theme-blue .mac-materia-btn.mac-materia-sel { background: #00255f; }
+body.theme-blue .mac-duracao-btn:hover {
+  border-color: #00255f;
+  background: rgba(0, 37, 95, 0.08);
+}
+body.theme-blue .mac-horario-input:focus { border-color: #00255f; }
+body.theme-blue .sol-cal-mes-titulo { background: linear-gradient(90deg, #00255f 0%, #4d668f 100%); }
+body.theme-blue .sol-cal-day-has { background: rgba(0, 37, 95, 0.05); }
+body.theme-blue .cm-chk-item:hover { background: rgba(0, 37, 95, 0.08); }
+body.theme-blue .cm-eye-btn.ativo { background: rgba(0, 37, 95, 0.08); }
+body.theme-blue .cm-tarefa-btn-tag:hover { color: #001a43; background: rgba(0, 37, 95, 0.08); }
+body.theme-blue .cm-tarefa-btn-comentario-ativo { color: #001a43; background: rgba(0, 37, 95, 0.08); }
+body.theme-blue .cm-tarefa-btn-funcoes-toggle.ativo { background: rgba(0, 37, 95, 0.08); }
+body.theme-blue .cm-hora-digito.ativo { background: rgba(0, 37, 95, 0.14); }
+body.theme-blue .cbusca-mesnav-btn:hover { background: rgba(0, 37, 95, 0.08); }
+
+/* ---- Cores fixas de componentes injetados via JS (auth/dashboard) ---- */
+body.theme-blue #configuracao,
+body.theme-blue #dc-configuracao { color: #00255f; }
+body.theme-blue .ap-btn--primary { background: #00255f; border-color: #00255f; }
+body.theme-blue .ap-config-item:hover { background: rgba(0, 37, 95, 0.08); border-color: #00255f; }
+body.theme-blue .ap-select-all input,
+body.theme-blue .ap-perm-item input[type="checkbox"] { accent-color: #00255f; }
+body.theme-blue .ap-search-input:focus {
+  border-color: #00255f;
+  box-shadow: 0 0 0 2px rgba(0, 37, 95, .18);
+}
+body.theme-blue .dba-td.dba-sel { outline-color: #00255f; background: rgba(0, 37, 95, 0.08); }
+body.theme-blue .dc-filter-pill:hover { border-color: #00255f; background: rgba(0, 37, 95, 0.08); }
+body.theme-blue .dc-filter-pill--active { background: #00255f; border-color: #00255f; }
+body.theme-blue .dc-status-option:hover { border-color: #00255f; background: rgba(0, 37, 95, 0.08); }
+body.theme-blue .dc-status-option--selected { border-color: #00255f; background: rgba(0, 37, 95, 0.08); }
+body.theme-blue #loading-grupo-bar { background: linear-gradient(90deg, #00255f, #16a34a) !important; }
+
+/* ---- Bordas de modais + leve transparência (efeito "glass") ---- */
+body.theme-blue #app-header {
+  background: rgba(255, 255, 255, 0.90) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+body.theme-blue .modal-container,
+body.theme-blue .dc-modal,
+body.theme-blue .demanda-card-modal {
+  border: 1px solid rgba(0, 37, 95, 0.30);
+  box-shadow: 0 8px 32px rgba(0, 37, 95, 0.18);
+  background: rgba(255, 255, 255, 0.97);
+}
+body.theme-blue .demandas-modal-overlay .demandas-wrapper {
+  border: 1px solid rgba(0, 37, 95, 0.30);
+  border-radius: 12px;
+  overflow: hidden;
+}
+body.theme-blue .modal-header,
+body.theme-blue .modal-footer,
+body.theme-blue .demanda-card-modal-header,
+body.theme-blue .demanda-card-modal-footer,
+body.theme-blue .dc-modal-header {
+  border-color: rgba(0, 37, 95, 0.25) !important;
+}
+
+/* ---- Rede de segurança para cor inline (ícones/spinners gerados via JS) ----
+   Só cobre color/border/outline — nunca "background", para não criar caixas
+   coloridas onde só havia um ícone ou um spinner sem fundo próprio. */
+body.theme-blue [style*="#f28705"],
+body.theme-blue [style*="#F28705"] {
+  color: #00255f !important;
+  border-color: #00255f !important;
+  border-top-color: #00255f !important;
+  outline-color: #00255f !important;
+}
+body.theme-blue [style*="#ffb347"],
+body.theme-blue [style*="#FFB347"] {
+  color: #4d668f !important;
+  border-color: #4d668f !important;
+}
+body.theme-blue [style*="#d97804"],
+body.theme-blue [style*="#D97804"] {
+  color: #001a43 !important;
+  border-color: #001a43 !important;
+}

@@ -22,8 +22,16 @@ const MASTER_WPP_CONSTANTS = {
 
   // Limite de contatos por payload (proteção contra payload malformado/abusivo; sem limite de negócio fixo)
   CONTATOS_MAX: 200,
+
+  // Imagem enviada como data URL base64 dentro do próprio payload (o Central já a lê e
+  // codifica antes de chamar a extensão — evita a extensão precisar ler o clipboard, que
+  // exige a aba em foco e conflita com ela rodar em segundo plano).
+  REGEX_IMAGEM_DATA_URL: /^data:image\/(png|jpe?g|gif|webp);base64,/i,
+  IMAGEM_MAX_LEN: 8 * 1024 * 1024, // ~8M caracteres de data URL (~6MB de imagem)
 };
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = MASTER_WPP_CONSTANTS;
+} else if (typeof self !== 'undefined') {
+  self.MASTER_WPP_CONSTANTS = MASTER_WPP_CONSTANTS;
 }
