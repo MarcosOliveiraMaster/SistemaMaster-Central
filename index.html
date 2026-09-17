@@ -73,7 +73,7 @@
       <div class="p-4 border-b border-orange-400">
         <div class="flex items-center justify-center">
           <div id="sidebar-logo-btn" class="w-16 h-16 bg-white rounded-full flex items-center justify-center cursor-pointer flex-shrink-0" title="Recolher/Expandir menu">
-            <img src="img/logo.png" alt="Logo Master Educação" class="w-12 h-12">
+            <img id="sidebar-logo-img" src="img/logo2.png" alt="Logo Master Educação" class="w-12 h-12">
           </div>
           <div class="sidebar-logo-text ml-3">
             <h1 class="font-lexend font-bold text-lg">Master Educação</h1>
@@ -204,10 +204,26 @@
         };
         (function () {
           var btn = document.getElementById('btn-theme-toggle');
+          var logoImg = document.getElementById('sidebar-logo-img');
+
+          function aplicarLogo(ativo) {
+            if (logoImg) logoImg.src = ativo ? 'img/logo.png' : 'img/logo2.png';
+          }
+
+          // Restaura preferência salva
+          var temaSalvo = localStorage.getItem('temaCor') === 'azul';
+          if (temaSalvo) {
+            document.body.classList.add('theme-blue');
+            if (btn) btn.classList.add('active');
+          }
+          aplicarLogo(temaSalvo);
+
           if (!btn) return;
           btn.addEventListener('click', function () {
             var ativo = document.body.classList.toggle('theme-blue');
             btn.classList.toggle('active', ativo);
+            localStorage.setItem('temaCor', ativo ? 'azul' : 'laranja');
+            aplicarLogo(ativo);
           });
         })();
       </script>
