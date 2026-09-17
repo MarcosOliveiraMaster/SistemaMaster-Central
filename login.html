@@ -251,10 +251,18 @@
 
   <!-- Logo -->
   <div class="login-logo">
-    <img src="img/logo.png" alt="Logo Master Educação" onerror="this.style.display='none'">
+    <img id="login-logo-img" src="img/logo2.png" alt="Logo Master Educação" onerror="this.style.display='none'">
     <h1>Master Educação</h1>
     <p>Painel Administrativo</p>
   </div>
+  <script>
+    (function () {
+      var logoImg = document.getElementById('login-logo-img');
+      if (logoImg && localStorage.getItem('temaCor') === 'azul') {
+        logoImg.src = 'img/logo.png';
+      }
+    })();
+  </script>
 
   <!-- Aviso de bloqueio por tentativas -->
   <div id="lockout-bar">

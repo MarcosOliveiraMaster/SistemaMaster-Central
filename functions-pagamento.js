@@ -992,7 +992,7 @@ function gerarRelatorioPagamento() {
   img.onerror = function () {
     renderPDF(null);
   };
-  img.src = 'img/logo.png';
+  img.src = document.body.classList.contains('theme-blue') ? 'img/logo.png' : 'img/logo2.png';
 }
 
 function mascaraValorInfoAdicional(input) {
@@ -1468,7 +1468,7 @@ function gerarPDFRelatorioGrupo(nomeProfessor, nomeMes, ano, todasLinhas) {
     const img = new window.Image();
     img.onload = function () { renderPDF(img); };
     img.onerror = function () { renderPDF(null); };
-    img.src = 'img/logo.png';
+    img.src = document.body.classList.contains('theme-blue') ? 'img/logo.png' : 'img/logo2.png';
   });
 }
 
