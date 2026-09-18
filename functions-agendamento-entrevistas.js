@@ -11,12 +11,7 @@ window.AgendamentoEntrevistas = (function () {
   'use strict';
 
   const CFG = {
-    diaLabel: {
-      segunda: 'Segunda', terca: 'Terça', quarta: 'Quarta', quinta: 'Quinta',
-      sexta: 'Sexta', sabado: 'Sábado', domingo: 'Domingo',
-    },
-    diaOrdem: { segunda: 1, terca: 2, quarta: 3, quinta: 4, sexta: 5, sabado: 6, domingo: 7 },
-    diaKeys: ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo'],
+    maxDatasAtivas: 5,
   };
 
   const S = {
@@ -27,6 +22,7 @@ window.AgendamentoEntrevistas = (function () {
     slots: [],
     inscricoes: [],
     inscricaoSelecionada: null,
+    novaDataStaged: null,   // ISO 'YYYY-MM-DD' escolhida no form de "Configurar Horários"
   };
 
   // ── Helpers ──────────────────────────────────────────────────
@@ -93,6 +89,107 @@ window.AgendamentoEntrevistas = (function () {
     return hh * 100 + mm;
   }
 
+  // ── Data (ISO 'YYYY-MM-DD') ─────────────────────────────────
+  function isoDeData(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function parseIso(iso) {
+    const [ano, mes, dia] = iso.split('-').map(Number);
+    return new Date(ano, mes - 1, dia);
+  }
+
+  function formatarDataLabel(dataISO) {
+    if (!dataISO) return 'Sem data definida';
+    const d = parseIso(dataISO);
+    const diaSemana = d.toLocaleDateString('pt-BR', { weekday: 'long' }).split('-feira')[0];
+    return diaSemana + ' ' + String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0');
+  }
+
+  // Mini-calendário (mesmo padrão visual de "Detalhes da Contratação" — reaproveita
+  // as classes globais .modal-overlay/.modal-container/.calendar-day de style.css).
+  function abrirSeletorData({ dataAtualISO, onSelecionar, onLimpar }) {
+    const base = dataAtualISO ? parseIso(dataAtualISO) : new Date();
+    let mes = base.getMonth();
+    let ano = base.getFullYear();
+    const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.style.zIndex = '10000';
+    overlay.innerHTML =
+      '<div class="modal-container" style="max-width:420px">' +
+        '<div class="modal-header">' +
+          '<h3 class="font-lexend font-bold text-lg"><i class="fas fa-calendar-alt text-orange-500 mr-2"></i>Data da entrevista</h3>' +
+          '<button class="modal-close text-gray-400 hover:text-gray-600" data-acao="fechar"><i class="fas fa-times"></i></button>' +
+        '</div>' +
+        '<div class="modal-body">' +
+          '<div class="calendar-header flex items-center justify-between mb-4 px-2">' +
+            '<button type="button" class="p-2 hover:bg-gray-100 rounded-full transition-colors" data-nav="-1"><i class="fas fa-chevron-left text-gray-600"></i></button>' +
+            '<div class="font-lexend font-bold text-base text-gray-700" id="dpaeCalMonthYear"></div>' +
+            '<button type="button" class="p-2 hover:bg-gray-100 rounded-full transition-colors" data-nav="1"><i class="fas fa-chevron-right text-gray-600"></i></button>' +
+          '</div>' +
+          '<div class="calendar-weekdays grid grid-cols-7 gap-1 mb-2 text-center text-xs font-medium text-gray-500">' +
+            '<div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div>' +
+          '</div>' +
+          '<div id="dpaeCalDays" class="calendar-days grid grid-cols-7 gap-1"></div>' +
+        '</div>' +
+        '<div class="modal-footer">' +
+          '<button class="dp-btn dp-btn--ghost dp-btn--sm" data-acao="limpar"><i class="fas fa-calendar-times mr-1"></i>Sem data definida</button>' +
+          '<button class="dp-btn dp-btn--ghost dp-btn--sm" data-acao="fechar">Cancelar</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+
+    const monthYearEl = overlay.querySelector('#dpaeCalMonthYear');
+    const daysEl = overlay.querySelector('#dpaeCalDays');
+
+    function fechar() { overlay.remove(); }
+
+    function render() {
+      monthYearEl.textContent = meses[mes] + ' ' + ano;
+      const primeiroDia = new Date(ano, mes, 1).getDay();
+      const diasNoMes = new Date(ano, mes + 1, 0).getDate();
+      const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+
+      let html = '';
+      for (let i = 0; i < primeiroDia; i++) html += '<div class="calendar-day-empty h-10"></div>';
+      for (let dia = 1; dia <= diasNoMes; dia++) {
+        const classes = ['calendar-day', 'h-10', 'rounded-lg', 'text-sm', 'font-medium'];
+        let title = '';
+        if (typeof Feriados !== 'undefined' && Feriados.doDia) {
+          const feriadosDoDia = Feriados.doDia(dia, mes, ano);
+          if (feriadosDoDia.length > 0) { classes.push('calendar-day-feriado'); title = feriadosDoDia.map((f) => f.nome).join(', '); }
+        }
+        const dataDoDia = new Date(ano, mes, dia);
+        if (dataAtualISO && isoDeData(dataDoDia) === dataAtualISO) classes.push('bg-orange-500', 'text-white', 'font-bold');
+        else if (dataDoDia.getTime() === hoje.getTime()) classes.push('border-2', 'border-orange-500', 'text-orange-500');
+        html += '<button type="button" class="' + classes.join(' ') + '" data-dia="' + dia + '" title="' + escapeHtml(title) + '">' + dia + '</button>';
+      }
+      daysEl.innerHTML = html;
+    }
+
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay || e.target.closest('[data-acao="fechar"]')) { fechar(); return; }
+      if (e.target.closest('[data-acao="limpar"]')) { fechar(); onLimpar(); return; }
+      const navBtn = e.target.closest('[data-nav]');
+      if (navBtn) {
+        mes += Number(navBtn.dataset.nav);
+        if (mes < 0) { mes = 11; ano--; } else if (mes > 11) { mes = 0; ano++; }
+        render();
+        return;
+      }
+      const dayBtn = e.target.closest('.calendar-day');
+      if (dayBtn) {
+        const iso = isoDeData(new Date(ano, mes, Number(dayBtn.dataset.dia)));
+        fechar();
+        onSelecionar(iso);
+      }
+    });
+
+    render();
+  }
+
   // ── Estilos (namespace dpae-) ────────────────────────────────
   function injectStyles() {
     if (document.getElementById('dpae-styles')) return;
@@ -113,6 +210,8 @@ window.AgendamentoEntrevistas = (function () {
       '.dpae-item:hover{border-color:var(--dp-orange,#f28705);}' +
       '.dpae-item.active{border-color:var(--dp-orange,#f28705);background:var(--dp-orange-light,#fef3e2);}' +
       '.dpae-item-nome{font-weight:700;font-size:.85rem;}' +
+      '.dpae-item-nome-clicavel{cursor:pointer;}' +
+      '.dpae-item-nome-clicavel:hover{text-decoration:underline;color:var(--dp-orange,#f28705);}' +
       '.dpae-item-meta{font-size:.72rem;color:var(--dp-gray-600,#4b5563);display:flex;justify-content:space-between;margin-top:.2rem;gap:.5rem;}' +
       '.dpae-detail{border:1px solid var(--dp-gray-200,#e5e7eb);border-radius:.6rem;padding:1rem;align-self:flex-start;}' +
       '.dpae-detail-row{display:flex;justify-content:space-between;gap:.5rem;padding:.35rem 0;border-bottom:1px dashed var(--dp-gray-200,#e5e7eb);font-size:.82rem;}' +
@@ -167,7 +266,7 @@ window.AgendamentoEntrevistas = (function () {
 
   async function carregarDados() {
     const [{ data: slots, error: errSlots }, { data: inscr, error: errInscr }] = await Promise.all([
-      S.sb.from('slots_disponiveis').select('*').order('dia_ordem').order('horario_ordem'),
+      S.sb.from('slots_disponiveis').select('*').order('data').order('horario_ordem'),
       S.sb.from('inscricoes').select('*'),
     ]);
     if (errSlots) { console.error('Erro ao carregar slots_disponiveis:', errSlots); toast('Erro ao carregar horários.', 'error'); }
@@ -203,11 +302,10 @@ window.AgendamentoEntrevistas = (function () {
   function renderAgendaLista(body) {
     if (!S.inscricoes.length) { body.innerHTML = '<p class="dpae-empty">Nenhuma entrevista marcada ainda.</p>'; return; }
 
-    const ordemDia = {};
-    S.slots.forEach((s) => { ordemDia[s.dia_semana] = s.dia_ordem; });
     const lista = [...S.inscricoes].sort((a, b) => {
-      const da = ordemDia[a.dia_semana] ?? 99, db = ordemDia[b.dia_semana] ?? 99;
-      if (da !== db) return da - db;
+      if (!a.data && b.data) return 1;
+      if (a.data && !b.data) return -1;
+      if (a.data !== b.data) return (a.data || '').localeCompare(b.data || '');
       return (a.horario || '').localeCompare(b.horario || '');
     });
 
@@ -222,13 +320,58 @@ window.AgendamentoEntrevistas = (function () {
       const div = document.createElement('div');
       div.className = 'dpae-item' + (S.inscricaoSelecionada?.id === item.id ? ' active' : '');
       div.innerHTML =
-        '<div class="dpae-item-nome">' + escapeHtml(item.nome_completo) + '</div>' +
-        '<div class="dpae-item-meta"><span>' + (CFG.diaLabel[item.dia_semana] || item.dia_semana) + ', ' + escapeHtml(item.horario) + '</span><span>' + formatarData(item.created_at) + '</span></div>';
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:.4rem">' +
+          '<div class="dpae-item-nome dpae-item-nome-clicavel">' + escapeHtml(item.nome_completo) + '</div>' +
+          '<button class="dpae-del-slot dpae-btn-excluir" title="Excluir cadastro"><i class="fas fa-trash"></i></button>' +
+        '</div>' +
+        '<div class="dpae-item-meta"><span>' + formatarDataLabel(item.data) + ', ' + escapeHtml(item.horario) + '</span><span>' + formatarData(item.created_at) + '</span></div>';
+      div.querySelector('.dpae-item-nome-clicavel').addEventListener('click', (e) => {
+        e.stopPropagation();
+        abrirSeletorData({
+          dataAtualISO: item.data,
+          onSelecionar: (iso) => atualizarDataInscricao(item, iso, body),
+          onLimpar: () => atualizarDataInscricao(item, null, body),
+        });
+      });
+      div.querySelector('.dpae-btn-excluir').addEventListener('click', (e) => {
+        e.stopPropagation();
+        excluirInscricao(item);
+      });
       div.addEventListener('click', () => { S.inscricaoSelecionada = item; renderAgendaLista(body); });
       listaEl.appendChild(div);
     });
 
     if (S.inscricaoSelecionada) renderDetalheInscricao(body.querySelector('#dpae-detalhe'), S.inscricaoSelecionada);
+  }
+
+  async function atualizarDataInscricao(item, novaDataISO, body) {
+    const anterior = item.data;
+    item.data = novaDataISO; // otimista
+    renderAgendaLista(body);
+
+    const { error } = await S.sb.from('inscricoes').update({ data: novaDataISO }).eq('id', item.id);
+    if (error) {
+      item.data = anterior;
+      renderAgendaLista(body);
+      toast('Erro ao atualizar data: ' + error.message, 'error');
+    } else {
+      toast(novaDataISO ? 'Data atualizada para ' + formatarDataLabel(novaDataISO) + '.' : 'Data removida.', 'success');
+    }
+  }
+
+  function excluirInscricao(item) {
+    confirmar({
+      titulo: 'Excluir cadastro?',
+      corpo: 'Remove definitivamente a inscrição de <strong>' + escapeHtml(item.nome_completo) + '</strong>.',
+      onOk: async () => {
+        const { error } = await S.sb.from('inscricoes').delete().eq('id', item.id);
+        if (error) { toast('Erro ao excluir: ' + error.message, 'error'); return; }
+        S.inscricoes = S.inscricoes.filter((i) => i.id !== item.id);
+        if (S.inscricaoSelecionada?.id === item.id) S.inscricaoSelecionada = null;
+        toast('Cadastro excluído.', 'success');
+        renderContent();
+      },
+    });
   }
 
   function renderDetalheInscricao(el, item) {
@@ -237,31 +380,29 @@ window.AgendamentoEntrevistas = (function () {
       '<div class="dpae-detail-row"><span>CPF</span><span>' + formatarCPF(item.cpf) + '</span></div>' +
       '<div class="dpae-detail-row"><span>E-mail</span><span>' + escapeHtml(item.email) + '</span></div>' +
       '<div class="dpae-detail-row"><span>Telefone</span><span>' + formatarTelefone(item.telefone) + '</span></div>' +
-      '<div class="dpae-detail-row"><span>Dia / Horário</span><span>' + (CFG.diaLabel[item.dia_semana] || item.dia_semana) + ', ' + escapeHtml(item.horario) + '</span></div>' +
+      '<div class="dpae-detail-row"><span>Dia / Horário</span><span>' + formatarDataLabel(item.data) + ', ' + escapeHtml(item.horario) +
+        ' <button class="dpae-del-slot" id="dpae-btnEditarData" title="Alterar data"><i class="fas fa-pen"></i></button></span></div>' +
       '<div class="dpae-detail-row"><span>Inscrito em</span><span>' + formatarData(item.created_at) + '</span></div>' +
       '<div style="margin-top:1rem;display:flex;gap:.5rem;flex-wrap:wrap">' +
         '<button class="dp-btn dp-btn--ghost dp-btn--sm" id="dpae-btnCopiarTel">📋 Copiar telefone</button>' +
-        '<button class="dp-btn dp-btn--danger dp-btn--sm" id="dpae-btnCancelar">Cancelar entrevista</button>' +
+        '<button class="dp-btn dp-btn--danger dp-btn--sm" id="dpae-btnCancelar">Excluir cadastro</button>' +
       '</div>';
 
     el.querySelector('#dpae-btnCopiarTel').addEventListener('click', () => {
       navigator.clipboard.writeText(item.telefone || '').then(() => toast('Telefone copiado!', 'success'));
     });
 
-    el.querySelector('#dpae-btnCancelar').addEventListener('click', () => {
-      confirmar({
-        titulo: 'Cancelar entrevista?',
-        corpo: 'Isso remove a inscrição de <strong>' + escapeHtml(item.nome_completo) + '</strong> e libera o horário ' +
-          escapeHtml(item.horario) + ' de ' + (CFG.diaLabel[item.dia_semana] || item.dia_semana) + ' para outra pessoa.',
-        onOk: async () => {
-          const { error } = await S.sb.from('inscricoes').delete().eq('id', item.id);
-          if (error) { toast('Erro ao cancelar: ' + error.message, 'error'); return; }
-          S.inscricoes = S.inscricoes.filter((i) => i.id !== item.id);
-          S.inscricaoSelecionada = null;
-          toast('Entrevista cancelada.', 'success');
-          renderContent();
-        },
+    el.querySelector('#dpae-btnEditarData').addEventListener('click', () => {
+      const body = el.closest('#dpae-agendaBody');
+      abrirSeletorData({
+        dataAtualISO: item.data,
+        onSelecionar: (iso) => atualizarDataInscricao(item, iso, body),
+        onLimpar: () => atualizarDataInscricao(item, null, body),
       });
+    });
+
+    el.querySelector('#dpae-btnCancelar').addEventListener('click', () => {
+      excluirInscricao(item);
     });
   }
 
@@ -269,17 +410,17 @@ window.AgendamentoEntrevistas = (function () {
     const ativos = S.slots.filter((s) => s.ativo);
     if (!ativos.length) { body.innerHTML = '<p class="dpae-empty">Nenhum horário ativo no catálogo.</p>'; return; }
 
-    const dias = ordenarChaves(ativos, 'dia_semana', 'dia_ordem');
+    const datas = ordenarChaves(ativos, 'data', 'data');
     const horarios = ordenarChaves(ativos, 'horario', 'horario_ordem');
-    const ocupadoMap = new Map(S.inscricoes.map((i) => [i.dia_semana + '|' + i.horario, i]));
-    const ativoSet = new Set(ativos.map((s) => s.dia_semana + '|' + s.horario));
+    const ocupadoMap = new Map(S.inscricoes.filter((i) => i.data).map((i) => [i.data + '|' + i.horario, i]));
+    const ativoSet = new Set(ativos.map((s) => s.data + '|' + s.horario));
 
-    let html = '<div class="dpae-grid" style="grid-template-columns:90px repeat(' + dias.length + ',1fr)">';
+    let html = '<div class="dpae-grid" style="grid-template-columns:90px repeat(' + datas.length + ',1fr)">';
     html += '<div class="dpae-grid-cell dpae-grid-head"></div>';
-    dias.forEach((d) => { html += '<div class="dpae-grid-cell dpae-grid-head">' + (CFG.diaLabel[d] || d) + '</div>'; });
+    datas.forEach((d) => { html += '<div class="dpae-grid-cell dpae-grid-head">' + formatarDataLabel(d) + '</div>'; });
     horarios.forEach((h) => {
       html += '<div class="dpae-grid-cell dpae-grid-head">' + escapeHtml(h) + '</div>';
-      dias.forEach((d) => {
+      datas.forEach((d) => {
         const key = d + '|' + h;
         if (!ativoSet.has(key)) { html += '<div class="dpae-grid-cell dpae-grid-cell--inativo">—</div>'; return; }
         const item = ocupadoMap.get(key);
@@ -307,33 +448,35 @@ window.AgendamentoEntrevistas = (function () {
   function ordenarChaves(slots, campoChave, campoOrdem) {
     const mapa = new Map();
     slots.forEach((s) => { if (!mapa.has(s[campoChave])) mapa.set(s[campoChave], s[campoOrdem]); });
-    return [...mapa.entries()].sort((a, b) => a[1] - b[1]).map(([k]) => k);
+    return [...mapa.entries()].sort((a, b) => (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0)).map(([k]) => k);
   }
 
   // ── Bloco B: Configurar horários ─────────────────────────────
   function renderConfigHorarios(el) {
-    const dias = ordenarChaves(S.slots, 'dia_semana', 'dia_ordem');
+    const datas = ordenarChaves(S.slots, 'data', 'data');
     const horarios = ordenarChaves(S.slots, 'horario', 'horario_ordem');
-    const slotMap = new Map(S.slots.map((s) => [s.dia_semana + '|' + s.horario, s]));
+    const slotMap = new Map(S.slots.map((s) => [s.data + '|' + s.horario, s]));
+    const datasAtivas = new Set(S.slots.filter((s) => s.ativo).map((s) => s.data));
 
     let html = '<p style="font-size:.8rem;color:var(--dp-gray-600,#4b5563);margin-bottom:.8rem">' +
       'Toque no interruptor pra ativar/desativar um horário no formulário público. Horários inativos ' +
-      'somem do formulário, mas continuam existindo (entrevistas já marcadas neles não são afetadas).</p>';
+      'somem do formulário, mas continuam existindo (entrevistas já marcadas neles não são afetadas). ' +
+      'Máximo de ' + CFG.maxDatasAtivas + ' datas ativas simultâneas (hoje: ' + datasAtivas.size + ').</p>';
 
-    if (!dias.length) {
+    if (!datas.length) {
       html += '<p class="dpae-empty">Nenhum horário cadastrado ainda.</p>';
     } else {
-      html += '<div class="dpae-grid" style="grid-template-columns:90px repeat(' + dias.length + ',1fr)">';
+      html += '<div class="dpae-grid" style="grid-template-columns:90px repeat(' + datas.length + ',1fr)">';
       html += '<div class="dpae-grid-cell dpae-grid-head"></div>';
-      dias.forEach((d) => { html += '<div class="dpae-grid-cell dpae-grid-head">' + (CFG.diaLabel[d] || d) + '</div>'; });
+      datas.forEach((d) => { html += '<div class="dpae-grid-cell dpae-grid-head">' + formatarDataLabel(d) + '</div>'; });
       horarios.forEach((h) => {
         html += '<div class="dpae-grid-cell dpae-grid-head">' + escapeHtml(h) + '</div>';
-        dias.forEach((d) => {
+        datas.forEach((d) => {
           const slot = slotMap.get(d + '|' + h);
           if (!slot) { html += '<div class="dpae-grid-cell"></div>'; return; }
           html += '<div class="dpae-grid-cell">' +
-            '<button class="dpae-toggle' + (slot.ativo ? ' on' : '') + '" data-dia="' + d + '" data-horario="' + escapeHtml(h) + '" title="' + (slot.ativo ? 'Ativo' : 'Inativo') + '"></button>' +
-            '<button class="dpae-del-slot" data-dia="' + d + '" data-horario="' + escapeHtml(h) + '">Excluir</button>' +
+            '<button class="dpae-toggle' + (slot.ativo ? ' on' : '') + '" data-data="' + d + '" data-horario="' + escapeHtml(h) + '" title="' + (slot.ativo ? 'Ativo' : 'Inativo') + '"></button>' +
+            '<button class="dpae-del-slot" data-data="' + d + '" data-horario="' + escapeHtml(h) + '">Excluir</button>' +
           '</div>';
         });
       });
@@ -341,10 +484,10 @@ window.AgendamentoEntrevistas = (function () {
     }
 
     html += '<div class="dpae-add-form">' +
-      '<div class="dp-field"><label class="dp-field-label">Dia da semana</label>' +
-        '<select id="dpae-novoDia" class="dp-select">' +
-          CFG.diaKeys.map((k) => '<option value="' + k + '">' + CFG.diaLabel[k] + '</option>').join('') +
-        '</select></div>' +
+      '<div class="dp-field"><label class="dp-field-label">Data</label>' +
+        '<button type="button" id="dpae-btnEscolherData" class="dp-btn dp-btn--ghost dp-btn--sm">' +
+          '<i class="fas fa-calendar-alt"></i> ' + (S.novaDataStaged ? formatarDataLabel(S.novaDataStaged) : 'Escolher data') +
+        '</button></div>' +
       '<div class="dp-field"><label class="dp-field-label">Horário</label>' +
         '<input type="text" id="dpae-novoHorario" class="dp-input" placeholder="ex: 14h ou 14h30" style="width:140px"></div>' +
       '<button id="dpae-btnAddHorario" class="dp-btn dp-btn--primary dp-btn--sm">+ Adicionar</button>' +
@@ -354,22 +497,29 @@ window.AgendamentoEntrevistas = (function () {
     el.innerHTML = html;
 
     el.querySelectorAll('.dpae-toggle').forEach((btn) => {
-      btn.addEventListener('click', () => toggleSlotAtivo(btn.dataset.dia, btn.dataset.horario, el));
+      btn.addEventListener('click', () => toggleSlotAtivo(btn.dataset.data, btn.dataset.horario, el));
     });
     el.querySelectorAll('.dpae-del-slot').forEach((btn) => {
-      btn.addEventListener('click', () => excluirSlot(btn.dataset.dia, btn.dataset.horario, el));
+      btn.addEventListener('click', () => excluirSlot(btn.dataset.data, btn.dataset.horario, el));
+    });
+    el.querySelector('#dpae-btnEscolherData').addEventListener('click', () => {
+      abrirSeletorData({
+        dataAtualISO: S.novaDataStaged,
+        onSelecionar: (iso) => { S.novaDataStaged = iso; renderConfigHorarios(el); },
+        onLimpar: () => { S.novaDataStaged = null; renderConfigHorarios(el); },
+      });
     });
     el.querySelector('#dpae-btnAddHorario').addEventListener('click', () => adicionarHorario(el));
   }
 
-  async function toggleSlotAtivo(dia, horario, el) {
-    const slot = S.slots.find((s) => s.dia_semana === dia && s.horario === horario);
+  async function toggleSlotAtivo(data, horario, el) {
+    const slot = S.slots.find((s) => s.data === data && s.horario === horario);
     if (!slot) return;
     const novoAtivo = !slot.ativo;
     slot.ativo = novoAtivo; // otimista
     renderConfigHorarios(el);
 
-    const { error } = await S.sb.from('slots_disponiveis').update({ ativo: novoAtivo }).eq('dia_semana', dia).eq('horario', horario);
+    const { error } = await S.sb.from('slots_disponiveis').update({ ativo: novoAtivo }).eq('data', data).eq('horario', horario);
     if (error) {
       slot.ativo = !novoAtivo;
       renderConfigHorarios(el);
@@ -379,18 +529,18 @@ window.AgendamentoEntrevistas = (function () {
     }
   }
 
-  function excluirSlot(dia, horario, el) {
+  function excluirSlot(data, horario, el) {
     confirmar({
       titulo: 'Excluir horário?',
-      corpo: 'Remove ' + (CFG.diaLabel[dia] || dia) + ' ' + escapeHtml(horario) + ' do catálogo. Se já houver ' +
+      corpo: 'Remove ' + formatarDataLabel(data) + ' ' + escapeHtml(horario) + ' do catálogo. Se já houver ' +
         'entrevistas marcadas nesse horário, não será possível excluir — desative em vez disso.',
       onOk: async () => {
-        const { error } = await S.sb.from('slots_disponiveis').delete().eq('dia_semana', dia).eq('horario', horario);
+        const { error } = await S.sb.from('slots_disponiveis').delete().eq('data', data).eq('horario', horario);
         if (error) {
           toast('Não é possível remover — já existem entrevistas nesse horário. Desative em vez de remover.', 'error');
           return;
         }
-        S.slots = S.slots.filter((s) => !(s.dia_semana === dia && s.horario === horario));
+        S.slots = S.slots.filter((s) => !(s.data === data && s.horario === horario));
         toast('Horário removido.', 'success');
         renderConfigHorarios(el);
       },
@@ -398,23 +548,30 @@ window.AgendamentoEntrevistas = (function () {
   }
 
   async function adicionarHorario(el) {
-    const dia = el.querySelector('#dpae-novoDia').value;
+    const data = S.novaDataStaged;
     const horarioRaw = el.querySelector('#dpae-novoHorario').value.trim();
     const msgEl = el.querySelector('#dpae-addMsg');
 
+    if (!data) { msgEl.textContent = 'Escolha uma data primeiro.'; return; }
     const ordem = parseHorarioOrdem(horarioRaw);
     if (ordem === null) { msgEl.textContent = 'Formato inválido. Use algo como "14h" ou "14h30".'; return; }
-    if (S.slots.some((s) => s.dia_semana === dia && s.horario === horarioRaw)) {
-      msgEl.textContent = 'Esse dia + horário já existe no catálogo.';
+    if (S.slots.some((s) => s.data === data && s.horario === horarioRaw)) {
+      msgEl.textContent = 'Essa data + horário já existe no catálogo.';
+      return;
+    }
+    const datasAtivas = new Set(S.slots.filter((s) => s.ativo).map((s) => s.data));
+    if (!datasAtivas.has(data) && datasAtivas.size >= CFG.maxDatasAtivas) {
+      msgEl.textContent = 'Máximo de ' + CFG.maxDatasAtivas + ' datas simultâneas. Desative ou exclua uma data existente antes de adicionar outra.';
       return;
     }
     msgEl.textContent = '';
 
-    const novoSlot = { dia_semana: dia, horario: horarioRaw, ativo: true, dia_ordem: CFG.diaOrdem[dia], horario_ordem: ordem };
+    const novoSlot = { data, horario: horarioRaw, ativo: true, horario_ordem: ordem };
     const { error } = await S.sb.from('slots_disponiveis').insert(novoSlot);
     if (error) { msgEl.textContent = 'Erro ao adicionar: ' + error.message; return; }
 
     S.slots.push(novoSlot);
+    S.novaDataStaged = null;
     toast('Horário adicionado!', 'success');
     renderConfigHorarios(el);
   }
