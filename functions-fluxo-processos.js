@@ -409,7 +409,7 @@ function showCopyFeedback(msg) {
   const el = document.createElement('div');
   el.textContent = msg;
   Object.assign(el.style, {
-    position: 'fixed', bottom: '24px', right: '24px', zIndex: '9999',
+    position: 'fixed', bottom: '24px', right: '24px', zIndex: '1000000',
     background: '#25d366', color: '#fff', borderRadius: '8px',
     padding: '10px 18px', fontSize: '13px', fontFamily: 'inherit',
     boxShadow: '0 4px 12px rgba(0,0,0,0.2)',

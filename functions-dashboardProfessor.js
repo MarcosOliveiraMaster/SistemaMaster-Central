@@ -468,7 +468,7 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
 .dp-cand-exp-desc { font-size:.74rem; color:var(--dp-gray-600); font-style:italic; line-height:1.4; }
 
 /* ── TOAST ── */
-.dp-toast { position:fixed; top:1.2rem; right:1.2rem; z-index:9999; max-width:320px; background:white; border-radius:.6rem; box-shadow:0 8px 24px rgba(0,0,0,.14); padding:.7rem 1rem; font-size:.8rem; display:flex; gap:.6rem; align-items:flex-start; border-left:4px solid var(--dp-blue); animation:dpSlideIn .25s ease; }
+.dp-toast { position:fixed; top:1.2rem; right:1.2rem; z-index:1000000; max-width:320px; background:white; border-radius:.6rem; box-shadow:0 8px 24px rgba(0,0,0,.14); padding:.7rem 1rem; font-size:.8rem; display:flex; gap:.6rem; align-items:flex-start; border-left:4px solid var(--dp-blue); animation:dpSlideIn .25s ease; }
 .dp-toast--success { border-color:var(--dp-green); }
 .dp-toast--error   { border-color:var(--dp-red); }
 .dp-toast--info    { border-color:var(--dp-blue); }
@@ -834,7 +834,7 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
 <div id="dp-tab-agendamento" class="dp-tab-content"></div>
 
 <!-- TOAST -->
-<div id="dp-toast" style="position:fixed;top:1.2rem;right:1.2rem;z-index:9999;display:flex;flex-direction:column;gap:.4rem;pointer-events:none"></div>
+<div id="dp-toast" style="position:fixed;top:1.2rem;right:1.2rem;z-index:1000000;display:flex;flex-direction:column;gap:.4rem;pointer-events:none"></div>
 
 <!-- POPUP OVERLAY -->
 <div id="dp-popupOverlay" class="dp-popup-overlay" style="display:none"></div>

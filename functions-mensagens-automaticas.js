@@ -80,7 +80,7 @@
     Object.assign(toast.style, {
       position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)',
       padding: '12px 24px', background: 'var(--orange, #f28705)', color: '#fff',
-      borderRadius: '6px', zIndex: 9999, fontWeight: 'bold'
+      borderRadius: '6px', zIndex: 1000000, fontWeight: 'bold'
     });
     document.body.appendChild(toast);
     setTimeout(() => { toast.style.opacity = 0; setTimeout(() => toast.remove(), 400); }, 1800);
