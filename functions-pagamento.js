@@ -61,6 +61,9 @@ function loadAreaPagamento() {
         <button id="btn-resumo-geral-pagamentos" class="btn-primary btn-compact" onclick="abrirResumoGeralPagamentos()" style="aspect-ratio:1; padding:6px;" title="Resumo geral de pagamentos">
           <i class="fas fa-table"></i>
         </button>
+        <button id="btn-buscar-professor-desligado" class="btn-primary btn-compact" onclick="abrirModalProfessorDesligado()" style="aspect-ratio:1; padding:6px; transition: opacity 0.3s ease;" title="Buscar professor desligado">
+          <i class="fas fa-user-slash"></i>
+        </button>
       </div>
     </div>
 
@@ -199,12 +202,15 @@ function setPagModo(colecao) {
   // Alternar botões Analisar / Gerar Relatórios
   const btnAnalisar = document.getElementById('btn-analisar-pagamentos');
   const btnGrupo = document.getElementById('btn-gerar-relatorios-grupo');
+  const btnDesligado = document.getElementById('btn-buscar-professor-desligado');
   if (colecao) {
     if (btnAnalisar) { btnAnalisar.style.opacity = '0'; setTimeout(() => { btnAnalisar.style.display = 'none'; }, 300); }
     if (btnGrupo) { btnGrupo.style.display = ''; setTimeout(() => { btnGrupo.style.opacity = '1'; }, 50); }
+    if (btnDesligado) { btnDesligado.style.opacity = '0'; setTimeout(() => { btnDesligado.style.display = 'none'; }, 300); }
   } else {
     if (btnGrupo) { btnGrupo.style.opacity = '0'; setTimeout(() => { btnGrupo.style.display = 'none'; }, 300); }
     if (btnAnalisar) { btnAnalisar.style.display = ''; setTimeout(() => { btnAnalisar.style.opacity = '1'; }, 50); }
+    if (btnDesligado) { btnDesligado.style.display = ''; setTimeout(() => { btnDesligado.style.opacity = '1'; }, 50); }
   }
 }
 
@@ -219,6 +225,11 @@ async function carregarProfessoresPagamento() {
     const ativos = professores.filter(p => (p.status || '').toLowerCase() === 'ativo');
     ativos.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
     window._pagProfessoresAtivos = ativos;
+
+    const desligados = professores.filter(p => (p.status || '').toLowerCase() === 'desligado');
+    desligados.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+    window._pagProfessoresDesligados = desligados;
+
     window._pagTodasAulas = todasAulas || [];
     filtrarProfessoresPorMesAno();
 
@@ -315,6 +326,73 @@ function renderProfessorSelect(professores, modoColecao) {
     });
     oldSelect.innerHTML = opts;
   }
+}
+
+// ─── Buscar professor por CPF (ativos + desligados) ───
+
+function buscarProfessorPagamento(cpf) {
+  return (window._pagProfessoresAtivos || []).find(p => p.cpf === cpf)
+      || (window._pagProfessoresDesligados || []).find(p => p.cpf === cpf);
+}
+
+// ─── Modal: buscar professor desligado ───
+
+function abrirModalProfessorDesligado() {
+  const desligados = window._pagProfessoresDesligados || [];
+
+  const listaHtml = desligados.length
+    ? desligados.map(p => `
+        <div class="pag-desligado-item" data-cpf="${p.cpf}" data-nome="${(p.nome || 'Sem nome').toLowerCase()}"
+             style="padding:10px 12px; border-bottom:1px solid #f3f4f6; cursor:pointer;"
+             onclick="selecionarProfessorDesligado('${p.cpf}')"
+             onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background=''">
+          <i class="fas fa-user-slash mr-2 text-gray-400"></i>${p.nome || 'Sem nome'}
+        </div>`).join('')
+    : '<div class="text-center text-gray-400 font-comfortaa text-sm py-6">Nenhum professor desligado encontrado.</div>';
+
+  const conteudo = `
+    <input id="pag-desligado-busca" type="text" class="filter-input filter-compact w-full mb-3"
+           placeholder="Buscar por nome..." oninput="filtrarProfessoresDesligadosModal(this.value)">
+    <div id="pag-desligado-lista" style="max-height:320px; overflow-y:auto; border:1px solid #f3f4f6; border-radius:var(--radius-sm);">
+      ${listaHtml}
+    </div>
+  `;
+
+  const { modal } = createModal('Buscar Professor Desligado', conteudo);
+  window._pagModalDesligadoAtual = modal;
+}
+
+function filtrarProfessoresDesligadosModal(termo) {
+  const busca = (termo || '').trim().toLowerCase();
+  const itens = document.querySelectorAll('#pag-desligado-lista .pag-desligado-item');
+  itens.forEach(item => {
+    const nome = item.dataset.nome || '';
+    item.style.display = nome.includes(busca) ? '' : 'none';
+  });
+}
+
+function selecionarProfessorDesligado(cpf) {
+  if (window._pagModalDesligadoAtual) {
+    window._pagModalDesligadoAtual.remove();
+    window._pagModalDesligadoAtual = null;
+  }
+
+  const professor = buscarProfessorPagamento(cpf);
+  if (!professor) return;
+
+  const select = document.getElementById('pag-professor-select');
+  if (!select) return;
+
+  let option = Array.from(select.options).find(o => o.value === cpf);
+  if (!option) {
+    option = document.createElement('option');
+    option.value = cpf;
+    option.textContent = professor.nome || 'Sem nome';
+    select.appendChild(option);
+  }
+  select.value = cpf;
+
+  analisarPagamentoIndividual();
 }
 
 // ─── Multi-select helpers ───
@@ -477,7 +555,7 @@ async function salvarInfoAdicional(id) {
   const ano = document.getElementById('pag-ano')?.value || '';
 
   // Buscar uid do professor para regras de segurança
-  const professor = (window._pagProfessoresAtivos || []).find(p => p.cpf === professorId);
+  const professor = buscarProfessorPagamento(professorId);
   const professorUid = professor?.uid || '';
 
   try {
@@ -762,7 +840,7 @@ function gerarRelatorioPagamento() {
   const usableWidth = pageWidth - marginLeft - marginRight;
 
   // ─── Coletar nome do professor e período ───
-  const professor = (window._pagProfessoresAtivos || []).find(p => p.cpf === (document.getElementById('pag-professor-select')?.value || ''));
+  const professor = buscarProfessorPagamento(document.getElementById('pag-professor-select')?.value || '');
   const nomeProfessor = professor?.nome || 'Professor';
   const mes = parseInt(document.getElementById('pag-mes')?.value) || 1;
   const ano = parseInt(document.getElementById('pag-ano')?.value) || new Date().getFullYear();
@@ -992,7 +1070,7 @@ function gerarRelatorioPagamento() {
   img.onerror = function () {
     renderPDF(null);
   };
-  img.src = 'img/logo.png';
+  img.src = document.body.classList.contains('theme-blue') ? 'img/logo.png' : 'img/logo2.png';
 }
 
 function mascaraValorInfoAdicional(input) {
@@ -1047,7 +1125,7 @@ async function analisarPagamentoIndividual() {
   if (!secao) return;
 
   // Nome do professor selecionado
-  const professor = (window._pagProfessoresAtivos || []).find(p => p.cpf === professorId);
+  const professor = buscarProfessorPagamento(professorId);
   const nomeProfessor = professor?.nome || 'Professor';
 
   const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -1468,7 +1546,7 @@ function gerarPDFRelatorioGrupo(nomeProfessor, nomeMes, ano, todasLinhas) {
     const img = new window.Image();
     img.onload = function () { renderPDF(img); };
     img.onerror = function () { renderPDF(null); };
-    img.src = 'img/logo.png';
+    img.src = document.body.classList.contains('theme-blue') ? 'img/logo.png' : 'img/logo2.png';
   });
 }
 
