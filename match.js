@@ -443,7 +443,7 @@ window.Match = (function () {
           <div class="modal-header">
             <h3 class="font-lexend font-bold text-lg text-gray-800">
               <i class="fas fa-people-arrows text-orange-500 mr-2"></i>
-              Match — ${escapeHtml(aula.codigoContratacao || 'Sem código')}${(aula.nome || aula.nomeCliente) ? ' - ' + escapeHtml(aula.nome || aula.nomeCliente) : ''}
+              Match — ${escapeHtml(aula.codigoContratacao || aula.idSimulacao || 'Sem código')}${(aula.nome || aula.nomeCliente) ? ' - ' + escapeHtml(aula.nome || aula.nomeCliente) : ''}
             </h3>
             <button class="modal-close text-gray-400 hover:text-gray-600" id="match-modal-close"><i class="fas fa-times"></i></button>
           </div>
@@ -504,8 +504,10 @@ window.Match = (function () {
 
     try {
       const codigoContratacao = aula.codigoContratacao;
+      // Simulações ainda não têm codigoContratacao/registro no bancoDeAulas — nesse
+      // caso usamos as aulas do rascunho recebidas diretamente, sem buscar no Firebase.
       const [aulasContrato, professores, todasAulasSistema, bairroInfo] = await Promise.all([
-        BANCO.fetchBancoDeAulasLista(codigoContratacao),
+        codigoContratacao ? BANCO.fetchBancoDeAulasLista(codigoContratacao) : Promise.resolve(aula.aulas || []),
         BANCO.fetchDataBaseProfessores(),
         BANCO.fetchBancoDeAulasListaBatch(),
         resolverBairroCliente(aula.cpf)

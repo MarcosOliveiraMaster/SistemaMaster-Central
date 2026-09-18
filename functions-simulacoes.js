@@ -838,6 +838,10 @@ const Simulacoes = (function() {
                     Cronograma de Aula
                   </h4>
                 <div class="flex gap-2">
+                  <button type="button" id="btn-match-simulacao" class="btn-secondary btn-compact" title="Rankear professores compatíveis com as aulas desta simulação">
+                    <i class="fas fa-people-arrows mr-2"></i>
+                    Match
+                  </button>
                   <button id="btn-calendario-simulacao" class="btn-secondary btn-compact" title="Visualizar calendário de aulas">
                     <i class="fas fa-calendar-alt mr-2"></i>
                     Vista Calendário
@@ -2000,6 +2004,28 @@ const Simulacoes = (function() {
         } finally {
           btnVerificarDatasSim.disabled = false;
           btnVerificarDatasSim.innerHTML = originalHTML;
+        }
+      });
+    }
+
+    // Botão "Match" — mesmo ranking de professores usado em Detalhes da Contratação,
+    // mas a simulação ainda não tem codigoContratacao/registro no bancoDeAulas, então
+    // passamos as aulas do rascunho direto (Match.abrirModalMatch usa esse fallback).
+    const btnMatchSim = modal.querySelector('#btn-match-simulacao');
+    if (btnMatchSim) {
+      btnMatchSim.addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (window.Match && typeof window.Match.abrirModalMatch === 'function') {
+          window.Match.abrirModalMatch({
+            codigoContratacao: editingSimulacao.codigoContratacao || null,
+            idSimulacao: editingSimulacao.idSimulacao,
+            nome: editingSimulacao.nomeCliente,
+            nomeCliente: editingSimulacao.nomeCliente,
+            cpf: editingSimulacao.cpf,
+            aulas: editingSimulacao.aulas || []
+          });
+        } else {
+          showToast('Módulo de Match não carregado.', 'error');
         }
       });
     }

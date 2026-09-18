@@ -5806,6 +5806,14 @@ body.theme-blue {
   --orange: #00255f;
   --orange-light: #4d668f;
   --orange-dark: #001a43;
+
+  /* Vidro fosco (glass) dos modais */
+  --glass-header-bg: rgba(255, 255, 255, 0.90);
+  --glass-header-blur: 6px;
+  --glass-body-bg: rgba(255, 255, 255, 0.80);
+  --glass-body-blur: 10px;
+  --glass-overlay-bg: rgba(0, 37, 95, 0.35);
+  --glass-overlay-blur: 3px;
 }
 
 body.theme-blue #professores {
@@ -5958,30 +5966,76 @@ body.theme-blue .dc-status-option:hover { border-color: #00255f; background: rgb
 body.theme-blue .dc-status-option--selected { border-color: #00255f; background: rgba(0, 37, 95, 0.08); }
 body.theme-blue #loading-grupo-bar { background: linear-gradient(90deg, #00255f, #16a34a) !important; }
 
-/* ---- Bordas de modais + leve transparência (efeito "glass") ---- */
+/* ---- Vidro fosco (glass) dos modais + overlays ----
+   Overlay: fundo escurecido atrás do modal, translúcido + leve blur.
+   Container do modal: vidro "leve" (10px blur / ~80% opaco) — cobre
+   corpo e rodapé por padrão, já que ambos são filhos sem fundo próprio.
+   Header: camada extra, mais opaca (6px blur / ~90%), por cima do vidro
+   do container — âncora de leitura mais sólida no topo.
+   Exceção deliberada: .cal-modal (tela cheia do Calendário Master) fica
+   de fora — não há "fundo" a borrar atrás de um modal 100vw/100vh, e
+   blur numa tela inteira de trabalho prejudicaria a leitura da grade. */
 body.theme-blue #app-header {
   background: rgba(255, 255, 255, 0.90) !important;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
+
+body.theme-blue .modal-overlay,
+body.theme-blue .dc-modal-overlay,
+body.theme-blue .demanda-card-modal-overlay,
+body.theme-blue .demandas-modal-overlay,
+body.theme-blue .demanda-confirm-overlay {
+  background: var(--glass-overlay-bg) !important;
+  backdrop-filter: blur(var(--glass-overlay-blur));
+  -webkit-backdrop-filter: blur(var(--glass-overlay-blur));
+}
+
 body.theme-blue .modal-container,
 body.theme-blue .dc-modal,
-body.theme-blue .demanda-card-modal {
+body.theme-blue .demanda-card-modal,
+body.theme-blue .demandas-modal-overlay .demandas-wrapper,
+body.theme-blue .demanda-confirm-modal,
+body.theme-blue .cm-hora-container {
   border: 1px solid rgba(0, 37, 95, 0.30);
   box-shadow: 0 8px 32px rgba(0, 37, 95, 0.18);
-  background: rgba(255, 255, 255, 0.97);
+  background: var(--glass-body-bg);
+  backdrop-filter: blur(var(--glass-body-blur));
+  -webkit-backdrop-filter: blur(var(--glass-body-blur));
 }
 body.theme-blue .demandas-modal-overlay .demandas-wrapper {
-  border: 1px solid rgba(0, 37, 95, 0.30);
   border-radius: 12px;
   overflow: hidden;
 }
+
 body.theme-blue .modal-header,
-body.theme-blue .modal-footer,
+body.theme-blue .dc-modal-header,
 body.theme-blue .demanda-card-modal-header,
-body.theme-blue .demanda-card-modal-footer,
-body.theme-blue .dc-modal-header {
+body.theme-blue .cm-hora-header {
+  background: var(--glass-header-bg);
+  backdrop-filter: blur(var(--glass-header-blur));
+  -webkit-backdrop-filter: blur(var(--glass-header-blur));
   border-color: rgba(0, 37, 95, 0.25) !important;
+}
+
+body.theme-blue .modal-footer,
+body.theme-blue .demanda-card-modal-footer,
+body.theme-blue .cm-hora-footer {
+  border-color: rgba(0, 37, 95, 0.25) !important;
+}
+
+/* Popups/menus pequenos (sem overlay full-screen atrás) — vidro mais opaco,
+   priorizando leitura rápida em elementos de UI pequenos e densos em texto. */
+body.theme-blue .link-popup,
+body.theme-blue .color-palette-popup,
+body.theme-blue .demanda-ctx-menu,
+body.theme-blue .cal-context-menu,
+body.theme-blue .ms-panel,
+body.theme-blue .cbusca-dd-menu,
+body.theme-blue .global-tooltip {
+  background: var(--glass-header-bg);
+  backdrop-filter: blur(var(--glass-header-blur));
+  -webkit-backdrop-filter: blur(var(--glass-header-blur));
 }
 
 /* ---- Rede de segurança para cor inline (ícones/spinners gerados via JS) ----
