@@ -85,7 +85,14 @@ O CONTRATADO compromete-se a não prestar serviços direta ou indiretamente aos 
 O descumprimento desta cláusula sujeitará o CONTRATADO ao pagamento de multa equivalente a 3 (três) vezes a média mensal recebida nos últimos 3 (três) meses de prestação de serviços.
 
 
-### CLÁUSULA SÉTIMA – DA CONFIDENCIALIDADE
+### CLÁUSULA SÉTIMA – DA VEDAÇÃO À ATUAÇÃO COMO CLIENTE OCULTO
+
+É expressamente vedado ao CONTRATADO atuar, direta ou indiretamente, como “cliente oculto” (“mystery shopper”) ou figura similar em relação à CONTRATANTE, seja para fins de avaliação, fiscalização, divulgação ou qualquer outra finalidade.
+
+O descumprimento desta cláusula poderá ensejar rescisão imediata do contrato por justa causa, nos termos da Cláusula Décima Primeira, sem prejuízo de outras medidas cabíveis.
+
+
+### CLÁUSULA OITAVA – DA CONFIDENCIALIDADE
 
 O CONTRATADO compromete-se a manter absoluto sigilo sobre:
 
@@ -100,7 +107,7 @@ IV – Estratégias metodológicas da CONTRATANTE.
 A obrigação de confidencialidade permanece válida mesmo após o encerramento contratual.
 
 
-### CLÁUSULA OITAVA – DA PROTEÇÃO DE DADOS (LGPD)
+### CLÁUSULA NONA – DA PROTEÇÃO DE DADOS (LGPD)
 
 O CONTRATADO declara ciência de que terá acesso a dados pessoais, inclusive de menores de idade, comprometendo-se a observar integralmente a Lei nº 13.709/2018 (LGPD).
 
@@ -117,7 +124,7 @@ IV – Excluir dados sensíveis eventualmente armazenados ao término do contrat
 A CONTRATANTE atuará como controladora dos dados e o CONTRATADO como operador, limitando-se o tratamento às instruções da CONTRATANTE.
 
 
-### CLÁUSULA NONA – DO USO DE IMAGEM
+### CLÁUSULA DÉCIMA – DO USO DE IMAGEM
 
 A captação de imagem, voz ou depoimentos de alunos somente poderá ocorrer quando houver autorização prévia e expressa dos responsáveis legais.
 
@@ -134,13 +141,37 @@ IV – Encaminhar qualquer material exclusivamente à CONTRATANTE.
 É expressamente proibida a publicação de fotos, vídeos ou depoimentos em redes sociais pessoais do CONTRATADO. O descumprimento poderá ensejar rescisão imediata e responsabilização civil.
 
 
-### CLÁUSULA DÉCIMA – DA VIGÊNCIA E RESCISÃO
+### CLÁUSULA DÉCIMA PRIMEIRA – DA VIGÊNCIA E RESCISÃO
 
 O presente contrato terá prazo inicial de 90 (noventa) dias, iniciando-se na data da assinatura eletrônica.
 
 Poderá ser renovado ou prorrogado mediante manifestação expressa de ambas as partes, formalizada por escrito, inclusive por meio eletrônico.
 
 O contrato poderá ser rescindido por qualquer das partes mediante aviso prévio de 5 (cinco) dias úteis. Em caso de descumprimento contratual, poderá haver rescisão imediata.
+
+**Parágrafo Primeiro – Da Rescisão Motivada pela CONTRATANTE**
+
+A CONTRATANTE poderá rescindir o presente contrato de forma imediata e motivada, sem necessidade de aviso prévio, nas seguintes hipóteses:
+
+I – Cancelamento ou desmarcação de 3 (três) ou mais aulas consecutivas por iniciativa do CONTRATADO, sem justificativa razoável;
+
+II – Atrasos recorrentes ao horário previamente agendado para as aulas;
+
+III – Conduta desrespeitosa, ofensiva, negligente ou inadequada para com a CONTRATANTE, seus clientes, familiares ou alunos;
+
+IV – Descumprimento das obrigações de confidencialidade e proteção de dados previstas nas Cláusulas Oitava e Nona;
+
+V – Recebimento de reclamações fundamentadas e recorrentes por parte dos clientes quanto à qualidade do atendimento, postura ou conduta do CONTRATADO durante as aulas;
+
+VI – Comparecimento às aulas sob efeito de álcool ou qualquer substância que comprometa a capacidade de atendimento do CONTRATADO, ou em condições de higiene ou vestimenta incompatíveis com o ambiente domiciliar e a imagem da CONTRATANTE;
+
+VII – Ausência em 3 (três) ou mais capacitações, treinamentos ou reuniões consecutivas promovidas pela CONTRATANTE, sem justificativa razoável e previamente comunicada;
+
+VIII – Atuação do CONTRATADO como “cliente oculto” ou figura similar em relação à CONTRATANTE, conforme vedado na Cláusula Sétima.
+
+A rescisão motivada não gera direito a qualquer indenização ao CONTRATADO, sem prejuízo da apuração e pagamento das horas/aula já efetivamente ministradas e validadas até a data da rescisão.
+
+**Parágrafo Segundo**
 
 Caso a rescisão seja solicitada pelo CONTRATADO, este compromete-se a:
 
@@ -157,12 +188,12 @@ V – Compilar e encaminhar todas as informações constantes no diário pedagó
 As informações deverão ser encaminhadas à CONTRATANTE no prazo máximo de 5 (cinco) dias corridos após a formalização do pedido de rescisão, a fim de garantir a continuidade pedagógica dos alunos. O não cumprimento desta obrigação poderá ensejar retenção proporcional de valores eventualmente pendentes até a regularização das informações.
 
 
-### CLÁUSULA DÉCIMA PRIMEIRA – DAS DISPOSIÇÕES GERAIS
+### CLÁUSULA DÉCIMA SEGUNDA – DAS DISPOSIÇÕES GERAIS
 
 A eventual tolerância quanto ao descumprimento de cláusulas não constitui renúncia de direito. Este contrato é firmado eletronicamente, possuindo validade jurídica nos termos da legislação vigente.
 
 
-### CLÁUSULA DÉCIMA SEGUNDA – DESLOCAMENTO E RESPONSABILIDADE
+### CLÁUSULA DÉCIMA TERCEIRA – DESLOCAMENTO E RESPONSABILIDADE
 
 O deslocamento até o local das aulas será realizado por meios próprios do CONTRATADO, que assume integral responsabilidade pela logística de transporte utilizada.
 
@@ -174,8 +205,12 @@ A CONTRATANTE não se responsabiliza por ocorrências durante o trajeto, tais co
 
 Eventual pagamento adicional por aula ministrada em local de difícil acesso não implica assunção de responsabilidade civil sobre o deslocamento.
 
+A escolha do meio de transporte utilizado para o deslocamento até o local das aulas é de responsabilidade exclusiva do CONTRATADO, não havendo qualquer indicação, direcionamento ou exigência por parte da CONTRATANTE quanto ao meio, ferramenta ou modalidade de transporte a ser utilizada, podendo o CONTRATADO optar livremente pela alternativa que julgar mais adequada.
 
-### CLÁUSULA DÉCIMA TERCEIRA – DO FORO
+A CONTRATANTE não se responsabiliza por quaisquer danos, avarias, perdas ou prejuízos decorrentes do meio de transporte escolhido pelo CONTRATADO, tampouco por danos, perda ou extravio de materiais, equipamentos ou bens pessoais do CONTRATADO (tais como notebooks, celulares, materiais pedagógicos, entre outros) ocorridos durante o deslocamento ou durante a prestação das aulas.
+
+
+### CLÁUSULA DÉCIMA QUARTA – DO FORO
 
 Fica eleito o foro da Comarca de Maceió, com renúncia de qualquer outro, por mais privilegiado que seja.
 
@@ -195,9 +230,3 @@ O presente contrato será firmado por meio eletrônico, sendo considerada válid
 -_________________________________-  
 - [NomeProfessor] -
 - [cpfProfessor] -
-
-
-
-
-
-
