@@ -406,7 +406,7 @@ const BancoDeAulasCards = (function() {
                 <div class="space-y-3">
                   <div>
                     <div class="text-xs font-medium text-gray-500 mb-1">Nome do Cliente</div>
-                    <div class="text-sm text-gray-800">${aula.nome || aula.nomeCliente || '--'}</div>
+                    <div class="text-sm text-gray-800">${escapeHtml(aula.nome || aula.nomeCliente || '--')}</div>
                   </div>
                   <div>
                     <div class="text-xs font-medium text-gray-500 mb-1">CPF</div>
@@ -2528,13 +2528,13 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
               </button>
             </td>
             <td class="text-center">
-              <button type="button" class="btn-materia-aula text-sm px-2 py-1 cursor-pointer hover:bg-orange-50 rounded transition-colors" data-id-aula="${aula['id-Aula']}" data-materia="${aula.materia || ''}" title="Clique para alterar a matéria">
-                ${aula.materia || '--'}
+              <button type="button" class="btn-materia-aula text-sm px-2 py-1 cursor-pointer hover:bg-orange-50 rounded transition-colors" data-id-aula="${aula['id-Aula']}" data-materia="${escapeHtml(aula.materia || '')}" title="Clique para alterar a matéria">
+                ${escapeHtml(aula.materia || '--')}
               </button>
             </td>
             <td>
-              <button type="button" class="btn-professor-aula text-sm px-2 py-1 cursor-pointer hover:bg-orange-50 rounded transition-colors ${!aula.professor || aula.professor === 'A definir' ? 'text-orange-500 font-semibold' : ''}" data-id-aula="${aula['id-Aula']}" data-professor="${aula.professor || 'A definir'}" data-id-professor="${aula.idProfessor || ''}" data-professor-uid="${aula.professorUid || ''}" title="Clique para alterar o professor">
-                ${aula.professor || 'A definir'}
+              <button type="button" class="btn-professor-aula text-sm px-2 py-1 cursor-pointer hover:bg-orange-50 rounded transition-colors ${!aula.professor || aula.professor === 'A definir' ? 'text-orange-500 font-semibold' : ''}" data-id-aula="${aula['id-Aula']}" data-professor="${escapeHtml(aula.professor || 'A definir')}" data-id-professor="${aula.idProfessor || ''}" data-professor-uid="${aula.professorUid || ''}" title="Clique para alterar o professor">
+                ${escapeHtml(aula.professor || 'A definir')}
               </button>
             </td>
             <td class="text-center">
@@ -2544,8 +2544,8 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
               ${formatCurrencyBR(valorAulaComputado)}
             </td>
             <td class="col-aula-estudante hidden">
-              <button type="button" class="btn-estudante-aula text-sm px-2 py-1 cursor-pointer hover:bg-orange-50 rounded transition-colors" data-id-aula="${aula['id-Aula']}" data-estudante="${aula.estudante || ''}" title="Clique para alterar o estudante">
-                ${aula.estudante || '--'}
+              <button type="button" class="btn-estudante-aula text-sm px-2 py-1 cursor-pointer hover:bg-orange-50 rounded transition-colors" data-id-aula="${aula['id-Aula']}" data-estudante="${escapeHtml(aula.estudante || '')}" title="Clique para alterar o estudante">
+                ${escapeHtml(aula.estudante || '--')}
               </button>
             </td>
             <td>
