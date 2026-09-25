@@ -2352,6 +2352,12 @@ window.verRelatorioAula = async function (id) {
         classes: 'px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors',
         attributes: 'onclick="this.closest(\'.modal-overlay\').remove()"'
       },
+      // Foto enviada pelo professor junto com o relatório (registro-aula.js).
+      ...(aula.temRegistroFoto === true ? [{
+        text: '<i class="fas fa-camera mr-1"></i> Ver registro da aula',
+        classes: 'px-4 py-2 bg-white text-orange-600 border border-orange-500 rounded-lg hover:bg-orange-50 transition-colors',
+        attributes: `onclick="verRegistroAula({ listaDocId: '${id}' })"`
+      }] : []),
       {
         text: '<i class="fas fa-copy mr-1"></i> Copiar',
         classes: 'px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors',

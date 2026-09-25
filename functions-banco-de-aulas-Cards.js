@@ -1621,8 +1621,15 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
         const { modal: relModal, closeModal: closeRel } = createModal('Relatório da Aula', content, [
           { text: 'Fechar', classes: 'btn-secondary btn-compact', attributes: 'id="btn-fechar-relatorio"' },
           { text: 'Editar', classes: 'btn-secondary btn-compact', attributes: 'id="btn-editar-relatorio"' },
-          { text: 'Disponibilizar o relatório', classes: 'btn-secondary btn-compact', attributes: 'id="btn-disponibilizar-relatorio"' }
+          { text: 'Disponibilizar o relatório', classes: 'btn-secondary btn-compact', attributes: 'id="btn-disponibilizar-relatorio"' },
+          { text: '<i class="fas fa-camera mr-1"></i> Ver registro da aula', classes: 'btn-secondary btn-compact', attributes: 'id="btn-ver-registro-aula"' }
         ]);
+
+        // Foto enviada pelo professor junto com o relatório (registro-aula.js).
+        const btnVerRegistro = relModal.querySelector('#btn-ver-registro-aula');
+        if (btnVerRegistro) {
+          btnVerRegistro.addEventListener('click', () => verRegistroAula({ idAula: btn.dataset.idAula }));
+        }
 
         const btnFechar = relModal.querySelector('#btn-fechar-relatorio');
         const btnEditar = relModal.querySelector('#btn-editar-relatorio');
