@@ -1,6 +1,7 @@
 // registro-aula.js
 // "Ver registro da aula": mostra a foto que o professor enviou junto com o
-// relatório, pelo portal (SistemMaster-Login).
+// relatório, pelo portal (SistemMaster-Login). Também exibe a avaliação
+// interna da aula (estrelas + pontos de melhoria).
 //
 // A foto fica em registrosAula/{id}, com o MESMO id do documento da aula em
 // BancoDeAulas-Lista, como um data URL JPEG que o navegador do professor gerou
@@ -54,6 +55,47 @@
     corpo.innerHTML = `<div class="text-center text-gray-500"><i class="fas ${icone} text-3xl mb-2"></i><p></p></div>`;
     corpo.querySelector('p').textContent = texto;
   }
+
+  // ── Avaliação interna da aula (estrelas + pontos de melhoria) ──
+  // Enviada pelo professor junto com o relatório, em avaliacoesAula/{id}.
+  // É só da Master: fica num bloco próprio do modal e NÃO entra no texto de
+  // "Copiar relatório" (que monta a mensagem só com as 3 seções do relatório).
+  const ROTULOS_NOTA = { 1: 'Ruim', 2: 'Regular', 3: 'Boa', 4: 'Muito boa', 5: 'Excelente' };
+
+  window.mostrarAvaliacaoAula = async function ({ listaDocId, idAula } = {}, container) {
+    if (!container) return;
+    container.innerHTML = '<p class="text-xs text-gray-400"><i class="fas fa-spinner fa-spin mr-1"></i>Carregando avaliação do professor...</p>';
+    try {
+      const id = await resolverIdLista({ listaDocId, idAula });
+      const doc = id ? await firebase.firestore().collection('avaliacoesAula').doc(id).get() : null;
+      const d = doc && doc.exists ? doc.data() : null;
+      const nota = d ? Number(d.nota) : 0;
+      if (!d || !Number.isInteger(nota) || nota < 1 || nota > 5) {
+        container.innerHTML = '<p class="text-xs text-gray-400"><i class="fas fa-star mr-1"></i>O professor ainda não avaliou esta aula.</p>';
+        return;
+      }
+      container.innerHTML = `
+        <div class="rounded-lg border border-gray-200 bg-gray-50 p-3 text-left">
+          <div class="flex items-center justify-between gap-2 flex-wrap mb-1">
+            <span class="text-sm font-semibold text-gray-700"><i class="fas fa-star text-yellow-400 mr-1"></i>Avaliação do professor</span>
+            <span class="text-xs text-gray-500 bg-white border border-gray-200 rounded-full px-2 py-0.5"><i class="fas fa-lock mr-1"></i>Interno · não vai para o cliente</span>
+          </div>
+          <div style="font-size:1.35rem;letter-spacing:.1rem;line-height:1;" aria-label="${nota} de 5 estrelas">
+            <span style="color:#f5b301;">${'★'.repeat(nota)}</span><span style="color:#d1d5db;">${'★'.repeat(5 - nota)}</span>
+          </div>
+          <p class="text-sm font-semibold text-gray-700 mt-1">${nota} de 5 · ${ROTULOS_NOTA[nota]}</p>
+          <p class="text-xs font-semibold text-gray-500 mt-2 mb-1">Pontos de melhoria</p>
+          <p data-melhorias class="text-sm text-gray-700 whitespace-pre-wrap"></p>
+        </div>`;
+      const melhorias = typeof d.melhorias === 'string' ? d.melhorias.trim() : '';
+      const alvo = container.querySelector('[data-melhorias]');
+      alvo.textContent = melhorias || 'Nenhum ponto de melhoria informado.';
+      if (!melhorias) alvo.classList.add('italic', 'text-gray-400');
+    } catch (err) {
+      console.error('[Avaliação da aula] Erro ao carregar:', err);
+      container.innerHTML = '<p class="text-xs text-red-500">Não foi possível carregar a avaliação do professor.</p>';
+    }
+  };
 
   window.verRegistroAula = async function ({ listaDocId, idAula } = {}) {
     const corpo = abrirVisualizador();

@@ -2332,6 +2332,10 @@ window.verRelatorioAula = async function (id) {
           <label class="block text-sm font-semibold text-gray-700 mb-1">Recomendações</label>
           <textarea id="relatorio-recomendacoes-${id}" class="w-full h-24 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm resize-y" placeholder="Sugestões ou tarefas...">${escapeHtml(recomendacoes)}</textarea>
         </div>
+
+        <!-- Avaliação interna do professor (registro-aula.js). Fora das textareas:
+             não entra em "Copiar" nem em "Salvar Alterações". -->
+        <div id="avaliacao-aula-${id}"></div>
       </div>
     `;
 
@@ -2369,6 +2373,10 @@ window.verRelatorioAula = async function (id) {
         attributes: `onclick="salvarRelatorio('${id}')"`
       }
     ]);
+
+    if (typeof mostrarAvaliacaoAula === 'function') {
+      mostrarAvaliacaoAula({ listaDocId: id }, document.getElementById(`avaliacao-aula-${id}`));
+    }
 
   } catch (error) {
     console.error('Erro ao buscar relatório:', error);
