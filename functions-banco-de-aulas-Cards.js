@@ -1614,6 +1614,8 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
             <div class="max-h-72 overflow-y-auto bg-white p-3 rounded border border-gray-200 text-sm">
               <p class="text-gray-700 whitespace-pre-wrap">${escapeHtml(raw)}</p>
             </div>
+            <!-- Avaliação interna do professor (registro-aula.js): não entra no texto copiado/enviado. -->
+            <div id="avaliacao-aula-area" class="mt-4"></div>
             <div id="relatorio-status-area" class="mt-4"></div>
           </div>
         `;
@@ -1626,6 +1628,10 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
         ]);
 
         // Foto enviada pelo professor junto com o relatório (registro-aula.js).
+        if (typeof mostrarAvaliacaoAula === 'function') {
+          mostrarAvaliacaoAula({ idAula: btn.dataset.idAula }, relModal.querySelector('#avaliacao-aula-area'));
+        }
+
         const btnVerRegistro = relModal.querySelector('#btn-ver-registro-aula');
         if (btnVerRegistro) {
           btnVerRegistro.addEventListener('click', () => verRegistroAula({ idAula: btn.dataset.idAula }));
