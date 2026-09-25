@@ -492,13 +492,13 @@ async function loadAulasPainel(dataFiltro) {
           <td class="px-4 py-3 text-sm text-gray-800 font-medium">
             <span class="flex items-center gap-1">
               <i class="fas fa-external-link-alt text-orange-300 text-xs opacity-0 group-hover:opacity-100 transition-opacity"></i>
-              ${aula.nomeCliente || '--'}
+              ${escapeHtml(String(aula.nomeCliente || '--'))}
             </span>
           </td>
-          <td class="col-estudante hidden px-4 py-3 text-sm text-gray-600">${aula.estudante || '--'}</td>
-          <td class="px-4 py-3 text-sm text-gray-600">${aula.professor || '--'}</td>
-          <td class="px-4 py-3 text-sm text-gray-600">${aula.materia || '--'}</td>
-          <td class="px-4 py-3 text-sm text-gray-600 font-medium">${aula.horario || '--'}</td>
+          <td class="col-estudante hidden px-4 py-3 text-sm text-gray-600">${escapeHtml(String(aula.estudante || '--'))}</td>
+          <td class="px-4 py-3 text-sm text-gray-600">${escapeHtml(String(aula.professor || '--'))}</td>
+          <td class="px-4 py-3 text-sm text-gray-600">${escapeHtml(String(aula.materia || '--'))}</td>
+          <td class="px-4 py-3 text-sm text-gray-600 font-medium">${escapeHtml(String(aula.horario || '--'))}</td>
           <td class="px-4 py-3 text-sm text-gray-600">${aula.duracao || '--'}</td>
           <td class="px-4 py-3 text-sm text-center">${statusIcon}</td>
           <td class="px-4 py-3 text-sm" onclick="event.stopPropagation()">
