@@ -102,6 +102,9 @@
         <button class="menu-item" data-section="fluxo-processos">
           <i class="fas fa-tasks mr-3"></i><span>Demandas</span>
         </button>
+        <button class="menu-item" data-section="quadros-aula" data-title="Quadros de aula">
+          <i class="fas fa-chalkboard mr-3"></i><span>Quadros de aula</span>
+        </button>
         <button class="menu-item menu-item-expandable" data-section="dashboard" id="btn-dashboard-menu">
           <i class="fas fa-tachometer-alt mr-3"></i>
           <span>Dashboard</span>
@@ -247,6 +250,7 @@
           </div>
         </section>
         <section id="fluxo-processos" class="section-content"></section>
+        <section id="quadros-aula"     class="section-content"></section>
         <section id="clientes"         class="section-content"></section>
         <section id="professores"      class="section-content"></section>
         <section id="galeria-professores" class="section-content"></section>
@@ -336,5 +340,7 @@
   <script src="functions-pagamento.js"></script>
   <script src="functions-cofres-pagamento.js"></script>
   <script src="previsaoFinanceira.js"></script>
+  <!-- Quadros de aula (Quadro Master): módulo, usa quadro-render.js -->
+  <script type="module" src="functions-quadros-aula.js"></script>
 </body>
 </html>
