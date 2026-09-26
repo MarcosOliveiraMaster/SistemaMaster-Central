@@ -642,6 +642,10 @@ const BancoDeAulasCards = (function() {
             <button id="btn-fechar-modal" class="btn-secondary btn-compact">
               Fechar
             </button>
+            <button id="btn-proposta-professores-contratacao" class="btn-secondary btn-compact" title="Envia aulas desta contratação (versão salva) para professores responderem no portal">
+              <i class="fas fa-paper-plane mr-2"></i>
+              Enviar proposta para professores
+            </button>
             <button id="btn-salvar-alteracoes" class="btn-primary btn-compact">
               <i class="fas fa-save mr-2"></i>
               Salvar Alterações
@@ -1237,6 +1241,14 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
             btnAplicar.innerHTML = 'Aplicar alterações';
           }
         });
+      });
+    }
+
+    // Proposta para professores (usa a versão SALVA da contratação)
+    const btnPropostaProf = modal.querySelector('#btn-proposta-professores-contratacao');
+    if (btnPropostaProf && window.PropostasProfessores) {
+      btnPropostaProf.addEventListener('click', () => {
+        window.PropostasProfessores.abrirEnvio({ origem: 'contratacao', id: aula.id });
       });
     }
 
