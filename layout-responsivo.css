@@ -1,0 +1,240 @@
+/* layout-responsivo.css
+   Layout do Central em celular e tablet. Muda só disposição e tamanhos — as
+   fontes continuam as mesmas (Comfortaa, Lexend etc.).
+   - Computador (> 1180px): menu lateral completo, agora em grupos.
+   - Tablet (769–1180px): menu vira uma coluna de ícones (a mesma do "recolher").
+   - Celular (≤ 768px): menu em gaveta (☰), barra de atalhos embaixo,
+     cabeçalho fixo e tabelas em cartões (rótulos vindos do cabeçalho da tabela).
+   Comportamento em layout-responsivo.js. */
+
+/* ── Grupos do menu ── */
+#menu-lateral .menu-grupo {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.8;
+  padding: 0.9rem 0.75rem 0.3rem;
+  margin: 0;
+}
+#menu-lateral .menu-grupo:first-child { padding-top: 0.2rem; }
+#menu-lateral.collapsed .menu-grupo { padding: 0.35rem 0; }
+#menu-lateral.collapsed .menu-grupo span { display: none; }
+#menu-lateral.collapsed #icon-area-dev-expand,
+#menu-lateral.collapsed #icon-clientes-expand,
+#menu-lateral.collapsed #icon-professores-expand { display: none; }
+#menu-lateral.collapsed .menu-grupo::before {
+  content: '';
+  display: block;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.3);
+  margin: 0 0.4rem;
+}
+#menu-lateral { display: flex; flex-direction: column; }
+
+/* ── Cabeçalho: título + data ── */
+#app-header { position: sticky; top: 0; z-index: 30; }
+.cabecalho-titulo { display: flex; flex-direction: column; min-width: 0; }
+.cabecalho-titulo #section-title { line-height: 1.25; }
+.cabecalho-data { font-size: 0.8rem; color: #6b7280; }
+.btn-gaveta { display: none; }
+#barra-inferior, #gaveta-fundo { display: none; }
+
+/* O botão flutuante antigo (script.js) dá lugar ao ☰ do cabeçalho */
+#menu-toggle { display: none !important; }
+
+/* ── Tablet: coluna de ícones ── */
+@media (min-width: 769px) and (max-width: 1180px) {
+  #menu-lateral.collapsed { width: 76px !important; min-width: 76px; }
+  #menu-lateral.collapsed .menu-item,
+  #menu-lateral.collapsed .menu-item-submenu,
+  #menu-lateral.collapsed .menu-item-submenu-leaf { padding: 12px 0; font-size: 1.05rem; }
+  #menu-lateral.collapsed #submenu-dashboard,
+  #menu-lateral.collapsed #submenu-area-dev,
+  #menu-lateral.collapsed #submenu-clientes,
+  #menu-lateral.collapsed #submenu-professores { margin-left: 0; }
+  .section-content { font-size: 0.95rem; }
+}
+
+/* ── Celular ── */
+@media (max-width: 768px) {
+  html { -webkit-text-size-adjust: 100%; }
+  body { font-size: 15px; }
+
+  /* Menu em gaveta */
+  #menu-lateral {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(86vw, 330px) !important;
+    min-width: 0;
+    max-height: none;
+    height: 100vh;
+    height: 100dvh;
+    z-index: 60;
+    transform: translateX(-105%);
+    transition: transform 0.28s ease;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  #menu-lateral.menu-open { transform: translateX(0); box-shadow: 0 0 40px rgba(0, 0, 0, 0.3); }
+  /* Na gaveta o menu é sempre o completo, mesmo se estava recolhido */
+  #menu-lateral.collapsed .sidebar-logo-text,
+  #menu-lateral.collapsed .menu-item span,
+  #menu-lateral.collapsed .menu-item-submenu span,
+  #menu-lateral.collapsed .menu-item-submenu-leaf span,
+  #menu-lateral.collapsed #user-email-display,
+  #menu-lateral.collapsed .logout-text,
+  #menu-lateral.collapsed .menu-grupo span { display: initial; }
+  #menu-lateral .menu-item,
+  #menu-lateral .menu-item-submenu,
+  #menu-lateral .menu-item-submenu-leaf { min-height: 46px; font-size: 0.95rem; }
+
+  #gaveta-fundo {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    background: rgba(17, 24, 39, 0.45);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s;
+  }
+  body.gaveta-aberta #gaveta-fundo { opacity: 1; pointer-events: auto; }
+  body.gaveta-aberta { overflow: hidden; }
+
+  /* Cabeçalho compacto e fixo */
+  #app-header { padding: 0.55rem 0.75rem !important; }
+  #app-header > div { gap: 0.6rem; }
+  .btn-gaveta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    color: #374151;
+    font-size: 1.1rem;
+  }
+  .cabecalho-titulo { flex: 1; }
+  .cabecalho-titulo #section-title {
+    font-size: 1.08rem !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .cabecalho-data { font-size: 0.72rem; }
+
+  /* Conteúdo: espaço para a barra inferior */
+  main.flex-1 { padding-bottom: calc(72px + env(safe-area-inset-bottom)); overflow-x: hidden; }
+  .section-content { font-size: 0.95rem; }
+  .section-content > div,
+  .section-content > section { max-width: 100%; }
+
+  /* Grades fixas de 3 a 6 colunas viram 2 (as responsivas do Tailwind seguem iguais) */
+  main .grid-cols-3,
+  main .grid-cols-4,
+  main .grid-cols-5,
+  main .grid-cols-6 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+  /* Barra de atalhos embaixo */
+  #barra-inferior {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 50;
+    background: #fff;
+    border-top: 1px solid #e5e7eb;
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.05);
+    padding: 0.3rem 0.25rem calc(0.3rem + env(safe-area-inset-bottom));
+  }
+  #barra-inferior button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+    background: none;
+    border: 0;
+    padding: 0.3rem 0;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #6b7280;
+    cursor: pointer;
+  }
+  #barra-inferior button i { font-size: 1.1rem; padding: 0.3rem 0.9rem; border-radius: 999px; }
+  #barra-inferior button.ativo { color: #d97804; }
+  #barra-inferior button.ativo i { background: #fff7eb; }
+  body.theme-blue #barra-inferior button.ativo { color: #1d4ed8; }
+  body.theme-blue #barra-inferior button.ativo i { background: #eff6ff; }
+
+  /* Tabelas em cartões: cada linha vira um cartão; cada célula mostra o
+     rótulo da coluna (data-label, preenchido por layout-responsivo.js). */
+  table.rt, table.rt tbody { display: block; width: 100%; }
+  table.rt thead { display: none; }
+  table.rt tbody tr {
+    display: block;
+    background: #fff;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 14px;
+    box-shadow: 0 2px 8px rgba(17, 24, 39, 0.05);
+    margin: 0 0 0.7rem;
+    padding: 0.35rem 0.85rem;
+  }
+  table.rt tbody td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.45rem 0 !important;
+    border: 0 !important;
+    border-bottom: 1px solid #f3f4f6 !important;
+    text-align: right !important;
+    font-size: 0.9rem;
+    white-space: normal !important;
+    min-width: 0;
+    word-break: break-word;
+  }
+  table.rt tbody td:last-child { border-bottom: 0 !important; }
+  table.rt tbody td::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    max-width: 45%;
+    text-align: left;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #6b7280;
+  }
+  table.rt tbody td[data-label=""]::before { content: none; }
+  table.rt tbody td[data-label=""] { justify-content: center; }
+  /* Primeira coluna em destaque (normalmente nome ou horário) */
+  table.rt tbody td:first-child { font-size: 1rem; font-weight: 700; }
+  table.rt tbody td.hidden,
+  table.rt tbody td[hidden] { display: none !important; }
+  table.rt tbody td.rt-cheia { display: block; text-align: center !important; }
+  table.rt tbody td.rt-cheia::before { content: none; }
+  /* Contêineres com rolagem horizontal deixam de rolar quando a tabela vira cartões */
+  .rt-pai { overflow-x: visible !important; }
+  .rt-pai > table.rt { min-width: 0 !important; }
+
+  /* Avisos acima da barra de atalhos */
+  #toast-container { left: 0.5rem !important; right: 0.5rem !important; bottom: calc(80px + env(safe-area-inset-bottom)) !important; }
+  #toast-container .toast { max-width: none; }
+
+  /* Barras de botões e filtros quebram linha em vez de sair da tela */
+  main .section-content .flex:not(.flex-col) { flex-wrap: wrap; }
+
+  /* Janelas (modais) ocupando a largura da tela */
+  .modal-container { width: calc(100vw - 16px) !important; max-width: none !important; max-height: 92vh; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #menu-lateral, #gaveta-fundo { transition: none !important; }
+}
