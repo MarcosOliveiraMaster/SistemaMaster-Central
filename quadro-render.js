@@ -10,7 +10,13 @@
 // Imagens: apenas data URL JPEG. Vídeos: apenas links https, abertos em nova aba.
 
 export const LARGURA = 1600;
-export const ALTURA  = 1131;           // proporção A4 deitado
+export const ALTURA  = 1131;           // proporção A4 deitado (folha "paisagem")
+export const ORIENTACOES = [
+    { id: 'paisagem', rotulo: 'Deitada (paisagem)' },
+    { id: 'retrato',  rotulo: 'Em pé (retrato)' }
+];
+/** Largura e altura lógicas da página conforme a orientação. */
+export const dimensoes = (p) => (p && p.orient === 'retrato') ? { w: ALTURA, h: LARGURA } : { w: LARGURA, h: ALTURA };
 export const MAX_PAGINAS = 10;
 export const LIMITE_PAGINA = 900000;   // caracteres por página (a regra aceita até 900.000)
 export const FUNDOS = [
@@ -91,12 +97,13 @@ export function sanitizarPagina(entrada) {
     if (typeof entrada === 'string') { try { p = JSON.parse(entrada); } catch { p = null; } }
     if (!p || typeof p !== 'object') p = {};
     const fundo = FUNDOS.some(f => f.id === p.fundo) ? p.fundo : 'quad-p';
+    const orient = p.orient === 'retrato' ? 'retrato' : 'paisagem';
     const objetos = (Array.isArray(p.objetos) ? p.objetos : []).slice(0, MAX_OBJETOS).map(sanitizarObjeto).filter(Boolean);
-    return { fundo, objetos };
+    return { fundo, orient, objetos };
 }
 
-export const paginaVazia = (fundo = 'quad-p') => ({ fundo, objetos: [] });
-export const serializarPagina = (p) => JSON.stringify({ fundo: p.fundo, objetos: p.objetos });
+export const paginaVazia = (fundo = 'quad-p', orient = 'paisagem') => ({ fundo, orient, objetos: [] });
+export const serializarPagina = (p) => JSON.stringify({ fundo: p.fundo, orient: p.orient || 'paisagem', objetos: p.objetos });
 
 // ── Geometria ──────────────────────────────────────────────────────────────
 export function caixaDoObjeto(o) {
@@ -143,7 +150,7 @@ export function tocaObjeto(o, x, y, r = 10) {
 }
 
 // ── Desenho ────────────────────────────────────────────────────────────────
-export function desenharFundo(ctx, fundo) {
+export function desenharFundo(ctx, fundo, { w: LARGURA, h: ALTURA } = dimensoes(null)) {
     ctx.save();
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, LARGURA, ALTURA);
@@ -350,9 +357,9 @@ function quebrarLinhasAltura(ctx, texto, largura, tam) {
     return quebrarLinhas(ctx, texto, largura).length * tam * 1.3;
 }
 
-/** Desenha a página inteira em coordenadas lógicas (LARGURA × ALTURA). */
+/** Desenha a página inteira em coordenadas lógicas (dimensoes(pagina)). */
 export function desenharPagina(ctx, pagina, imagens, aoCarregar) {
-    desenharFundo(ctx, pagina.fundo);
+    desenharFundo(ctx, pagina.fundo, dimensoes(pagina));
     pagina.objetos.forEach(o => desenharObjeto(ctx, o, imagens, aoCarregar));
 }
 
@@ -369,7 +376,7 @@ export function carregarImagens(paginas, imagens) {
 }
 
 // ── PDF (sem biblioteca externa) ───────────────────────────────────────────
-// Cada página vira um JPEG em tela cheia numa página A4 deitada.
+// Cada página vira um JPEG em tela cheia numa página A4 (deitada ou em pé).
 function base64ParaBytes(b64) {
     const bin = atob(b64);
     const out = new Uint8Array(bin.length);
@@ -392,7 +399,6 @@ export async function gerarPdf(paginas, { titulo = 'Quadro Master', autor = 'Mas
     const imagens = new Map();
     await carregarImagens(paginas, imagens);
     const canvas = document.createElement('canvas');
-    canvas.width = LARGURA; canvas.height = ALTURA;
     const ctx = canvas.getContext('2d');
 
     const enc = new TextEncoder();
@@ -402,7 +408,6 @@ export async function gerarPdf(paginas, { titulo = 'Quadro Master', autor = 'Mas
     const escrever = (p) => { const b = typeof p === 'string' ? enc.encode(p) : p; partes.push(b); tamanho += b.length; };
     const objeto = (n, corpo) => { offsets[n] = tamanho; escrever(`${n} 0 obj\n`); corpo(); escrever('\nendobj\n'); };
 
-    const W = 842, H = 595;
     const n = paginas.length;
     // 1 catálogo, 2 páginas, 3 info; cada página: página, conteúdo, imagem
     escrever('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n');
@@ -412,6 +417,9 @@ export async function gerarPdf(paginas, { titulo = 'Quadro Master', autor = 'Mas
     objeto(3, () => escrever(`<< /Title ${textoPdf(titulo)} /Author ${textoPdf(autor)} /Producer ${textoPdf('Quadro Master')} >>`));
 
     for (let i = 0; i < n; i++) {
+        const { w: LW, h: LH } = dimensoes(paginas[i]);
+        canvas.width = LW; canvas.height = LH;
+        const [W, H] = paginas[i].orient === 'retrato' ? [595, 842] : [842, 595];
         desenharPagina(ctx, paginas[i], imagens);
         const jpeg = base64ParaBytes(canvas.toDataURL('image/jpeg', 0.88).split(',')[1]);
         const pg = 4 + i * 3, cont = pg + 1, img = pg + 2;
@@ -419,7 +427,7 @@ export async function gerarPdf(paginas, { titulo = 'Quadro Master', autor = 'Mas
         const fluxo = `q ${W} 0 0 ${H} 0 0 cm /Im${i} Do Q`;
         objeto(cont, () => escrever(`<< /Length ${fluxo.length} >>\nstream\n${fluxo}\nendstream`));
         objeto(img, () => {
-            escrever(`<< /Type /XObject /Subtype /Image /Width ${LARGURA} /Height ${ALTURA} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.length} >>\nstream\n`);
+            escrever(`<< /Type /XObject /Subtype /Image /Width ${LW} /Height ${LH} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.length} >>\nstream\n`);
             escrever(jpeg);
             escrever('\nendstream');
         });
@@ -468,8 +476,8 @@ function injetarEstilo() {
     .qmv-corpo{padding:14px 16px;overflow:auto;display:flex;flex-direction:column;gap:10px;}
     .qmv-meta{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.8rem;color:#6b7280;}
     .qmv-desc{font-size:.88rem;color:#374151;line-height:1.55;margin:0;white-space:pre-wrap;background:#fff7ed;border-left:4px solid #f28705;border-radius:8px;padding:8px 10px;}
-    .qmv-folha{position:relative;width:100%;border-radius:12px;overflow:hidden;border:1.5px solid #e5e7eb;background:#fff;}
-    .qmv-folha canvas{display:block;width:100%;height:auto;touch-action:pan-y;}
+    .qmv-folha{position:relative;width:100%;border-radius:12px;overflow:hidden;border:1.5px solid #e5e7eb;background:#f3f4f6;display:flex;justify-content:center;}
+    .qmv-folha canvas{display:block;max-width:100%;height:auto;max-height:70vh;background:#fff;touch-action:pan-y;}
     .qmv-barra{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;}
     .qmv-nav{display:flex;align-items:center;gap:8px;font-size:.88rem;color:#374151;font-weight:700;}
     .qmv-btn{border:2px solid #e5e7eb;background:#fff;color:#374151;border-radius:10px;padding:8px 12px;font:700 .85rem 'Comfortaa',system-ui,sans-serif;cursor:pointer;display:inline-flex;gap:6px;align-items:center;}
@@ -532,7 +540,13 @@ export async function abrirVisualizadorQuadro(quadro, carregar) {
     overlay.querySelector('.qmv-x').onclick = fechar;
     overlay.addEventListener('mousedown', e => { if (e.target === overlay) fechar(); });
 
-    const desenhar = () => { if (paginas[atual]) desenharPagina(ctx, paginas[atual], imagens, desenhar); };
+    const desenhar = () => {
+        const p = paginas[atual];
+        if (!p) return;
+        const { w, h } = dimensoes(p);
+        if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+        desenharPagina(ctx, p, imagens, desenhar);
+    };
     function ir(i) {
         if (!paginas.length) return;
         atual = Math.max(0, Math.min(paginas.length - 1, i));
@@ -548,7 +562,7 @@ export async function abrirVisualizadorQuadro(quadro, carregar) {
     // Vídeo: abre o link (já validado) em nova aba.
     canvas.addEventListener('click', (e) => {
         const r = canvas.getBoundingClientRect();
-        const x = (e.clientX - r.left) * LARGURA / r.width, y = (e.clientY - r.top) * ALTURA / r.height;
+        const x = (e.clientX - r.left) * canvas.width / r.width, y = (e.clientY - r.top) * canvas.height / r.height;
         const v = [...(paginas[atual]?.objetos || [])].reverse().find(o => o.t === 'video' && tocaObjeto(o, x, y, 0));
         if (v) window.open(v.url, '_blank', 'noopener,noreferrer');
     });
