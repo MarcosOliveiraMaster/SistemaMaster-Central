@@ -158,14 +158,19 @@ usuários). Não exige mudança no código.
    **Workers & Pages** → projeto do Central → **Custom domains** deve listar
    `central.mastereducacao.app.br`.
 2. **Zero Trust** → (na primeira vez, escolha um nome de equipe e o plano Free).
-3. **Settings → Authentication → Login methods**: deixe ativo o
-   **One-time PIN** (código por e-mail). Opcional: adicione **Google**.
-4. **Access → Applications → Add an application → Self-hosted**:
+3. **Zero Trust → Integrations → Identity providers → Add new identity
+   provider → One-time PIN** (código por e-mail). Contas novas do Zero Trust
+   vêm só com o login "Cloudflare", que exige conta na Cloudflare — sem o
+   One-time PIN os dois e-mails não conseguem entrar.
+4. **Zero Trust → Access controls → Applications → Add an application →
+   Self-hosted**:
    - Application name: `Master Central`
    - Session duration: `24 hours` (ou o que preferir)
    - Application domain: `central.mastereducacao.app.br` (path vazio = site todo)
-   - Se o projeto do Pages também responde em `*.pages.dev`, adicione esse
-     domínio na mesma aplicação — senão ele fica aberto.
+   - Adicione também `sistemamaster-central.pages.dev` e
+     `*.sistemamaster-central.pages.dev` (previews de cada branch) — senão
+     ficam abertos.
+   - Em login methods da aplicação, marque **One-time PIN**.
 5. Policy:
    - Name: `Somente administradores` · Action: **Allow**
    - Include → **Emails**: `marcos.lucas.ti@gmail.com`, `mastereducacaoadm@gmail.com`
