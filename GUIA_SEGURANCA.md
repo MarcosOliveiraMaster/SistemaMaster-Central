@@ -30,10 +30,18 @@
 
 ### Passo 2 · Publicar as Firestore Security Rules
 
-1. Abra o arquivo `firestore.rules`
-2. No Firebase Console → **Firestore Database → Rules**
-3. Substitua todo o conteúdo pelo do arquivo
-4. Clique em **Publish**
+As regras ficam versionadas no repositório **SistemMaster-Login**
+(`firestore.rules`), não neste. Publique sempre a partir de lá:
+
+```
+cd SistemMaster-Login
+npx firebase emulators:exec --only firestore --project demo-test "node tests/firestore.rules.test.mjs"
+firebase deploy --only firestore:rules
+```
+
+Os testes conferem, entre outras coisas, que os dois e-mails de administrador
+continuam reconhecidos. Evite editar direto no Console: foi assim que um erro
+de digitação no e-mail (`marcos.lucas.tai@…`) bloqueou a central inteira.
 
 Resultado: nenhuma pessoa consegue ler ou gravar dados sem estar autenticada
 com um dos dois e-mails autorizados.
@@ -138,10 +146,44 @@ Adicione no `<head>` de `index.html` e `login.html`:
 
 ---
 
-## 4 — Fluxo de acesso após implementação
+## 4 — Bloqueio na borda: Cloudflare Access
+
+O login do Firebase (seção 2) protege os **dados**, mas os arquivos do site
+(`index.html` e os `.js`) continuam sendo entregues a qualquer visitante. Para
+que só os dois e-mails consigam sequer abrir `central.mastereducacao.app.br`,
+coloque o domínio atrás do Cloudflare Access (Zero Trust, gratuito até 50
+usuários). Não exige mudança no código.
+
+1. Confirme que o domínio está na Cloudflare: painel da Cloudflare →
+   **Workers & Pages** → projeto do Central → **Custom domains** deve listar
+   `central.mastereducacao.app.br`.
+2. **Zero Trust** → (na primeira vez, escolha um nome de equipe e o plano Free).
+3. **Settings → Authentication → Login methods**: deixe ativo o
+   **One-time PIN** (código por e-mail). Opcional: adicione **Google**.
+4. **Access → Applications → Add an application → Self-hosted**:
+   - Application name: `Master Central`
+   - Session duration: `24 hours` (ou o que preferir)
+   - Application domain: `central.mastereducacao.app.br` (path vazio = site todo)
+   - Se o projeto do Pages também responde em `*.pages.dev`, adicione esse
+     domínio na mesma aplicação — senão ele fica aberto.
+5. Policy:
+   - Name: `Somente administradores` · Action: **Allow**
+   - Include → **Emails**: `marcos.lucas.ti@gmail.com`, `mastereducacaoadm@gmail.com`
+6. Salve e teste numa janela anônima: deve aparecer a tela da Cloudflare
+   pedindo o e-mail; qualquer outro e-mail não recebe código.
+
+Depois disso o acesso fica em duas etapas: código da Cloudflare (bloqueia
+quem não é admin antes de baixar qualquer arquivo) → login do Firebase
+(libera os dados via Firestore Rules).
+
+---
+
+## 5 — Fluxo de acesso após implementação
 
 ```
-Usuário acessa index.html
+Usuário acessa central.mastereducacao.app.br
+        ↓
+Cloudflare Access: e-mail está na policy? → não: bloqueado (nada é baixado)
         ↓
 auth.js verifica onAuthStateChanged
         ↓

@@ -557,6 +557,9 @@ async function salvarInfoAdicional(id) {
   // Buscar uid do professor para regras de segurança
   const professor = buscarProfessorPagamento(professorId);
   const professorUid = professor?.uid || '';
+  // professorEmail é o que as Firestore Rules usam para o professor ler os
+  // próprios lançamentos (SistemMaster-Login/firestore.rules).
+  const professorEmail = String(professor?.email || '').trim().toLowerCase();
 
   try {
     const docId = professorId + '_' + mes + '-' + ano + '_' + Date.now();
@@ -567,6 +570,7 @@ async function salvarInfoAdicional(id) {
       tipo,
       idProfessor: professorId,
       professorUid,
+      professorEmail,
       mes: parseInt(mes, 10),
       ano: parseInt(ano, 10)
     });
