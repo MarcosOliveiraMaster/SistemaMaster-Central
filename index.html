@@ -102,6 +102,9 @@
         <button class="menu-item" data-section="quadros-aula" data-title="Quadros de aula">
           <i class="fas fa-chalkboard mr-3"></i><span>Quadros de aula</span>
         </button>
+        <button class="menu-item" data-section="notificacoes" data-title="Notificações" style="position:relative">
+          <i class="fas fa-bell mr-3"></i><span>Notificações</span><span id="contador-notificacoes" hidden aria-label="respostas não lidas">0</span>
+        </button>
         <p class="menu-grupo" role="presentation"><span>Financeiro</span></p>
         <button class="menu-item" data-section="mensagens" data-title="Painel Financeiro">
           <i class="fas fa-wallet mr-3"></i><span>Painel Financeiro</span>
@@ -274,6 +277,7 @@
           </div>
         </section>
         <section id="detalhes-banco-de-aulas" class="section-content"></section>
+        <section id="notificacoes"     class="section-content"></section>
       </div>
     </main>
   </div>
@@ -351,6 +355,8 @@
   <script src="previsaoFinanceira.js"></script>
   <!-- Layout responsivo: gaveta de menu, barra inferior, tabelas em cartões no celular -->
   <script src="layout-responsivo.js"></script>
+  <!-- Propostas de aulas para professores + área Notificações -->
+  <script src="propostas-professores.js"></script>
   <!-- Quadros de aula (Quadro Master): módulo, usa quadro-render.js -->
   <script type="module" src="functions-quadros-aula.js"></script>
 </body>

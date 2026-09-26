@@ -902,6 +902,10 @@ const Simulacoes = (function() {
               <i class="fas fa-calendar-plus mr-2"></i>
               Solicitação Professor
             </button>
+            <button id="btn-proposta-professores-simulacao" class="btn-secondary btn-compact" title="Envia as aulas da simulação salva para professores responderem no portal">
+              <i class="fas fa-paper-plane mr-2"></i>
+              Enviar proposta para professores
+            </button>
 
             <button id="btn-enviar-simulacao" class="btn-primary btn-compact">
               <i class="fas fa-paper-plane mr-2"></i>
@@ -1597,6 +1601,20 @@ const Simulacoes = (function() {
       if (btnSolicitacaoSim) {
         btnSolicitacaoSim.addEventListener('click', () => {
           showModalSolicitacaoSimulacao();
+        });
+      }
+
+      // Proposta para professores (usa a versão SALVA da simulação)
+      const btnPropostaProf = modal.querySelector('#btn-proposta-professores-simulacao');
+      if (btnPropostaProf) {
+        btnPropostaProf.addEventListener('click', () => {
+          if (isNova || !editingSimulacao || !editingSimulacao.idSimulacao) {
+            showToast('Salve a simulação antes de enviar a proposta para professores.', 'warning', 4000);
+            return;
+          }
+          if (window.PropostasProfessores) {
+            window.PropostasProfessores.abrirEnvio({ origem: 'simulacao', id: editingSimulacao.idSimulacao });
+          }
         });
       }
     // Modal de Enviar Simulação
