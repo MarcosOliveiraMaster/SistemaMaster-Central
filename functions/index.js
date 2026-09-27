@@ -295,11 +295,3 @@ exports.manageProfessorAuth = functions
 
   return res.status(400).json({ sucesso: false, erro: 'Ação inválida. Use "enable" ou "disable".' });
 });
-
-// ── Google Agenda (ver agenda.js) ─────────────────────────────────────────────
-const agenda = require('./agenda');
-exports.agendaAutorizar       = agenda.agendaAutorizar;
-exports.agendaCallback        = agenda.agendaCallback;
-exports.agendaSincronizarTudo = agenda.agendaSincronizarTudo;
-exports.agendaDesconectar     = agenda.agendaDesconectar;
-exports.agendaSincronizarAula = agenda.agendaSincronizarAula;

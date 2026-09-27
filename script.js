@@ -8,7 +8,7 @@ const CONFIG = {
     'painel-central', 'banco-aulas', 'simulacoes', 'mensagens',
     'calendario', 'fluxo-processos', 'clientes', 'professores', 'galeria-professores',
     'area-pagamento', 'cofres-pagamento', 'exportar-dados', 'previsao-financeira',
-    'detalhes-banco-de-aulas', 'quadros-aula', 'notificacoes', 'integracoes'
+    'detalhes-banco-de-aulas', 'quadros-aula', 'notificacoes'
   ]
 };
 
@@ -291,9 +291,6 @@ function loadSectionContent(sectionId) {
       break;
     case 'notificacoes':
       if (typeof loadNotificacoes === 'function') loadNotificacoes();
-      break;
-    case 'integracoes':
-      if (typeof loadIntegracoes === 'function') loadIntegracoes();
       break;
   }
 }
