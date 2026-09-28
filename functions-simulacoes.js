@@ -657,22 +657,32 @@ const Simulacoes = (function() {
                     <i class="fas fa-user text-orange-500 mr-1"></i>
                     Nome do Cliente
                   </label>
-                  <div class="relative">
-                    <select 
-                      id="select-cliente" 
-                      class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus: outline-none focus:ring-2 focus:ring-orange-500"
-                    >
+                  <div class="relative" id="cliente-combo-wrap">
+                    <div class="relative" id="busca-cliente-wrap">
+                      <input
+                        type="text"
+                        id="busca-cliente"
+                        placeholder="Buscar cliente..."
+                        autocomplete="off"
+                        value="${escapeHtml(simulacao.nomeCliente || '')}"
+                        class="w-full border border-gray-300 rounded-lg pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      />
+                      <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                    </div>
+                    <div id="dropdown-cliente" class="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto hidden"></div>
+                    <!-- select nativo escondido: continua sendo a fonte de valor/eventos usada pelo resto do código (autoSalvarSimulacao, salvarSimulacao, etc.) -->
+                    <select id="select-cliente" class="hidden">
                       <option value="">Selecione um cliente</option>
                       <option value="__novo__">➕ Novo Cliente</option>
-                      ${clientesData.map(c => `
-                        <option value="${c. id}" ${c.nome === simulacao.nomeCliente ? 'selected' : ''}>
+                      ${[...clientesData].sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR')).map(c => `
+                        <option value="${c.id}" ${c.nome === simulacao.nomeCliente ? 'selected' : ''}>
                           ${escapeHtml(c.nome || 'Sem nome')}
                         </option>
                       `).join('')}
                     </select>
-                    <input 
-                      type="text" 
-                      id="input-novo-cliente" 
+                    <input
+                      type="text"
+                      id="input-novo-cliente"
                       placeholder="Digite o nome do novo cliente"
                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 hidden"
                     />
@@ -1810,6 +1820,59 @@ const Simulacoes = (function() {
     const inputNovoCliente = modal.querySelector('#input-novo-cliente');
     const btnAdicionarCliente = modal.querySelector('#btn-adicionar-cliente');
 
+    // Combobox de cliente com busca (a UI visível) — o <select id="select-cliente">
+    // continua escondido no DOM só como fonte de valor/eventos pro resto do código
+    // (autoSalvarSimulacao, salvarSimulacao etc.), que não precisou mudar nada.
+    const buscaCliente = modal.querySelector('#busca-cliente');
+    const buscaClienteWrap = modal.querySelector('#busca-cliente-wrap');
+    const dropdownCliente = modal.querySelector('#dropdown-cliente');
+
+    const renderDropdownCliente = (filtro) => {
+      const termo = (filtro || '').toLowerCase().trim();
+      const itensFixos = [
+        { value: '', label: 'Nenhum cliente selecionado' },
+        { value: '__novo__', label: '➕ Novo Cliente' },
+      ];
+      const itensClientes = [...clientesData]
+        .sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'))
+        .map(c => ({ value: c.id, label: c.nome || 'Sem nome' }))
+        .filter(it => !termo || it.label.toLowerCase().includes(termo));
+
+      const linhas = [...itensFixos, ...itensClientes];
+      dropdownCliente.innerHTML = linhas.length
+        ? linhas.map(it => `
+            <div class="px-3 py-2 text-sm cursor-pointer hover:bg-orange-50 ${it.value === '__novo__' ? 'text-orange-600 font-semibold border-b border-gray-100' : 'text-gray-700'}" data-value="${escapeHtml(it.value)}" data-label="${escapeHtml(it.label)}">
+              ${escapeHtml(it.label)}
+            </div>`).join('')
+        : '<div class="px-3 py-2 text-sm text-gray-400">Nenhum cliente encontrado</div>';
+    };
+
+    const fecharDropdownCliente = () => dropdownCliente.classList.add('hidden');
+    const abrirDropdownCliente = () => {
+      renderDropdownCliente('');
+      dropdownCliente.classList.remove('hidden');
+    };
+
+    buscaCliente.addEventListener('focus', abrirDropdownCliente);
+    buscaCliente.addEventListener('click', abrirDropdownCliente);
+    buscaCliente.addEventListener('input', () => {
+      renderDropdownCliente(buscaCliente.value);
+      dropdownCliente.classList.remove('hidden');
+    });
+    // blur fecha com um pequeno atraso pra dar tempo do clique no item do dropdown registrar
+    buscaCliente.addEventListener('blur', () => setTimeout(fecharDropdownCliente, 150));
+
+    dropdownCliente.addEventListener('mousedown', (e) => {
+      // mousedown (não click) pra disparar antes do blur do input de busca
+      const item = e.target.closest('[data-value]');
+      if (!item) return;
+      e.preventDefault();
+      selectCliente.value = item.dataset.value;
+      buscaCliente.value = item.dataset.value ? item.dataset.label : '';
+      fecharDropdownCliente();
+      selectCliente.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
     // Lista de estudantes cadastrados do cliente selecionado
     const elListaEstudantesSim = modal.querySelector('#lista-estudantes-cliente-sim');
     const renderListaEstudantesSim = (clienteId) => {
@@ -1900,9 +1963,11 @@ const Simulacoes = (function() {
                 horario:   item.horario || '',
                 cor:       item.cor     || null
               }));
-              // Atualiza a tabela imediatamente (sem precisar fechar e reabrir)
-              const tbody = document.getElementById('tbody-aulas-simulacao');
-              if (tbody) tbody.innerHTML = renderAulasSimulacao(editingSimulacao.aulas);
+              // recalcularValores() já re-renderiza #tbody-aulas-simulacao E atualiza os
+              // "Dados da contratação" da simulação (valor do pacote, valor equipe, lucro
+              // master, valor hora/aula) — antes só a tabela era atualizada aqui, deixando
+              // esses totais desatualizados até fechar e reabrir a simulação.
+              if (typeof recalcularValores === 'function') recalcularValores();
               if (typeof autoSalvarSimulacao === 'function') autoSalvarSimulacao();
             },
             getClienteInfo: async () => {
@@ -2053,7 +2118,7 @@ const Simulacoes = (function() {
       if (e.target.value === '__novo__') {
         inputNovoCliente.classList.remove('hidden');
         btnAdicionarCliente.classList.remove('hidden');
-        selectCliente.classList.add('hidden');
+        buscaClienteWrap.classList.add('hidden');
         document.getElementById('cpf-cliente').value = '';
         renderListaEstudantesSim('');
       } else if (e.target.value) {
@@ -2074,8 +2139,8 @@ const Simulacoes = (function() {
     btnAdicionarCliente.addEventListener('click', () => {
       const nomeNovoCliente = inputNovoCliente.value.trim();
       if (nomeNovoCliente) {
-        // Voltar para select e resetar
-        selectCliente.classList.remove('hidden');
+        // Voltar pro combobox de busca e resetar
+        buscaClienteWrap.classList.remove('hidden');
         inputNovoCliente.classList.add('hidden');
         btnAdicionarCliente.classList. add('hidden');
 
@@ -2085,6 +2150,7 @@ const Simulacoes = (function() {
         option.textContent = nomeNovoCliente;
         option.selected = true;
         selectCliente.appendChild(option);
+        buscaCliente.value = nomeNovoCliente;
 
         // Limpar CPF
         document.getElementById('cpf-cliente').value = '';

@@ -925,16 +925,35 @@ async function showModalAulasCalendarios(aulaData, onSave, onDelete = null) {
     <button class="mac-duracao-btn${d === aulaData.duracao ? ' mac-duracao-sel' : ''}" data-duracao="${d}">${d}</button>
   `).join('');
 
-  // Value carrega cpf|nome|uid (mesmo padrão do modal "Selecione Professor" em
-  // functions-banco-de-aulas-Cards.js) para que idProfessor/professorUid sejam
-  // gravados junto com o nome ao salvar — antes só o nome era enviado, o que
+  // cpf/nome/uid ficam em data-attributes do card (mesmo padrão do modal "Selecione
+  // Professor" em functions-banco-de-aulas-Cards.js) para que idProfessor/professorUid
+  // sejam gravados junto com o nome ao salvar — antes só o nome era enviado, o que
   // deixava idProfessor/professorUid da aula desatualizados após uma troca de
   // professor por esta tela. Seleção continua por nome (sinal mais confiável
   // para aulas já dessincronizadas por esse bug antes desta correção).
-  const profOptsHtml = `<option value="|A definir">A definir</option>` +
-    professores.map(p =>
-      `<option value="${p.cpf || ''}|${p.nome}|${p.uid || ''}"${p.nome === aulaData.professor ? ' selected' : ''}>${p.nome}</option>`
-    ).join('');
+  const macFotoCardHtml = (p) => p.fotoUpload
+    ? `<img src="${p.fotoUpload}" alt="" class="w-full h-full object-cover">`
+    : `<i class="fas fa-user text-xl text-gray-300"></i>`;
+
+  const macCardHtml = (cpf, nome, uid, apelido, fotoHtml, ehAtual) => `
+    <button type="button" class="mac-prof-card group relative flex flex-col items-center gap-1 p-1.5 rounded-lg border-2 ${ehAtual ? 'border-orange-300' : 'border-transparent'} hover:border-orange-300 hover:bg-orange-50 transition-all"
+      data-cpf="${escapeHtml(cpf)}" data-nome="${escapeHtml(nome)}" data-uid="${escapeHtml(uid)}" data-busca="${escapeHtml((nome + ' ' + apelido).toLowerCase())}">
+      <div class="relative w-full aspect-square rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
+        ${fotoHtml}
+        ${ehAtual ? `<span class="absolute top-0.5 right-0.5 bg-orange-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px]" title="Professor atual"><i class="fas fa-star"></i></span>` : ''}
+        <span class="mac-prof-card__check absolute inset-0 hidden items-center justify-center bg-orange-500/75">
+          <i class="fas fa-check text-white text-lg"></i>
+        </span>
+      </div>
+      <span class="text-[11px] font-semibold text-gray-700 text-center leading-tight line-clamp-2">${escapeHtml(apelido)}</span>
+    </button>`;
+
+  const profGridHtml = [
+    macCardHtml('', 'A definir', '', 'A definir', `<i class="fas fa-user-slash text-xl text-gray-300"></i>`, !aulaData.professor || aulaData.professor === 'A definir'),
+    ...professores.map(p => macCardHtml(
+      p.cpf || '', p.nome, p.uid || '', p.apelido || p.nome, macFotoCardHtml(p), p.nome === aulaData.professor
+    )),
+  ].join('');
 
   const excluirBtnHtml = onDelete
     ? `<button id="mac-btn-excluir" class="btn-secondary btn-compact" style="color:#ef4444;border-color:#fca5a5;">
@@ -944,7 +963,7 @@ async function showModalAulasCalendarios(aulaData, onSave, onDelete = null) {
 
   const modalHtml = `
     <div class="modal-overlay" id="modalAulasCalendarios" style="z-index: 10000;">
-      <div class="modal-container" style="max-width: 680px;">
+      <div class="modal-container" style="max-width: 1100px; width: 95vw; height: 82vh;">
         <div class="modal-header">
           <h3 class="font-lexend font-bold text-lg text-gray-800">
             <i class="fas fa-calendar-plus text-orange-500 mr-2"></i>Configurar Aula
@@ -954,62 +973,64 @@ async function showModalAulasCalendarios(aulaData, onSave, onDelete = null) {
           </button>
         </div>
 
-        <div class="modal-body space-y-4">
-          <!-- Disciplina -->
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">
-              <i class="fas fa-book text-orange-500 mr-2"></i>Escolha a disciplina
-            </label>
-            <div class="grid grid-cols-4 gap-2" id="mac-grid-materias"></div>
-          </div>
+        <div class="modal-body">
+          <div class="grid grid-cols-2 gap-6 h-full">
+            <!-- Coluna 1: Disciplina, Horário, Duração (igual a antes) -->
+            <div class="flex flex-col h-full">
+              <!-- Disciplina -->
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                  <i class="fas fa-book text-orange-500 mr-2"></i>Escolha a disciplina
+                </label>
+                <div class="grid grid-cols-4 gap-2" id="mac-grid-materias"></div>
+              </div>
 
-          <!-- Horário + Duração -->
-          <div class="flex items-start gap-6">
-            <div>
-              <label class="block text-sm font-semibold text-gray-700 mb-2">
-                <i class="fas fa-clock text-orange-500 mr-2"></i>Horário
-              </label>
-              <input
-                type="text"
-                id="mac-horario"
-                class="mac-horario-input"
-                placeholder="HH:MM"
-                maxlength="5"
-                value="${aulaData.horario || ''}"
-              />
-            </div>
-            <div class="flex-1">
-              <label class="block text-sm font-semibold text-gray-700 mb-2">
-                <i class="fas fa-hourglass-half text-orange-500 mr-2"></i>Duração
-              </label>
-              <div class="flex gap-2">
-                ${duracaoHtml}
+              <!-- Horário + Duração — empurrado pro fim da coluna (mt-auto), pra
+                   acompanhar a altura do grid de professores ao lado -->
+              <div class="flex items-start gap-6 mt-auto">
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    <i class="fas fa-clock text-orange-500 mr-2"></i>Horário
+                  </label>
+                  <input
+                    type="text"
+                    id="mac-horario"
+                    class="mac-horario-input"
+                    placeholder="HH:MM"
+                    maxlength="5"
+                    value="${aulaData.horario || ''}"
+                  />
+                </div>
+                <div class="flex-1">
+                  <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    <i class="fas fa-hourglass-half text-orange-500 mr-2"></i>Duração
+                  </label>
+                  <div class="flex gap-2">
+                    ${duracaoHtml}
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
 
-          <!-- Professor -->
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">
-              <i class="fas fa-chalkboard-teacher text-orange-500 mr-2"></i>Professor
-            </label>
-            <div class="relative mb-2">
-              <input
-                type="text"
-                id="mac-prof-busca"
-                placeholder="Buscar professor..."
-                class="w-full border-2 border-gray-300 rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
-              />
-              <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+            <!-- Coluna 2: Professor — busca + grid de fotos (4 colunas), esticado até o fim do modal -->
+            <div class="flex flex-col h-full min-h-0">
+              <label class="block text-sm font-semibold text-gray-700 mb-2">
+                <i class="fas fa-chalkboard-teacher text-orange-500 mr-2"></i>Professor
+              </label>
+              <div class="relative mb-2">
+                <input
+                  type="text"
+                  id="mac-prof-busca"
+                  placeholder="Buscar professor..."
+                  class="w-full border-2 border-gray-300 rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
+                />
+                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+              </div>
+              <div id="mac-prof-grid" class="grid grid-cols-4 gap-2 flex-1 content-start overflow-y-auto p-1">
+                ${profGridHtml}
+              </div>
+              <p id="mac-prof-grid-vazio" class="text-center text-xs text-gray-400 py-4" style="display:none">Nenhum professor encontrado.</p>
             </div>
-            <select
-              id="mac-prof-select"
-              class="w-full border-2 border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"
-              size="3"
-              style="min-height: 72px; max-height: 90px;"
-            >
-              ${profOptsHtml}
-            </select>
           </div>
         </div>
 
@@ -1030,7 +1051,8 @@ async function showModalAulasCalendarios(aulaData, onSave, onDelete = null) {
   const btnCancelar  = document.getElementById('mac-btn-cancelar');
   const btnConfirmar = document.getElementById('mac-btn-confirmar');
   const inputBusca   = document.getElementById('mac-prof-busca');
-  const selectProf   = document.getElementById('mac-prof-select');
+  const gridProf     = document.getElementById('mac-prof-grid');
+  const gridProfVazio = document.getElementById('mac-prof-grid-vazio');
   const inputHorario = document.getElementById('mac-horario');
 
   let materiaSelected = aulaData.materia || '';
@@ -1124,18 +1146,42 @@ async function showModalAulasCalendarios(aulaData, onSave, onDelete = null) {
     });
   });
 
-  const todasOpcoes = Array.from(selectProf.options);
+  const profCards = Array.from(gridProf.querySelectorAll('.mac-prof-card'));
+  let profCardSelecionado = profCards.find(c => c.dataset.nome === aulaData.professor) || profCards[0];
+
+  const marcarProfSelecionado = (card) => {
+    profCards.forEach(c => {
+      const check = c.querySelector('.mac-prof-card__check');
+      const isSel = c === card;
+      c.classList.toggle('border-orange-500', isSel);
+      c.classList.toggle('bg-orange-50', isSel);
+      check.classList.toggle('hidden', !isSel);
+      check.classList.toggle('flex', isSel);
+    });
+    profCardSelecionado = card;
+  };
+  marcarProfSelecionado(profCardSelecionado);
+
+  profCards.forEach(card => {
+    card.addEventListener('click', () => marcarProfSelecionado(card));
+  });
+
   inputBusca.addEventListener('input', () => {
     const termo = inputBusca.value.toLowerCase().trim();
-    while (selectProf.options.length > 0) selectProf.remove(0);
-    todasOpcoes
-      .filter(o => !termo || o.text.toLowerCase().includes(termo))
-      .forEach(o => selectProf.add(new Option(o.text, o.value, false, o.selected)));
+    let algumVisivel = false;
+    profCards.forEach(card => {
+      const visivel = !termo || card.dataset.busca.includes(termo);
+      card.style.display = visivel ? '' : 'none';
+      if (visivel) algumVisivel = true;
+    });
+    gridProfVazio.style.display = algumVisivel ? 'none' : 'block';
   });
 
   btnConfirmar.addEventListener('click', () => {
     const horario = inputHorario.value.trim();
-    const [cpfSel, nomeSel, uidSel] = (selectProf.value || '|A definir').split('|');
+    const cpfSel  = profCardSelecionado ? profCardSelecionado.dataset.cpf  : '';
+    const nomeSel = profCardSelecionado ? profCardSelecionado.dataset.nome : '';
+    const uidSel  = profCardSelecionado ? profCardSelecionado.dataset.uid  : '';
     onSave({
       materia:      materiaSelected || aulaData.materia || 'A definir',
       duracao:      duracaoSelected || aulaData.duracao || '--',
