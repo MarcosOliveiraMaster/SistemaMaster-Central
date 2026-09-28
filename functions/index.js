@@ -295,3 +295,13 @@ exports.manageProfessorAuth = functions
 
   return res.status(400).json({ sucesso: false, erro: 'Ação inválida. Use "enable" ou "disable".' });
 });
+
+// NOTA (avaliado e descartado por enquanto — mesmo motivo de manageProfessorAuth
+// acima: QUALQUER Cloud Function exige plano Blaze pra ser deployada, e o projeto
+// está no Spark). O bug do botão "Compartilhar" na Galeria de Professores (foto
+// não copia pra área de transferência) é causado por falta de CORS no bucket do
+// Storage pra chamadas fetch() via JS. A correção usada em vez disso foi liberar
+// CORS direto no bucket (ver cors.json na raiz do repo + instruções lá). Se um dia
+// o projeto migrar pro Blaze, dá pra trocar por uma Cloud Function proxy que busca
+// a foto no servidor e devolve com Access-Control-Allow-Origin liberado — mais
+// robusto porque não depende de configuração de bucket ficar "esquecida".

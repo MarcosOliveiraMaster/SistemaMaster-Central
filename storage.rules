@@ -1,0 +1,29 @@
+rules_version = '2';
+
+// Firebase Storage — Master Educação
+// Cobre o bug de upload de foto de perfil de professores (dashboardProfessores.js /
+// GaleriaProfessores): antes desta feature o projeto não usava Storage, então as
+// regras nunca tinham sido publicadas e ficavam no padrão restritivo do Firebase
+// (allow read, write: if false), o que derrubava qualquer ref.put().
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Fotos de perfil dos professores — exibidas publicamente nos cards da
+    // Galeria de Professores (<img src>), por isso leitura é liberada.
+    // Escrita só para e-mails autorizados do painel administrativo (mesma
+    // whitelist usada nas regras do Firestore e em functions/index.js).
+    match /fotos-professores/{arquivo} {
+      allow read: if true;
+      allow write: if request.auth != null &&
+        request.auth.token.email in [
+          'mastereducacaoadm@gmail.com',
+          'marcos.lucas.ti@gmail.com'
+        ];
+    }
+
+    // Bloqueia tudo o mais por padrão.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
