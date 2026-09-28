@@ -4066,7 +4066,11 @@ h2, h3, h4, h5, h6 {
 .verif-datas-dot.verif-neutro   { background-color: #D1D5DB; }
 .verif-datas-dot.verif-cinza    { background-color: #4B5563; }
 .verif-datas-dot.verif-verde    { background-color: #10B981; }
-.verif-datas-dot.verif-amarelo  { background-color: #F59E0B; }
+/* amarela: aula fora do dia/turno de disponibilidade cadastrado pelo professor */
+.verif-datas-dot.verif-amarelo  { background-color: #EAB308; }
+/* laranja: mesmo professor com outra aula no mesmo dia (horário diferente), ou véspera de feriado
+   — era a cor "amarelo" original antes de a amarela virar a checagem de preferência acima */
+.verif-datas-dot.verif-laranja  { background-color: #F97316; }
 .verif-datas-dot.verif-vermelho { background-color: #EF4444; }
 
 .verif-datas-dot.verif-checando {

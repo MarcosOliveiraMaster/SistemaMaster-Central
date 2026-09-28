@@ -2953,7 +2953,7 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
 
         const dots = Array.from(document.querySelectorAll('.verif-datas-dot'));
         dots.forEach(dot => {
-          dot.classList.remove('verif-neutro', 'verif-verde', 'verif-amarelo', 'verif-vermelho');
+          dot.classList.remove('verif-neutro', 'verif-cinza', 'verif-verde', 'verif-amarelo', 'verif-laranja', 'verif-vermelho');
           dot.classList.add('verif-checando');
         });
 

@@ -79,14 +79,19 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
     const key = `${m[3]}-${parseInt(m[2]) - 1}-${parseInt(m[1])}`;
     if (!aulasMap[key]) aulasMap[key] = [];
     aulasMap[key].push({
-      materia:   a.materia   || 'A definir',
-      duracao:   a.duracao   || '--',
-      professor: a.professor || 'A definir',
-      horario:   a.horario   || '',
-      cor:       a.cor       || null,
-      _idAula:   a['id-Aula'] || a.idAula || null,
-      _origIdx:  origIdx,
-      _docId:    a._docId    || null
+      materia:      a.materia      || 'A definir',
+      duracao:      a.duracao      || '--',
+      professor:    a.professor    || 'A definir',
+      // sem isso, qualquer aula que passe pelo calendário sem ter o professor trocado
+      // (ou seja, quase todas) perde o vínculo com o professor real ao salvar — ver
+      // nota no ponto onde "item" é remontado pra fullAulas/updates, mais abaixo.
+      idProfessor:  a.idProfessor  || '',
+      professorUid: a.professorUid || '',
+      horario:      a.horario      || '',
+      cor:          a.cor          || null,
+      _idAula:      a['id-Aula'] || a.idAula || null,
+      _origIdx:     origIdx,
+      _docId:       a._docId       || null
     });
   });
 
@@ -295,15 +300,23 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
         const dataBr = calKeyToDateBr(key);
         cards.forEach(card => {
           const item = {
-            data:      dataBr,
-            materia:   card.materia   || 'A definir',
-            professor: card.professor || 'A definir',
-            duracao:   card.duracao   || '--',
-            horario:   card.horario   || '',
-            cor:       card.cor       || null,
-            _idAula:   card._idAula   || null,
-            _origIdx:  card._origIdx  ?? null,
-            _docId:    card._docId    || null
+            data:         dataBr,
+            materia:      card.materia   || 'A definir',
+            professor:    card.professor || 'A definir',
+            // idProfessor/professorUid vinham sumindo daqui — "Configurar Aula" já os grava
+            // em card.idProfessor/card.professorUid ao trocar de professor (ver openCardConfig),
+            // mas esta reconstrução de item ignorava os dois campos. Resultado: a aula ficava
+            // com o NOME do professor novo mas o idProfessor/professorUid do professor antigo
+            // (ou vazio, se a aula nunca teve), quebrando silenciosamente tanto o conflito de
+            // agenda quanto a checagem de preferência de dia/turno em "Verificar Datas".
+            idProfessor:  card.idProfessor  || '',
+            professorUid: card.professorUid || '',
+            duracao:      card.duracao   || '--',
+            horario:      card.horario   || '',
+            cor:          card.cor       || null,
+            _idAula:      card._idAula   || null,
+            _origIdx:     card._origIdx  ?? null,
+            _docId:       card._docId    || null
           };
           fullAulas.push(item);
           if (card._idAula) {
