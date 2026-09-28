@@ -117,7 +117,8 @@
     }
     const menu = document.getElementById('contador-contratacoes-app');
     if (menu) { menu.textContent = txt; menu.hidden = n === 0; }
-    const outros = (typeof window.contadorAvaliacoesNaoLidas === 'function') ? window.contadorAvaliacoesNaoLidas() : 0;
+    const outros = ((typeof window.contadorAvaliacoesNaoLidas === 'function') ? window.contadorAvaliacoesNaoLidas() : 0)
+      + ((typeof window.contadorSolicitacoesNaoLidas === 'function') ? window.contadorSolicitacoesNaoLidas() : 0);
     const total = n + outros;
     document.title = total ? `(${total > 99 ? '99+' : total}) ${TITULO_BASE}` : TITULO_BASE;
     const painel = document.querySelector('.ca-painel');
