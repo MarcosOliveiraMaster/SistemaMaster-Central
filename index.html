@@ -118,8 +118,8 @@
         <button class="menu-item" data-section="previsao-financeira">
           <i class="fas fa-chart-pie mr-3"></i><span>Previsão Financeira</span>
         </button>
-        <button class="menu-item" data-section="simulacoes">
-          <i class="fas fa-chart-line mr-3"></i><span>Simulações</span>
+        <button class="menu-item" data-section="simulacoes" style="position:relative">
+          <i class="fas fa-chart-line mr-3"></i><span>Simulações</span><span id="contador-contratacoes-app" class="contador-menu" hidden aria-label="contratações via app não abertas">0</span>
         </button>
         <p class="menu-grupo" role="presentation"><span>Pessoas</span></p>
         <button class="menu-item menu-item-expandable" data-section="dashboard" id="btn-dashboard-menu">
@@ -167,6 +167,9 @@
             </button>
           </div>
         </div>
+        <button class="menu-item" data-section="avaliacoes-equipe" data-title="Avaliações da equipe" style="position:relative">
+          <i class="fas fa-star mr-3"></i><span>Avaliações da equipe</span><span id="contador-avaliacoes" class="contador-menu" hidden aria-label="avaliações não lidas">0</span>
+        </button>
         <p class="menu-grupo" role="presentation"><span>Ferramentas</span></p>
         <button class="menu-item" data-section="exportar-dados">
           <i class="fas fa-file-export mr-3"></i><span>Exportar Dados</span>
@@ -278,6 +281,7 @@
         </section>
         <section id="detalhes-banco-de-aulas" class="section-content"></section>
         <section id="notificacoes"     class="section-content"></section>
+        <section id="avaliacoes-equipe" class="section-content"></section>
       </div>
     </main>
   </div>
@@ -357,6 +361,11 @@
   <script src="layout-responsivo.js"></script>
   <!-- Propostas de aulas para professores + área Notificações -->
   <script src="propostas-professores.js"></script>
+  <!-- Sino de contratações feitas pelo app do cliente + Avaliações da equipe -->
+  <script src="contratacoes-app.js"></script>
+  <!-- Pedidos de reagendar/cancelar dos clientes (aba "Clientes" em Notificações) -->
+  <script src="solicitacoes-clientes.js"></script>
+  <script src="avaliacoes-equipe.js"></script>
   <!-- Quadros de aula (Quadro Master): módulo, usa quadro-render.js -->
   <script type="module" src="functions-quadros-aula.js"></script>
 </body>
