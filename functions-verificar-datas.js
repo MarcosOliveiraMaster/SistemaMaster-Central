@@ -1,7 +1,18 @@
 // ============================================================
 // functions-verificar-datas.js
-// Motor de verificação de datas: feriados + conflitos de agenda do professor
+// Motor de verificação de datas: feriados, conflitos de agenda do professor e
+// aderência à disponibilidade (dia/turno) cadastrada nas preferências dele.
 // Usado pelo botão "Verificar Datas" em Detalhes da Contratação e Simulações
+//
+// Cores (prioridade vermelho > laranja > amarela > verde):
+//   vermelho — conflito de horário exato com outra aula, ou feriado no dia
+//   laranja  — mesmo professor com outra aula no mesmo dia (horário diferente),
+//              ou véspera de feriado
+//   amarela  — aula fora do dia/turno que o professor marcou como disponível
+//              (inclui domingo, que nunca tem disponibilidade cadastrável, e
+//              professor sem essa preferência preenchida)
+//   verde    — nenhum problema encontrado
+//   cinza    — aula sem data definida, nada pra checar
 // ============================================================
 
 // Feriados estaduais (Alagoas) e municipais (Maceió).
@@ -90,6 +101,60 @@ function _primeiroNome(nome) {
   return String(nome).trim().split(/\s+/)[0];
 }
 
+// ===== Preferência de dia/turno do professor =====
+// O professor só tem campos de disponibilidade de segunda a sábado
+// (segManha, segTarde ... sabManha, sabTarde) — não existe domManha/domTarde.
+// Mesma convenção de dia/turno já usada pelo botão "Match" (match.js): turno é
+// só Manhã/Tarde (hora < 12h = Manhã, senão Tarde — não existe "Noite" no sistema).
+const _DIA_KEY_POR_INDICE = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
+const _DIA_LABEL = { dom: 'domingo', seg: 'segunda-feira', ter: 'terça-feira', qua: 'quarta-feira', qui: 'quinta-feira', sex: 'sexta-feira', sab: 'sábado' };
+
+function _isTruthy(v) {
+  if (v === undefined || v === null) return false;
+  if (typeof v === 'boolean') return v;
+  if (typeof v === 'number') return v === 1;
+  return ['true', '1', 'sim', 's', 'yes', 'on'].includes(String(v).toLowerCase().trim());
+}
+
+function _extrairTurno(horario) {
+  const m = String(horario || '').match(/^(\d{1,2}):/);
+  if (!m) return null;
+  return parseInt(m[1], 10) < 12 ? 'Manha' : 'Tarde';
+}
+
+// Retorna { foraDaPreferencia: bool, diaLabel, turnoLabel } — null se não der pra checar
+// (sem professor definido, data ou horário inválidos). Domingo e professor sem a
+// disponibilidade daquele dia/turno marcada (campo ausente ou false) sempre contam
+// como "fora da preferência" — não há como confirmar disponibilidade nesses casos.
+async function _verificarPreferenciaProfessor(idProfessor, dataStr, horario) {
+  if (!idProfessor || idProfessor === 'A definir') return null;
+
+  const dataObj = _parseDataAula(dataStr);
+  const turno = _extrairTurno(horario);
+  if (!dataObj || !turno) return null;
+
+  const diaKey = _DIA_KEY_POR_INDICE[dataObj.getDay()];
+  const diaLabel = _DIA_LABEL[diaKey];
+  const turnoLabel = turno === 'Manha' ? 'manhã' : 'tarde';
+
+  if (diaKey === 'dom') return { foraDaPreferencia: true, diaLabel, turnoLabel };
+
+  let professor = null;
+  try {
+    if (typeof BANCO !== 'undefined' && BANCO.fetchDataBaseProfessores) {
+      const lista = await BANCO.fetchDataBaseProfessores();
+      professor = lista.find(p => p.cpf === idProfessor) || null;
+    }
+  } catch (err) {
+    console.warn('⚠️ Não foi possível buscar disponibilidade do professor:', err);
+  }
+
+  // Professor não encontrado ou sem o campo daquele dia/turno marcado: não dá pra
+  // confirmar disponibilidade, então também conta como fora da preferência.
+  const disponivel = professor ? _isTruthy(professor[`${diaKey}${turno}`]) : false;
+  return { foraDaPreferencia: !disponivel, diaLabel, turnoLabel };
+}
+
 // Retorna { feriado: {nome}|null, vesperaFeriado: {nome}|null } para a data da aula
 async function _verificarFeriadoData(dataStr) {
   const dataObj = _parseDataAula(dataStr);
@@ -176,7 +241,7 @@ function _listarConflitos(lista, incluirHorario) {
 }
 
 // Função principal: recebe uma aula (com data, horario, idProfessor, e opcionalmente id-Aula)
-// e retorna { cor: 'verde'|'amarelo'|'vermelho', tooltip: string }
+// e retorna { cor: 'verde'|'amarelo'|'laranja'|'vermelho'|'cinza', tooltip: string }
 window.verificarStatusAula = async function (aula) {
   const dataStr = aula.data;
   const horario = aula.horario;
@@ -189,12 +254,13 @@ window.verificarStatusAula = async function (aula) {
     return { cor: 'cinza', tooltip: 'Aula sem data definida — nada para verificar' };
   }
 
-  const [{ feriado, vesperaFeriado }, { mesmoHorario, mesmoDia }] = await Promise.all([
+  const [{ feriado, vesperaFeriado }, { mesmoHorario, mesmoDia }, preferencia] = await Promise.all([
     _verificarFeriadoData(dataStr),
-    _verificarConflitoAgenda(idProfessor, dataStr, horario, excluirId, codigoContratacaoAtual)
+    _verificarConflitoAgenda(idProfessor, dataStr, horario, excluirId, codigoContratacaoAtual),
+    _verificarPreferenciaProfessor(idProfessor, dataStr, horario)
   ]);
 
-  // Prioridade: vermelho > amarelo > verde
+  // Prioridade: vermelho > laranja > amarela > verde
   if (mesmoHorario.length > 0) {
     const tooltip = mesmoHorario.length === 1
       ? `Existe uma aula com ${_primeiroNome(mesmoHorario[0].nomeCliente)} no pacote ${mesmoHorario[0].codigoContratacao} para este mesmo dia e horário`
@@ -208,10 +274,14 @@ window.verificarStatusAula = async function (aula) {
     const tooltip = mesmoDia.length === 1
       ? `Existe uma aula com ${_primeiroNome(mesmoDia[0].nomeCliente)} no pacote ${mesmoDia[0].codigoContratacao} neste mesmo dia, às ${mesmoDia[0].horario || '--'}`
       : `Existem ${mesmoDia.length} aulas neste mesmo dia:\n${_listarConflitos(mesmoDia, true)}`;
-    return { cor: 'amarelo', tooltip };
+    return { cor: 'laranja', tooltip };
   }
   if (vesperaFeriado) {
-    return { cor: 'amarelo', tooltip: `Amanhã é feriado de ${vesperaFeriado.nome} — véspera de feriado` };
+    return { cor: 'laranja', tooltip: `Amanhã é feriado de ${vesperaFeriado.nome} — véspera de feriado` };
+  }
+  if (preferencia && preferencia.foraDaPreferencia) {
+    const tooltip = `Fora da disponibilidade cadastrada do professor: sem preferência marcada para ${preferencia.diaLabel} de ${preferencia.turnoLabel}`;
+    return { cor: 'amarelo', tooltip };
   }
   return { cor: 'verde', tooltip: 'Nenhum conflito de agenda ou feriado encontrado' };
 };

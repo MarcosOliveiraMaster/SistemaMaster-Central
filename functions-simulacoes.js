@@ -1954,14 +1954,19 @@ const Simulacoes = (function() {
               }
             },
             onSave: async ({ fullAulas }) => {
-              // Reconstrói o array de aulas da simulação a partir do estado atual do calendário
+              // Reconstrói o array de aulas da simulação a partir do estado atual do calendário.
+              // idProfessor/professorUid precisam vir junto (não só o nome) — sem eles, "Verificar
+              // Datas" não consegue checar conflito de agenda nem preferência de dia/turno pra
+              // qualquer aula editada pelo calendário (ambas as checagens exigem idProfessor).
               editingSimulacao.aulas = fullAulas.map(item => ({
-                data:      item.data,
-                materia:   item.materia,
-                professor: item.professor,
-                duracao:   item.duracao,
-                horario:   item.horario || '',
-                cor:       item.cor     || null
+                data:         item.data,
+                materia:      item.materia,
+                professor:    item.professor,
+                idProfessor:  item.idProfessor  || '',
+                professorUid: item.professorUid || '',
+                duracao:      item.duracao,
+                horario:      item.horario || '',
+                cor:          item.cor     || null
               }));
               // recalcularValores() já re-renderiza #tbody-aulas-simulacao E atualiza os
               // "Dados da contratação" da simulação (valor do pacote, valor equipe, lucro
@@ -2056,7 +2061,7 @@ const Simulacoes = (function() {
 
         const dots = Array.from(modal.querySelectorAll('.verif-datas-dot'));
         dots.forEach(dot => {
-          dot.classList.remove('verif-neutro', 'verif-verde', 'verif-amarelo', 'verif-vermelho');
+          dot.classList.remove('verif-neutro', 'verif-cinza', 'verif-verde', 'verif-amarelo', 'verif-laranja', 'verif-vermelho');
           dot.classList.add('verif-checando');
         });
 
