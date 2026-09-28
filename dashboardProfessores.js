@@ -12,16 +12,18 @@ window.GaleriaProfessores = (function () {
   // ─────────────────────────────────────────────────────────────
   const CFG = {
     colProfessores: 'dataBaseProfessores',
-    campoFoto:     'fotoUpload',      // URL da foto no Firebase Storage (fallback: data URL base64 legado)
+    // data URL (base64) salva direto no Firestore. O projeto está no plano Spark e
+    // criar um bucket novo de Cloud Storage for Firebase hoje exige plano Blaze —
+    // então a foto fica no próprio documento, como sempre foi antes do commit
+    // "ajuste chip" (30/ago), que tentou migrar pro Storage sem essa checagem.
+    campoFoto:     'fotoUpload',
     campoFotoEm:   'fotoUploadEm',    // timestamp do último envio
     campoBairros:     'bairros',      // string livre (mesmo campo usado em BD Professores)
     campoDisciplinas: 'disciplinas',  // string ou array (idem)
     campoOuro:        'prof_ouro',    // boolean — professor "destaque", vai pro início da lista
-    storagePasta:  'fotos-professores', // pasta no Firebase Storage
-    maxDim:        1600,              // maior lado da imagem redimensionada (px) — única cópia, boa resolução
-    jpegQuality:   0.9,
-    avisoResolucaoBaixa: 600, // abaixo disso (px, maior lado) avisa que a foto cadastrada é de baixa resolução ao compartilhar
-    limiteAviso:   1.5 * 1024 * 1024, // aviso se o arquivo passar disso (~1.5MB) — só um alerta de upload lento
+    maxDim:        480,               // maior lado da imagem redimensionada (px) — mantém o data URL pequeno o bastante pro Firestore (limite de 1MiB por documento)
+    jpegQuality:   0.82,
+    limiteAviso:   700 * 1024,        // aviso se o base64 passar disso (~700KB)
     // mesma lista fixa usada em BD Professores (functions-dashboardProfessor.js)
     disciplinasFixas: ['Ciências', 'Física', 'Geografia', 'História', 'Inglês', 'Literatura', 'Matemática', 'Pedagogia', 'Português', 'Química', 'Biologia'],
     // rótulos — mesmos de BD Professores (CFG.defaultMasks)
@@ -52,8 +54,7 @@ window.GaleriaProfessores = (function () {
     filtroRapido: 'todos', // 'todos' | 'tdics' | 'neuro'
     cardsPorLinha: 5,
     profSelecionado: null,
-    pendingBlob: null,
-    pendingPreviewUrl: null,
+    pendingDataURL: null,
     // modal contrato (vínculo/desligamento) — porta a lógica de BD Professores
     desligamentoSelecionados: [],
     // modal desligar professores (novo)
@@ -71,7 +72,6 @@ window.GaleriaProfessores = (function () {
       if (typeof FIREBASE_CONFIG === 'undefined') throw new Error('FIREBASE_CONFIG não encontrado.');
       if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
       S.db = firebase.firestore();
-      S.storage = firebase.storage();
       return true;
     } catch (e) {
       console.error('❌ GaleriaProfessores — Firebase init error:', e);
@@ -296,10 +296,6 @@ window.GaleriaProfessores = (function () {
 .gp-upload-btn { font-family:'Comfortaa',cursive; font-size:.78rem; font-weight:600; padding:.5rem 1rem; border-radius:.5rem; background:var(--gp-orange-light); color:var(--gp-orange-dk); cursor:pointer; border:1px solid var(--gp-orange); transition:background var(--gp-transition); }
 .gp-upload-btn:hover { background:#fde3bd; }
 .gp-file-info { font-size:.68rem; color:var(--gp-gray-600); text-align:center; min-height:1rem; margin:0; }
-.gp-progress-wrap { width:100%; display:flex; align-items:center; gap:.5rem; }
-.gp-progress-track { flex:1; height:.4rem; border-radius:999px; background:var(--gp-gray-200); overflow:hidden; }
-.gp-progress-bar { height:100%; width:0%; background:var(--gp-orange); border-radius:999px; transition:width .15s ease; }
-.gp-progress-pct { font-size:.68rem; font-weight:700; color:var(--gp-orange-dk); min-width:2.4em; text-align:right; }
 .gp-modal-footer { display:flex; gap:.6rem; padding:1rem 1.1rem; border-top:1px solid var(--gp-gray-200); }
 .gp-btn { flex:1; font-family:'Comfortaa',cursive; font-size:.8rem; font-weight:600; padding:.5rem .9rem; border-radius:.5rem; cursor:pointer; border:1px solid transparent; text-align:center; transition:all var(--gp-transition); }
 .gp-btn--ghost { background:var(--gp-gray-100); color:var(--gp-gray-800); border-color:var(--gp-gray-200); }
@@ -483,10 +479,6 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
       <label class="gp-upload-btn" for="gp-fileInput"><i class="fas fa-camera" style="margin-right:.35rem"></i>Escolher foto</label>
       <input type="file" id="gp-fileInput" accept="image/*" style="display:none">
       <p id="gp-fileInfo" class="gp-file-info"></p>
-      <div id="gp-uploadProgressWrap" class="gp-progress-wrap" style="display:none">
-        <div class="gp-progress-track"><div id="gp-uploadProgressBar" class="gp-progress-bar"></div></div>
-        <span id="gp-uploadProgressPct" class="gp-progress-pct">0%</span>
-      </div>
     </div>
     <div class="gp-modal-footer">
       <button id="gp-btnCancelar" class="gp-btn gp-btn--ghost" type="button">Cancelar</button>
@@ -677,7 +669,7 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
   // novos objetos {label, icon, action} aqui.
   function itensMenuContexto(prof) {
     return [
-      { label: 'Copiar foto (alta qualidade)', icon: 'fa-share-nodes', action: () => compartilharProfessor(prof) },
+      { label: 'Copiar foto', icon: 'fa-share-nodes', action: () => compartilharProfessor(prof) },
     ];
   }
 
@@ -714,18 +706,15 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
     }, 0);
   }
 
-  // busca a foto do professor na resolução ORIGINAL salva (sem redimensionar — só
-  // reencapsula em PNG) e copia pra área de transferência, pronta pra colar no WhatsApp.
-  // Só existe um botão porque não há uma segunda cópia em resolução maior guardada em
-  // lugar nenhum: "alta qualidade" aqui É a foto tal como está cadastrada.
+  // converte a foto do professor (data URL base64) em PNG e copia pra área de
+  // transferência — pronto pra colar no WhatsApp. Foto é sempre data:, então fetch()
+  // aqui nunca esbarra em CORS (diferente de uma URL https:// de Storage).
   async function compartilharProfessor(prof) {
     const nome = getField(prof, 'nome') || 'Professor';
     const foto = getField(prof, CFG.campoFoto);
     if (!foto) { toast('Esse professor ainda não tem foto cadastrada.', 'error'); return; }
 
     try {
-      // requer CORS liberado no bucket do Storage pra URLs https:// (ver cors.json na
-      // raiz do repo) — URLs "data:" (foto legada em base64) não precisam disso.
       const resp = await fetch(foto);
       if (!resp.ok) throw new Error('Não foi possível carregar a foto.');
       const origemBlob = await resp.blob();
@@ -741,14 +730,7 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
 
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
 
-      // fotos cadastradas antes da migração pro Storage (commit "ajuste chip") foram
-      // salvas com no máximo 480px — não tem como copiar em alta qualidade uma foto que
-      // nunca existiu em alta qualidade. Avisa em vez de fingir que copiou "alta".
-      if (Math.max(bitmap.width, bitmap.height) < CFG.avisoResolucaoBaixa) {
-        toast(`Foto de ${nome} copiada, mas em resolução baixa (${bitmap.width}×${bitmap.height}px — cadastro antigo). Reenvie a foto pra ter uma cópia em alta qualidade.`, 'info');
-      } else {
-        toast(`Foto de ${nome} copiada em alta qualidade! Cole (Ctrl+V) na conversa.`, 'success');
-      }
+      toast(`Foto de ${nome} copiada! Cole (Ctrl+V) na conversa.`, 'success');
     } catch (err) {
       console.error('❌ Compartilhar professor — erro:', err);
       toast('Erro ao copiar a foto: ' + (err.message || err), 'error');
@@ -792,7 +774,7 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
   // ─────────────────────────────────────────────────────────────
   function abrirModal(prof) {
     S.profSelecionado = prof;
-    limparPendingFoto();
+    S.pendingDataURL = null;
 
     $id('gp-modalNome').textContent = getField(prof, 'nome') || 'Professor';
 
@@ -809,38 +791,20 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
     $id('gp-fileInfo').textContent = '';
     $id('gp-btnSalvar').disabled = true;
     $id('gp-btnSalvar').textContent = 'Salvar foto';
-    ocultarProgresso();
 
     $id('gp-modalOverlay').style.display = 'flex';
-  }
-
-  function atualizarProgresso(pct) {
-    const wrap = $id('gp-uploadProgressWrap');
-    wrap.style.display = 'flex';
-    $id('gp-uploadProgressBar').style.width = pct + '%';
-    $id('gp-uploadProgressPct').textContent = Math.round(pct) + '%';
-  }
-
-  function ocultarProgresso() {
-    $id('gp-uploadProgressWrap').style.display = 'none';
-    $id('gp-uploadProgressBar').style.width = '0%';
-    $id('gp-uploadProgressPct').textContent = '0%';
   }
 
   function fecharModal() {
     $id('gp-modalOverlay').style.display = 'none';
     S.profSelecionado = null;
-    limparPendingFoto();
+    S.pendingDataURL = null;
   }
 
-  function limparPendingFoto() {
-    if (S.pendingPreviewUrl) URL.revokeObjectURL(S.pendingPreviewUrl);
-    S.pendingBlob = null;
-    S.pendingPreviewUrl = null;
-  }
-
-  // redimensiona pro maior lado configurado e comprime — uma única cópia, em boa resolução
-  function resizeImageToBlob(file) {
+  // redimensiona pro maior lado configurado e comprime — o resultado (data URL) vai
+  // direto num campo do documento do professor no Firestore, por isso o limite de
+  // tamanho é mais apertado (limite de 1MiB por documento)
+  function resizeImageToDataURL(file) {
     return new Promise((resolve, reject) => {
       if (!file.type || !file.type.startsWith('image/')) {
         reject(new Error('Selecione um arquivo de imagem válido.')); return;
@@ -860,10 +824,7 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
           const canvas = document.createElement('canvas');
           canvas.width = width; canvas.height = height;
           canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-          canvas.toBlob(blob => {
-            if (!blob) { reject(new Error('Não foi possível processar essa imagem.')); return; }
-            resolve(blob);
-          }, 'image/jpeg', CFG.jpegQuality);
+          resolve(canvas.toDataURL('image/jpeg', CFG.jpegQuality));
         };
         img.src = reader.result;
       };
@@ -879,18 +840,16 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
     btnSalvar.disabled = true;
     info.textContent = 'Processando imagem...';
     try {
-      const blob = await resizeImageToBlob(file);
-      limparPendingFoto();
-      S.pendingBlob = blob;
-      S.pendingPreviewUrl = URL.createObjectURL(blob);
+      const dataURL = await resizeImageToDataURL(file);
+      S.pendingDataURL = dataURL;
 
       const img = $id('gp-modalPreview');
-      img.src = S.pendingPreviewUrl; img.classList.add('gp-show');
+      img.src = dataURL; img.classList.add('gp-show');
       $id('gp-modalIconeFallback').style.display = 'none';
 
-      const kb = Math.round(blob.size / 1024);
-      info.textContent = blob.size > CFG.limiteAviso
-        ? `Pronto (${kb} KB — imagem grande, pode demorar um pouco a enviar)`
+      const kb = Math.round(dataURL.length / 1024);
+      info.textContent = kb > (CFG.limiteAviso / 1024)
+        ? `Pronto (${kb} KB — imagem grande, pode demorar um pouco a salvar)`
         : `Pronto para salvar (${kb} KB)`;
       btnSalvar.disabled = false;
     } catch (err) {
@@ -900,32 +859,18 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
   }
 
   async function salvarFoto() {
-    if (!S.profSelecionado || !S.pendingBlob) return;
+    if (!S.profSelecionado || !S.pendingDataURL) return;
     const btn = $id('gp-btnSalvar');
     btn.disabled = true;
     btn.textContent = 'Salvando...';
-    atualizarProgresso(0);
     try {
-      const path = `${CFG.storagePasta}/${S.profSelecionado.id}.jpg`;
-      const ref = S.storage.ref(path);
-      const task = ref.put(S.pendingBlob, { contentType: 'image/jpeg' });
-
-      await new Promise((resolve, reject) => {
-        task.on('state_changed', snapshot => {
-          const pct = snapshot.totalBytes ? (snapshot.bytesTransferred / snapshot.totalBytes) * 100 : 0;
-          atualizarProgresso(pct);
-        }, reject, resolve);
-      });
-
-      const url = await ref.getDownloadURL();
-
       await S.db.collection(CFG.colProfessores).doc(S.profSelecionado.id).update({
-        [CFG.campoFoto]: url,
+        [CFG.campoFoto]: S.pendingDataURL,
         [CFG.campoFotoEm]: Date.now(),
       });
 
       const idx = S.professores.findIndex(p => p.id === S.profSelecionado.id);
-      if (idx > -1) S.professores[idx][CFG.campoFoto] = url;
+      if (idx > -1) S.professores[idx][CFG.campoFoto] = S.pendingDataURL;
 
       renderGrid(filtrarProfessores());
       toast('Foto atualizada com sucesso!', 'success');
@@ -934,7 +879,6 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
       toast('Erro ao salvar foto: ' + err.message, 'error');
       btn.disabled = false;
       btn.textContent = 'Salvar foto';
-      ocultarProgresso();
     }
   }
 

@@ -298,10 +298,13 @@ exports.manageProfessorAuth = functions
 
 // NOTA (avaliado e descartado por enquanto — mesmo motivo de manageProfessorAuth
 // acima: QUALQUER Cloud Function exige plano Blaze pra ser deployada, e o projeto
-// está no Spark). O bug do botão "Compartilhar" na Galeria de Professores (foto
-// não copia pra área de transferência) é causado por falta de CORS no bucket do
-// Storage pra chamadas fetch() via JS. A correção usada em vez disso foi liberar
-// CORS direto no bucket (ver cors.json na raiz do repo + instruções lá). Se um dia
-// o projeto migrar pro Blaze, dá pra trocar por uma Cloud Function proxy que busca
-// a foto no servidor e devolve com Access-Control-Allow-Origin liberado — mais
-// robusto porque não depende de configuração de bucket ficar "esquecida".
+// está no Spark). Cloud Storage for Firebase também passou a exigir Blaze pra criar
+// o bucket pela primeira vez — e este projeto nunca chegou a ter um bucket criado
+// (0 buckets, API firebasestorage.googleapis.com nunca ativada). Por isso o envio de
+// foto de perfil de professores (dashboardProfessores.js / GaleriaProfessores) foi
+// revertido pra salvar a foto como data URL base64 direto no Firestore, sem usar
+// Storage — nem CORS nem Cloud Function proxy fazem falta enquanto isso durar.
+// Se um dia o projeto migrar pro Blaze: criar o bucket (Console > Storage > Vamos
+// começar), reativar storage.rules em firebase.json, aplicar cors.json (ambos já
+// prontos na raiz do repo) e aí sim considerar uma Cloud Function proxy como esta
+// pra buscar a foto no servidor e devolver com CORS liberado.

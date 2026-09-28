@@ -1,10 +1,18 @@
 rules_version = '2';
 
 // Firebase Storage — Master Educação
-// Cobre o bug de upload de foto de perfil de professores (dashboardProfessores.js /
-// GaleriaProfessores): antes desta feature o projeto não usava Storage, então as
-// regras nunca tinham sido publicadas e ficavam no padrão restritivo do Firebase
-// (allow read, write: if false), o que derrubava qualquer ref.put().
+//
+// NÃO ATIVO NO MOMENTO. O projeto está no plano Spark, e criar o bucket de Cloud
+// Storage for Firebase (Storage > Vamos começar, no Console) hoje exige plano Blaze.
+// Por isso o envio de foto de perfil de professores (dashboardProfessores.js /
+// GaleriaProfessores) foi revertido pra salvar a foto como data URL base64 direto
+// no Firestore (ver CFG.campoFoto no próprio arquivo), sem usar Storage.
+//
+// Este arquivo fica guardado pronto pra quando o projeto migrar pro Blaze: nessa
+// hora, é só criar o bucket, reativar "storage": {"rules": "storage.rules"} em
+// firebase.json, rodar `firebase deploy --only storage`, aplicar o cors.json da
+// raiz (`gsutil cors set cors.json gs://<bucket>`) e trocar o front-end de volta
+// pra usar S.storage.ref().put() em vez de salvar base64 no Firestore.
 service firebase.storage {
   match /b/{bucket}/o {
 

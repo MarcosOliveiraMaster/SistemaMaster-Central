@@ -4221,9 +4221,34 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
         return nomeA.localeCompare(nomeB);
       });
       
+      // miniatura: foto (fotoUpload — data URL ou URL do Storage) com fallback de ícone
+      const fotoCardHtml = (prof) => prof.fotoUpload
+        ? `<img src="${prof.fotoUpload}" alt="" class="w-full h-full object-cover">`
+        : `<i class="fas fa-user text-3xl text-gray-300"></i>`;
+
+      const cardHtml = (cpf, nome, uid, apelido, fotoHtml, ehAtual) => `
+        <button type="button" class="professor-card group relative flex flex-col items-center gap-1.5 p-2 rounded-lg border-2 ${ehAtual ? 'border-orange-300' : 'border-transparent'} hover:border-orange-300 hover:bg-orange-50 transition-all"
+          data-cpf="${escapeHtml(cpf)}" data-nome="${escapeHtml(nome)}" data-uid="${escapeHtml(uid)}" data-busca="${escapeHtml((nome + ' ' + apelido).toLowerCase())}">
+          <div class="professor-card__imgWrap relative w-full aspect-square rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
+            ${fotoHtml}
+            ${ehAtual ? `<span class="absolute top-1 right-1 bg-orange-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px]" title="Professor atual"><i class="fas fa-star"></i></span>` : ''}
+            <span class="professor-card__check absolute inset-0 hidden items-center justify-center bg-orange-500/75">
+              <i class="fas fa-check text-white text-2xl"></i>
+            </span>
+          </div>
+          <span class="text-xs font-semibold text-gray-700 text-center leading-tight line-clamp-2">${escapeHtml(apelido)}</span>
+        </button>`;
+
+      const gridHtml = [
+        cardHtml('', 'A definir', '', 'A definir', `<i class="fas fa-user-slash text-2xl text-gray-300"></i>`, !professorAtual || professorAtual === 'A definir'),
+        ...professoresOrdenados.map(prof => cardHtml(
+          prof.cpf, prof.nome, prof.uid || '', prof.apelido || prof.nome, fotoCardHtml(prof), prof.nome === professorAtual
+        )),
+      ].join('');
+
       const modalHtml = `
         <div class="modal-overlay" id="professorModal" style="z-index: 10000;">
-          <div class="modal-container" style="max-width: 650px;">
+          <div class="modal-container" style="max-width: 900px;">
             <div class="modal-header">
               <h3 class="font-lexend font-bold text-lg">
                 <i class="fas fa-chalkboard-teacher text-orange-500 mr-2"></i>
@@ -4233,54 +4258,49 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
                 <i class="fas fa-times"></i>
               </button>
             </div>
-            
+
             <div class="modal-body">
-              <div class="space-y-5">
-                <div class="bg-gradient-to-r from-orange-50 to-orange-100 border-l-4 border-orange-500 rounded-lg p-4 shadow-sm">
-                  <p class="text-sm text-gray-700 flex items-center">
-                    <i class="fas fa-user-tie text-orange-500 mr-3 text-lg"></i>
-                    <span>Professor atual: <strong class="text-orange-600 ml-1">${professorAtual || 'Não definido'}</strong></span>
-                  </p>
-                </div>
-                
-                <div>
-                  <label class="block text-sm font-semibold text-gray-700 mb-3">
-                    <i class="fas fa-search text-orange-500 mr-2"></i>
-                    Buscar professor
-                  </label>
-                  <div class="relative">
-                    <input 
-                      type="text" 
-                      id="inputBuscaProfessor" 
-                      placeholder="Digite o nome do professor..."
-                      class="w-full border-2 border-gray-300 rounded-lg pl-11 pr-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
-                    />
-                    <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+              <div class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                      <i class="fas fa-user-tie text-orange-500 mr-2"></i>
+                      Professor atual
+                    </label>
+                    <div class="bg-orange-50 border-2 border-orange-200 rounded-lg px-4 py-3 text-sm text-gray-700 h-[50px] flex items-center overflow-hidden">
+                      <strong class="text-orange-600 truncate">${professorAtual || 'Não definido'}</strong>
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                      <i class="fas fa-search text-orange-500 mr-2"></i>
+                      Buscar professor
+                    </label>
+                    <div class="relative">
+                      <input
+                        type="text"
+                        id="inputBuscaProfessor"
+                        placeholder="Digite o nome do professor..."
+                        class="w-full border-2 border-gray-300 rounded-lg pl-11 pr-4 py-3 text-base h-[50px] focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
+                      />
+                      <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                    </div>
                   </div>
                 </div>
-                
+
                 <div>
                   <label class="block text-sm font-semibold text-gray-700 mb-3">
-                    <i class="fas fa-list-ul text-orange-500 mr-2"></i>
-                    Lista de professores disponíveis
+                    <i class="fas fa-th text-orange-500 mr-2"></i>
+                    Professores disponíveis
                   </label>
-                  <select 
-                    id="selectProfessor" 
-                    class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 text-base focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white shadow-inner"
-                    size="10"
-                    style="min-height: 280px;"
-                  >
-                    <option value="|A definir" style="padding: 8px; font-weight: 500; color: #f97316;">A definir</option>
-                    ${professoresOrdenados.map(prof => `
-                      <option value="${prof.cpf}|${prof.nome}|${prof.uid || ''}" ${prof.nome === professorAtual ? 'selected' : ''} style="padding: 8px;">
-                        ${prof.nome}
-                      </option>
-                    `).join('')}
-                  </select>
+                  <div id="gridProfessores" class="grid grid-cols-5 gap-3 max-h-[360px] overflow-y-auto p-1">
+                    ${gridHtml}
+                  </div>
+                  <p id="gridProfessoresVazio" class="text-center text-sm text-gray-400 py-8" style="display:none">Nenhum professor encontrado.</p>
                 </div>
               </div>
             </div>
-            
+
             <div class="modal-footer">
               <button id="btnCancelarProfessor" class="btn-secondary btn-compact">
                 Cancelar
@@ -4293,57 +4313,67 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
           </div>
         </div>
       `;
-      
+
       const modalContainer = document.createElement('div');
       modalContainer.innerHTML = modalHtml;
       document.body.appendChild(modalContainer);
-      
+
       const modal = modalContainer.querySelector('#professorModal');
       const btnCancelar = modal.querySelector('#btnCancelarProfessor');
       const btnConfirmar = modal.querySelector('#btnConfirmarProfessor');
       const btnClose = modal.querySelector('.modal-close');
       const inputBusca = modal.querySelector('#inputBuscaProfessor');
-      const selectProfessor = modal.querySelector('#selectProfessor');
-      
-      // Array com todas as opções originais
-      const todasOpcoes = Array.from(selectProfessor.options);
-      
-      // Função para filtrar professores
+      const grid = modal.querySelector('#gridProfessores');
+      const gridVazio = modal.querySelector('#gridProfessoresVazio');
+      const cards = Array.from(grid.querySelectorAll('.professor-card'));
+
+      // card selecionado (pré-marca o professor atual da aula, ou "A definir")
+      let cardSelecionado = cards.find(c => c.dataset.nome === professorAtual) || cards[0];
+
+      const marcarSelecionado = (card) => {
+        cards.forEach(c => {
+          const check = c.querySelector('.professor-card__check');
+          const isSel = c === card;
+          c.classList.toggle('border-orange-500', isSel);
+          c.classList.toggle('bg-orange-50', isSel);
+          check.classList.toggle('hidden', !isSel);
+          check.classList.toggle('flex', isSel);
+        });
+        cardSelecionado = card;
+      };
+      marcarSelecionado(cardSelecionado);
+
+      cards.forEach(card => {
+        card.addEventListener('click', () => marcarSelecionado(card));
+      });
+
+      // Filtra os cards pelo nome/apelido, sem recarregar a grid
       inputBusca.addEventListener('input', function() {
         const termoBusca = this.value.toLowerCase().trim();
-        
-        // Limpar select
-        selectProfessor.innerHTML = '';
-        
-        // Filtrar e adicionar opções
-        const opcoesFiltradas = todasOpcoes.filter(opcao => {
-          const texto = opcao.textContent.toLowerCase();
-          return texto.includes(termoBusca);
+        let algumVisivel = false;
+        cards.forEach(card => {
+          const visivel = !termoBusca || card.dataset.busca.includes(termoBusca);
+          card.style.display = visivel ? '' : 'none';
+          if (visivel) algumVisivel = true;
         });
-        
-        opcoesFiltradas.forEach(opcao => {
-          selectProfessor.appendChild(opcao.cloneNode(true));
-        });
+        gridVazio.style.display = algumVisivel ? 'none' : 'block';
       });
-      
+
       const closeModal = () => {
         modalContainer.remove();
       };
-      
+
       btnCancelar.addEventListener('click', closeModal);
       btnClose.addEventListener('click', closeModal);
-      
+
       btnConfirmar.addEventListener('click', () => {
-        const selectedOption = selectProfessor.value;
-        
-        if (!selectedOption) {
+        if (!cardSelecionado) {
           showToast('⚠️ Por favor, selecione um professor', 'error');
           return;
         }
-        
-        // Separar CPF, nome e uid
-        const [cpf, nome, uid] = selectedOption.split('|');
-        
+
+        const { cpf, nome, uid } = cardSelecionado.dataset;
+
         if (nome === professorAtual) {
           showToast('ℹ️ Este já é o professor atual da aula', 'info');
           return;
