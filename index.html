@@ -85,103 +85,8 @@
       </div>
       
       <!-- Menu Items -->
-      <nav id="div-menuLateral" class="p-3 space-y-1 mt-4" aria-label="Menu principal">
-        <p class="menu-grupo" role="presentation"><span>Operação</span></p>
-        <button class="menu-item active" data-section="painel-central">
-          <i class="fas fa-home mr-3"></i><span>Painel Central</span>
-        </button>
-        <button class="menu-item" data-section="banco-aulas">
-          <i class="fas fa-book mr-3"></i><span>Banco de Aulas</span>
-        </button>
-        <button class="menu-item" data-section="calendario" data-title="Calendário Master">
-          <i class="fas fa-calendar-alt mr-3"></i><span>Calendário Master</span>
-        </button>
-        <button class="menu-item" data-section="fluxo-processos" data-title="Processos">
-          <i class="fas fa-route mr-3"></i><span>Processos</span>
-        </button>
-        <button class="menu-item" data-section="quadros-aula" data-title="Quadros de aula">
-          <i class="fas fa-chalkboard mr-3"></i><span>Quadros de aula</span>
-        </button>
-        <button class="menu-item" data-section="notificacoes" data-title="Notificações" style="position:relative">
-          <i class="fas fa-bell mr-3"></i><span>Notificações</span><span id="contador-notificacoes" hidden aria-label="respostas não lidas">0</span>
-        </button>
-        <p class="menu-grupo" role="presentation"><span>Financeiro</span></p>
-        <button class="menu-item" data-section="mensagens" data-title="Painel Financeiro">
-          <i class="fas fa-wallet mr-3"></i><span>Painel Financeiro</span>
-        </button>
-        <button class="menu-item" data-section="area-pagamento">
-          <i class="fas fa-credit-card mr-3"></i><span>Área Pagamento</span>
-        </button>
-        <button class="menu-item" data-section="cofres-pagamento">
-          <i class="fas fa-vault mr-3"></i><span>Cofres e Reservas</span>
-        </button>
-        <button class="menu-item" data-section="previsao-financeira">
-          <i class="fas fa-chart-pie mr-3"></i><span>Previsão Financeira</span>
-        </button>
-        <button class="menu-item" data-section="simulacoes">
-          <i class="fas fa-chart-line mr-3"></i><span>Simulações</span>
-        </button>
-        <p class="menu-grupo" role="presentation"><span>Pessoas</span></p>
-        <button class="menu-item menu-item-expandable" data-section="dashboard" id="btn-dashboard-menu">
-          <i class="fas fa-tachometer-alt mr-3"></i>
-          <span>Clientes e Professores</span>
-          <i class="fas fa-chevron-down ml-auto text-sm transition-transform" id="icon-dashboard-expand"></i>
-        </button>
-        <div id="submenu-dashboard" class="ml-4 space-y-1 hidden">
-          <!-- Clientes -->
-          <button class="menu-item-submenu menu-item-submenu-expandable" id="btn-clientes-menu">
-            <i class="fas fa-users mr-3"></i>
-            <span>Clientes</span>
-            <i class="fas fa-chevron-right ml-auto text-xs" id="icon-clientes-expand"></i>
-          </button>
-          <div id="submenu-clientes" class="ml-3 space-y-1 hidden">
-            <button class="menu-item-submenu-leaf" data-section="clientes" data-title="BD Clientes">
-              <i class="fas fa-database mr-3"></i><span>BD Clientes</span>
-            </button>
-          </div>
-          <!-- Professores -->
-          <button class="menu-item-submenu menu-item-submenu-expandable" id="btn-professores-menu">
-            <i class="fas fa-chalkboard-user mr-3"></i>
-            <span>Professores</span>
-            <i class="fas fa-chevron-right ml-auto text-xs" id="icon-professores-expand"></i>
-          </button>
-          <div id="submenu-professores" class="ml-3 space-y-1 hidden">
-            <button class="menu-item-submenu-leaf" data-section="galeria-professores" data-title="BD Professores">
-              <i class="fas fa-database mr-3"></i><span>BD Professores</span>
-            </button>
-            <!-- ocultos (não apagados): substituídos pela Galeria de Professores acima -->
-            <button class="menu-item-submenu-leaf hidden" data-section="professores" data-tab="dp-tab-bancoDados" data-title="BD Professores">
-              <i class="fas fa-database mr-3"></i><span>BD Professores</span>
-            </button>
-            <button class="menu-item-submenu-leaf hidden" data-section="professores" data-tab="dp-tab-edicao" data-title="Edição de Professores">
-              <i class="fas fa-user-edit mr-3"></i><span>Edição de Professores</span>
-            </button>
-            <button class="menu-item-submenu-leaf" data-section="professores" data-tab="dp-tab-candidatos" data-title="Avaliação de Candidatos">
-              <i class="fas fa-user-check mr-3"></i><span>Avaliação de Candidatos</span>
-            </button>
-            <button class="menu-item-submenu-leaf" data-section="professores" data-tab="dp-tab-equipe" data-title="Análise e Desempenho de Equipe">
-              <i class="fas fa-chart-line mr-3"></i><span>Análise e Desempenho de Equipe</span>
-            </button>
-            <button class="menu-item-submenu-leaf" data-section="professores" data-tab="dp-tab-agendamento" data-title="Agendamento de Entrevistas">
-              <i class="fas fa-calendar-check mr-3"></i><span>Agendamento de Entrevistas</span>
-            </button>
-          </div>
-        </div>
-        <p class="menu-grupo" role="presentation"><span>Ferramentas</span></p>
-        <button class="menu-item" data-section="exportar-dados">
-          <i class="fas fa-file-export mr-3"></i><span>Exportar Dados</span>
-        </button>
-        <button class="menu-item menu-item-expandable" data-section="area-dev" id="btn-area-dev-menu">
-          <i class="fas fa-code mr-3"></i>
-          <span>Área Dev</span>
-          <i class="fas fa-chevron-down ml-auto text-sm transition-transform" id="icon-area-dev-expand"></i>
-        </button>
-        <div id="submenu-area-dev" class="ml-4 space-y-1 hidden">
-          <button class="menu-item-submenu-leaf" data-section="detalhes-banco-de-aulas" data-title="Detalhes Banco de Aulas">
-            <i class="fas fa-table-cells mr-3"></i><span>Detalhes Banco de Aulas</span>
-          </button>
-        </div>
-      </nav>
+      <!-- Itens montados por functions-menu-lateral.js (tela "Organizar Menu") -->
+      <nav id="div-menuLateral" class="p-3 space-y-1 mt-4" aria-label="Menu principal"></nav>
 
       <!-- ── Usuário logado + Logout ── -->
       <div class="user-area border-t border-orange-400">
@@ -278,6 +183,7 @@
         </section>
         <section id="detalhes-banco-de-aulas" class="section-content"></section>
         <section id="notificacoes"     class="section-content"></section>
+        <section id="organizar-menu"   class="section-content"></section>
       </div>
     </main>
   </div>
@@ -291,6 +197,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
 
   <!-- 1. Config centralizada -->
   <script src="firebase-config.js"></script>
@@ -317,7 +224,10 @@
     });
   </script>
 
-  <!-- 4. Scripts do app (ordem original preservada) -->
+  <!-- 4. Menu lateral: monta os itens antes do script.js ligar a navegação -->
+  <script src="functions-menu-lateral.js"></script>
+
+  <!-- 5. Scripts do app (ordem original preservada) -->
   <script src="functions-contrato.js"></script>
   <script src="functions-contratoProfessor.js"></script>
   <script src="banco.js"></script>

@@ -685,7 +685,7 @@
   padding: 12px 8px;
 }
 
-#menu-lateral.collapsed #icon-dashboard-expand {
+#menu-lateral.collapsed .menu-gaveta-seta {
   display: none;
 }
 
@@ -1030,21 +1030,21 @@
   width: 24px;
 }
 
-#icon-dashboard-expand {
+/* Gavetas do menu lateral (montado por functions-menu-lateral.js) */
+.menu-gaveta-seta {
   transition: transform 0.3s ease;
 }
 
-#icon-dashboard-expand.rotate {
+.menu-gaveta-seta.rotate {
   transform: rotate(180deg);
 }
 
-/* Submenu do Dashboard */
-#submenu-dashboard {
+.menu-gaveta-conteudo {
   animation: slideDown 0.3s ease forwards;
   overflow: hidden;
 }
 
-#submenu-dashboard.hidden {
+.menu-gaveta-conteudo.hidden {
   animation: slideUp 0.3s ease forwards;
 }
 

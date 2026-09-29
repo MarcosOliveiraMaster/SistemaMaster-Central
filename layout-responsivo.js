@@ -79,7 +79,8 @@
     if (!b) return;
     var secao = b.getAttribute('data-atalho');
     if (secao === 'menu') { abrirGaveta(true); return; }
-    var item = menu.querySelector('.menu-item[data-section="' + secao + '"]');
+    // Sem filtrar pela classe: o item pode ter sido movido para dentro de uma gaveta
+    var item = menu.querySelector('button[data-section="' + secao + '"]:not([data-tab])');
     if (item) item.click();
   });
 

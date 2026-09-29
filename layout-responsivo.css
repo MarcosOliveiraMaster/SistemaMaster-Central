@@ -20,9 +20,7 @@
 #menu-lateral .menu-grupo:first-child { padding-top: 0.2rem; }
 #menu-lateral.collapsed .menu-grupo { padding: 0.35rem 0; }
 #menu-lateral.collapsed .menu-grupo span { display: none; }
-#menu-lateral.collapsed #icon-area-dev-expand,
-#menu-lateral.collapsed #icon-clientes-expand,
-#menu-lateral.collapsed #icon-professores-expand { display: none; }
+#menu-lateral.collapsed .menu-gaveta-seta { display: none; }
 #menu-lateral.collapsed .menu-grupo::before {
   content: '';
   display: block;
@@ -49,10 +47,7 @@
   #menu-lateral.collapsed .menu-item,
   #menu-lateral.collapsed .menu-item-submenu,
   #menu-lateral.collapsed .menu-item-submenu-leaf { padding: 12px 0; font-size: 1.05rem; }
-  #menu-lateral.collapsed #submenu-dashboard,
-  #menu-lateral.collapsed #submenu-area-dev,
-  #menu-lateral.collapsed #submenu-clientes,
-  #menu-lateral.collapsed #submenu-professores { margin-left: 0; }
+  #menu-lateral.collapsed .menu-gaveta-conteudo { margin-left: 0; }
   .section-content { font-size: 0.95rem; }
 }
 

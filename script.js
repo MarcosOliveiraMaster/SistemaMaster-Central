@@ -8,7 +8,7 @@ const CONFIG = {
     'painel-central', 'banco-aulas', 'simulacoes', 'mensagens',
     'calendario', 'fluxo-processos', 'clientes', 'professores', 'galeria-professores',
     'area-pagamento', 'cofres-pagamento', 'exportar-dados', 'previsao-financeira',
-    'detalhes-banco-de-aulas', 'quadros-aula', 'notificacoes'
+    'detalhes-banco-de-aulas', 'quadros-aula', 'notificacoes', 'organizar-menu'
   ]
 };
 
@@ -53,9 +53,6 @@ let _pendingProfessorTab = null;
 
 function initializeApp() {
   setupMenuNavigation();
-  setupDashboardSubmenu();
-  setupAreaDevSubmenu();
-  setupSubgroupSubmenus();
   setupSidebarToggle();
   setupGlobalListeners();
   loadSection('painel-central');
@@ -71,138 +68,61 @@ function setupSidebarToggle() {
     sidebar.classList.toggle('collapsed');
 
     if (sidebar.classList.contains('collapsed')) {
-      const submenu = document.getElementById('submenu-dashboard');
-      const chevron = document.getElementById('icon-dashboard-expand');
-      if (submenu) submenu.classList.add('hidden');
-      if (chevron) chevron.classList.remove('rotate');
-      ['submenu-clientes', 'submenu-professores'].forEach(id => {
-        document.getElementById(id)?.classList.add('hidden');
-      });
-      ['icon-clientes-expand', 'icon-professores-expand'].forEach(id => {
-        document.getElementById(id)?.classList.remove('rotate-90');
-      });
-
-      const submenuDev = document.getElementById('submenu-area-dev');
-      const chevronDev = document.getElementById('icon-area-dev-expand');
-      if (submenuDev) submenuDev.classList.add('hidden');
-      if (chevronDev) chevronDev.classList.remove('rotate');
+      document.querySelectorAll('#div-menuLateral [data-gaveta]').forEach(btn => alternarGaveta(btn, false));
     }
   });
 }
 
+// O menu é montado por functions-menu-lateral.js e pode ser remontado a
+// qualquer momento (tela Organizar Menu), por isso os cliques são tratados por
+// delegação no <nav> em vez de um listener por botão.
 function setupMenuNavigation() {
-  const menuItems    = document.querySelectorAll('.menu-item:not(.menu-item-expandable)');
-  const submenuItems = document.querySelectorAll('.menu-item-submenu:not(.menu-item-submenu-expandable)');
-  const leafItems    = document.querySelectorAll('.menu-item-submenu-leaf');
+  const nav = document.getElementById('div-menuLateral');
+  if (!nav) return;
 
-  function clearActive() {
-    menuItems.forEach(i => i.classList.remove('active'));
-    submenuItems.forEach(i => i.classList.remove('active'));
-    leafItems.forEach(i => i.classList.remove('active'));
-  }
+  nav.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn || !nav.contains(btn)) return;
 
-  menuItems.forEach(item => {
-    item.addEventListener('click', function () {
-      const sectionId = this.getAttribute('data-section');
-      if (sectionId && sectionId !== APP_STATE.currentSection) {
-        clearActive();
-        this.classList.add('active');
-        const title = this.getAttribute('data-title') || this.querySelector('span').textContent;
-        updateSectionTitle(title);
-        loadSection(sectionId);
-      }
-    });
+    if (btn.hasAttribute('data-gaveta')) {
+      e.preventDefault();
+      alternarGaveta(btn);
+      return;
+    }
+
+    const sectionId = btn.getAttribute('data-section');
+    const tabId     = btn.getAttribute('data-tab');
+    if (!sectionId) return;
+    if (sectionId === APP_STATE.currentSection && !tabId) return;
+
+    nav.querySelectorAll('button.active').forEach(i => i.classList.remove('active'));
+    btn.classList.add('active');
+    const title = btn.getAttribute('data-title') || btn.querySelector('span').textContent;
+    updateSectionTitle(title);
+
+    if (sectionId === APP_STATE.currentSection) {
+      const tabBtn = document.querySelector(`[data-dptab="${tabId}"]`);
+      if (tabBtn) tabBtn.click();
+    } else {
+      if (tabId) _pendingProfessorTab = tabId;
+      loadSection(sectionId);
+    }
   });
+}
 
-  submenuItems.forEach(item => {
-    item.addEventListener('click', function (e) {
-      e.stopPropagation();
-      const sectionId = this.getAttribute('data-section');
-      if (sectionId && sectionId !== APP_STATE.currentSection) {
-        clearActive();
-        this.classList.add('active');
-        const title = this.getAttribute('data-title') || this.querySelector('span').textContent;
-        updateSectionTitle(title);
-        loadSection(sectionId);
-      }
-    });
-  });
-
-  leafItems.forEach(item => {
-    item.addEventListener('click', function (e) {
-      e.stopPropagation();
-      const sectionId = this.getAttribute('data-section');
-      const tabId     = this.getAttribute('data-tab');
-      if (!sectionId) return;
-
-      clearActive();
-      this.classList.add('active');
-      const title = this.getAttribute('data-title') || this.querySelector('span').textContent;
-      updateSectionTitle(title);
-
-      if (sectionId === APP_STATE.currentSection) {
-        if (tabId) {
-          const tabBtn = document.querySelector(`[data-dptab="${tabId}"]`);
-          if (tabBtn) tabBtn.click();
-        }
-      } else {
-        if (tabId) _pendingProfessorTab = tabId;
-        loadSection(sectionId);
-      }
-    });
-  });
+// Abre/fecha a gaveta cujo conteúdo vem logo depois do botão. Sem `abrir`, alterna.
+function alternarGaveta(btn, abrir) {
+  const conteudo = btn.nextElementSibling;
+  if (!conteudo) return;
+  const aberta = abrir === undefined ? conteudo.classList.contains('hidden') : abrir;
+  conteudo.classList.toggle('hidden', !aberta);
+  const seta = btn.querySelector('.menu-gaveta-seta');
+  if (seta) seta.classList.toggle(btn.classList.contains('menu-item-expandable') ? 'rotate' : 'rotate-90', aberta);
 }
 
 function updateSectionTitle(title) {
   const el = document.getElementById('section-title');
   if (el) el.textContent = title;
-}
-
-function setupSubgroupSubmenus() {
-  [
-    { btnId: 'btn-clientes-menu',   subId: 'submenu-clientes',   iconId: 'icon-clientes-expand'   },
-    { btnId: 'btn-professores-menu', subId: 'submenu-professores', iconId: 'icon-professores-expand' },
-  ].forEach(({ btnId, subId, iconId }) => {
-    const btn  = document.getElementById(btnId);
-    const sub  = document.getElementById(subId);
-    const icon = document.getElementById(iconId);
-    if (!btn || !sub) return;
-    let expanded = false;
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      expanded = !expanded;
-      sub.classList.toggle('hidden', !expanded);
-      if (icon) icon.classList.toggle('rotate-90', expanded);
-    });
-  });
-}
-
-function setupDashboardSubmenu() {
-  const btn    = document.getElementById('btn-dashboard-menu');
-  const sub    = document.getElementById('submenu-dashboard');
-  const icon   = document.getElementById('icon-dashboard-expand');
-  let expanded = false;
-  if (!btn || !sub) return;
-  btn.addEventListener('click', function (e) {
-    e.preventDefault(); e.stopPropagation();
-    expanded = !expanded;
-    sub.classList.toggle('hidden', !expanded);
-    if (icon) icon.classList.toggle('rotate', expanded);
-  });
-}
-
-function setupAreaDevSubmenu() {
-  const btn    = document.getElementById('btn-area-dev-menu');
-  const sub    = document.getElementById('submenu-area-dev');
-  const icon   = document.getElementById('icon-area-dev-expand');
-  let expanded = false;
-  if (!btn || !sub) return;
-  btn.addEventListener('click', function (e) {
-    e.preventDefault(); e.stopPropagation();
-    expanded = !expanded;
-    sub.classList.toggle('hidden', !expanded);
-    if (icon) icon.classList.toggle('rotate', expanded);
-  });
 }
 
 async function loadSection(sectionId) {
@@ -291,6 +211,9 @@ function loadSectionContent(sectionId) {
       break;
     case 'notificacoes':
       if (typeof loadNotificacoes === 'function') loadNotificacoes();
+      break;
+    case 'organizar-menu':
+      if (typeof MenuLateral !== 'undefined' && MenuLateral.abrirEditor) MenuLateral.abrirEditor();
       break;
   }
 }

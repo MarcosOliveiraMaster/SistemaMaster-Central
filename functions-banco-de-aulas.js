@@ -53,7 +53,8 @@ async function carregarAulasBatch() {
         id: aula.id,
         statusAula: statusAula,
         concluida: concluida,
-        professor: professor
+        professor: professor,
+        data: aula.data || ''
       });
       
       validosCount++;
@@ -81,6 +82,19 @@ async function carregarAulasBatch() {
     console.error('❌ Erro ao carregar aulas em batch:', error);
     return {};
   }
+}
+
+// Reposição é um status final (continua "Reposição" depois de dada, com
+// relatório), então sozinha não diz se a aula já aconteceu. Uma Reposição
+// marcada para hoje ou para frente (ou sem data) ainda está por vir e mantém o
+// pacote em execução — mesmo não preenchendo a barra de progresso do card.
+function reposicaoEmAberto(aula) {
+  if ((aula.statusAula || '').toLowerCase() !== 'reposição') return false;
+  const match = (aula.data || '').match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  if (!match) return true;
+  const dataAula = new Date(match[3], match[2] - 1, match[1]);
+  const hoje = new Date();
+  return dataAula >= new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
 }
 
 // Função para obter aulas de uma contratação específica
@@ -575,7 +589,7 @@ function computeAndRenderFilters() {
       if (aulasInfo.total === 0) return false;
       return aulasInfo.aulas.some(a => {
         const st = (a.statusAula || '').toLowerCase();
-        return st === 'pendente' || st === 'não informado' || st === '';
+        return st === 'pendente' || st === 'não informado' || st === '' || reposicaoEmAberto(a);
       });
     });
     partes.push('▶️ em execução');
@@ -585,7 +599,7 @@ function computeAndRenderFilters() {
       if (aulasInfo.total === 0) return false;
       return aulasInfo.aulas.every(a => {
         const st = (a.statusAula || '').toLowerCase();
-        return st === 'concluída' || st === 'reposição';
+        return st === 'concluída' || (st === 'reposição' && !reposicaoEmAberto(a));
       });
     });
     partes.push('✅ completos');
