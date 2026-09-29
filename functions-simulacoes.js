@@ -9,13 +9,17 @@ const Simulacoes = (function() {
   let currentFilters = {};
   let editingSimulacao = null;
   let isNovaSimulacao = false;
+  let idParaAbrir = null; // contratação do app a abrir assim que a seção carregar
   
   // ==================== GERAÇÃO DE ID ====================
   
   // Função para gerar próximo ID de simulação (AAA → AAB → ...  → ZZZ)
   async function gerarProximoIdSimulacao() {
     try {
+      // Só os IDs sequenciais em maiúsculas (AAA…ZZZ): as contratações do app
+      // usam "app-…" (minúsculas, sempre depois de "[" na ordenação) e ficam de fora.
       const snapshot = await db.collection('simulacoes')
+        .where('idSimulacao', '<', '[')
         .orderBy('idSimulacao', 'desc')
         .limit(1)
         .get();
@@ -200,7 +204,42 @@ const Simulacoes = (function() {
     
     // Popular filtro de professores
     popularFiltroProfessores();
+
+    // Veio do sino de contratações via app: abre a simulação escolhida.
+    if (idParaAbrir) {
+      const id = idParaAbrir;
+      idParaAbrir = null;
+      const sim = simulacoesData.find(x => x.idSimulacao === id || x.id === id);
+      if (sim) abrirModalSimulacao(sim);
+    }
   }
+
+  // Abre uma simulação pelo ID (usado pelo sino de contratações via app).
+  // Se a seção ainda está carregando, abre quando os dados chegarem.
+  async function abrirPorId(id) {
+    const secao = document.getElementById('simulacoes');
+    const pronta = secao && secao.classList.contains('active') && document.getElementById('simulacoes-container');
+    if (!pronta) { idParaAbrir = id; return; }
+    let sim = simulacoesData.find(x => x.idSimulacao === id || x.id === id);
+    if (!sim) {
+      await carregarSimulacoes();
+      renderSimulacoesCards(simulacoesData, currentFilters);
+      sim = simulacoesData.find(x => x.idSimulacao === id || x.id === id);
+    }
+    if (sim) abrirModalSimulacao(sim);
+    else showToast('Simulação não encontrada — ela pode ter sido excluída.', 'error');
+  }
+
+  // Nova contratação chegou pelo app com a seção aberta: recarrega os cards.
+  async function recarregarSeAberta() {
+    const secao = document.getElementById('simulacoes');
+    if (!secao || !secao.classList.contains('active') || !document.getElementById('simulacoes-container')) return;
+    await carregarSimulacoes();
+    renderSimulacoesCards(simulacoesData, currentFilters);
+  }
+
+  const ehDoApp = (sim) => sim && sim.origem === 'app-cliente';
+  const naoLidaDoApp = (sim) => ehDoApp(sim) && sim.lidaCentral === false;
   
   // Função para carregar simulações do Firebase
   async function carregarSimulacoes() {
@@ -297,8 +336,9 @@ const Simulacoes = (function() {
       return;
     }
     
-    // Aplicar filtros
-    let filteredSimulacoes = applySimulacoesFilters([...simulacoes], filters);
+    // Aplicar filtros (contratações do app ainda não abertas ficam no topo)
+    let filteredSimulacoes = applySimulacoesFilters([...simulacoes], filters)
+      .sort((a, b) => Number(naoLidaDoApp(b)) - Number(naoLidaDoApp(a)));
     
     if (filteredSimulacoes. length === 0) {
       container.innerHTML = `
@@ -355,10 +395,18 @@ const Simulacoes = (function() {
 
     const isEspecial = (simulacao.tituloSimulacao || '').trimStart().toUpperCase().startsWith('ESPECIAL');
     const especialClass = isEspecial ? ' card-especial' : '';
+    const doApp = ehDoApp(simulacao);
+    const nova = naoLidaDoApp(simulacao);
+    const appClass = doApp ? ' card-app' + (nova ? ' card-app-nova' : '') : '';
 
     return `
-      <div class="card${especialClass} cursor-pointer hover:shadow-lg transition-shadow" data-simulacao-id="${simulacao.idSimulacao}">
+      <div class="card${especialClass}${appClass} cursor-pointer hover:shadow-lg transition-shadow" data-simulacao-id="${escapeHtml(simulacao.idSimulacao)}">
         <div class="p-4">
+          ${doApp ? `
+          <div class="selo-app-linha">
+            <span class="selo-app"><i class="fas fa-mobile-screen-button"></i> Via App</span>
+            ${nova ? '<span class="selo-app-nova" title="Nova contratação — ainda não aberta"><i class="fas fa-bell"></i> Nova</span>' : ''}
+          </div>` : ''}
           <h3 class="font-lexend font-bold text-base text-gray-800 mb-2 line-clamp-2">
             ${escapeHtml(simulacao.tituloSimulacao || 'Sem título')}
           </h3>
@@ -371,7 +419,7 @@ const Simulacoes = (function() {
               ${formatDuration(totalHoras)} - R$ ${formatBR(valorPacote)}
             </span>
             <span class="text-xs text-gray-400">
-              ${simulacao.idSimulacao}
+              ${doApp ? escapeHtml(formatarQuando(simulacao.timestamp)) : escapeHtml(simulacao.idSimulacao)}
             </span>
           </div>
         </div>
@@ -379,6 +427,19 @@ const Simulacoes = (function() {
     `;
   }
   
+  // "hoje 14:05", "ontem 09:10" ou "28/09 14:05" (cards das contratações do app)
+  function formatarQuando(ts) {
+    const d = ts && ts.toDate ? ts.toDate() : null;
+    if (!d) return 'agora';
+    const hora = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+    const dia = new Date(d); dia.setHours(0, 0, 0, 0);
+    const dif = Math.round((hoje - dia) / 86400000);
+    if (dif === 0) return `hoje ${hora}`;
+    if (dif === 1) return `ontem ${hora}`;
+    return `${d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} ${hora}`;
+  }
+
   // Função de escape HTML
   function escapeHtml(str) {
     if (str === undefined || str === null) return '';
@@ -560,6 +621,19 @@ const Simulacoes = (function() {
   function abrirModalSimulacao(simulacao, isNova = false) {
     editingSimulacao = simulacao;
     isNovaSimulacao = isNova;
+
+    // Abrir uma contratação do app apaga o sino dela (aqui e no cabeçalho).
+    if (!isNova && naoLidaDoApp(simulacao)) {
+      simulacao.lidaCentral = true;
+      db.collection('simulacoes').doc(simulacao.idSimulacao)
+        .update({ lidaCentral: true })
+        .catch(err => console.warn('[Simulações] Não marcou como lida:', err && err.code));
+      const card = document.querySelector(`[data-simulacao-id="${simulacao.idSimulacao}"]`);
+      if (card) {
+        card.classList.remove('card-app-nova');
+        card.querySelector('.selo-app-nova')?.remove();
+      }
+    }
 
     // Importar valores persistidos (se houver) para garantir que a UI mostre o que foi salvo no DB
     // Observação: no banco a propriedade persistida é `lucroMaster` (campo salvo em `salvarSimulacao`).
@@ -1337,7 +1411,9 @@ const Simulacoes = (function() {
     };
 
     try {
-      await db.collection('simulacoes').doc(data.idSimulacao).set(data);
+      // merge: mantém os campos que o formulário não conhece (origem,
+      // clienteUid, lidaCentral… das contratações feitas pelo app).
+      await db.collection('simulacoes').doc(data.idSimulacao).set(data, { merge: true });
       const btnSalvar = document.getElementById('btn-salvar-simulacao');
       if (btnSalvar) {
         const htmlOriginal = btnSalvar.innerHTML;
@@ -4281,7 +4357,9 @@ const Simulacoes = (function() {
   return {
     loadSimulacoes,
     abrirModalNovaSimulacao,
-    limparFiltros
+    limparFiltros,
+    abrirPorId,
+    recarregarSeAberta
   };
 })();
 

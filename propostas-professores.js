@@ -121,6 +121,8 @@
     .nt-texto{background:#fff7eb;border-left:4px solid #f28705;border-radius:8px;padding:.8rem 1rem;white-space:pre-wrap;font-size:.92rem;color:#111827;line-height:1.55;}
     .nt-aulas{list-style:none;padding:0;margin:.6rem 0 0;display:flex;flex-direction:column;gap:.35rem;font-size:.85rem;color:#374151;}
     .nt-aulas li{background:#f9fafb;border-radius:8px;padding:.45rem .6rem;}
+    .nt-chip-n{background:#ef4444;color:#fff;border-radius:999px;font-size:.66rem;padding:.05rem .4rem;margin-left:.2rem;}
+    .nt-chip-n[hidden]{display:none;}
     #contador-notificacoes{margin-left:auto;background:#fff;color:#d97804;border-radius:999px;font:700 .7rem 'Lexend',sans-serif;padding:.05rem .45rem;min-width:1.2rem;text-align:center;}
     #menu-lateral.collapsed #contador-notificacoes{position:absolute;top:4px;right:8px;margin:0;}
     `;
@@ -332,10 +334,15 @@
   };
   const naoLidas = () => propostas.filter(p => p.status !== 'pendente' && !p.lidaCentral).length;
 
+  // Pedidos de reagendar/cancelar dos clientes (solicitacoes-clientes.js) somam no mesmo contador.
+  const naoLidasClientes = () => (window.SolicitacoesClientes ? window.SolicitacoesClientes.naoLidas() : 0);
+
   function atualizarContador() {
     const el = document.getElementById('contador-notificacoes');
+    const chip = document.querySelector('.nt-chip[data-f="clientes"] .nt-chip-n');
+    if (chip) { const c = naoLidasClientes(); chip.textContent = c; chip.hidden = c === 0; }
     if (!el) return;
-    const n = naoLidas();
+    const n = naoLidas() + naoLidasClientes();
     el.textContent = n > 99 ? '99+' : String(n);
     el.hidden = n === 0;
   }
@@ -365,6 +372,13 @@
     const sec = document.getElementById('notificacoes');
     if (!sec) return;
     const cont = sec.querySelector('.nt-conteudo');
+    sec.querySelectorAll('.nt-chip').forEach(c => c.classList.toggle('on', c.dataset.f === filtro));
+    const dica = sec.querySelector('.nt-dica');
+    if (dica) dica.hidden = filtro === 'clientes';
+    if (filtro === 'clientes') {
+      if (window.SolicitacoesClientes) window.SolicitacoesClientes.desenhar(cont);
+      return;
+    }
     const lista = ordenar(propostas.filter(p => filtro === 'todas' ? true : filtro === 'aguardando' ? p.status === 'pendente' : p.status !== 'pendente'));
     sec.querySelectorAll('.nt-chip').forEach(c => c.classList.toggle('on', c.dataset.f === filtro));
     if (!lista.length) {
@@ -461,6 +475,7 @@
     if (!sec) return;
     sec.innerHTML = `<div class="nt-wrap">
       <div class="nt-barra">
+        <button class="nt-chip" data-f="clientes"><i class="fas fa-user-clock"></i> Clientes · reagendar/cancelar <span class="nt-chip-n" hidden>0</span></button>
         <button class="nt-chip" data-f="respondidas">Respondidas</button>
         <button class="nt-chip" data-f="aguardando">Aguardando resposta</button>
         <button class="nt-chip" data-f="todas">Todas</button>
@@ -468,7 +483,10 @@
       </div>
       <div class="nt-conteudo"><p class="pe-vazio">Carregando…</p></div></div>`;
     sec.querySelectorAll('.nt-chip').forEach(c => { c.onclick = () => { filtro = c.dataset.f; desenharNotificacoes(); }; });
-    if (cancelar) desenharNotificacoes();
+    // Com pedido de cliente sem ler, a área já abre nessa aba.
+    if (naoLidasClientes() > 0) filtro = 'clientes';
+    atualizarContador();
+    if (cancelar || filtro === 'clientes') desenharNotificacoes();
   }
 
   // Começa a escutar assim que o login do Central terminar (contador no menu).
@@ -476,5 +494,6 @@
   setTimeout(() => clearInterval(espera), 60000);
 
   window.PropostasProfessores = { abrirEnvio };
+  window.atualizarContadorNotificacoesCentral = atualizarContador;
   window.loadNotificacoes = loadNotificacoes;
 })();
