@@ -165,6 +165,16 @@ async function vincularAulasAoCliente(cpf, uid) {
   return total;
 }
 
+// uid do cliente pelo CPF (com ou sem máscara) no cadastro. '' se não tiver
+// acesso ao portal. Usado quando a aula de origem não tem clienteUid.
+async function resolverUidCliente(cpf) {
+  const dig = String(cpf || '').replace(/\D/g, '');
+  if (dig.length !== 11) return '';
+  const formas = [...new Set([dig, `${dig.slice(0, 3)}.${dig.slice(3, 6)}.${dig.slice(6, 9)}-${dig.slice(9)}`, String(cpf).trim()])];
+  const snap = await db.collection('cadastroClientes').where('cpf', 'in', formas).limit(1).get();
+  return snap.empty ? '' : (snap.docs[0].data().uid || '');
+}
+
 // Função para buscar cliente por CPF
 async function fetchClienteByCPF(cpf) {
   try {
@@ -523,6 +533,12 @@ async function addNovaAulaLista(codigoContratacao, valorHoraContrato = 35) {
     }
     const valorAulaCalculado = horasDecimais > 0 ? horasDecimais * Number(valorHoraContrato) : 0;
 
+    // Contratos antigos: a última aula pode não ter professorEmail/clienteUid.
+    // Resolve pelo cadastro para a aula nova já nascer completa.
+    const professorEmail = ultimaAula.professorEmail
+      || await resolverEmailProfessor({ cpf: ultimaAula.idProfessor, nome: ultimaAula.professor });
+    const uidCliente = ultimaAula.clienteUid || ultimaAula.clientUid || await resolverUidCliente(ultimaAula.cpf);
+
     const novaAula = {
       ConfirmacaoProfessorAula: false,
       ObservacoesAula: "",
@@ -531,8 +547,8 @@ async function addNovaAulaLista(codigoContratacao, valorHoraContrato = 35) {
       ValorAula: valorAulaCalculado,
       // FIX: clienteUid e clientUid herdados da última aula para
       // que as Firestore Rules permitam leitura pelo cliente no login
-      clienteUid:   ultimaAula.clienteUid   || "",
-      clientUid:    ultimaAula.clientUid    || "",
+      clienteUid:   uidCliente,
+      clientUid:    uidCliente,
       codigoContratacao: ultimaAula.codigoContratacao || "",
       idContratacao: codigoContratacao,
       cpf: ultimaAula.cpf || "",
@@ -545,7 +561,7 @@ async function addNovaAulaLista(codigoContratacao, valorHoraContrato = 35) {
       // para que o professor visualize a nova aula no sistema de login
       idProfessor:  ultimaAula.idProfessor  || "",
       professorUid: ultimaAula.professorUid || "",
-      professorEmail: ultimaAula.professorEmail || "",
+      professorEmail,
       materia: "",
       metodoPagamento: ultimaAula.metodoPagamento || "",
       nomeCliente: ultimaAula.nomeCliente || "",
@@ -704,14 +720,16 @@ async function addAulaCalendario(codigoContratacao, campos) {
       ? (ultima.professorEmail || await resolverEmailProfessor({ cpf: ultima.idProfessor, nome: ultima.professor }))
       : String(profNovo?.email || '').trim().toLowerCase();
 
+    const uidCliente = ultima.clienteUid || ultima.clientUid || await resolverUidCliente(ultima.cpf);
+
     const novaAula = {
       ConfirmacaoProfessorAula: false,
       ObservacoesAula: "",
       RelatorioAula: "",
       StatusAula: "Pendente",
       ValorAula: valorAula,
-      clienteUid:   ultima.clienteUid   || "",
-      clientUid:    ultima.clientUid    || "",
+      clienteUid:   uidCliente,
+      clientUid:    uidCliente,
       codigoContratacao: ultima.codigoContratacao || codigoContratacao,
       idContratacao: codigoContratacao,
       cpf:          ultima.cpf          || "",
@@ -764,8 +782,13 @@ async function copiarAulaLista(idAulaOrigem) {
     const ultimaAula = aulas[aulas.length - 1];
     const novoIdAula = incrementarIdAula(ultimaAula['id-Aula']);
 
+    const uidCliente = origem.clienteUid || origem.clientUid || await resolverUidCliente(origem.cpf);
     const novaAula = {
       ...origem,
+      professorEmail: origem.professorEmail
+        || await resolverEmailProfessor({ cpf: origem.idProfessor, nome: origem.professor }),
+      clienteUid: uidCliente,
+      clientUid:  uidCliente,
       ConfirmacaoProfessorAula: false,
       ObservacoesAula: "",
       RelatorioAula: "",
