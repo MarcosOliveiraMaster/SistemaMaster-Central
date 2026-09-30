@@ -113,6 +113,58 @@ async function fetchDataBaseProfessores(forceRefresh = false) {
   }
 }
 
+// E-mail (minúsculas) do professor para o campo "professorEmail" das aulas.
+// É por ele que o portal do professor e as Firestore Rules reconhecem o dono da
+// aula — sem ele o professor não consegue ligar quadros ao cliente e o cliente
+// não compartilha o local da aula. Resolve pelo CPF e, sem CPF, pelo nome.
+// Professor "A definir"/não encontrado → '' (a aula fica sem dono no portal).
+async function resolverProfessor({ cpf = '', nome = '' } = {}) {
+  const lista = await fetchDataBaseProfessores();
+  const dig = String(cpf || '').replace(/\D/g, '');
+  let prof = dig ? lista.find(p => String(p.cpf || '').replace(/\D/g, '') === dig) : null;
+  const nomeLimpo = String(nome || '').trim();
+  if (!prof && nomeLimpo && nomeLimpo !== 'A definir') prof = lista.find(p => (p.nome || '').trim() === nomeLimpo);
+  return prof || null;
+}
+
+async function resolverEmailProfessor(filtro) {
+  const prof = await resolverProfessor(filtro);
+  return prof ? String(prof.email || '').trim().toLowerCase() : '';
+}
+
+// Grava clienteUid/clientUid = uid nas aulas (BancoDeAulas-Lista) e contratações
+// (BancoDeAulas) do CPF do cliente. Aulas criadas antes de o cliente ter acesso
+// ficam com o uid vazio: ele vê a aula (o portal busca por CPF), mas não os
+// quadros nem as fotos do registro, que as regras ligam ao uid. O CPF aparece
+// com e sem máscara no banco, por isso a busca usa as duas formas.
+// Retorna quantos documentos foram atualizados.
+async function vincularAulasAoCliente(cpf, uid) {
+  const dig = String(cpf || '').replace(/\D/g, '');
+  if (dig.length !== 11 || !uid) return 0;
+  const formas = [...new Set([
+    dig,
+    `${dig.slice(0, 3)}.${dig.slice(3, 6)}.${dig.slice(6, 9)}-${dig.slice(9)}`,
+    String(cpf).trim()
+  ])];
+
+  let total = 0;
+  for (const colecao of ['BancoDeAulas-Lista', 'BancoDeAulas']) {
+    const snap = await db.collection(colecao).where('cpf', 'in', formas).get();
+    let batch = db.batch();
+    let n = 0;
+    for (const d of snap.docs) {
+      const a = d.data();
+      if (a.clienteUid === uid && a.clientUid === uid) continue;
+      batch.update(d.ref, { clienteUid: uid, clientUid: uid });
+      total++;
+      if (++n === 450) { await batch.commit(); batch = db.batch(); n = 0; }
+    }
+    if (n) await batch.commit();
+  }
+  if (total) forceCacheRefresh();
+  return total;
+}
+
 // Função para buscar cliente por CPF
 async function fetchClienteByCPF(cpf) {
   try {
@@ -375,10 +427,12 @@ async function updateProfessorAula(idAula, nomeProfessor, cpfProfessor, uidProfe
     const querySnapshot = await db.collection("BancoDeAulas-Lista")
       .where("id-Aula", "==", idAula).get();
     if (querySnapshot.empty) throw new Error(`Aula ${idAula} não encontrada`);
+    const professorEmail = await resolverEmailProfessor({ cpf: cpfProfessor, nome: nomeProfessor });
     await querySnapshot.docs[0].ref.update({
       professor: nomeProfessor,
       idProfessor: cpfProfessor,
       professorUid: uidProfessor || '',
+      professorEmail,
       timestamp: firebase.firestore.FieldValue.serverTimestamp()
     });
     return true;
@@ -491,6 +545,7 @@ async function addNovaAulaLista(codigoContratacao, valorHoraContrato = 35) {
       // para que o professor visualize a nova aula no sistema de login
       idProfessor:  ultimaAula.idProfessor  || "",
       professorUid: ultimaAula.professorUid || "",
+      professorEmail: ultimaAula.professorEmail || "",
       materia: "",
       metodoPagamento: ultimaAula.metodoPagamento || "",
       nomeCliente: ultimaAula.nomeCliente || "",
@@ -583,6 +638,14 @@ async function updateCamposCalendario(idAula, campos) {
     const querySnapshot = await db.collection("BancoDeAulas-Lista")
       .where("id-Aula", "==", idAula).get();
     if (querySnapshot.empty) throw new Error(`Aula ${idAula} não encontrada`);
+    // Troca de professor: o e-mail acompanha (senão o professor antigo segue
+    // como dono da aula no portal e o novo não a reconhece).
+    if ('idProfessor' in campos || 'professor' in campos) {
+      const atual = querySnapshot.docs[0].data();
+      const cpf  = 'idProfessor' in campos ? campos.idProfessor : ('professor' in campos && campos.professor !== atual.professor ? '' : atual.idProfessor);
+      const nome = 'professor' in campos ? campos.professor : atual.professor;
+      campos = { ...campos, professorEmail: await resolverEmailProfessor({ cpf, nome }) };
+    }
     await querySnapshot.docs[0].ref.update(campos);
     forceCacheRefresh();
     return true;
@@ -634,6 +697,13 @@ async function addAulaCalendario(codigoContratacao, campos) {
         })())) : 35);
     const valorAula = horasDecimais > 0 ? horasDecimais * valorHora : 0;
 
+    // Professor diferente do da última aula: não herda CPF/uid/e-mail dela.
+    const mesmoProfessor = !campos.professor || campos.professor === ultima.professor;
+    const profNovo = mesmoProfessor ? null : await resolverProfessor({ nome: campos.professor });
+    const professorEmail = mesmoProfessor
+      ? (ultima.professorEmail || await resolverEmailProfessor({ cpf: ultima.idProfessor, nome: ultima.professor }))
+      : String(profNovo?.email || '').trim().toLowerCase();
+
     const novaAula = {
       ConfirmacaoProfessorAula: false,
       ObservacoesAula: "",
@@ -646,8 +716,9 @@ async function addAulaCalendario(codigoContratacao, campos) {
       idContratacao: codigoContratacao,
       cpf:          ultima.cpf          || "",
       estudante:    ultima.estudante    || "",
-      idProfessor:  ultima.idProfessor  || "",
-      professorUid: ultima.professorUid || "",
+      idProfessor:  mesmoProfessor ? (ultima.idProfessor  || "") : (profNovo?.cpf || ""),
+      professorUid: mesmoProfessor ? (ultima.professorUid || "") : (profNovo?.uid || ""),
+      professorEmail,
       metodoPagamento: ultima.metodoPagamento || "",
       nomeCliente:  ultima.nomeCliente  || "",
       "id-Aula": novoId,
@@ -939,6 +1010,8 @@ if (typeof window !== 'undefined') {
     fetchBancoDeAulas,
     fetchCadastroClientes,
     fetchDataBaseProfessores,
+    resolverEmailProfessor,
+    vincularAulasAoCliente,
     fetchClienteByCPF,
     fetchAulasByDate,
     updateAula,
