@@ -1366,7 +1366,7 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
             const listaProfessores = await BANCO.fetchDataBaseProfessores();
             const profPorNome = {};
             (listaProfessores || []).forEach(p => {
-              if (p.nome) profPorNome[p.nome.trim()] = { cpf: p.cpf || '', uid: p.uid || '' };
+              if (p.nome) profPorNome[p.nome.trim()] = { cpf: p.cpf || '', uid: p.uid || '', email: String(p.email || '').trim().toLowerCase() };
             });
 
             // Usar batch para eficiência (máx. 500 por batch)
@@ -1433,16 +1433,19 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
               const nomeProfessorLinha = btnProfessor ? (btnProfessor.dataset.professor || '') : '';
               let idProfessorLinha = '';
               let professorUidLinha = '';
+              let professorEmailLinha = '';
               if (nomeProfessorLinha && nomeProfessorLinha !== 'A definir') {
                 const infoProf = profPorNome[nomeProfessorLinha.trim()];
                 if (infoProf) {
                   idProfessorLinha = infoProf.cpf;
                   professorUidLinha = infoProf.uid;
+                  professorEmailLinha = infoProf.email;
                 } else {
                   // Professor não encontrado no cadastro pelo nome — mantém o que já
                   // estava salvo no documento em vez de apagar por engano.
                   idProfessorLinha = docData.idProfessor || '';
                   professorUidLinha = docData.professorUid || '';
+                  professorEmailLinha = docData.professorEmail || '';
                   console.warn(`[SalvarAulas] Professor "${nomeProfessorLinha}" não encontrado no cadastro — mantendo idProfessor/professorUid já salvos.`);
                 }
               }
@@ -1459,6 +1462,7 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
                 professor: nomeProfessorLinha,
                 idProfessor: idProfessorLinha,
                 professorUid: professorUidLinha,
+                professorEmail: professorEmailLinha,
                 clienteUid: resolvedClienteUid,
                 clientUid:  resolvedClienteUid,
                 estudante: btnEstudante ? (btnEstudante.dataset.estudante || '') : '',

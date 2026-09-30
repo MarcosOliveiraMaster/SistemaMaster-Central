@@ -2126,6 +2126,13 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
           // conta já existia — corrigir-uid-aulas.js limpa essa flag ao resolver.
           if (res.jaExistia) update.precisaVerificarUid = true;
           await db.collection('cadastroClientes').doc(c._docId).update(update);
+          // Leva o uid às aulas já criadas para este CPF (quadros e fotos do
+          // registro só aparecem no portal do cliente com clienteUid na aula).
+          const uidCliente = res.uid || c.uid || '';
+          if (uidCliente && window.BANCO && typeof BANCO.vincularAulasAoCliente === 'function') {
+            try { await BANCO.vincularAulasAoCliente(cpf, uidCliente); }
+            catch (eVinc) { console.warn('[Acesso] Não foi possível vincular as aulas ao cliente:', eVinc); }
+          }
           resultados.push({
             nome, tipo: res.jaExistia ? 'warn' : 'ok',
             msg: res.jaExistia

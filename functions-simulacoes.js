@@ -4067,6 +4067,16 @@ const Simulacoes = (function() {
           ? editingSimulacao.valorLucroMaster
           : (valorPacoteCalc - valorEquipeCalc);
 
+      // E-mail do professor (minúsculas) → campo professorEmail, usado pelo portal
+      // do professor e pelas Firestore Rules para reconhecer o dono da aula.
+      const emailDoProfessor = (aula) => {
+        const dig = String(aula.idProfessor || '').replace(/\D/g, '');
+        const nome = String(aula.professor || '').trim();
+        const prof = (dig && professoresData.find(p => String(p.cpf || '').replace(/\D/g, '') === dig))
+          || (nome && nome !== 'A definir' && professoresData.find(p => (p.nome || '').trim() === nome));
+        return prof ? String(prof.email || '').trim().toLowerCase() : '';
+      };
+
       // 4. Gerar IDs de aula e fixar ValorAula com os valores atualmente exibidos
       const aulasComIds = (editingSimulacao.aulas || []).map((aula, index) => {
         const idAula = novoCodigoContratacao + gerarSufixoAula(index);
@@ -4077,6 +4087,7 @@ const Simulacoes = (function() {
           'id-Aula': idAula,
           idProfessor: aula.idProfessor || '',
           professorUid: aula.professorUid || '',
+          professorEmail: emailDoProfessor(aula),
           professor: aula.professor || 'A definir',
           materia: aula.materia || '',
           estudante: aula.estudante || '',
