@@ -386,26 +386,26 @@ window.AuthProfessores = (function () {
 
   /**
    * Cria conta de professor no Firebase Auth via instância secundária.
-   * Senha = CPF com apenas os dígitos (sem pontos e traço).
+   * Senha aleatória (senha-inicial.js) que ninguém vê; o professor recebe o
+   * e-mail para definir a própria senha. Antes a senha era o CPF (C3).
    *
-   * @returns {{ sucesso, uid, jaExistia, erro }}
+   * @returns {{ sucesso, uid, jaExistia, emailEnviado, erro }}
    */
   async function criarContaProfessor(email, cpf) {
-    const senha = (cpf || '').replace(/\D/g, ''); // apenas os 11 dígitos
-
     if (!email || !email.includes('@')) {
       return { sucesso: false, erro: 'E-mail inválido.' };
     }
-    if (senha.length < 6) {
+    if ((cpf || '').replace(/\D/g, '').length < 6) {
       return { sucesso: false, erro: 'CPF inválido (mínimo 6 dígitos).' };
     }
 
     const auth = getSecondaryAuth();
     try {
-      const cred = await auth.createUserWithEmailAndPassword(email, senha);
+      const cred = await auth.createUserWithEmailAndPassword(email, window.SENHA_INICIAL.gerar());
       const uid  = cred.user.uid;
       await auth.signOut();
-      return { sucesso: true, uid, jaExistia: false };
+      const emailEnviado = await window.SENHA_INICIAL.enviarDefinicao(email);
+      return { sucesso: true, uid, jaExistia: false, emailEnviado };
     } catch (e) {
       try { await auth.signOut(); } catch { /* ignora */ }
 
@@ -916,13 +916,15 @@ window.AuthProfessores = (function () {
 
           resultados.push({
             nome,
-            tipo: res.jaExistia ? 'warn' : 'ok',
+            tipo: (res.jaExistia || res.emailEnviado === false) ? 'warn' : 'ok',
             msg: res.jaExistia
-              // Lembrete explícito: nesse caso o "uid" não é sincronizado aqui
-              // (limitação do SDK client-side / Cloud Function indisponível no
-              // plano Spark) — rodar corrigir-uid-aulas.js em seguida.
-              ? '⚠️ Acesso reativado (conta já existia no sistema). Rode corrigir-uid-aulas.js (repo Login) para sincronizar o uid.'
-              : 'Conta criada e acesso concedido com sucesso.'
+              // O "uid" não é sincronizado aqui (limitação do SDK client-side);
+              // o portal corrige sozinho no 1º login com e-mail confirmado
+              // (SistemMaster-Login/auth.js → auto-correção do uid).
+              ? '⚠️ Acesso reativado (conta já existia). O login se ajusta sozinho quando o professor entrar e confirmar o e-mail.'
+              : res.emailEnviado === false
+                ? '⚠️ Conta criada, mas o e-mail para definir a senha não foi enviado. Peça ao professor para usar "Esqueci minha senha".'
+                : 'Conta criada. O professor recebeu um e-mail para definir a senha.'
           });
         } else {
           resultados.push({ nome, tipo: 'error', msg: `Erro ao criar conta: ${res.erro}` });

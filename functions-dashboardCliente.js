@@ -2126,17 +2126,19 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
     }
   }
 
+  // Senha aleatória (senha-inicial.js) que ninguém vê + e-mail para o
+  // responsável definir a própria senha. Antes a senha era o CPF (C3).
   async _criarContaCliente(email, cpf) {
-    const senha = (cpf || '').replace(/\D/g, '');
     if (!email || !email.includes('@')) return { sucesso: false, erro: 'E-mail inválido.' };
-    if (senha.length < 6) return { sucesso: false, erro: 'CPF inválido (mínimo 6 dígitos).' };
+    if ((cpf || '').replace(/\D/g, '').length < 6) return { sucesso: false, erro: 'CPF inválido (mínimo 6 dígitos).' };
 
     const auth = this._getSecondaryAuth();
     try {
-      const cred = await auth.createUserWithEmailAndPassword(email, senha);
+      const cred = await auth.createUserWithEmailAndPassword(email, window.SENHA_INICIAL.gerar());
       const uid  = cred.user.uid;
       await auth.signOut();
-      return { sucesso: true, uid, jaExistia: false };
+      const emailEnviado = await window.SENHA_INICIAL.enviarDefinicao(email);
+      return { sucesso: true, uid, jaExistia: false, emailEnviado };
     } catch (e) {
       try { await auth.signOut(); } catch { /* ignora */ }
       if (e.code === 'auth/email-already-in-use') {
@@ -2189,10 +2191,12 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
             catch (eVinc) { console.warn('[Acesso] Não foi possível vincular as aulas ao cliente:', eVinc); }
           }
           resultados.push({
-            nome, tipo: res.jaExistia ? 'warn' : 'ok',
+            nome, tipo: (res.jaExistia || res.emailEnviado === false) ? 'warn' : 'ok',
             msg: res.jaExistia
-              ? '⚠️ Acesso concedido (conta já existia no sistema). Rode corrigir-uid-aulas.js --incluir-cliente para sincronizar o uid.'
-              : 'Conta criada e acesso concedido com sucesso.'
+              ? '⚠️ Acesso concedido (conta já existia). Quando o responsável entrar e confirmar o e-mail, ele aparece em "Login novo — vincular aulas".'
+              : res.emailEnviado === false
+                ? '⚠️ Conta criada, mas o e-mail para definir a senha não foi enviado. Peça ao responsável para usar "Esqueci minha senha".'
+                : 'Conta criada. O responsável recebeu um e-mail para definir a senha.'
           });
         } else {
           resultados.push({ nome, tipo: 'error', msg: `Erro ao criar conta: ${res.erro}` });
