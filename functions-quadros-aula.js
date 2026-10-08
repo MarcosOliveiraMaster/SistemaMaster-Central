@@ -7,6 +7,13 @@
 // Dados: quadros/{id} e quadros/{id}/paginas/{0..9}. O admin lê tudo pelas
 // regras do Firestore. As páginas são desenhadas por quadro-render.js (cópia
 // do arquivo do portal) SÓ em <canvas>: nada do conteúdo vira HTML.
+//
+// Vínculo com o cliente: o cliente só vê o quadro com clienteUid preenchido.
+// Quando o professor cria o quadro com uma aula ainda sem professorEmail ou sem
+// clienteUid, o quadro nasce "não visível". O botão "Vincular ao cliente" (e
+// "Vincular pendentes") acha a aula do mesmo professor e aluno, corrige a aula
+// (professorEmail/clienteUid) e liga o quadro a ela — o mesmo vínculo que as
+// regras exigem quando o professor salva o quadro (vinculoValido).
 
 import { abrirVisualizadorQuadro, MAX_PAGINAS } from './quadro-render.js';
 
@@ -39,19 +46,100 @@ import { abrirVisualizadorQuadro, MAX_PAGINAS } from './quadro-render.js';
     });
   }
 
+  const norm = (v) => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  const naoVinculado = (q) => !q.clienteUid && !!(q.alunoNome || q.clienteNome);
+
+  function seloVinculo(q) {
+    if (q.clienteUid) return '<span class="text-xs font-semibold bg-green-50 text-green-700 rounded-full px-2 py-0.5"><i class="fas fa-eye"></i> Visível ao cliente</span>';
+    if (!naoVinculado(q)) return '<span class="text-xs font-semibold bg-gray-100 text-gray-600 rounded-full px-2 py-0.5">Sem aluno · só professor e Master</span>';
+    return '<span class="text-xs font-semibold bg-red-50 text-red-700 rounded-full px-2 py-0.5"><i class="fas fa-eye-slash"></i> Não visível ao cliente</span>';
+  }
+
+  function formasCpf(cpf) {
+    const dig = String(cpf || '').replace(/\D/g, '');
+    if (dig.length !== 11) return [];
+    return [...new Set([dig, `${dig.slice(0, 3)}.${dig.slice(3, 6)}.${dig.slice(6, 9)}-${dig.slice(9)}`, String(cpf).trim()])];
+  }
+
+  // Liga o quadro ao cliente. Lança Error com mensagem para o usuário.
+  async function vincular(q) {
+    const db = firebase.firestore();
+    const email = String(q.professorEmail || '').trim().toLowerCase();
+    const snap = q.clienteNome
+      ? await db.collection('BancoDeAulas-Lista').where('nomeCliente', '==', q.clienteNome).get()
+      : await db.collection('BancoDeAulas-Lista').where('estudante', '==', q.alunoNome).get();
+    const aluno = norm(q.alunoNome);
+    let candidatas = snap.docs
+      .map(d => ({ id: d.id, ref: d.ref, a: d.data() }))
+      .filter(c => !aluno || norm(c.a.estudante) === aluno);
+    if (!candidatas.length) throw new Error('Nenhuma aula encontrada para este aluno/cliente.');
+
+    // A aula precisa ser do professor do quadro (as regras conferem isso).
+    for (const c of candidatas) {
+      if (String(c.a.professorEmail || '').toLowerCase() !== email && typeof window.BANCO?.resolverEmailProfessor === 'function') {
+        c.emailResolvido = await window.BANCO.resolverEmailProfessor({ cpf: c.a.idProfessor, nome: c.a.professor });
+      }
+    }
+    candidatas = candidatas.filter(c => String(c.a.professorEmail || '').toLowerCase() === email || c.emailResolvido === email);
+    if (!candidatas.length) throw new Error('Nenhuma aula deste aluno está atribuída ao professor do quadro.');
+    const naoCancelada = candidatas.filter(c => !String(c.a.StatusAula || '').toLowerCase().includes('cancel'));
+    const aula = (naoCancelada.length ? naoCancelada : candidatas)
+      .sort((x, y) => (y.a.clienteUid ? 1 : 0) - (x.a.clienteUid ? 1 : 0))[0];
+
+    let uid = aula.a.clienteUid || aula.a.clientUid || '';
+    if (!uid) {
+      const formas = formasCpf(aula.a.cpf);
+      if (formas.length) {
+        const cad = await db.collection('cadastroClientes').where('cpf', 'in', formas).limit(1).get();
+        if (!cad.empty) uid = cad.docs[0].data().uid || '';
+      }
+      if (!uid) throw new Error('O cliente ainda não tem acesso ao portal. Libere o acesso em Clientes e tente de novo.');
+      if (typeof window.BANCO?.vincularAulasAoCliente === 'function') await window.BANCO.vincularAulasAoCliente(aula.a.cpf, uid);
+      else await aula.ref.update({ clienteUid: uid, clientUid: uid });
+    }
+    if (String(aula.a.professorEmail || '').toLowerCase() !== email) await aula.ref.update({ professorEmail: email });
+
+    await db.collection('quadros').doc(q.id).update({ aulaId: aula.id, clienteUid: uid });
+    q.aulaId = aula.id; q.clienteUid = uid;
+  }
+
+  const avisar = (msg, tipo) => (typeof showToast === 'function' ? showToast(msg, tipo) : alert(msg));
+
+  async function vincularPendentes(btn) {
+    const pendentes = quadros.filter(naoVinculado);
+    if (!pendentes.length) return;
+    btn.disabled = true;
+    let ok = 0; const falhas = [];
+    for (const q of pendentes) {
+      btn.textContent = `Vinculando ${ok + falhas.length + 1}/${pendentes.length}…`;
+      try { await vincular(q); ok++; }
+      catch (err) { falhas.push(`${q.titulo}: ${err.message}`); }
+    }
+    if (falhas.length) console.warn('[Quadros de aula] Não vinculados:\n' + falhas.join('\n'));
+    avisar(`${ok} quadro(s) vinculado(s)${falhas.length ? ` · ${falhas.length} sem vínculo possível (detalhes no console)` : ''}.`, falhas.length ? 'warning' : 'success');
+    desenharCards();
+  }
+
   function desenharCards() {
     const lista = document.getElementById('qa-lista');
     const cont = document.getElementById('qa-contagem');
     if (!lista) return;
     const itens = filtrados();
     cont.textContent = `${itens.length} ${itens.length === 1 ? 'quadro' : 'quadros'}`;
+    const pend = quadros.filter(naoVinculado).length;
+    const btnPend = document.getElementById('qa-vincular-pendentes');
+    if (btnPend) {
+      btnPend.style.display = pend ? '' : 'none';
+      btnPend.disabled = false;
+      btnPend.innerHTML = `<i class="fas fa-link"></i> Vincular pendentes (${pend})`;
+    }
     if (!itens.length) {
       lista.innerHTML = `<div class="col-span-full text-center text-gray-500 py-12 bg-white rounded-xl border border-dashed">
         <i class="fas fa-chalkboard text-4xl text-orange-300 mb-3 block"></i>Nenhum quadro encontrado com estes filtros.</div>`;
       return;
     }
     lista.innerHTML = itens.map(q => `
-      <button type="button" class="qa-card text-left bg-white rounded-xl shadow-sm border border-gray-200 p-4 flex flex-col gap-2 hover:shadow-md hover:border-orange-300 transition" data-id="${esc(q.id)}">
+      <div class="qa-card text-left bg-white rounded-xl shadow-sm border border-gray-200 p-4 flex flex-col gap-2 hover:shadow-md hover:border-orange-300 transition" data-id="${esc(q.id)}">
         <div class="flex items-start justify-between gap-2">
           <h3 class="font-lexend font-bold text-gray-800 break-words">${esc(q.titulo)}</h3>
           <span class="text-xs font-semibold bg-orange-50 text-orange-600 rounded-full px-2 py-0.5 whitespace-nowrap">${Number(q.paginas) || 1} pág.</span>
@@ -62,10 +150,28 @@ import { abrirVisualizadorQuadro, MAX_PAGINAS } from './quadro-render.js';
           <div><i class="fas fa-user-graduate w-4 text-orange-500"></i> ${esc(q.alunoNome || 'Sem aluno')}${q.clienteNome ? ` · ${esc(q.clienteNome)}` : ''}</div>
           <div><i class="far fa-calendar w-4 text-orange-500"></i> Criado em ${esc(fmt(q.criadoEm))} · Atualizado em ${esc(fmt(q.atualizadoEm))}</div>
         </div>
-        <span class="text-sm font-semibold text-orange-600 mt-1">Ver quadro <i class="fas fa-arrow-right text-xs"></i></span>
-      </button>`).join('');
+        <div>${seloVinculo(q)}</div>
+        <div class="flex flex-wrap items-center gap-3 mt-1">
+          <button type="button" class="qa-ver text-sm font-semibold text-orange-600 hover:underline">Ver quadro <i class="fas fa-arrow-right text-xs"></i></button>
+          ${naoVinculado(q) ? '<button type="button" class="qa-vincular text-sm font-semibold text-red-700 hover:underline"><i class="fas fa-link"></i> Vincular ao cliente</button>' : ''}
+        </div>
+      </div>`).join('');
     lista.querySelectorAll('.qa-card').forEach(card => {
-      card.onclick = () => abrir(quadros.find(q => q.id === card.dataset.id));
+      const q = quadros.find(x => x.id === card.dataset.id);
+      card.querySelector('.qa-ver').onclick = () => abrir(q);
+      const btn = card.querySelector('.qa-vincular');
+      if (btn) btn.onclick = async () => {
+        btn.disabled = true;
+        btn.textContent = 'Vinculando…';
+        try {
+          await vincular(q);
+          avisar('Quadro vinculado: o cliente já pode vê-lo no portal.', 'success');
+        } catch (err) {
+          console.error('[Quadros de aula] Vincular:', err);
+          avisar(err.message || 'Não foi possível vincular o quadro.', 'error');
+        }
+        desenharCards();
+      };
     });
   }
 
@@ -107,7 +213,10 @@ import { abrirVisualizadorQuadro, MAX_PAGINAS } from './quadro-render.js';
           </div>
           <div class="flex items-center justify-between mt-3">
             <span id="qa-contagem" class="text-sm text-gray-500">Carregando…</span>
-            <button id="qa-limpar" type="button" class="text-sm font-semibold text-orange-600 hover:underline">Limpar filtros</button>
+            <div class="flex items-center gap-4">
+              <button id="qa-vincular-pendentes" type="button" class="text-sm font-semibold text-red-700 hover:underline" style="display:none"></button>
+              <button id="qa-limpar" type="button" class="text-sm font-semibold text-orange-600 hover:underline">Limpar filtros</button>
+            </div>
           </div>
         </div>
         <div id="qa-lista" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4"></div>
@@ -141,6 +250,8 @@ import { abrirVisualizadorQuadro, MAX_PAGINAS } from './quadro-render.js';
     ligar('qa-f-de', 'de');
     ligar('qa-f-ate', 'ate');
     ligar('qa-f-busca', 'busca', 'input');
+    const btnPend = document.getElementById('qa-vincular-pendentes');
+    btnPend.onclick = () => vincularPendentes(btnPend);
     document.getElementById('qa-limpar').onclick = () => {
       Object.keys(filtros).forEach(k => { filtros[k] = ''; });
       ['qa-f-professor', 'qa-f-cliente', 'qa-f-de', 'qa-f-ate', 'qa-f-busca'].forEach(id => { document.getElementById(id).value = ''; });
