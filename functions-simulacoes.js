@@ -683,7 +683,19 @@ const Simulacoes = (function() {
                 )
             )
         );
-    
+
+    // Cliente já cadastrado desta simulação. Contratações feitas pelo app trazem
+    // o uid do login (clienteUid) e o CPF só com dígitos: casar por eles evita
+    // pegar o cliente errado (homônimo) ou nenhum (nome com espaço/acento
+    // diferente), o que faria a aprovação gravar aulas sem cpf/clientUid.
+    const soDigitos = (v) => String(v || '').replace(/\D/g, '');
+    const nomeNorm  = (v) => String(v || '').trim().replace(/\s+/g, ' ').toLowerCase();
+    const clienteDaSimulacao =
+         (simulacao.clienteUid && clientesData.find(c => c.uid && c.uid === simulacao.clienteUid))
+      || (soDigitos(simulacao.cpf) && clientesData.find(c => soDigitos(c.cpf) === soDigitos(simulacao.cpf)))
+      || (simulacao.nomeCliente && clientesData.find(c => nomeNorm(c.nome) === nomeNorm(simulacao.nomeCliente)))
+      || null;
+
     const modalHtml = `
       <div class="modal-overlay" id="modal-simulacao">
         <div class="modal-container" style="max-width: 95vw; max-height: 90vh;">
@@ -738,7 +750,7 @@ const Simulacoes = (function() {
                         id="busca-cliente"
                         placeholder="Buscar cliente..."
                         autocomplete="off"
-                        value="${escapeHtml(simulacao.nomeCliente || '')}"
+                        value="${escapeHtml(clienteDaSimulacao ? (clienteDaSimulacao.nome || '') : (simulacao.nomeCliente || ''))}"
                         class="w-full border border-gray-300 rounded-lg pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
                       />
                       <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
@@ -749,7 +761,7 @@ const Simulacoes = (function() {
                       <option value="">Selecione um cliente</option>
                       <option value="__novo__">➕ Novo Cliente</option>
                       ${[...clientesData].sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR')).map(c => `
-                        <option value="${c.id}" ${c.nome === simulacao.nomeCliente ? 'selected' : ''}>
+                        <option value="${c.id}" ${clienteDaSimulacao && c.id === clienteDaSimulacao.id ? 'selected' : ''}>
                           ${escapeHtml(c.nome || 'Sem nome')}
                         </option>
                       `).join('')}
@@ -3983,7 +3995,25 @@ const Simulacoes = (function() {
       showToast('⚠️ Adicione pelo menos uma aula antes de aprovar', 'warning');
       return;
     }
-    
+
+    // Sem cliente, as aulas nascem sem cpf/clientUid e ninguém as vê no portal.
+    const selCliente = document.getElementById('select-cliente');
+    if (!selCliente || !selCliente.value || selCliente.value === '__novo__') {
+      showToast('⚠️ Selecione o cliente antes de aprovar', 'warning');
+      return;
+    }
+    // Contratação feita pelo app: o cliente escolhido tem de ser quem contratou.
+    if (editingSimulacao.origem === 'app-cliente' && selCliente.value !== '__temp__') {
+      const escolhido = clientesData.find(c => c.id === selCliente.value) || {};
+      const dig = (v) => String(v || '').replace(/\D/g, '');
+      const mesmoUid = editingSimulacao.clienteUid && escolhido.uid === editingSimulacao.clienteUid;
+      const mesmoCpf = dig(editingSimulacao.cpf) && dig(escolhido.cpf) === dig(editingSimulacao.cpf);
+      if (!mesmoUid && !mesmoCpf) {
+        showToast(`⚠️ Esta contratação foi feita pelo app por outro cliente (CPF ${escapeHtml(editingSimulacao.cpf || '—')}). Confira o cliente selecionado.`, 'warning', 9000);
+        return;
+      }
+    }
+
     // Mostrar loading
     const btnAprovar = document.getElementById('btn-aprovar-simulacao');
     const originalHtml = btnAprovar.innerHTML;
@@ -4097,7 +4127,7 @@ const Simulacoes = (function() {
           StatusAula: aula.StatusAula || '',
           ObservacoesAula: aula.ObservacoesAula || '',
           RelatorioAula: aula.RelatorioAula || '',
-          ConfirmacaoProfessorAula: aula.ConfirmacaoProfessorAula || 'false',
+          ConfirmacaoProfessorAula: aula.ConfirmacaoProfessorAula === true || aula.ConfirmacaoProfessorAula === 'true', // sempre booleano (o texto 'false' contava como concluída)
           disponibilizarRrelatório: aula.disponibilizarRrelatório || '',
           ValorAula: valorAulaCalc
         };
@@ -4126,7 +4156,7 @@ const Simulacoes = (function() {
         valorLucroMasterPorHora: editingSimulacao && editingSimulacao.valorLucroMasterPorHora ? editingSimulacao.valorLucroMasterPorHora : null,
         SomatorioDuracaoAulas: horasTotais,
         aulas: aulasComIds,
-        ConfirmacaoProfessorAula: '',
+        ConfirmacaoProfessorAula: false,
         ObservacaoContratacao: '',
         timestamp: firebase.firestore.FieldValue.serverTimestamp()
       };

@@ -471,7 +471,7 @@ async function loadAulasPainel(dataFiltro) {
 
     // Renderizar tabela
     tbody.innerHTML = aulas.map(aula => {
-      const statusIcon = aula.ConfirmacaoProfessorAula
+      const statusIcon = (aula.ConfirmacaoProfessorAula === true || aula.ConfirmacaoProfessorAula === 'true')
         ? '<i class="fas fa-check-circle text-green-500" title="Concluída"></i>'
         : '<i class="fas fa-clock text-yellow-500" title="Pendente"></i>';
 

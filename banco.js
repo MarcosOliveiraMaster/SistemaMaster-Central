@@ -769,6 +769,7 @@ async function copiarAulaLista(idAulaOrigem) {
       ConfirmacaoProfessorAula: false,
       ObservacoesAula: "",
       RelatorioAula: "",
+      temRegistroFoto: false, // a foto (registrosAula) é da aula de origem, não da cópia
       StatusAula: "Pendente",
       "id-Aula": novoIdAula,
       timestamp: firebase.firestore.FieldValue.serverTimestamp()

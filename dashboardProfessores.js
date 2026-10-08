@@ -1061,6 +1061,8 @@ textarea.gp-det-input { resize:vertical; min-height:60px; }
     const btn = $id('gp-btnSalvarDetalhes');
     const dados = {};
     $qa('#gp-detOverlay [data-field]').forEach(el => { dados[el.dataset.field] = el.value.trim(); });
+    // O portal e as Firestore Rules comparam o e-mail em minúsculas.
+    if (typeof dados.email === 'string') dados.email = dados.email.toLowerCase();
     dados[CFG.campoDisciplinas] = S.detDiscSelecionadas.join(', ');
     $qa('#gp-det-aulas .gp-avail-table input[type=checkbox]').forEach(cb => { dados[cb.dataset.slot] = cb.checked; });
 

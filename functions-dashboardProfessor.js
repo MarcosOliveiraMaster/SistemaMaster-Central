@@ -2049,6 +2049,8 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
       if (inp.tagName === 'SELECT' && CFG.colunasDiasTurnos.includes(inp.dataset.field)) val = val === 'true';
       dados[inp.dataset.field] = val;
     });
+    // O portal e as Firestore Rules comparam o e-mail em minúsculas.
+    if (typeof dados.email === 'string') dados.email = dados.email.toLowerCase();
     if (!dados.nome || !dados.nome.trim()) { toast('O campo "Nome Completo" é obrigatório.', 'error'); return; }
     const btn = $id('dp-btnSalvarEdicao');
     if (btn) { btn.textContent = 'Salvando…'; btn.disabled = true; }
@@ -2563,6 +2565,9 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
 
           // Cria conta no Firebase Auth: login = email, senha inicial = CPF (só dígitos)
           const emailLogin = String(profData.email || '').trim().toLowerCase();
+          // O cadastro guarda o mesmo e-mail do login (minúsculas): é por ele
+          // que o portal acha o professor e as Firestore Rules o reconhecem.
+          profData.email = emailLogin;
           const cpfSenha   = String(profData.cpf   || '').replace(/\D/g, '');
           const uid = await criarContaAuth(emailLogin, cpfSenha);
           if (uid) {
