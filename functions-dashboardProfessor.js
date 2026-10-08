@@ -2049,6 +2049,8 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
       if (inp.tagName === 'SELECT' && CFG.colunasDiasTurnos.includes(inp.dataset.field)) val = val === 'true';
       dados[inp.dataset.field] = val;
     });
+    // O portal e as Firestore Rules comparam o e-mail em minúsculas.
+    if (typeof dados.email === 'string') dados.email = dados.email.toLowerCase();
     if (!dados.nome || !dados.nome.trim()) { toast('O campo "Nome Completo" é obrigatório.', 'error'); return; }
     const btn = $id('dp-btnSalvarEdicao');
     if (btn) { btn.textContent = 'Salvando…'; btn.disabled = true; }
@@ -2561,16 +2563,21 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
           profData.status = 'Ativo';
           profData.dataAtivacao = Date.now();
 
-          // Cria conta no Firebase Auth: login = email, senha inicial = CPF (só dígitos)
+          // Cria conta no Firebase Auth: login = email, senha aleatória que
+          // ninguém vê (C3 — antes era o CPF). O professor recebe o e-mail
+          // para definir a própria senha (senha-inicial.js).
           const emailLogin = String(profData.email || '').trim().toLowerCase();
-          const cpfSenha   = String(profData.cpf   || '').replace(/\D/g, '');
-          const uid = await criarContaAuth(emailLogin, cpfSenha);
+          // O cadastro guarda o mesmo e-mail do login (minúsculas): é por ele
+          // que o portal acha o professor e as Firestore Rules o reconhecem.
+          profData.email = emailLogin;
+          const uid = await criarContaAuth(emailLogin, window.SENHA_INICIAL.gerar());
+          let emailEnviado = true;
           if (uid) {
             profData.uid = uid;
+            emailEnviado = await window.SENHA_INICIAL.enviarDefinicao(emailLogin);
           } else {
-            // E-mail já tinha conta — uid não resolvido aqui. Marca o doc pra
-            // ficar visível no aviso do painel "Atualizar Permissões" até
-            // corrigir-uid-aulas.js rodar e limpar essa flag.
+            // E-mail já tinha conta — uid não resolvido aqui. O portal corrige
+            // o uid sozinho no 1º login com e-mail confirmado (auth.js).
             profData.precisaVerificarUid = true;
           }
 
@@ -2583,9 +2590,11 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
           renderListaCandidatos();
 
           if (!uid) {
-            toast(`⚠️ ${profData.nome || 'Professor'} promovido, mas o e-mail já tinha conta — rode corrigir-uid-aulas.js para sincronizar o login.`, 'warning');
+            toast(`⚠️ ${profData.nome || 'Professor'} promovido. O e-mail já tinha conta: o login se ajusta sozinho quando o professor entrar e confirmar o e-mail.`, 'warning');
+          } else if (!emailEnviado) {
+            toast(`⚠️ ${profData.nome || 'Professor'} promovido, mas o e-mail para definir a senha não foi enviado. Peça para usar "Esqueci minha senha".`, 'warning');
           } else {
-            toast(`${profData.nome || 'Professor'} promovido com sucesso!`, 'success');
+            toast(`${profData.nome || 'Professor'} promovido! Ele recebeu um e-mail para definir a senha.`, 'success');
           }
         } catch (e) { toast('Erro ao promover: ' + e.message, 'error'); }
       }

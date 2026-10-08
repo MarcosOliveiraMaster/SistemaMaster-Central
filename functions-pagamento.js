@@ -335,6 +335,14 @@ function buscarProfessorPagamento(cpf) {
       || (window._pagProfessoresDesligados || []).find(p => p.cpf === cpf);
 }
 
+// E-mail (minúsculas) do professor para o campo "professorEmail" dos
+// lançamentos. É por ele que a aba Financeiro do portal do professor e as
+// Firestore Rules reconhecem o dono do lançamento — sem ele o lançamento só
+// aparece para quem ainda tem o claim de transição.
+function emailProfessorPagamento(cpf) {
+  return String(buscarProfessorPagamento(cpf)?.email || '').trim().toLowerCase();
+}
+
 // ─── Modal: buscar professor desligado ───
 
 function abrirModalProfessorDesligado() {
@@ -557,6 +565,7 @@ async function salvarInfoAdicional(id) {
   // Buscar uid do professor para regras de segurança
   const professor = buscarProfessorPagamento(professorId);
   const professorUid = professor?.uid || '';
+  const professorEmail = emailProfessorPagamento(professorId);
 
   try {
     const docId = professorId + '_' + mes + '-' + ano + '_' + Date.now();
@@ -567,6 +576,7 @@ async function salvarInfoAdicional(id) {
       tipo,
       idProfessor: professorId,
       professorUid,
+      professorEmail,
       mes: parseInt(mes, 10),
       ano: parseInt(ano, 10)
     });
@@ -582,7 +592,8 @@ async function salvarInfoAdicional(id) {
     btn.innerHTML = '<i class="fas fa-trash-alt"></i>';
     registrarAutoSaveInfoAdicional(row);
 
-    showToast('Informação salva com sucesso!', 'success');
+    if (professorEmail) showToast('Informação salva com sucesso!', 'success');
+    else showToast('Informação salva, mas o professor não tem e-mail no cadastro: ele não verá este lançamento no portal.', 'warning');
     atualizarResumoSeNecessario();
   } catch (error) {
     console.error('Erro ao salvar informação adicional:', error);
@@ -655,8 +666,11 @@ async function confirmarEdicaoInfoAdicional(id) {
   const tipo = select?.value || 'entrada';
 
   try {
+    // Lançamentos antigos, sem professorEmail, ganham o campo na primeira edição.
+    const professorEmail = emailProfessorPagamento(document.getElementById('pag-professor-select')?.value);
     await db.collection('informacoesPagamento').doc(docId).update({
-      descricao, data, valor, tipo
+      descricao, data, valor, tipo,
+      ...(professorEmail ? { professorEmail } : {})
     });
 
     // Voltar para lixeira

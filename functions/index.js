@@ -66,13 +66,16 @@ exports.manageClientAuth = functions
 
   // ── ENABLE: cria ou reativa conta ─────────────────────────────
   if (action === 'enable') {
-    const senha = (cpf || '').replace(/\D/g, '');
+    // C3: a senha NUNCA é o CPF. Conta nova nasce com senha aleatória (a pessoa
+    // define a dela pelo e-mail de redefinição); conta existente mantém a senha.
+    const senha      = require('crypto').randomBytes(24).toString('base64url') + 'Aa1!';
+    const cpfDigitos = (cpf || '').replace(/\D/g, '');
 
     if (!email || !email.includes('@'))
       return res.status(400).json({ sucesso: false, erro: 'E-mail inválido.' });
     if (!docId)
       return res.status(400).json({ sucesso: false, erro: 'docId obrigatório.' });
-    if (senha.length < 6)
+    if (cpfDigitos.length < 6)
       return res.status(400).json({ sucesso: false, erro: 'CPF inválido (mínimo 6 dígitos).' });
 
     try {
@@ -82,7 +85,7 @@ exports.manageClientAuth = functions
       try {
         userRecord = await admin.auth().getUserByEmail(email);
         jaExistia  = true;
-        await admin.auth().updateUser(userRecord.uid, { disabled: false, password: senha });
+        await admin.auth().updateUser(userRecord.uid, { disabled: false });
       } catch (e) {
         if (e.code === 'auth/user-not-found') {
           try {
@@ -204,13 +207,16 @@ exports.manageProfessorAuth = functions
 
   // ── ENABLE: cria ou reativa conta ─────────────────────────────
   if (action === 'enable') {
-    const senha = (cpf || '').replace(/\D/g, '');
+    // C3: a senha NUNCA é o CPF. Conta nova nasce com senha aleatória (a pessoa
+    // define a dela pelo e-mail de redefinição); conta existente mantém a senha.
+    const senha      = require('crypto').randomBytes(24).toString('base64url') + 'Aa1!';
+    const cpfDigitos = (cpf || '').replace(/\D/g, '');
 
     if (!email || !email.includes('@'))
       return res.status(400).json({ sucesso: false, erro: 'E-mail inválido.' });
     if (!docId)
       return res.status(400).json({ sucesso: false, erro: 'docId obrigatório.' });
-    if (senha.length < 6)
+    if (cpfDigitos.length < 6)
       return res.status(400).json({ sucesso: false, erro: 'CPF inválido (mínimo 6 dígitos).' });
 
     try {
@@ -220,7 +226,7 @@ exports.manageProfessorAuth = functions
       try {
         userRecord = await admin.auth().getUserByEmail(email);
         jaExistia  = true;
-        await admin.auth().updateUser(userRecord.uid, { disabled: false, password: senha });
+        await admin.auth().updateUser(userRecord.uid, { disabled: false });
       } catch (e) {
         if (e.code === 'auth/user-not-found') {
           try {

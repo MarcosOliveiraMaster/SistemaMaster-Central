@@ -1849,6 +1849,53 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
     this.carregarPermissoesClientes();
   }
 
+  // Aviso no topo do modal: "N clientes com login novo" + botão que leva o uid
+  // às aulas (BancoDeAulas-Lista e BancoDeAulas, consulta por CPF — barata) e
+  // limpa vincularAulasPendente no cadastro.
+  _renderVinculosPendentes(body, pendentes) {
+    if (!pendentes.length) return;
+    const esc = str => String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const box = document.createElement('div');
+    box.className = 'ap-perm-group';
+    box.innerHTML = `
+      <div class="ap-perm-group-title ap-perm-group-title--grant">
+        <i class="fas fa-link"></i> Login novo — vincular aulas (${pendentes.length})
+      </div>
+      <p style="font-size:.85rem;color:#6b7280;margin:.2rem 0 .6rem">
+        Estes clientes entraram com uma conta que já existia. Vincule as aulas ao login
+        para eles verem quadros, fotos do registro e compartilharem o local da aula.
+      </p>
+      <div class="ap-perm-list">${pendentes.map(c => `
+        <div class="ap-perm-item"><div class="ap-perm-info">
+          <div class="ap-perm-nome">${esc(c.nome || '(sem nome)')}</div>
+          <div class="ap-perm-sub">${esc(c.email || '—')}</div>
+        </div></div>`).join('')}</div>
+      <button class="ap-btn ap-btn--primary" type="button" style="margin-top:.6rem"><i class="fas fa-link"></i> Vincular aulas</button>`;
+    body.prepend(box);
+
+    const btn = box.querySelector('button');
+    btn.addEventListener('click', async () => {
+      if (!window.BANCO || typeof BANCO.vincularAulasAoCliente !== 'function') {
+        this.showToast('Função de vínculo indisponível.', 'error');
+        return;
+      }
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Vinculando…';
+      let ok = 0, aulas = 0;
+      for (const c of pendentes) {
+        try {
+          aulas += await BANCO.vincularAulasAoCliente(c.cpf, c.uid);
+          await this.firestore.collection('cadastroClientes').doc(c._docId).update({ vincularAulasPendente: false });
+          ok++;
+        } catch (e) {
+          console.warn('[Acesso] Não vinculou as aulas de', c._docId, e);
+        }
+      }
+      this.showToast(`${ok} de ${pendentes.length} clientes vinculados (${aulas} registros atualizados).`, ok === pendentes.length ? 'success' : 'warning');
+      this.carregarPermissoesClientes();
+    });
+  }
+
   async carregarPermissoesClientes() {
     const body   = document.getElementById('dc-permBody');
     const footer = document.getElementById('dc-permFooter');
@@ -1876,6 +1923,12 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
       sortByName(receberao);
       sortByName(perderao);
 
+      // Clientes cujo login corrigiu o próprio uid (conta que já existia
+      // quando o acesso foi liberado — SistemMaster-Login/auth.js). As aulas
+      // ainda têm o uid antigo/vazio: sem levar o uid novo até elas, o cliente
+      // não vê quadros, fotos do registro nem compartilha o local da aula.
+      const pendentesVinculo = sortByName(clientes.filter(c => c.vincularAulasPendente === true && c.uid));
+
       if (!receberao.length && !perderao.length) {
         body.innerHTML = `
           <div class="ap-empty">
@@ -1883,6 +1936,7 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
             <strong>Tudo sincronizado!</strong>
             <p>Todos os acessos já estão de acordo com os status atuais.<br>Nenhuma ação necessária.</p>
           </div>`;
+        this._renderVinculosPendentes(body, pendentesVinculo);
         return;
       }
 
@@ -1940,6 +1994,7 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
       }
 
       body.innerHTML = html;
+      this._renderVinculosPendentes(body, pendentesVinculo);
 
       const atualizarBtn = () => {
         const btn = document.getElementById('dc-permAplicar');
@@ -2071,17 +2126,19 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
     }
   }
 
+  // Senha aleatória (senha-inicial.js) que ninguém vê + e-mail para o
+  // responsável definir a própria senha. Antes a senha era o CPF (C3).
   async _criarContaCliente(email, cpf) {
-    const senha = (cpf || '').replace(/\D/g, '');
     if (!email || !email.includes('@')) return { sucesso: false, erro: 'E-mail inválido.' };
-    if (senha.length < 6) return { sucesso: false, erro: 'CPF inválido (mínimo 6 dígitos).' };
+    if ((cpf || '').replace(/\D/g, '').length < 6) return { sucesso: false, erro: 'CPF inválido (mínimo 6 dígitos).' };
 
     const auth = this._getSecondaryAuth();
     try {
-      const cred = await auth.createUserWithEmailAndPassword(email, senha);
+      const cred = await auth.createUserWithEmailAndPassword(email, window.SENHA_INICIAL.gerar());
       const uid  = cred.user.uid;
       await auth.signOut();
-      return { sucesso: true, uid, jaExistia: false };
+      const emailEnviado = await window.SENHA_INICIAL.enviarDefinicao(email);
+      return { sucesso: true, uid, jaExistia: false, emailEnviado };
     } catch (e) {
       try { await auth.signOut(); } catch { /* ignora */ }
       if (e.code === 'auth/email-already-in-use') {
@@ -2134,10 +2191,12 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
             catch (eVinc) { console.warn('[Acesso] Não foi possível vincular as aulas ao cliente:', eVinc); }
           }
           resultados.push({
-            nome, tipo: res.jaExistia ? 'warn' : 'ok',
+            nome, tipo: (res.jaExistia || res.emailEnviado === false) ? 'warn' : 'ok',
             msg: res.jaExistia
-              ? '⚠️ Acesso concedido (conta já existia no sistema). Rode corrigir-uid-aulas.js --incluir-cliente para sincronizar o uid.'
-              : 'Conta criada e acesso concedido com sucesso.'
+              ? '⚠️ Acesso concedido (conta já existia). Quando o responsável entrar e confirmar o e-mail, ele aparece em "Login novo — vincular aulas".'
+              : res.emailEnviado === false
+                ? '⚠️ Conta criada, mas o e-mail para definir a senha não foi enviado. Peça ao responsável para usar "Esqueci minha senha".'
+                : 'Conta criada. O responsável recebeu um e-mail para definir a senha.'
           });
         } else {
           resultados.push({ nome, tipo: 'error', msg: `Erro ao criar conta: ${res.erro}` });

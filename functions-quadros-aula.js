@@ -47,7 +47,7 @@ import { abrirVisualizadorQuadro, MAX_PAGINAS } from './quadro-render.js';
   }
 
   const norm = (v) => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-  const naoVinculado = (q) => !q.clienteUid && !!(q.alunoNome || q.clienteNome);
+  const naoVinculado = (q) => !q.clienteUid && !!(q.aulaEscolhida || q.alunoNome || q.clienteNome);
 
   function seloVinculo(q) {
     if (q.clienteUid) return '<span class="text-xs font-semibold bg-green-50 text-green-700 rounded-full px-2 py-0.5"><i class="fas fa-eye"></i> Visível ao cliente</span>';
@@ -65,6 +65,19 @@ import { abrirVisualizadorQuadro, MAX_PAGINAS } from './quadro-render.js';
   async function vincular(q) {
     const db = firebase.firestore();
     const email = String(q.professorEmail || '').trim().toLowerCase();
+    // O professor escolheu a aula do quadro (aulaEscolhida): usa exatamente ela,
+    // desde que a aula seja mesmo desse professor (as regras conferem isso).
+    if (q.aulaEscolhida) {
+      const s = await db.collection('BancoDeAulas-Lista').doc(q.aulaEscolhida).get();
+      if (s.exists) {
+        const a = s.data();
+        let doProfessor = String(a.professorEmail || '').toLowerCase() === email;
+        if (!doProfessor && typeof window.BANCO?.resolverEmailProfessor === 'function') {
+          doProfessor = (await window.BANCO.resolverEmailProfessor({ cpf: a.idProfessor, nome: a.professor })) === email;
+        }
+        if (doProfessor) return vincularNaAula(q, { id: s.id, ref: s.ref, a }, email);
+      }
+    }
     const snap = q.clienteNome
       ? await db.collection('BancoDeAulas-Lista').where('nomeCliente', '==', q.clienteNome).get()
       : await db.collection('BancoDeAulas-Lista').where('estudante', '==', q.alunoNome).get();
@@ -85,7 +98,12 @@ import { abrirVisualizadorQuadro, MAX_PAGINAS } from './quadro-render.js';
     const naoCancelada = candidatas.filter(c => !String(c.a.StatusAula || '').toLowerCase().includes('cancel'));
     const aula = (naoCancelada.length ? naoCancelada : candidatas)
       .sort((x, y) => (y.a.clienteUid ? 1 : 0) - (x.a.clienteUid ? 1 : 0))[0];
+    return vincularNaAula(q, aula, email);
+  }
 
+  // Completa a aula (cliente e professor) e liga o quadro a ela.
+  async function vincularNaAula(q, aula, email) {
+    const db = firebase.firestore();
     let uid = aula.a.clienteUid || aula.a.clientUid || '';
     if (!uid) {
       const formas = formasCpf(aula.a.cpf);

@@ -113,7 +113,7 @@
     .nt-apelido{font:700 1.05rem 'Lexend',sans-serif;color:#111827;}
     .nt-nome{font-size:.85rem;color:#6b7280;}
     .nt-status{font-size:.88rem;font-weight:700;margin-top:.3rem;display:flex;gap:.4rem;align-items:center;}
-    .nt-status.aceita{color:#15803d;} .nt-status.recusada{color:#dc2626;} .nt-status.contraproposta{color:#d97804;} .nt-status.pendente{color:#6b7280;}
+    .nt-status.aceita{color:#15803d;} .nt-status.recusada{color:#dc2626;} .nt-status.contraproposta{color:#d97804;} .nt-status.pendente{color:#6b7280;} .nt-status.encerrada{color:#6b7280;}
     .nt-data{font-size:.75rem;color:#9ca3af;}
     .nt-menu{position:fixed;z-index:10060;background:#fff;border:1px solid #e5e7eb;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:.3rem;min-width:160px;}
     .nt-menu button{display:flex;gap:.5rem;align-items:center;width:100%;background:none;border:0;padding:.6rem .8rem;border-radius:8px;cursor:pointer;font:700 .88rem 'Comfortaa',sans-serif;color:#dc2626;}
@@ -154,7 +154,7 @@
     const aulas = (d.aulas || []).map((a, i) => {
       const valorSalvo = Number(a.ValorAula);
       return {
-        i, data: a.data || '', horario: a.horario || '', duracao: a.duracao || '', materia: a.materia || '',
+        i, idAula: a['id-Aula'] || '', data: a.data || '', horario: a.horario || '', duracao: a.duracao || '', materia: a.materia || '',
         estudante: a.estudante || '', professor: a.professor || '', status: a.StatusAula || '',
         valor: Number((valorSalvo > 0 ? valorSalvo : hora * horasDe(a.duracao)).toFixed(2))
       };
@@ -291,7 +291,9 @@
     resumo();
 
     $('#pe-enviar').onclick = async () => {
-      const aulas = selecionadas().map(a => ({ data: a.data, horario: a.horario, duracao: a.duracao, materia: a.materia, estudante: a.estudante, valor: a.valor }));
+      // idAula liga cada aula da proposta à aula real (BancoDeAulas-Lista) para
+      // "Atribuir às aulas" depois do aceite.
+      const aulas = selecionadas().map(a => ({ idAula: a.idAula || '', data: a.data, horario: a.horario, duracao: a.duracao, materia: a.materia, estudante: a.estudante, valor: a.valor }));
       const total = Number(aulas.reduce((t, a) => t + a.valor, 0).toFixed(2));
       const lote = fdb().batch();
       const quem = (window.currentUser && window.currentUser.email) || '';
@@ -330,6 +332,7 @@
     aceita:         { texto: 'aceitou', icone: 'fas fa-circle-check' },
     recusada:       { texto: 'recusou', icone: 'fas fa-circle-xmark' },
     contraproposta: { texto: 'realizou contraproposta', icone: 'fas fa-comment-dots' },
+    encerrada:      { texto: 'não respondeu a tempo (aulas já atribuídas a outro professor)', icone: 'fas fa-lock' },
     pendente:       { texto: '', icone: 'far fa-clock' }
   };
   const naoLidas = () => propostas.filter(p => p.status !== 'pendente' && !p.lidaCentral).length;
@@ -441,11 +444,59 @@
     const st = STATUS[p.status] || STATUS.pendente;
     const prof = p.professorApelido || p.professorNome || 'Professor';
     const aulas = (p.aulas || []).map(a => `<li><b>${esc(a.data)}</b> · ${esc(a.horario)} · ${esc(a.duracao)} · ${esc(a.materia)}${a.estudante ? ' · ' + esc(a.estudante) : ''}</li>`).join('');
-    await janela(`${p.origem === 'simulacao' ? 'Simulação' : 'Contratação'} ${p.codigo || ''} · ${p.clienteNome || ''}`, `
+    const escolha = await janela(`${p.origem === 'simulacao' ? 'Simulação' : 'Contratação'} ${p.codigo || ''} · ${p.clienteNome || ''}`, `
       <p class="nt-status ${esc(p.status)}" style="margin:0 0 .8rem"><i class="${st.icone}"></i>${p.status === 'pendente' ? `Aguardando resposta do professor ${esc(prof)}` : `Professor ${esc(prof)} ${st.texto}`}</p>
       ${p.status === 'contraproposta' ? `<p style="font-weight:700;margin:0 0 .4rem">Contraproposta do professor:</p><div class="nt-texto">${esc(p.contraproposta || '')}</div>` : ''}
       <p style="margin:1rem 0 0;font-size:.85rem;color:#374151">Aulas enviadas (${(p.aulas || []).length}) · professor recebe <b>${moeda(p.valorTotal)}</b> · professor: ${esc(p.professorNome || '')}</p>
-      <ul class="nt-aulas">${aulas}</ul>`, [{ rotulo: 'Fechar', valor: null, classe: 'pri' }]);
+      <ul class="nt-aulas">${aulas}</ul>
+      ${p.status === 'aceita' && p.atribuidaEm ? '<p style="margin:.6rem 0 0;font-size:.85rem;color:#15803d"><i class="fas fa-check"></i> Professor já atribuído às aulas.</p>' : ''}
+      ${p.status === 'aceita' && p.origem === 'simulacao' ? '<p style="margin:.6rem 0 0;font-size:.85rem;color:#6b7280">Simulação: escolha este professor nas aulas da simulação antes de aprovar.</p>' : ''}`,
+      p.status === 'aceita' && p.origem !== 'simulacao' && !p.atribuidaEm
+        ? [{ rotulo: 'Fechar', valor: null }, { rotulo: 'Atribuir às aulas', valor: 'atribuir', classe: 'pri' }]
+        : [{ rotulo: 'Fechar', valor: null, classe: 'pri' }]);
+    if (escolha === 'atribuir') await atribuirAsAulas(p);
+  }
+
+  // Aceite → grava o professor nas aulas da contratação (BANCO.updateProfessorAula
+  // já resolve professorEmail/uid) e encerra as outras propostas pendentes da
+  // mesma contratação, que somem como "encerrada" para os outros professores.
+  async function atribuirAsAulas(p) {
+    if (!window.BANCO || typeof BANCO.updateProfessorAula !== 'function') { aviso('Função de atribuição indisponível.', 'error'); return; }
+    try {
+      const profSnap = await fdb().collection('dataBaseProfessores').doc(String(p.professorId)).get();
+      if (!profSnap.exists) { aviso('Cadastro do professor não encontrado.', 'error'); return; }
+      const prof = profSnap.data();
+
+      const codigo = String(p.idOrigem || p.codigo || '');
+      const [porId, porCodigo] = await Promise.all([
+        fdb().collection('BancoDeAulas-Lista').where('idContratacao', '==', codigo).get(),
+        fdb().collection('BancoDeAulas-Lista').where('codigoContratacao', '==', codigo).get()
+      ]);
+      const doContrato = new Map();
+      [...porId.docs, ...porCodigo.docs].forEach(d => doContrato.set(d.id, d.data()));
+      const listaAulas = [...doContrato.values()];
+
+      let ok = 0, semPar = 0;
+      for (const a of (p.aulas || [])) {
+        const alvo = (a.idAula && listaAulas.find(x => x['id-Aula'] === a.idAula))
+          || listaAulas.find(x => x.data === a.data && x.horario === a.horario);
+        if (!alvo || !alvo['id-Aula']) { semPar++; continue; }
+        await BANCO.updateProfessorAula(alvo['id-Aula'], prof.nome || p.professorNome || '', prof.cpf || '', prof.uid || '');
+        ok++;
+      }
+
+      await fdb().collection(COLECAO).doc(p.id).update({ atribuidaEm: firebase.firestore.FieldValue.serverTimestamp() });
+      const outras = propostas.filter(x => x.id !== p.id && String(x.idOrigem) === String(p.idOrigem) && x.status === 'pendente');
+      if (outras.length) {
+        const lote = fdb().batch();
+        outras.forEach(x => lote.update(fdb().collection(COLECAO).doc(x.id), { status: 'encerrada', lidaCentral: true }));
+        await lote.commit();
+      }
+      aviso(`Professor atribuído a ${ok} aula(s)${semPar ? ` · ${semPar} não encontrada(s) na contratação (confira datas/horários)` : ''}${outras.length ? ` · ${outras.length} proposta(s) pendente(s) encerrada(s)` : ''}.`, semPar ? 'warning' : 'success');
+    } catch (err) {
+      console.error('[Propostas] Erro ao atribuir:', err);
+      aviso('Não foi possível atribuir o professor às aulas.', 'error');
+    }
   }
 
   function menuExcluir(p, x, y) {
