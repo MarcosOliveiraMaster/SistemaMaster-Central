@@ -39,6 +39,7 @@
     'previsao-financeira':     { secao: 'previsao-financeira', nome: 'Previsão Financeira', icone: 'fas fa-chart-pie' },
     'simulacoes':              { secao: 'simulacoes', nome: 'Simulações', icone: 'fas fa-chart-line' },
     'clientes':                { secao: 'clientes', nome: 'BD Clientes', icone: 'fas fa-database' },
+    'orientacoes-alunos':      { secao: 'orientacoes-alunos', nome: 'Orientações para alunos', icone: 'fas fa-hand-holding-heart' },
     'galeria-professores':     { secao: 'galeria-professores', nome: 'BD Professores', icone: 'fas fa-database' },
     'avaliacao-candidatos':    { secao: 'professores', aba: 'dp-tab-candidatos', nome: 'Avaliação de Candidatos', icone: 'fas fa-user-check' },
     'desempenho-equipe':       { secao: 'professores', aba: 'dp-tab-equipe', nome: 'Análise e Desempenho de Equipe', icone: 'fas fa-chart-line' },
@@ -72,7 +73,7 @@
       ] },
       { id: 's-pessoas', nome: 'Pessoas', itens: [
         { tipo: 'gaveta', id: 'g-clientes-professores', nome: 'Clientes e Professores', icone: 'fas fa-tachometer-alt', itens: [
-          { tipo: 'gaveta', id: 'g-clientes', nome: 'Clientes', icone: 'fas fa-users', itens: [f('clientes')] },
+          { tipo: 'gaveta', id: 'g-clientes', nome: 'Clientes', icone: 'fas fa-users', itens: [f('clientes'), f('orientacoes-alunos')] },
           { tipo: 'gaveta', id: 'g-professores', nome: 'Professores', icone: 'fas fa-chalkboard-user', itens: [
             f('galeria-professores'), f('avaliacao-candidatos'),
             f('desempenho-equipe'), f('agendamento-entrevistas')
@@ -151,8 +152,22 @@
     }));
     if (secoes.length === 0) return clonar(PADRAO);
 
+    // Funções novas entram no lugar previsto quando ele existe no menu salvo
+    // (ex.: "Orientações para alunos" na gaveta Clientes); senão, no fim.
+    const LUGAR_NOVAS = { 'orientacoes-alunos': 'g-clientes' };
+    const acharGaveta = (itens, id) => {
+      for (const n of itens) {
+        if (n.tipo !== 'gaveta') continue;
+        if (n.id === id) return n;
+        const dentro = acharGaveta(n.itens || [], id);
+        if (dentro) return dentro;
+      }
+      return null;
+    };
     Object.keys(FUNCOES).forEach((chave) => {
-      if (!usadas.has(chave)) secoes[secoes.length - 1].itens.push({ tipo: 'funcao', funcao: chave });
+      if (usadas.has(chave)) return;
+      const gaveta = LUGAR_NOVAS[chave] && secoes.map(s => acharGaveta(s.itens, LUGAR_NOVAS[chave])).find(Boolean);
+      (gaveta ? gaveta.itens : secoes[secoes.length - 1].itens).push({ tipo: 'funcao', funcao: chave });
     });
     return { versao: 1, secoes };
   }

@@ -299,6 +299,27 @@ async function updateRelatorioAula(idAula, novoRelatorio) {
   }
 }
 
+// Planejamento da aula (PlanejamentoAula = { texto, atualizadoEm, atualizadoPor }).
+// O professor escreve pelo portal; a Master edita aqui sem aviso a ninguém.
+async function fetchPlanejamentoAula(idAula) {
+  const snap = await db.collection("BancoDeAulas-Lista").where("id-Aula", "==", idAula).limit(1).get();
+  if (snap.empty) throw new Error(`Aula ${idAula} não encontrada`);
+  return snap.docs[0].data().PlanejamentoAula || null;
+}
+
+async function updatePlanejamentoAula(idAula, texto) {
+  const snap = await db.collection("BancoDeAulas-Lista").where("id-Aula", "==", idAula).get();
+  if (snap.empty) throw new Error(`Aula ${idAula} não encontrada`);
+  await snap.docs[0].ref.update({
+    PlanejamentoAula: {
+      texto: String(texto || '').slice(0, 5000),
+      atualizadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+      atualizadoPor: 'master'
+    }
+  });
+  return true;
+}
+
 // Função para atualizar StatusAula
 async function updateStatusAula(idAula, novoStatus) {
   try {
@@ -749,7 +770,8 @@ async function copiarAulaLista(idAulaOrigem) {
       .where("id-Aula", "==", idAulaOrigem).get();
     if (origemSnap.empty) throw new Error(`Aula ${idAulaOrigem} não encontrada`);
 
-    const origem = origemSnap.docs[0].data();
+    // A cópia começa sem planejamento (o professor planeja de novo, se quiser).
+    const { PlanejamentoAula: _semPlanejamento, ...origem } = origemSnap.docs[0].data();
     const codigoContratacao = origem.idContratacao || origem.codigoContratacao;
     if (!codigoContratacao) throw new Error(`Aula ${idAulaOrigem} sem código de contratação`);
 
@@ -1023,6 +1045,8 @@ if (typeof window !== 'undefined') {
     updateRelatorioAula,
     updateStatusAula,
     updateObservacoesAula,
+    fetchPlanejamentoAula,
+    updatePlanejamentoAula,
     updateDataAula,
     updateHorarioAula,
     updateDuracaoAula,

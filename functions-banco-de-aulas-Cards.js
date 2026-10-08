@@ -514,6 +514,10 @@ const BancoDeAulasCards = (function() {
                   <span class="w-[30%] flex items-center justify-center"><i class="fas fa-eye text-xl"></i></span>
                   <span class="w-[70%] text-xs leading-tight text-center">Observações</span>
                 </button>
+                <button id="btn-ver-conteudos" class="btn-secondary flex-1 flex items-center py-[7.68px] px-1 text-xs">
+                  <span class="w-[30%] flex items-center justify-center"><i class="fas fa-book-open text-xl"></i></span>
+                  <span class="w-[70%] text-xs leading-tight text-center">Conteúdos das aulas</span>
+                </button>
                 <button id="btn-ver-dados-cliente" class="btn-secondary flex-1 flex items-center py-[7.68px] px-1 text-xs">
                   <span class="w-[30%] flex items-center justify-center"><i class="fas fa-user text-xl"></i></span>
                   <span class="w-[70%] text-xs leading-tight text-center">Ver cliente</span>
@@ -960,6 +964,11 @@ const BancoDeAulasCards = (function() {
     const btnVerObservacoes = modal.querySelector('#btn-ver-observacoes');
     btnVerObservacoes.addEventListener('click', () => {
       showObservacoesModal(aula);
+    });
+
+    // Conteúdos das aulas (enviados pelo responsável no portal; a Master edita)
+    modal.querySelector('#btn-ver-conteudos')?.addEventListener('click', () => {
+      showConteudosModal(aula);
     });
 
     // Helpers de formatação local (não dependem do DashboardCliente)
@@ -1785,6 +1794,92 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
     });
   }
   
+  // ── Conteúdos das aulas ────────────────────────────────────────────────
+  // conteudosContratacoes/{código da contratação} (fora de BancoDeAulas: o
+  // professor lê os conteúdos, mas não pode ler valores do pacote). O
+  // responsável escreve pelo portal; aqui a Master edita, sem aviso a ninguém
+  // (atualizadoPor: 'master'). professoresEmails = professores das aulas do
+  // pacote, que é quem pode ler (SistemMaster-Login/firestore.rules).
+  async function showConteudosModal(aula) {
+    const codigo = String(aula.id || aula.codigoContratacao || '');
+    if (!codigo) { showToast('❌ Código de contratação não encontrado', 'error'); return; }
+    const db = firebase.firestore();
+    const ref = db.collection('conteudosContratacoes').doc(codigo);
+    let atual = {};
+    try { const s = await ref.get(); atual = s.exists ? s.data() : {}; }
+    catch (e) { console.error('[Conteúdos] Erro ao ler:', e); showToast('❌ Não foi possível carregar os conteúdos', 'error'); return; }
+    const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const quando = atual.atualizadoEm && atual.atualizadoEm.toDate ? atual.atualizadoEm.toDate().toLocaleString('pt-BR') : '';
+
+    const { modal, closeModal } = createModal(
+      'Conteúdos das aulas',
+      `
+        <div class="p-4 bg-gray-50 rounded-lg">
+          <div class="text-sm text-gray-600 mb-2">
+            <i class="fas fa-info-circle text-orange-500 mr-2"></i>
+            O que o estudante está vendo na escola. O professor do pacote vê este texto e o material ao planejar as aulas.
+            ${quando ? `<br><span class="text-xs text-gray-400">Última atualização: ${esc(quando)}</span>` : ''}
+          </div>
+          <textarea id="textarea-conteudos" maxlength="5000" class="w-full h-40 p-3 border rounded text-sm" placeholder="Conteúdos das aulas...">${esc(atual.texto || '')}</textarea>
+          <label class="block text-sm font-semibold text-gray-700 mt-3 mb-1">Link do material (Google Drive) — opcional</label>
+          <input id="input-conteudos-link" type="url" class="w-full p-2 border rounded text-sm" placeholder="https://drive.google.com/..." value="${esc(atual.linkAnexo || '')}">
+          <p id="msg-conteudos-link" class="text-xs mt-1 text-gray-500">Compartilhe o arquivo no Drive como "Qualquer pessoa com o link → Leitor".</p>
+          ${atual.linkAnexo ? `<a href="${esc(atual.linkAnexo)}" target="_blank" rel="noopener noreferrer" class="inline-block mt-2 text-sm text-orange-600 font-semibold"><i class="fas fa-paperclip mr-1"></i>Abrir material</a>` : ''}
+        </div>
+      `,
+      [
+        { text: 'Fechar', classes: 'btn-secondary btn-compact', attributes: 'id="btn-fechar-conteudos"' },
+        { text: 'Salvar alterações', classes: 'btn-primary btn-compact', attributes: 'id="btn-salvar-conteudos"' }
+      ]
+    );
+    modal.querySelector('#btn-fechar-conteudos')?.addEventListener('click', closeModal);
+    const btnSalvar = modal.querySelector('#btn-salvar-conteudos');
+    btnSalvar.addEventListener('click', async () => {
+      const texto = modal.querySelector('#textarea-conteudos').value.trim();
+      const link = modal.querySelector('#input-conteudos-link').value.trim();
+      const msg = modal.querySelector('#msg-conteudos-link');
+      if (link) {
+        let u = null;
+        try { u = new URL(link); } catch (_) { u = null; }
+        if (!u || u.protocol !== 'https:') { msg.textContent = 'O link precisa começar com https://'; msg.className = 'text-xs mt-1 text-red-600'; return; }
+        if (!['drive.google.com', 'docs.google.com'].includes(u.hostname)) {
+          msg.textContent = 'Aviso: este link não é do Google Drive. Confira se ele abre para qualquer pessoa.';
+          msg.className = 'text-xs mt-1 text-amber-600';
+        }
+      }
+      btnSalvar.disabled = true;
+      const original = btnSalvar.innerHTML;
+      btnSalvar.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Salvando...';
+      try {
+        // Professores do pacote (os dois nomes do código que as aulas usam).
+        const [a, b] = await Promise.all([
+          db.collection('BancoDeAulas-Lista').where('codigoContratacao', '==', codigo).get(),
+          db.collection('BancoDeAulas-Lista').where('idContratacao', '==', codigo).get()
+        ]);
+        const emails = new Set(atual.professoresEmails || []);
+        [...a.docs, ...b.docs].forEach(d => {
+          const e = String(d.data().professorEmail || '').trim().toLowerCase();
+          if (e) emails.add(e);
+        });
+        await ref.set({
+          texto: texto.slice(0, 5000),
+          linkAnexo: link,
+          atualizadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+          atualizadoPor: 'master',
+          clienteUid: aula.clienteUid || aula.clientUid || atual.clienteUid || '',
+          professoresEmails: [...emails].sort().slice(0, 50)
+        });
+        showToast('✅ Conteúdos das aulas salvos!', 'success');
+        closeModal();
+      } catch (error) {
+        console.error('❌ Erro ao salvar conteúdos:', error);
+        showToast('❌ Erro ao salvar conteúdos', 'error');
+        btnSalvar.innerHTML = original;
+        btnSalvar.disabled = false;
+      }
+    });
+  }
+
   // Função para mostrar modal de observações
   function showObservacoesModal(aula) {
     const observacoesOriginais = aula.ObservacaoContratacao || '';
@@ -4996,6 +5091,16 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
               <label class="block text-sm font-medium text-gray-700 mb-2">Observação</label>
               <textarea id="observacaoTexto" class="w-full p-4 border border-gray-300 rounded-lg text-sm resize-none" rows="8" placeholder="Nenhuma observação registrada">${escapeHtml(observacaoOriginal)}</textarea>
             </div>
+            <div class="form-group mt-4 pt-4 border-t border-gray-200">
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                <i class="fas fa-clipboard-list text-orange-500 mr-1"></i> Planejamento da aula
+                <span class="text-xs text-gray-400 font-normal">(do professor; o cliente vê no portal)</span>
+              </label>
+              <textarea id="planejamentoTexto" class="w-full p-4 border border-gray-300 rounded-lg text-sm resize-none" rows="6" maxlength="5000" placeholder="Carregando..." disabled></textarea>
+              <div class="flex justify-end mt-2">
+                <button id="btnSalvarPlanejamento" class="btn-secondary btn-compact" disabled><i class="fas fa-save mr-2"></i>Salvar planejamento</button>
+              </div>
+            </div>
           </div>
 
           <div class="modal-footer">
@@ -5022,6 +5127,35 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
     const closeModal = () => {
       modalContainer.remove();
     };
+
+    // Planejamento da aula (lido e salvo à parte das observações).
+    const txtPlano = modal.querySelector('#planejamentoTexto');
+    const btnPlano = modal.querySelector('#btnSalvarPlanejamento');
+    let planoOriginal = '';
+    if (window.BANCO && typeof BANCO.fetchPlanejamentoAula === 'function') {
+      BANCO.fetchPlanejamentoAula(idAula).then(p => {
+        planoOriginal = (p && p.texto) || '';
+        txtPlano.value = planoOriginal;
+        txtPlano.placeholder = 'O professor ainda não escreveu o planejamento desta aula.';
+        txtPlano.disabled = false;
+      }).catch(err => {
+        console.warn('[Planejamento] Não foi possível carregar:', err);
+        txtPlano.placeholder = 'Não foi possível carregar o planejamento.';
+      });
+    }
+    txtPlano.addEventListener('input', () => { btnPlano.disabled = txtPlano.value === planoOriginal; });
+    btnPlano.addEventListener('click', async () => {
+      btnPlano.disabled = true;
+      try {
+        await BANCO.updatePlanejamentoAula(idAula, txtPlano.value.trim());
+        planoOriginal = txtPlano.value.trim();
+        showToast('✅ Planejamento salvo!', 'success');
+      } catch (err) {
+        console.error('❌ Erro ao salvar planejamento:', err);
+        showToast('❌ Erro ao salvar planejamento', 'error');
+        btnPlano.disabled = false;
+      }
+    });
 
     btnFechar.addEventListener('click', closeModal);
     btnClose.addEventListener('click', closeModal);
