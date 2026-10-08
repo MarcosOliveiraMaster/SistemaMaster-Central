@@ -133,7 +133,7 @@ window.DashboardProfessores = (function () {
     professoresEquipe : [],
     chartRankingMes   : null,
     // Tab5 — Agendamento de Entrevistas (módulo autocontido, ver
-    // functions-agendamento-entrevistas.js — conecta direto no Supabase)
+    // functions-agendamento-entrevistas.js — Firestore)
     t5Loaded : false,
   };
 
@@ -1175,11 +1175,27 @@ body.dp-resizing { cursor:col-resize!important; user-select:none!important; }
     if (tabId === 'dp-tab-edicao'     && !S.t2Loaded) { S.t2Loaded = true; carregarT2(); }
     if (tabId === 'dp-tab-candidatos' && !S.t3Loaded) { S.t3Loaded = true; carregarT3(); }
     if (tabId === 'dp-tab-equipe'     && !S.t4Loaded) { S.t4Loaded = true; carregarT4(); }
-    if (tabId === 'dp-tab-agendamento' && !S.t5Loaded) { S.t5Loaded = true; carregarT5(); }
+    if (tabId === 'dp-tab-agendamento') {
+      // 1ª abertura monta a tela; nas seguintes recarrega (a aba "Avaliação
+      // de Candidatos" também edita dataEntrevista/horaEntrevista).
+      if (!S.t5Loaded) { S.t5Loaded = true; carregarT5(); }
+      else window.AgendamentoEntrevistas?.recarregar?.();
+    }
   }
 
+  // Agendamento de Entrevistas atribuiu/removeu uma data: reflete no cache
+  // da aba "Avaliação de Candidatos" sem recarregar a coleção inteira.
+  window.addEventListener('dp:candidato-atualizado', (e) => {
+    const { id, dados } = e.detail || {};
+    const cand = S.candidatos?.find(c => c.id === id);
+    if (!cand) return;
+    Object.assign(cand, dados);
+    if (S.candidatoAtual?.id === id) selecionarCandidato(cand);
+    if (S.t3Loaded) renderListaCandidatos();
+  });
+
   // Tab5 — delega inteiramente ao módulo autocontido AgendamentoEntrevistas
-  // (functions-agendamento-entrevistas.js), que fala direto com o Supabase.
+  // (functions-agendamento-entrevistas.js), que lê/grava no Firestore.
   function carregarT5() {
     if (typeof window.AgendamentoEntrevistas === 'undefined') {
       const el = $id('dp-tab-agendamento');

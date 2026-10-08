@@ -44,8 +44,16 @@
     'desempenho-equipe':       { secao: 'professores', aba: 'dp-tab-equipe', nome: 'Análise e Desempenho de Equipe', icone: 'fas fa-chart-line' },
     'agendamento-entrevistas': { secao: 'professores', aba: 'dp-tab-agendamento', nome: 'Agendamento de Entrevistas', icone: 'fas fa-calendar-check' },
     'exportar-dados':          { secao: 'exportar-dados', nome: 'Exportar Dados', icone: 'fas fa-file-export' },
+    'avaliacoes-equipe':       { secao: 'avaliacoes-equipe', nome: 'Avaliações da equipe', icone: 'fas fa-star' },
     'organizar-menu':          { secao: 'organizar-menu', nome: 'Organizar Menu', icone: 'fas fa-sitemap' },
     'detalhes-banco-de-aulas': { secao: 'detalhes-banco-de-aulas', nome: 'Detalhes Banco de Aulas', icone: 'fas fa-table-cells' }
+  };
+
+  // Badges de contagem pendurados em certos itens (atualizados por outros scripts pelo id)
+  const CONTADORES = {
+    'notificacoes':      { id: 'contador-notificacoes', classe: null, rotulo: 'respostas não lidas' },
+    'simulacoes':        { id: 'contador-contratacoes-app', classe: 'contador-menu', rotulo: 'contratações via app não abertas' },
+    'avaliacoes-equipe': { id: 'contador-avaliacoes', classe: 'contador-menu', rotulo: 'avaliações não lidas' }
   };
 
   const f = (funcao) => ({ tipo: 'funcao', funcao });
@@ -69,7 +77,8 @@
             f('galeria-professores'), f('avaliacao-candidatos'),
             f('desempenho-equipe'), f('agendamento-entrevistas')
           ] }
-        ] }
+        ] },
+        f('avaliacoes-equipe')
       ] },
       { id: 's-ferramentas', nome: 'Ferramentas e Administrativo', itens: [
         f('exportar-dados'), f('organizar-menu'),
@@ -169,9 +178,10 @@
         type: 'button', 'data-section': def.secao, 'data-tab': def.aba, 'data-title': nome, title: nome
       });
       btn.append(iconeEl(no.icone || def.icone, 'mr-3'), spanTexto(nome));
-      if (no.funcao === 'notificacoes') {
+      const cfgContador = CONTADORES[no.funcao];
+      if (cfgContador) {
         btn.style.position = 'relative';
-        const contador = el('span', null, { id: 'contador-notificacoes', 'aria-label': 'respostas não lidas' });
+        const contador = el('span', cfgContador.classe, { id: cfgContador.id, 'aria-label': cfgContador.rotulo });
         contador.hidden = true;
         contador.textContent = '0';
         btn.appendChild(contador);
@@ -197,12 +207,15 @@
     const nav = document.getElementById('div-menuLateral');
     if (!nav) return;
 
-    // Preserva o item ativo e o contador de notificações entre remontagens
+    // Preserva o item ativo e os contadores entre remontagens
     const ativoAntes = nav.querySelector('button.active[data-section]');
     const secaoAtiva = ativoAntes ? ativoAntes.getAttribute('data-section') : 'painel-central';
     const abaAtiva = ativoAntes ? ativoAntes.getAttribute('data-tab') : null;
-    const contadorAntes = document.getElementById('contador-notificacoes');
-    const contador = contadorAntes ? { texto: contadorAntes.textContent, oculto: contadorAntes.hidden } : null;
+    const contadoresAntes = {};
+    Object.values(CONTADORES).forEach(({ id }) => {
+      const c = document.getElementById(id);
+      if (c) contadoresAntes[id] = { texto: c.textContent, oculto: c.hidden };
+    });
 
     nav.innerHTML = '';
     config.secoes.forEach((secao) => {
@@ -217,11 +230,12 @@
     const ativo = nav.querySelector(seletor) || nav.querySelector(`button[data-section="${secaoAtiva}"]`);
     if (ativo) ativo.classList.add('active');
 
-    const novoContador = document.getElementById('contador-notificacoes');
-    if (contador && novoContador) {
-      novoContador.textContent = contador.texto;
-      novoContador.hidden = contador.oculto;
-    }
+    Object.entries(contadoresAntes).forEach(([id, antes]) => {
+      const novo = document.getElementById(id);
+      if (!novo) return;
+      novo.textContent = antes.texto;
+      novo.hidden = antes.oculto;
+    });
   }
 
   // ── Carregamento da configuração ─────────────────────────────────────────
