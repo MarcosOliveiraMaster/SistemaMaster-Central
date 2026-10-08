@@ -15,8 +15,26 @@ export const ORIENTACOES = [
     { id: 'paisagem', rotulo: 'Deitada (paisagem)' },
     { id: 'retrato',  rotulo: 'Em pé (retrato)' }
 ];
-/** Largura e altura lógicas da página conforme a orientação. */
-export const dimensoes = (p) => (p && p.orient === 'retrato') ? { w: ALTURA, h: LARGURA } : { w: LARGURA, h: ALTURA };
+// Tamanho da folha. A largura lógica (lado maior) é sempre 1600; a altura sai
+// da proporção. "Tela toda" guarda a proporção da área do editor (prop) no
+// momento da escolha e ocupa toda a largura, com pequena margem.
+export const FORMATOS = [
+    { id: 'a4',   rotulo: 'A4',        prop: LARGURA / ALTURA },
+    { id: '4x3',  rotulo: '4:3',       prop: 4 / 3 },
+    { id: '16x9', rotulo: '16:9',      prop: 16 / 9 },
+    { id: 'tela', rotulo: 'Tela toda', prop: null }
+];
+const PROP_MIN = 0.4, PROP_MAX = 3;
+/** Largura e altura lógicas da página conforme formato e orientação. */
+export const dimensoes = (p) => {
+    const f = FORMATOS.find(x => x.id === (p && p.formato)) || FORMATOS[0];
+    if (f.id === 'tela') {
+        const prop = Math.min(PROP_MAX, Math.max(PROP_MIN, Number(p && p.prop) || LARGURA / ALTURA));
+        return prop >= 1 ? { w: LARGURA, h: Math.round(LARGURA / prop) } : { w: Math.round(LARGURA * prop), h: LARGURA };
+    }
+    const h = Math.round(LARGURA / f.prop);
+    return (p && p.orient === 'retrato') ? { w: h, h: LARGURA } : { w: LARGURA, h };
+};
 export const MAX_PAGINAS = 10;
 export const LIMITE_PAGINA = 900000;   // caracteres por página (a regra aceita até 900.000)
 export const FUNDOS = [
@@ -30,6 +48,7 @@ export const FONTE = "'Comfortaa', 'Lexend', system-ui, sans-serif";
 const PREFIXO_JPEG = 'data:image/jpeg;base64,';
 const MAX_OBJETOS = 4000;
 const MAX_PONTOS  = 12000;             // números (x,y) por traço
+const LIM = 6000;                      // limite de coordenadas (folha mais alta: 4000)
 
 // ── Validação ──────────────────────────────────────────────────────────────
 const num = (v, min, max, pad = 0) => (typeof v === 'number' && Number.isFinite(v)) ? Math.min(max, Math.max(min, v)) : pad;
@@ -54,29 +73,35 @@ export function validarLinkVideo(texto) {
 
 function sanitizarObjeto(o) {
     if (!o || typeof o !== 'object') return null;
-    const base = { x: num(o.x, -LARGURA, LARGURA * 2), y: num(o.y, -ALTURA, ALTURA * 2) };
-    const caixa = { ...base, w: num(o.w, 10, LARGURA * 2, 200), h: num(o.h, 10, ALTURA * 2, 120) };
+    const base = { x: num(o.x, -LIM, LIM), y: num(o.y, -LIM, LIM) };
+    const caixa = { ...base, w: num(o.w, 10, LIM, 200), h: num(o.h, 10, LIM, 120) };
     switch (o.t) {
         case 'traco': {
             if (!Array.isArray(o.pts)) return null;
-            const pts = o.pts.slice(0, MAX_PONTOS).map(v => Math.round(num(v, -LARGURA, LARGURA * 2)));
+            const pts = o.pts.slice(0, MAX_PONTOS).map(v => Math.round(num(v, -LIM, LIM)));
             if (pts.length < 2) return null;
             if (pts.length % 2) pts.pop();
             return { t: 'traco', cor: cor(o.cor), esp: num(o.esp, 1, 80, 4), alfa: num(o.alfa, 0.1, 1, 1), pts };
         }
         case 'linha':
             return { t: 'linha', cor: cor(o.cor), esp: num(o.esp, 1, 80, 4), alfa: num(o.alfa, 0.1, 1, 1),
-                     x1: num(o.x1, -LARGURA, LARGURA * 2), y1: num(o.y1, -ALTURA, ALTURA * 2),
-                     x2: num(o.x2, -LARGURA, LARGURA * 2), y2: num(o.y2, -ALTURA, ALTURA * 2), seta: o.seta === true };
+                     x1: num(o.x1, -LIM, LIM), y1: num(o.y1, -LIM, LIM),
+                     x2: num(o.x2, -LIM, LIM), y2: num(o.y2, -LIM, LIM), seta: o.seta === true };
         case 'forma':
             if (!['ret', 'elipse', 'tri'].includes(o.f)) return null;
             return { t: 'forma', f: o.f, ...caixa, cor: cor(o.cor), esp: num(o.esp, 1, 40, 4), preench: o.preench === true };
         case 'balao':
             if (!['fala', 'pensa'].includes(o.f)) return null;
-            return { t: 'balao', f: o.f, ...caixa, cor: cor(o.cor), esp: num(o.esp, 1, 20, 4),
-                     texto: txt(o.texto, 600), tam: num(o.tam, 14, 96, 30) };
+        {
+            const b = { t: 'balao', f: o.f, ...caixa, cor: cor(o.cor), esp: num(o.esp, 1, 20, 4),
+                        texto: txt(o.texto, 600), tam: num(o.tam, 14, 96, 30) };
+            if (typeof o.pontaX === 'number' && typeof o.pontaY === 'number') {
+                b.pontaX = num(o.pontaX, -LIM, LIM); b.pontaY = num(o.pontaY, -LIM, LIM);
+            }
+            return b;
+        }
         case 'texto':
-            return { t: 'texto', ...base, w: num(o.w, 40, LARGURA * 2, 500), texto: txt(o.texto, 2000),
+            return { t: 'texto', ...base, w: num(o.w, 40, LIM, 500), texto: txt(o.texto, 2000),
                      cor: cor(o.cor), tam: num(o.tam, 14, 120, 32) };
         case 'imagem':
             if (typeof o.src !== 'string' || !o.src.startsWith(PREFIXO_JPEG) || o.src.length > 400000
@@ -98,12 +123,22 @@ export function sanitizarPagina(entrada) {
     if (!p || typeof p !== 'object') p = {};
     const fundo = FUNDOS.some(f => f.id === p.fundo) ? p.fundo : 'quad-p';
     const orient = p.orient === 'retrato' ? 'retrato' : 'paisagem';
+    const formato = FORMATOS.some(f => f.id === p.formato) ? p.formato : 'a4';
     const objetos = (Array.isArray(p.objetos) ? p.objetos : []).slice(0, MAX_OBJETOS).map(sanitizarObjeto).filter(Boolean);
-    return { fundo, orient, objetos };
+    const pagina = { fundo, orient, formato, objetos };
+    if (formato === 'tela') pagina.prop = Math.min(PROP_MAX, Math.max(PROP_MIN, Number(p.prop) || LARGURA / ALTURA));
+    return pagina;
 }
 
-export const paginaVazia = (fundo = 'quad-p', orient = 'paisagem') => ({ fundo, orient, objetos: [] });
-export const serializarPagina = (p) => JSON.stringify({ fundo: p.fundo, orient: p.orient || 'paisagem', objetos: p.objetos });
+export const paginaVazia = (fundo = 'quad-p', orient = 'paisagem', formato = 'a4', prop = null) => {
+    const p = { fundo, orient, formato: FORMATOS.some(f => f.id === formato) ? formato : 'a4', objetos: [] };
+    if (p.formato === 'tela') p.prop = Math.min(PROP_MAX, Math.max(PROP_MIN, Number(prop) || LARGURA / ALTURA));
+    return p;
+};
+export const serializarPagina = (p) => JSON.stringify({
+    fundo: p.fundo, orient: p.orient || 'paisagem', formato: p.formato || 'a4',
+    ...(p.formato === 'tela' ? { prop: p.prop } : {}), objetos: p.objetos
+});
 
 // ── Geometria ──────────────────────────────────────────────────────────────
 export function caixaDoObjeto(o) {
@@ -228,7 +263,79 @@ function caminhoTraco(ctx, p) {
     ctx.lineTo(p[p.length - 2], p[p.length - 1]);
 }
 
+/** Balão novo (com ponta livre): corpo ocupa a caixa toda. */
+export const temPonta = (o) => o.t === 'balao' && typeof o.pontaX === 'number' && typeof o.pontaY === 'number';
+
+/** Ponta padrão de um balão novo: embaixo, à esquerda, fora da caixa. */
+export function pontaPadrao(o) {
+    return { pontaX: o.x + o.w * 0.25, pontaY: o.y + o.h + Math.max(40, o.h * 0.3) };
+}
+
+/** Área do texto dentro do balão (coordenadas da página). */
+export function areaTextoBalao(o) {
+    if (temPonta(o)) {
+        const padX = o.f === 'fala' ? Math.max(14, o.w * 0.07) : o.w * 0.16;
+        const padY = o.f === 'fala' ? Math.max(10, o.h * 0.08) : o.h * 0.16;
+        return { x: o.x + padX, y: o.y + padY, w: Math.max(10, o.w - padX * 2), h: Math.max(10, o.h - padY * 2) };
+    }
+    const hCorpo = o.f === 'fala' ? o.h * 0.78 : o.h * 0.8;
+    const pad = o.f === 'fala' ? 18 : o.w * 0.16;
+    return { x: o.x + pad, y: o.y + 8, w: Math.max(10, o.w - pad * 2), h: Math.max(10, hCorpo - 16) };
+}
+
+// Corpo do balão novo (fala: retângulo arredondado; pensa: nuvem/elipse).
+function caminhoCorpoNovo(ctx, o) {
+    const { x, y, w, h } = o;
+    ctx.beginPath();
+    if (o.f === 'fala') {
+        const r = Math.min(32, w / 4, h / 4);
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+        ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+        ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath();
+    } else {
+        ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+    }
+}
+
+// Ponta da fala: triângulo do centro do balão até (pontaX, pontaY).
+function caminhoPontaFala(ctx, o) {
+    const cx = o.x + o.w / 2, cy = o.y + o.h / 2;
+    const ang = Math.atan2(o.pontaY - cy, o.pontaX - cx);
+    const base = Math.max(14, Math.min(o.w, o.h) * 0.16);
+    const px = Math.cos(ang + Math.PI / 2) * base, py = Math.sin(ang + Math.PI / 2) * base;
+    ctx.beginPath();
+    ctx.moveTo(cx + px, cy + py);
+    ctx.lineTo(o.pontaX, o.pontaY);
+    ctx.lineTo(cx - px, cy - py);
+    ctx.closePath();
+}
+
+// Bolhas do pensamento: da borda da nuvem até a ponta, diminuindo.
+function bolhasPensa(o) {
+    const cx = o.x + o.w / 2, cy = o.y + o.h / 2;
+    const ang = Math.atan2(o.pontaY - cy, o.pontaX - cx);
+    // ponto da elipse na direção da ponta
+    const ex = cx + Math.cos(ang) * o.w / 2, ey = cy + Math.sin(ang) * o.h / 2;
+    const r0 = Math.max(8, Math.min(o.w, o.h) * 0.07);
+    return [0.25, 0.6, 0.95].map((t, i) => ({ x: ex + (o.pontaX - ex) * t, y: ey + (o.pontaY - ey) * t, r: Math.max(4, r0 * (1 - i * 0.3)) }));
+}
+
+// Maior tamanho de letra (até o.tam) em que o texto cabe na área.
+function tamQueCabe(ctx, texto, area, tamMax) {
+    let tam = tamMax;
+    while (tam > 12) {
+        ctx.font = `${tam}px ${FONTE}`;
+        if (quebrarLinhas(ctx, texto, area.w).length * tam * 1.3 <= area.h) break;
+        tam -= 2;
+    }
+    return Math.max(12, tam);
+}
+
 function caminhoBalao(ctx, o) {
+    if (temPonta(o)) { caminhoCorpoNovo(ctx, o); return; }
     const { x, y, w, h } = o;
     ctx.beginPath();
     if (o.f === 'fala') {
@@ -287,6 +394,26 @@ export function desenharObjeto(ctx, o, imagens, aoCarregar) {
             break;
         }
         case 'balao': {
+            if (temPonta(o)) {
+                // Contorno único (corpo + ponta): risca tudo com o dobro da
+                // espessura e depois pinta de branco por cima — a junção some.
+                ctx.strokeStyle = o.cor; ctx.lineWidth = o.esp * 2; ctx.fillStyle = '#ffffff';
+                const bolhas = o.f === 'pensa' ? bolhasPensa(o) : [];
+                caminhoCorpoNovo(ctx, o); ctx.stroke();
+                if (o.f === 'fala') { caminhoPontaFala(ctx, o); ctx.stroke(); }
+                bolhas.forEach(b => { ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.stroke(); });
+                caminhoCorpoNovo(ctx, o); ctx.fill();
+                if (o.f === 'fala') { caminhoPontaFala(ctx, o); ctx.fill(); }
+                bolhas.forEach(b => { ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill(); });
+                const area = areaTextoBalao(o);
+                const tam = tamQueCabe(ctx, o.texto, area, o.tam);
+                const altTexto = quebrarLinhasAltura(ctx, o.texto, area.w, tam);
+                ctx.save();
+                caminhoCorpoNovo(ctx, o); ctx.clip();
+                escreverTexto(ctx, o.texto, area.x, area.y + Math.max(0, (area.h - altTexto) / 2), area.w, tam, '#1f2937', 'center', area.h);
+                ctx.restore();
+                break;
+            }
             caminhoBalao(ctx, o);
             ctx.fillStyle = '#ffffff'; ctx.fill();
             ctx.strokeStyle = o.cor; ctx.lineWidth = o.esp; ctx.stroke();
@@ -419,7 +546,8 @@ export async function gerarPdf(paginas, { titulo = 'Quadro Master', autor = 'Mas
     for (let i = 0; i < n; i++) {
         const { w: LW, h: LH } = dimensoes(paginas[i]);
         canvas.width = LW; canvas.height = LH;
-        const [W, H] = paginas[i].orient === 'retrato' ? [595, 842] : [842, 595];
+        // Lado maior = 842 pt (A4); o outro lado segue a proporção da folha.
+        const [W, H] = LW >= LH ? [842, Math.round(842 * LH / LW)] : [Math.round(842 * LW / LH), 842];
         desenharPagina(ctx, paginas[i], imagens);
         const jpeg = base64ParaBytes(canvas.toDataURL('image/jpeg', 0.88).split(',')[1]);
         const pg = 4 + i * 3, cont = pg + 1, img = pg + 2;
