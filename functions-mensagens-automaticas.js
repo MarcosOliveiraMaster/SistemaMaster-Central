@@ -56,7 +56,7 @@
   }
 
   function gerarMensagem(aula) {
-    return `${gerarSaudacao()} ${aula.nomeCliente}.\nEste é o relatório da aula do dia ${aula.data} com ${aula.estudante}.\n\n${aula.RelatorioAula}`;
+    return `${gerarSaudacao()} ${aula.nomeCliente}.\nEste é o relatório da aula do dia ${aula.data} com ${aula.estudante}.\n\n${aula.RelatorioAula}\n\nPara mais informações, acesse o link: login.app.mastereducacao.com.br`;
   }
 
   function copiarParaClipboard(mensagem) {
