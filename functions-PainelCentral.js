@@ -2487,7 +2487,9 @@ Comportamento do aluno:
 ${comp}
 
 Recomendações:
-${rec}`;
+${rec}
+
+Para mais informações, acesse o link: login.app.mastereducacao.com.br`;
 
   try {
     await navigator.clipboard.writeText(mensagem);

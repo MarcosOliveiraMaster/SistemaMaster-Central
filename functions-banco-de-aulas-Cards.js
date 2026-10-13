@@ -5646,7 +5646,7 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
       }
 
       // Template com tokens entre colchetes
-      const template = `Bom dia [NomeCliente] esta é o relatório da aula do dia [DataDaAula] com prof. [NomeDoProfessor]\n\n*Descrição da Aula:*\n[Descricao]\n\n*Comportamento do estudante:*\n[Comportamento]\n\n*Recomendações:*\n[Recomendacoes]`;
+      const template = `Bom dia [NomeCliente] esta é o relatório da aula do dia [DataDaAula] com prof. [NomeDoProfessor]\n\n*Descrição da Aula:*\n[Descricao]\n\n*Comportamento do estudante:*\n[Comportamento]\n\n*Recomendações:*\n[Recomendacoes]\n\nPara mais informações, acesse o link: login.app.mastereducacao.com.br`;
 
       // Substituir tokens
       let texto = template
