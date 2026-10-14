@@ -2035,6 +2035,10 @@ const Simulacoes = (function() {
           const disciplinasCalendario = await DisciplinasStore.getAll();
           showVisualizacaoCalendarioModal(editingSimulacao.aulas || [], {
             disciplinas: disciplinasCalendario,
+            // O CPF do formulário vale mesmo antes de a simulação ser salva
+            getEstudantes: () => buscarEstudantesClienteCal(
+              (modal.querySelector('#cpf-cliente')?.value || '').trim() || editingSimulacao.cpf
+            ),
             onColorSave: async (cardData, color) => {
               if (cardData._origIdx !== undefined && editingSimulacao.aulas[cardData._origIdx]) {
                 editingSimulacao.aulas[cardData._origIdx].cor = color;

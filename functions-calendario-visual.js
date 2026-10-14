@@ -110,7 +110,18 @@ function camposAlteradosCal(card, key) {
   return alterados;
 }
 
-// "Mat1, Mat2 e Mat3" <-> ['Mat1','Mat2','Mat3'] — mesmo formato da tabela de aulas
+// Nomes dos estudantes do cliente (cadastroClientes) para options.getEstudantes.
+// Sem CPF ou sem cadastro: [] (o "Configurar Aula" mostra caixa de texto).
+async function buscarEstudantesClienteCal(cpf) {
+  if (!cpf || cpf === '--' || typeof db === 'undefined') return [];
+  const snap = await db.collection('cadastroClientes').where('cpf', '==', cpf).get();
+  if (snap.empty) return [];
+  const data = snap.docs[0].data();
+  const lista = data.estudantes || data.Estudante || [];
+  return [...new Set(lista.map(e => (e && e.nome ? String(e.nome).trim() : '')).filter(Boolean))].sort();
+}
+
+// "Mat1, Mat2 e Mat3" <->['Mat1','Mat2','Mat3'] — mesmo formato da tabela de aulas
 // (formatarMateriasMultiplas) e do Match (splitMaterias).
 function splitMateriasCal(str) {
   return String(str || '')
@@ -621,8 +632,10 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
           { ...aulaAtual },
           key, idx,
           (novaAula) => {
-            if (aulasMap[key]?.[idx] !== undefined)
+            if (aulasMap[key]?.[idx] !== undefined) {
               aulasMap[key][idx] = { ...aulasMap[key][idx], ...novaAula };
+              delete aulasMap[key][idx]._verif; // professor/horário podem ter mudado
+            }
             renderCalendar();
           },
           () => {
@@ -912,6 +925,7 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
               duracao:      novaAula.duracao,
               horario:      novaAula.horario
             });
+            if (aulasMap[k]?.[i]) delete aulasMap[k][i]._verif;
           });
           cModal.remove();
           onConfirm(novaAula);
@@ -923,7 +937,24 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
       } else {
         onConfirm(novaAula);
       }
-    }, onDelete);
+    }, onDelete, { carregarEstudantes });
+  }
+
+  // Estudantes do cliente para o seletor do "Configurar Aula" — carregados uma vez
+  // por abertura do calendário. Lista vazia = o modal mostra caixa de texto livre.
+  let estudantesPromise = null;
+  function carregarEstudantes() {
+    if (typeof options.getEstudantes !== 'function') return Promise.resolve([]);
+    if (!estudantesPromise) {
+      estudantesPromise = withTimeoutCal(options.getEstudantes(), 15000, 'estudantes do cliente')
+        .then(lista => (lista || []).filter(Boolean))
+        .catch(err => {
+          console.warn('⚠️ Falha ao carregar estudantes do cliente:', err);
+          estudantesPromise = null;
+          return [];
+        });
+    }
+    return estudantesPromise;
   }
 
   // ── Replica semana (funciona cross-month pois todas as chaves são reais) ──
@@ -1007,7 +1038,22 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
 // ──────────────────────────────────────────────────────────
 //  Modal de configuração: Configurar Aula
 // ──────────────────────────────────────────────────────────
-async function showModalAulasCalendarios(aulaData, onSave, onDelete = null) {
+async function showModalAulasCalendarios(aulaData, onSave, onDelete = null, opts = {}) {
+  // Estudantes do cliente (nomes). Vazio = caixa de texto (simulação sem cliente
+  // cadastrado ou cliente sem estudantes).
+  let estudantesCliente = [];
+  try {
+    if (typeof opts.carregarEstudantes === 'function') estudantesCliente = await opts.carregarEstudantes();
+  } catch (_) {}
+  const estudanteAtual = aulaData.estudante || '';
+  const estudanteHtml = estudantesCliente.length
+    ? `<select id="mac-estudante" class="mac-estudante-input">
+         <option value="">Não definido</option>
+         ${[...new Set([...estudantesCliente, ...(estudanteAtual ? [estudanteAtual] : [])])]
+            .map(n => `<option value="${escapeHtml(n)}"${n === estudanteAtual ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('')}
+       </select>`
+    : `<input type="text" id="mac-estudante" class="mac-estudante-input" placeholder="Nome do estudante" value="${escapeHtml(estudanteAtual)}" />`;
+
   let professores = [];
   try {
     if (typeof BANCO !== 'undefined' && BANCO.fetchDataBaseProfessores) {
@@ -1084,6 +1130,14 @@ async function showModalAulasCalendarios(aulaData, onSave, onDelete = null) {
                   <i class="fas fa-book text-orange-500 mr-2"></i>Escolha a disciplina
                 </label>
                 <div class="grid grid-cols-4 gap-2" id="mac-grid-materias"></div>
+              </div>
+
+              <!-- Estudante: dropdown com os estudantes do cliente, ou texto livre -->
+              <div class="mt-5">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                  <i class="fas fa-user-graduate text-orange-500 mr-2"></i>Estudante
+                </label>
+                ${estudanteHtml}
               </div>
 
               <!-- Horário + Duração — empurrado pro fim da coluna (mt-auto), pra
@@ -1289,6 +1343,7 @@ async function showModalAulasCalendarios(aulaData, onSave, onDelete = null) {
       professor:    nomeSel || 'A definir',
       idProfessor:  cpfSel || '',
       professorUid: uidSel || '',
+      estudante:    (document.getElementById('mac-estudante')?.value || '').trim(),
       horario
     });
     closeModal();

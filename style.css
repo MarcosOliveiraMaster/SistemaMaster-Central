@@ -3977,6 +3977,22 @@ h2, h3, h4, h5, h6 {
   border-color: #f28705;
 }
 
+.mac-estudante-input {
+  width: 100%;
+  max-width: 360px;
+  border: 2px solid #e5e7eb;
+  border-radius: 7px;
+  padding: 7px 10px;
+  font-size: 0.9rem;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.mac-estudante-input:focus {
+  border-color: #f28705;
+}
+
 /* ── Solicitação em Calendário (read-only, multi-mês) ── */
 .sol-cal-mes {
   margin-bottom: 1.75rem;

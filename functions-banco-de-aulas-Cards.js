@@ -3119,6 +3119,7 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
           const disciplinasCalendario = await DisciplinasStore.getAll();
           showVisualizacaoCalendarioModal(aulasParaCalendario, {
             disciplinas: disciplinasCalendario,
+            getEstudantes: () => buscarEstudantesClienteCal((_aulaDetalhesAtual || {}).cpf),
             getAulas: codigoCont
               ? async () => BANCO.fetchBancoDeAulasLista(codigoCont)
               : null,
