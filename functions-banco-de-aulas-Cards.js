@@ -3120,6 +3120,12 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
           showVisualizacaoCalendarioModal(aulasParaCalendario, {
             disciplinas: disciplinasCalendario,
             getEstudantes: () => buscarEstudantesClienteCal((_aulaDetalhesAtual || {}).cpf),
+            // Habilita Match e Verificar Datas dentro do calendário
+            contexto: {
+              codigoContratacao: codigoCont || null,
+              nomeCliente: (_aulaDetalhesAtual || {}).nome || (_aulaDetalhesAtual || {}).nomeCliente || '',
+              cpf: (_aulaDetalhesAtual || {}).cpf
+            },
             getAulas: codigoCont
               ? async () => BANCO.fetchBancoDeAulasLista(codigoCont)
               : null,

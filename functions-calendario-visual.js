@@ -212,6 +212,13 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
                 <i class="fas fa-chevron-right"></i>
               </button>
               <div style="flex:1"></div>
+              ${options.contexto ? `
+              <button id="calBtnMatch" class="btn-secondary btn-compact" title="Rankear professores compatíveis com as aulas do calendário (inclui mudanças não salvas)">
+                <i class="fas fa-people-arrows mr-2"></i>Match
+              </button>
+              <button id="calBtnVerificarDatas" class="btn-secondary btn-compact" title="Checar feriados e conflitos de agenda das aulas do calendário (inclui mudanças não salvas)">
+                <i class="fas fa-calendar-check mr-2"></i>Verificar Datas
+              </button>` : ''}
               <button id="calInfoBtn" class="btn-secondary btn-compact" title="Como usar o calendário">
                 <i class="fas fa-question-circle"></i>
               </button>
@@ -334,6 +341,92 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
     renderCalendar();
   });
   overlay.querySelector('#calInfoBtn').addEventListener('click', showCalInfoModal);
+  overlay.querySelector('#calBtnVerificarDatas')?.addEventListener('click', verificarDatasCalendario);
+  overlay.querySelector('#calBtnMatch')?.addEventListener('click', abrirMatchCalendario);
+
+  // Card da tela -> aula no formato do banco (para Verificar Datas e Match)
+  function cardParaAula(card, key) {
+    return {
+      data:         calKeyToDateBr(key),
+      materia:      card.materia,
+      professor:    card.professor,
+      idProfessor:  card.idProfessor,
+      professorUid: card.professorUid,
+      estudante:    card.estudante,
+      duracao:      card.duracao,
+      horario:      card.horario,
+      'id-Aula':    card._idAula || undefined,
+      codigoContratacao: (options.contexto || {}).codigoContratacao || undefined
+    };
+  }
+
+  function todosOsCards() {
+    const lista = [];
+    Object.entries(aulasMap).forEach(([key, cards]) => cards.forEach(card => lista.push({ key, card })));
+    return lista;
+  }
+
+  // ── Verificar Datas: mesmo motor da tabela, sobre o estado atual da tela ──
+  async function verificarDatasCalendario() {
+    if (typeof window.verificarStatusAula !== 'function') {
+      if (typeof showToast === 'function') showToast('Motor de verificação de datas não disponível', 'error');
+      return;
+    }
+    const alvos = todosOsCards();
+    if (!alvos.length) {
+      if (typeof showToast === 'function') showToast('ℹ️ Nenhuma aula no calendário', 'info');
+      return;
+    }
+    const btn = overlay.querySelector('#calBtnVerificarDatas');
+    const htmlOriginal = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Verificando...';
+
+    // O token impede que um resultado atrasado volte para um card que foi
+    // movido/editado durante a verificação (a edição apaga o _verif).
+    alvos.forEach(({ card }) => { card._verif = { cor: 'checando', tooltip: 'Verificando…', token: {} }; });
+    renderCalendar();
+
+    try {
+      await Promise.all(alvos.map(async ({ key, card }) => {
+        const token = card._verif.token;
+        let res;
+        try {
+          res = await withTimeoutCal(window.verificarStatusAula(cardParaAula(card, key)), 20000, 'verificação da aula');
+        } catch (err) {
+          console.error('Erro ao verificar aula do calendário:', err);
+          res = { cor: 'neutro', tooltip: 'Não foi possível verificar esta aula' };
+        }
+        if (card._verif && card._verif.token === token) card._verif = { cor: res.cor, tooltip: res.tooltip };
+      }));
+      if (typeof showToast === 'function') showToast('✅ Verificação de datas concluída', 'success');
+    } finally {
+      if (document.body.contains(overlay)) {
+        btn.disabled = false;
+        btn.innerHTML = htmlOriginal;
+        renderCalendar();
+      }
+    }
+  }
+
+  // ── Match: ranking sobre as aulas da tela (inclui mudanças não salvas) ──
+  function abrirMatchCalendario() {
+    if (!window.Match || typeof window.Match.abrirModalMatch !== 'function') {
+      if (typeof showToast === 'function') showToast('Módulo de Match não carregado.', 'error');
+      return;
+    }
+    const ctx = options.contexto || {};
+    const aulasAtuais = todosOsCards().map(({ key, card }) => cardParaAula(card, key));
+    window.Match.abrirModalMatch({
+      codigoContratacao: ctx.codigoContratacao || null,
+      idSimulacao:       ctx.idSimulacao,
+      nome:              ctx.nomeCliente,
+      nomeCliente:       ctx.nomeCliente,
+      cpf:               ctx.cpf,
+      aulas:             aulasAtuais,
+      aulasAtuais
+    });
+  }
   overlay.querySelector('#calBtnSalvar').addEventListener('click', async () => {
     if (!options.onSave) {
       if (typeof showToast === 'function') showToast('ℹ️ Sem contexto de salvamento configurado', 'info');
@@ -533,10 +626,16 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
       ? `background:${a.cor};`
       : 'background:linear-gradient(135deg,#f28705 0%,#ffb347 100%);';
     const textColor  = a.cor ? getContrastColor(a.cor) : '#fff';
+    // Resultado do Verificar Datas (mesmas cores da tabela)
+    const verifCls = a._verif
+      ? (a._verif.cor === 'checando' ? 'verif-neutro verif-checando' : `verif-${a._verif.cor}`) : '';
+    const dotHtml = a._verif
+      ? `<span class="verif-datas-dot cal-verif-dot ${verifCls}" data-tooltip="${escapeHtml(a._verif.tooltip || '')}"></span>`
+      : '';
     return `<div class="cal-aula-card" draggable="true"
       data-key="${key}" data-idx="${idx}"
       style="${bgStyle}color:${textColor};">
-      <span class="cal-aula-materia">${a.materia} &bull; ${a.duracao}${horStr}</span>
+      <span class="cal-aula-materia">${dotHtml}${a.materia} &bull; ${a.duracao}${horStr}</span>
       <span class="cal-aula-prof">${nome1}</span>
     </div>`;
   }

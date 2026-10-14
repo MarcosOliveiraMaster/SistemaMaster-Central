@@ -2039,6 +2039,13 @@ const Simulacoes = (function() {
             getEstudantes: () => buscarEstudantesClienteCal(
               (modal.querySelector('#cpf-cliente')?.value || '').trim() || editingSimulacao.cpf
             ),
+            // Habilita Match e Verificar Datas dentro do calendário
+            contexto: {
+              codigoContratacao: editingSimulacao.codigoContratacao || null,
+              idSimulacao: editingSimulacao.idSimulacao,
+              nomeCliente: editingSimulacao.nomeCliente,
+              cpf: (modal.querySelector('#cpf-cliente')?.value || '').trim() || editingSimulacao.cpf
+            },
             onColorSave: async (cardData, color) => {
               if (cardData._origIdx !== undefined && editingSimulacao.aulas[cardData._origIdx]) {
                 editingSimulacao.aulas[cardData._origIdx].cor = color;

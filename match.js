@@ -506,8 +506,12 @@ window.Match = (function () {
       const codigoContratacao = aula.codigoContratacao;
       // Simulações ainda não têm codigoContratacao/registro no bancoDeAulas — nesse
       // caso usamos as aulas do rascunho recebidas diretamente, sem buscar no Firebase.
+      // aula.aulasAtuais (Vista Calendário) tem prioridade: são as aulas da tela, com
+      // mudanças ainda não salvas; o codigoContratacao continua servindo para não
+      // contar as aulas do próprio contrato como conflito.
       const [aulasContrato, professores, todasAulasSistema, bairroInfo] = await Promise.all([
-        codigoContratacao ? BANCO.fetchBancoDeAulasLista(codigoContratacao) : Promise.resolve(aula.aulas || []),
+        Array.isArray(aula.aulasAtuais) ? Promise.resolve(aula.aulasAtuais)
+          : codigoContratacao ? BANCO.fetchBancoDeAulasLista(codigoContratacao) : Promise.resolve(aula.aulas || []),
         BANCO.fetchDataBaseProfessores(),
         BANCO.fetchBancoDeAulasListaBatch(),
         resolverBairroCliente(aula.cpf)

@@ -3710,6 +3710,16 @@ h2, h3, h4, h5, h6 {
   opacity: 0.45;
 }
 
+/* Bolinha do Verificar Datas dentro do card */
+.cal-verif-dot {
+  width: 8px;
+  height: 8px;
+  margin-right: 3px;
+  vertical-align: middle;
+  border-color: #fff;
+  cursor: help;
+}
+
 /* Pré-visualização da fusão: disciplina da lateral sobre o card */
 .cal-aula-card.cal-merge-target {
   opacity: 0.5;
