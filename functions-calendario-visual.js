@@ -464,17 +464,37 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
     for (let i = 0; i < flatCells.length; i += 7)
       weekData.push(flatCells.slice(i, i + 7).map(c => c.key));
 
+    // Feriados (nacionais, AL e Maceió) por mês, calculados uma vez por render
+    const feriadosCache = {};
+    const feriadosDaKey = (key) => {
+      if (!window.Feriados) return [];
+      const [y, m, d] = key.split('-').map(Number);
+      const ym = `${y}-${m}`;
+      if (!feriadosCache[ym]) feriadosCache[ym] = window.Feriados.porDia(m, y);
+      return feriadosCache[ym][d] || [];
+    };
+    const feriadoHtml = (lista) => {
+      if (!lista.length) return { cls: '', label: '' };
+      const nomes = lista.map(f => f.nome).join(' / ');
+      return {
+        cls: ' cal-day-feriado',
+        label: `<div class="cal-feriado-label" data-tooltip="Feriado: ${escapeHtml(nomes)}">${escapeHtml(nomes)}</div>`
+      };
+    };
+
     const container = document.getElementById('calWeeksContainer');
     container.innerHTML = weekData.map((week, wIdx) => {
       const daysHtml = flatCells.slice(wIdx * 7, wIdx * 7 + 7).map(cell => {
+        const fer = feriadoHtml(feriadosDaKey(cell.key));
         if (cell.type === 'other')
-          return `<div class="cal-day cal-day-other"><div class="cal-day-num">${cell.dayNum}</div></div>`;
+          return `<div class="cal-day cal-day-other${fer.cls}"><div class="cal-day-num">${cell.dayNum}</div>${fer.label}</div>`;
 
         const isToday  = isCurMonth && cell.dayNum === today.getDate();
         const dayAulas = aulasMap[cell.key] || [];
 
-        return `<div class="cal-day${isToday ? ' cal-day-today' : ''}" data-key="${cell.key}" data-day="${cell.dayNum}">
+        return `<div class="cal-day${isToday ? ' cal-day-today' : ''}${fer.cls}" data-key="${cell.key}" data-day="${cell.dayNum}">
           <div class="cal-day-num">${cell.dayNum}</div>
+          ${fer.label}
           ${dayAulas.map((a, idx) => buildCardHtml(a, cell.key, idx)).join('')}
         </div>`;
       }).join('');

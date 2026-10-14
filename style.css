@@ -3663,6 +3663,27 @@ h2, h3, h4, h5, h6 {
   color: #f28705;
 }
 
+/* Feriado (feriados.js) */
+.cal-day.cal-day-feriado {
+  background: #fef2f2;
+  border-color: #fca5a5;
+}
+
+.cal-day-feriado .cal-day-num {
+  color: #dc2626;
+}
+
+.cal-feriado-label {
+  font-size: 0.55rem;
+  font-weight: 700;
+  color: #dc2626;
+  line-height: 1.2;
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Aula card inside day */
 .cal-aula-card {
   background: linear-gradient(135deg, #f28705 0%, #ffb347 100%);
