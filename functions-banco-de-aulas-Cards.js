@@ -3134,19 +3134,14 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
                 for (const item of updates) {
                   if (!item._idAula) continue;
                   try {
-                    const camposCalendario = {
-                      data:      item.data,
-                      materia:   item.materia,
-                      professor: item.professor,
-                      duracao:   item.duracao,
-                      horario:   item.horario,
-                      cor:       item.cor ?? null
-                    };
-                    // Só inclui idProfessor/professorUid quando o modal realmente os
-                    // enviou (campo professor foi tocado) — evita sobrescrever um
-                    // identificador já correto quando só horário/data/matéria mudam.
-                    if (item.idProfessor !== undefined)  camposCalendario.idProfessor  = item.idProfessor;
-                    if (item.professorUid !== undefined) camposCalendario.professorUid = item.professorUid;
+                    // Só os campos que mudaram no calendário (item._alterados). Assim
+                    // idProfessor/professorUid só são regravados quando o professor foi
+                    // de fato trocado, e aulas intactas não geram escrita.
+                    const camposCalendario = {};
+                    (item._alterados || []).forEach(campo => {
+                      camposCalendario[campo] = campo === 'cor' ? (item.cor ?? null) : item[campo];
+                    });
+                    if (!Object.keys(camposCalendario).length) continue;
                     await BANCO.updateCamposCalendario(item._idAula, camposCalendario);
                   } catch (err) {
                     console.error('❌ updateCamposCalendario:', err);
@@ -3163,12 +3158,15 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
                   if (!codigoCont) { erros.push('Código de contratação ausente'); continue; }
                   try {
                     await BANCO.addAulaCalendario(codigoCont, {
-                      data:      item.data,
-                      materia:   item.materia,
-                      professor: item.professor,
-                      duracao:   item.duracao,
-                      horario:   item.horario,
-                      cor:       item.cor ?? null
+                      data:         item.data,
+                      materia:      item.materia,
+                      professor:    item.professor,
+                      idProfessor:  item.idProfessor,
+                      professorUid: item.professorUid,
+                      estudante:    item.estudante,
+                      duracao:      item.duracao,
+                      horario:      item.horario,
+                      cor:          item.cor ?? null
                     });
                   } catch (err) {
                     console.error('❌ addAulaCalendario:', err);

@@ -719,8 +719,12 @@ async function addAulaCalendario(codigoContratacao, campos) {
     const valorAula = horasDecimais > 0 ? horasDecimais * valorHora : 0;
 
     // Professor diferente do da última aula: não herda CPF/uid/e-mail dela.
-    const mesmoProfessor = !campos.professor || campos.professor === ultima.professor;
-    const profNovo = mesmoProfessor ? null : await resolverProfessor({ nome: campos.professor });
+    // O CPF escolhido no calendário (campos.idProfessor) tem prioridade sobre o nome,
+    // que pode se repetir entre professores.
+    const cpfInformado = String(campos.idProfessor || '').trim();
+    const mesmoProfessor = !campos.professor
+      || (campos.professor === ultima.professor && (!cpfInformado || cpfInformado === (ultima.idProfessor || '')));
+    const profNovo = mesmoProfessor ? null : await resolverProfessor({ cpf: cpfInformado, nome: campos.professor });
     const professorEmail = mesmoProfessor
       ? (ultima.professorEmail || await resolverEmailProfessor({ cpf: ultima.idProfessor, nome: ultima.professor }))
       : String(profNovo?.email || '').trim().toLowerCase();
@@ -736,9 +740,9 @@ async function addAulaCalendario(codigoContratacao, campos) {
       codigoContratacao: ultima.codigoContratacao || codigoContratacao,
       idContratacao: codigoContratacao,
       cpf:          ultima.cpf          || "",
-      estudante:    ultima.estudante    || "",
-      idProfessor:  mesmoProfessor ? (ultima.idProfessor  || "") : (profNovo?.cpf || ""),
-      professorUid: mesmoProfessor ? (ultima.professorUid || "") : (profNovo?.uid || ""),
+      estudante:    campos.estudante    || ultima.estudante || "",
+      idProfessor:  mesmoProfessor ? (ultima.idProfessor  || "") : (profNovo?.cpf || cpfInformado || ""),
+      professorUid: mesmoProfessor ? (ultima.professorUid || "") : (profNovo?.uid || campos.professorUid || ""),
       professorEmail,
       metodoPagamento: ultima.metodoPagamento || "",
       nomeCliente:  ultima.nomeCliente  || "",

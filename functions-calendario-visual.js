@@ -53,6 +53,78 @@ const CORES_CAL = [
   { label: 'Cinza escuro', value: '#6B7280' }
 ];
 
+// Campos de um card que vão para o banco. Usados no diff do Salvar: só o que mudou
+// em relação ao estado carregado (_orig) é regravado.
+const CAMPOS_CARD_CAL = ['materia', 'duracao', 'professor', 'idProfessor', 'professorUid', 'estudante', 'horario', 'cor'];
+
+// "dd/mm/aaaa" (com ou sem dia da semana na frente) -> chave "aaaa-M-d" (mês 0-11)
+function dataParaKeyCal(dataStr) {
+  const m = String(dataStr || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  return m ? `${m[3]}-${parseInt(m[2]) - 1}-${parseInt(m[1])}` : null;
+}
+
+// Converte uma aula (banco ou simulação) em card do calendário. Ponto único de
+// conversão: carregamento inicial e reloadFromFirebase usavam cópias separadas e
+// uma delas perdia idProfessor/professorUid, que o Salvar depois gravava vazios.
+function aulaParaCardCal(a, origIdx) {
+  const card = {
+    materia:      a.materia      || 'A definir',
+    duracao:      a.duracao      || '--',
+    professor:    a.professor    || 'A definir',
+    idProfessor:  a.idProfessor  || '',
+    professorUid: a.professorUid || '',
+    estudante:    a.estudante    || '',
+    horario:      a.horario      || '',
+    cor:          a.cor          || null,
+    _idAula:      a['id-Aula'] || a.idAula || null,
+    _origIdx:     origIdx,
+    _docId:       a._docId || a.id || null
+  };
+  card._orig = { key: dataParaKeyCal(a.data) };
+  CAMPOS_CARD_CAL.forEach(c => { card._orig[c] = card[c]; });
+  return card;
+}
+
+// Cópia de card (Ctrl+arrastar, replicar semana): é uma aula nova, então não herda
+// a identidade da original — senão o Salvar trataria as duas como a mesma aula e
+// a cópia sobrescreveria a original em vez de ser criada.
+function clonarCardCal(a) {
+  const { _idAula, _origIdx, _docId, _orig, _verif, ...resto } = a;
+  return { ...resto, _idAula: null, _origIdx: null, _docId: null };
+}
+
+// Campos alterados de um card já salvo, comparando com o estado carregado.
+// professor/idProfessor/professorUid andam juntos: trocar um regrava os três.
+function camposAlteradosCal(card, key) {
+  const o = card._orig;
+  if (!o) return ['data', ...CAMPOS_CARD_CAL];
+  const alterados = [];
+  if (o.key !== key) alterados.push('data');
+  ['materia', 'duracao', 'estudante', 'horario', 'cor'].forEach(c => {
+    if ((card[c] || '') !== (o[c] || '')) alterados.push(c);
+  });
+  const profMudou = card.professor !== o.professor
+    || (card.idProfessor && card.idProfessor !== o.idProfessor)
+    || (card.professorUid && card.professorUid !== o.professorUid);
+  if (profMudou) alterados.push('professor', 'idProfessor', 'professorUid');
+  return alterados;
+}
+
+// "Mat1, Mat2 e Mat3" <-> ['Mat1','Mat2','Mat3'] — mesmo formato da tabela de aulas
+// (formatarMateriasMultiplas) e do Match (splitMaterias).
+function splitMateriasCal(str) {
+  return String(str || '')
+    .split(/,\s+|\s+e\s+/)
+    .map(m => m.trim())
+    .filter(m => m && m.toLowerCase() !== 'a definir');
+}
+
+function formatarMateriasCal(lista) {
+  const u = [...new Set(lista)].filter(Boolean);
+  if (u.length <= 1) return u[0] || 'A definir';
+  return `${u.slice(0, -1).join(', ')} e ${u[u.length - 1]}`;
+}
+
 // ──────────────────────────────────────────────────────────
 //  Modal principal: Calendário Visual
 // ──────────────────────────────────────────────────────────
@@ -73,26 +145,10 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
 
   // Pré-popular com aulas existentes
   (aulasArray || []).forEach((a, origIdx) => {
-    if (!a.data) return;
-    const m = a.data.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-    if (!m) return;
-    const key = `${m[3]}-${parseInt(m[2]) - 1}-${parseInt(m[1])}`;
+    const key = dataParaKeyCal(a.data);
+    if (!key) return;
     if (!aulasMap[key]) aulasMap[key] = [];
-    aulasMap[key].push({
-      materia:      a.materia      || 'A definir',
-      duracao:      a.duracao      || '--',
-      professor:    a.professor    || 'A definir',
-      // sem isso, qualquer aula que passe pelo calendário sem ter o professor trocado
-      // (ou seja, quase todas) perde o vínculo com o professor real ao salvar — ver
-      // nota no ponto onde "item" é remontado pra fullAulas/updates, mais abaixo.
-      idProfessor:  a.idProfessor  || '',
-      professorUid: a.professorUid || '',
-      horario:      a.horario      || '',
-      cor:          a.cor          || null,
-      _idAula:      a['id-Aula'] || a.idAula || null,
-      _origIdx:     origIdx,
-      _docId:       a._docId       || null
-    });
+    aulasMap[key].push(aulaParaCardCal(a, origIdx));
   });
 
   // Navega para o mês da aula mais próxima ao futuro (ou a mais recente)
@@ -182,9 +238,15 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
   const overlay = document.getElementById('visualizacaoCalendarioModal');
 
   // ── Handlers globais ─────────────────────────────────────
+  // Há algum modal aberto por cima do calendário (Configurar Aula, Match, cor...)?
+  // Esses são inseridos no body depois do overlay do calendário.
+  const temModalPorCima = () => Array.from(document.querySelectorAll('.modal-overlay'))
+    .some(m => overlay.compareDocumentPosition(m) & Node.DOCUMENT_POSITION_FOLLOWING);
+
   const onKeyDown = (e) => {
     if (e.key === 'Control') dragCtrlHeld = true;
-    if (e.key === 'Escape')  closeModal();
+    // Escape fecha só o modal do topo — o sub-modal trata o próprio Escape
+    if (e.key === 'Escape' && !temModalPorCima()) closeModal();
   };
   const onKeyUp = (e) => { if (e.key === 'Control') dragCtrlHeld = false; };
   document.addEventListener('keydown', onKeyDown);
@@ -227,22 +289,15 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
       // Reconstrói aulasMap
       Object.keys(aulasMap).forEach(k => delete aulasMap[k]);
       (freshAulas || []).forEach((a, origIdx) => {
-        if (!a.data) return;
-        const m = a.data.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-        if (!m) return;
-        const key = `${m[3]}-${parseInt(m[2]) - 1}-${parseInt(m[1])}`;
+        const key = dataParaKeyCal(a.data);
+        if (!key) return;
         if (!aulasMap[key]) aulasMap[key] = [];
-        aulasMap[key].push({
-          materia:   a.materia   || 'A definir',
-          duracao:   a.duracao   || '--',
-          professor: a.professor || 'A definir',
-          horario:   a.horario   || '',
-          cor:       a.cor       || null,
-          _idAula:   a['id-Aula'] || a.idAula || null,
-          _origIdx:  origIdx,
-          _docId:    a._docId    || null
-        });
+        aulasMap[key].push(aulaParaCardCal(a, origIdx));
       });
+      // A base de exclusões acompanha o que está no banco agora
+      aulasBaseIds = new Set(
+        (freshAulas || []).filter(a => a['id-Aula'] || a.idAula).map(a => a['id-Aula'] || a.idAula)
+      );
       renderCalendar();
     } catch (err) {
       console.warn('⚠️ Falha ao sincronizar calendário:', err);
@@ -303,14 +358,9 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
             data:         dataBr,
             materia:      card.materia   || 'A definir',
             professor:    card.professor || 'A definir',
-            // idProfessor/professorUid vinham sumindo daqui — "Configurar Aula" já os grava
-            // em card.idProfessor/card.professorUid ao trocar de professor (ver openCardConfig),
-            // mas esta reconstrução de item ignorava os dois campos. Resultado: a aula ficava
-            // com o NOME do professor novo mas o idProfessor/professorUid do professor antigo
-            // (ou vazio, se a aula nunca teve), quebrando silenciosamente tanto o conflito de
-            // agenda quanto a checagem de preferência de dia/turno em "Verificar Datas".
             idProfessor:  card.idProfessor  || '',
             professorUid: card.professorUid || '',
+            estudante:    card.estudante || '',
             duracao:      card.duracao   || '--',
             horario:      card.horario   || '',
             cor:          card.cor       || null,
@@ -321,7 +371,11 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
           fullAulas.push(item);
           if (card._idAula) {
             currentIds.add(card._idAula);
-            updates.push(item);
+            // Só entra em updates o que mudou desde o carregamento. _alterados diz
+            // quais campos regravar: sem isso todo Salvar regravava todas as aulas e
+            // mandava idProfessor/professorUid mesmo sem troca de professor.
+            item._alterados = camposAlteradosCal(card, key);
+            if (item._alterados.length) updates.push(item);
           } else {
             creates.push(item);
           }
@@ -475,6 +529,20 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
 
     listEl.innerHTML = cardsHtml + novaHtml;
 
+    // Arrastar disciplina = colocação silenciosa. Fica aqui (e não em setupDragDrop)
+    // porque a lista só é recriada nesta função: em setupDragDrop o listener era
+    // reanexado a cada renderCalendar e se acumulava nos mesmos elementos.
+    listEl.querySelectorAll('.cal-disciplina-card:not(.cal-disciplina-nova)').forEach(card => {
+      card.addEventListener('dragstart', (e) => {
+        isDraggingCard = false;
+        isDraggingWeek = false;
+        e.dataTransfer.setData('disciplina', card.dataset.disciplina);
+        e.dataTransfer.effectAllowed = 'copy';
+        setTimeout(() => card.classList.add('cal-dragging'), 0);
+      });
+      card.addEventListener('dragend', () => card.classList.remove('cal-dragging'));
+    });
+
     listEl.querySelectorAll('.cal-disciplina-card[data-disc-id]:not(.cal-disciplina-nova)').forEach(card => {
       card.addEventListener('contextmenu', (e) => {
         e.preventDefault();
@@ -509,18 +577,6 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
 
   // ── Drag & Drop ──────────────────────────────────────────
   function setupDragDrop() {
-    // --- Sidebar: arrastar disciplina = colocação silenciosa ---
-    overlay.querySelectorAll('.cal-disciplina-card').forEach(card => {
-      card.addEventListener('dragstart', (e) => {
-        isDraggingCard = false;
-        isDraggingWeek = false;
-        e.dataTransfer.setData('disciplina', card.dataset.disciplina);
-        e.dataTransfer.effectAllowed = 'copy';
-        setTimeout(() => card.classList.add('cal-dragging'), 0);
-      });
-      card.addEventListener('dragend', () => card.classList.remove('cal-dragging'));
-    });
-
     // --- Cards de aula: arrastar = mover/copiar; clicar = abre modal ---
     overlay.querySelectorAll('.cal-aula-card').forEach(card => {
       card.addEventListener('dragstart', (e) => {
@@ -589,9 +645,17 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
           const { key: srcKey, idx: srcIdx } = JSON.parse(cardDataStr);
           const aulaData = aulasMap[srcKey]?.[srcIdx];
           if (!aulaData) return;
-          if (!aulasMap[targetKey]) aulasMap[targetKey] = [];
-          aulasMap[targetKey].push({ ...aulaData });
-          if (!dragCtrlHeld) aulasMap[srcKey].splice(srcIdx, 1);
+          if (dragCtrlHeld) {
+            if (!aulasMap[targetKey]) aulasMap[targetKey] = [];
+            aulasMap[targetKey].push(clonarCardCal(aulaData));
+          } else {
+            // Mover mantém a identidade da aula (vira update de data no Salvar)
+            aulasMap[srcKey].splice(srcIdx, 1);
+            if (!aulasMap[srcKey].length) delete aulasMap[srcKey];
+            delete aulaData._verif;
+            if (!aulasMap[targetKey]) aulasMap[targetKey] = [];
+            aulasMap[targetKey].push(aulaData);
+          }
           renderCalendar();
         } else if (disciplinaStr) {
           // Colocação silenciosa: sem abrir modal
@@ -770,7 +834,11 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
 
       if (options.onColorSave) {
         for (const { ref } of cardsToColor) {
-          try { await withTimeoutCal(options.onColorSave(ref, selectedColor), 15000, 'salvamento de cor'); } catch (_) {}
+          try {
+            await withTimeoutCal(options.onColorSave(ref, selectedColor), 15000, 'salvamento de cor');
+            // Cor já gravada: o Salvar não precisa regravá-la
+            if (ref._orig && ref._idAula) ref._orig.cor = selectedColor;
+          } catch (_) {}
         }
       }
 
@@ -850,7 +918,7 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
       const aulas = aulasMap[srcKey] || [];
       if (!aulas.length) return;
       if (!aulasMap[tgtKey]) aulasMap[tgtKey] = [];
-      aulas.forEach(a => { aulasMap[tgtKey].push({ ...a }); n++; });
+      aulas.forEach(a => { aulasMap[tgtKey].push(clonarCardCal(a)); n++; });
     });
     if (n > 0) {
       renderCalendar();

@@ -2046,7 +2046,12 @@ const Simulacoes = (function() {
               // idProfessor/professorUid precisam vir junto (não só o nome) — sem eles, "Verificar
               // Datas" não consegue checar conflito de agenda nem preferência de dia/turno pra
               // qualquer aula editada pelo calendário (ambas as checagens exigem idProfessor).
+              // A aula original (via _origIdx) é a base, para não perder campos que o
+              // calendário não edita; cópias e aulas novas não têm _origIdx.
+              const aulasAntes = editingSimulacao.aulas || [];
               editingSimulacao.aulas = fullAulas.map(item => ({
+                ...(item._origIdx != null ? (aulasAntes[item._origIdx] || {}) : {}),
+                estudante:    item.estudante || '',
                 data:         item.data,
                 materia:      item.materia,
                 professor:    item.professor,
