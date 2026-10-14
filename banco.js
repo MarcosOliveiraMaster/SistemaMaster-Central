@@ -266,16 +266,28 @@ async function fetchBancoDeAulasListaBatch(forceRefresh = false) {
 // Função para buscar aulas individuais da coleção BancoDeAulas-Lista
 async function fetchBancoDeAulasLista(codigoContratacao) {
   try {
+    if (!codigoContratacao) return [];
+    // Busca só as aulas do contrato (prefixo do id-Aula) em vez da coleção inteira.
+    // O resultado é o mesmo de antes: mesmo recorte (4 primeiros caracteres) e mesma
+    // ordem do antigo orderBy("data") — que também descartava aulas sem o campo data.
     const querySnapshot = await db.collection("BancoDeAulas-Lista")
-      .orderBy("data", "asc")
+      .where("id-Aula", ">=", codigoContratacao)
+      .where("id-Aula", "<", codigoContratacao + "")
       .get();
-    const todasAulas = [];
-    querySnapshot.forEach(doc => { todasAulas.push({ id: doc.id, ...doc.data() }); });
-    const aulasFiltradas = todasAulas.filter(aula => {
-      const idAula = aula['id-Aula'] || '';
-      return idAula.substring(0, 4) === codigoContratacao;
+    const aulas = [];
+    querySnapshot.forEach(doc => {
+      const dados = doc.data();
+      if (!('data' in dados)) return;
+      aulas.push({ id: doc.id, ...dados });
     });
-    return aulasFiltradas;
+    return aulas
+      .filter(aula => (aula['id-Aula'] || '').substring(0, 4) === codigoContratacao)
+      .sort((a, b) => {
+        const sa = typeof a.data === 'string', sb = typeof b.data === 'string';
+        if (sa !== sb) return sa ? 1 : -1; // não-texto (ex.: null) vem antes, como no Firestore
+        if (!sa) return 0;
+        return a.data < b.data ? -1 : a.data > b.data ? 1 : 0;
+      });
   } catch (error) {
     console.error('❌ Erro ao buscar BancoDeAulas-Lista:', error.message);
     throw error;
