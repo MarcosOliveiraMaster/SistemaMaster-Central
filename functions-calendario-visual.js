@@ -150,6 +150,7 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
   let dragCtrlHeld   = false;
   let isDraggingCard = false;
   let isDraggingWeek = false;
+  let disciplinaArrastada = null; // nome da disciplina da lateral sendo arrastada
 
   // Lista de disciplinas (carregada pelo chamador via DisciplinasStore.getAll())
   let disciplinasCal = [...(options.disciplinas || [])];
@@ -272,6 +273,7 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
       isDraggingCard = false;
       isDraggingWeek = false;
       dragCtrlHeld = false;
+      disciplinaArrastada = null;
     }
   };
   document.addEventListener('visibilitychange', onVisibilityReset);
@@ -569,9 +571,15 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
         isDraggingWeek = false;
         e.dataTransfer.setData('disciplina', card.dataset.disciplina);
         e.dataTransfer.effectAllowed = 'copy';
+        // getData não funciona em dragover: guarda o nome para a pré-visualização da fusão
+        disciplinaArrastada = card.dataset.disciplina;
         setTimeout(() => card.classList.add('cal-dragging'), 0);
       });
-      card.addEventListener('dragend', () => card.classList.remove('cal-dragging'));
+      card.addEventListener('dragend', () => {
+        card.classList.remove('cal-dragging');
+        disciplinaArrastada = null;
+        overlay.querySelectorAll('.cal-merge-target').forEach(c => c.classList.remove('cal-merge-target'));
+      });
     });
 
     listEl.querySelectorAll('.cal-disciplina-card[data-disc-id]:not(.cal-disciplina-nova)').forEach(card => {
@@ -621,6 +629,29 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
         setTimeout(() => card.classList.add('cal-aula-dragging'), 0);
       });
       card.addEventListener('dragend', () => card.classList.remove('cal-aula-dragging'));
+
+      // Disciplina da lateral solta SOBRE o card = fusão ("Mat1 e Mat2").
+      // Outros arrastos (card, semana) seguem para o dia, como antes.
+      card.addEventListener('dragover', (e) => {
+        if (!disciplinaArrastada) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'copy';
+        card.closest('.cal-day')?.classList.remove('cal-drag-over');
+        card.dataset.mergeLabel = `+ ${disciplinaArrastada}`;
+        card.classList.add('cal-merge-target');
+      });
+      card.addEventListener('dragleave', (e) => {
+        if (!card.contains(e.relatedTarget)) card.classList.remove('cal-merge-target');
+      });
+      card.addEventListener('drop', (e) => {
+        const disciplina = e.dataTransfer.getData('disciplina');
+        if (!disciplina) return;
+        e.preventDefault();
+        e.stopPropagation();
+        card.classList.remove('cal-merge-target');
+        fundirDisciplina(card.dataset.key, parseInt(card.dataset.idx), disciplina);
+      });
 
       card.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -736,6 +767,21 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
         if (!isNaN(srcWeek) && srcWeek !== tgtWeek) replicateWeek(srcWeek, tgtWeek);
       });
     });
+  }
+
+  // ── Fusão: acrescenta uma disciplina à aula ("Mat1" -> "Mat1 e Mat2") ──
+  function fundirDisciplina(key, idx, disciplina) {
+    const card = aulasMap[key]?.[idx];
+    if (!card) return;
+    const partes = splitMateriasCal(card.materia);
+    if (partes.some(p => p.toLowerCase() === disciplina.toLowerCase())) {
+      if (typeof showToast === 'function') showToast(`ℹ️ A aula já tem ${disciplina}`, 'info');
+      return;
+    }
+    card.materia = formatarMateriasCal([...partes, disciplina]);
+    delete card._verif;
+    renderCalendar();
+    if (typeof showToast === 'function') showToast(`✅ Aula agora é ${card.materia}`, 'success');
   }
 
   // ── Menu de contexto ─────────────────────────────────────
@@ -1009,7 +1055,14 @@ function showVisualizacaoCalendarioModal(aulasArray, options = {}) {
               <i class="fas fa-mouse-pointer text-green-500 mt-0.5 text-xl flex-shrink-0"></i>
               <div>
                 <p class="text-sm font-semibold text-gray-800">Configurar aula</p>
-                <p class="text-xs text-gray-600 mt-1">Clique em qualquer card para abrir as configurações (professor, horário, duração). Arraste uma disciplina do painel direito para criar um card silenciosamente.</p>
+                <p class="text-xs text-gray-600 mt-1">Clique em qualquer card para abrir as configurações (professor, estudante, horário, duração). Arraste uma disciplina do painel direito para um espaço vazio do dia para criar um card silenciosamente.</p>
+              </div>
+            </div>
+            <div class="flex gap-3 p-3 bg-yellow-50 border border-yellow-100 rounded-lg">
+              <i class="fas fa-object-group text-yellow-600 mt-0.5 text-xl flex-shrink-0"></i>
+              <div>
+                <p class="text-sm font-semibold text-gray-800">Juntar disciplinas</p>
+                <p class="text-xs text-gray-600 mt-1">Solte uma disciplina do painel direito <strong>em cima</strong> de um card: ele fica transparente e, ao soltar, a aula passa a ter as duas disciplinas (ex.: Matemática e Física).</p>
               </div>
             </div>
             <div class="flex gap-3 p-3 bg-purple-50 border border-purple-100 rounded-lg">
@@ -1243,8 +1296,10 @@ async function showModalAulasCalendarios(aulaData, onSave, onDelete = null, opts
   const gridMateriasEl = document.getElementById('mac-grid-materias');
 
   const renderMateriasGrid = () => {
+    // Aula fundida ("Mat1 e Mat2") destaca cada disciplina; clicar em uma substitui a seleção
+    const partesSel = splitMateriasCal(materiaSelected);
     const materiasHtml = disciplinasMac.map(d => `
-      <button class="mac-materia-btn${d.nome === materiaSelected ? ' mac-materia-sel' : ''}" data-materia="${d.nome}" data-disc-id="${d.id ?? ''}">${d.nome}</button>
+      <button class="mac-materia-btn${(d.nome === materiaSelected || partesSel.includes(d.nome)) ? ' mac-materia-sel' : ''}" data-materia="${d.nome}" data-disc-id="${d.id ?? ''}">${d.nome}</button>
     `).join('');
 
     const novaHtml = `
