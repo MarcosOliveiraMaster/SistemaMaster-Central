@@ -1,0 +1,484 @@
+/* ==================== DETALHES DA CONTRATAÇÃO — NOVA VERSÃO ====================
+   Camada principal do modal (detalhes-contratacao-v2.js), por cima da versão antiga.
+   Glassmorphism em laranja/branco; em body.theme-blue, azul/branco.
+   Os elementos movidos da versão antiga mantêm as classes originais — os seletores
+   abaixo são todos escopados em .mdc2-overlay para não afetar a versão antiga.
+   Tamanhos acompanham a ALTURA da tela (vh) para os menus laterais caberem sem
+   barra de rolagem; só a tabela de Aulas Agendadas rola. */
+
+/* Versão antiga fica montada (os handlers dela dependem disso), mas invisível. */
+.mdc2-v1-oculta { background: transparent !important; }
+.mdc2-v1-oculta > .modal-container { visibility: hidden; }
+
+.mdc2-overlay {
+  --mdc2-acc: #f28705;
+  --mdc2-acc-forte: #d97804;
+  --mdc2-acc-rgb: 242, 135, 5;
+  --mdc2-fundo-1: rgba(255, 196, 128, 0.60);
+  --mdc2-fundo-2: rgba(255, 160, 70, 0.38);
+  --mdc2-base: rgba(255, 249, 242, 0.86);
+  --mdc2-texto: #1f2937;
+  --mdc2-texto-suave: #6b7280;
+  --mdc2-gap: clamp(4px, 1.1vh, 14px);
+  --mdc2-raio: clamp(12px, 1.8vh, 20px);
+  --mdc2-fonte: clamp(10.5px, 1.6vh, 13.5px);
+  --mdc2-btn-altura: clamp(21px, 4.1vh, 40px);
+  --mdc2-linha-pad: clamp(1px, 0.85vh, 10px);
+
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  padding: clamp(4px, 1.3vh, 18px);
+  background:
+    radial-gradient(55% 55% at 0% 0%, var(--mdc2-fundo-1), transparent 70%),
+    radial-gradient(50% 60% at 100% 100%, var(--mdc2-fundo-2), transparent 70%),
+    var(--mdc2-base);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  color: var(--mdc2-texto);
+  font-size: var(--mdc2-fonte);
+  animation: mdc2-entrar 0.22s ease-out;
+}
+
+body.theme-blue .mdc2-overlay {
+  --mdc2-acc: #00255f;
+  --mdc2-acc-forte: #001a43;
+  --mdc2-acc-rgb: 0, 37, 95;
+  --mdc2-fundo-1: rgba(130, 170, 235, 0.50);
+  --mdc2-fundo-2: rgba(70, 115, 205, 0.32);
+  --mdc2-base: rgba(242, 246, 255, 0.88);
+}
+
+@keyframes mdc2-entrar {
+  from { opacity: 0; transform: scale(0.985); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.mdc2-glass {
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: var(--mdc2-raio);
+  box-shadow: 0 10px 30px rgba(var(--mdc2-acc-rgb), 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+}
+
+.mdc2-shell {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mdc2-gap);
+}
+
+/* ---------- Cabeçalho (uma linha) ---------- */
+.mdc2-header {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(5px, 1.5vh, 18px) clamp(12px, 1.6vw, 24px);
+  background: linear-gradient(105deg, rgba(255, 255, 255, 0.82) 35%, rgba(var(--mdc2-acc-rgb), 0.16));
+  flex-shrink: 0;
+}
+.mdc2-header::after {
+  content: '';
+  position: absolute;
+  right: -60px;
+  bottom: -110px;
+  width: 260px;
+  height: 260px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(var(--mdc2-acc-rgb), 0.22), transparent 65%);
+  pointer-events: none;
+}
+.mdc2-header-topo {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.mdc2-header-id {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+.mdc2-nome {
+  margin: 0 clamp(4px, 1vw, 16px) 0 0;
+  font-family: 'Lexend', sans-serif;
+  font-weight: 700;
+  font-size: clamp(16px, 2.6vh, 24px);
+  line-height: 1.2;
+  color: var(--mdc2-texto);
+  overflow-wrap: anywhere;
+}
+.mdc2-contrato {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--mdc2-texto-suave);
+  white-space: nowrap;
+}
+.mdc2-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.mdc2-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  color: #4b5563;
+  white-space: nowrap;
+}
+.mdc2-chip-ponto { width: 7px; height: 7px; border-radius: 50%; background: #9ca3af; }
+.mdc2-chip[data-tom="atencao"] { background: #fef3c7; border-color: #fcd34d; color: #92400e; }
+.mdc2-chip[data-tom="atencao"] .mdc2-chip-ponto { background: #f59e0b; }
+.mdc2-chip[data-tom="ok"] { background: #dcfce7; border-color: #86efac; color: #166534; }
+.mdc2-chip[data-tom="ok"] .mdc2-chip-ponto { background: #22c55e; }
+.mdc2-chip[data-tom="perigo"] { background: #fee2e2; border-color: #fca5a5; color: #991b1b; }
+.mdc2-chip[data-tom="perigo"] .mdc2-chip-ponto { background: #ef4444; }
+
+.mdc2-header-acoes { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.mdc2-btn-perfil,
+.mdc2-btn-icone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: clamp(28px, 4.6vh, 38px);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  color: var(--mdc2-texto);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(17, 24, 39, 0.06);
+  transition: background 0.15s, color 0.15s;
+  cursor: pointer;
+}
+.mdc2-btn-perfil { padding: 0 14px; }
+.mdc2-btn-perfil i { color: var(--mdc2-acc); }
+.mdc2-btn-icone { width: clamp(28px, 4.6vh, 38px); }
+.mdc2-btn-perfil:hover,
+.mdc2-btn-icone:hover { background: #fff; color: var(--mdc2-acc); }
+.mdc2-btn-icone[data-v2="expandir"] i { transition: transform 0.2s ease; }
+.mdc2-header-aberto .mdc2-btn-icone[data-v2="expandir"] i { transform: rotate(180deg); }
+
+/* Informações do Cliente (o #body-info-cliente da versão antiga) */
+.mdc2-header-info {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.25s ease, margin-top 0.25s ease;
+}
+.mdc2-header-info > * { overflow: hidden; min-height: 0; }
+.mdc2-header-aberto .mdc2-header-info {
+  grid-template-rows: 1fr;
+  margin-top: 12px;
+}
+.mdc2-header-aberto .mdc2-header-info > * {
+  overflow: auto;
+  max-height: 32vh;
+  padding-top: 12px;
+  border-top: 1px solid rgba(var(--mdc2-acc-rgb), 0.15);
+}
+
+/* ---------- Corpo em 3 colunas ---------- */
+.mdc2-main {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: clamp(190px, 14vw, 250px) minmax(0, 1fr) clamp(230px, 18vw, 310px);
+  gap: var(--mdc2-gap);
+}
+.mdc2-nav,
+.mdc2-lateral { min-height: 0; overflow: auto; scrollbar-width: none; }
+.mdc2-nav::-webkit-scrollbar,
+.mdc2-lateral::-webkit-scrollbar { display: none; }
+
+/* Menu lateral */
+.mdc2-nav {
+  padding: clamp(5px, 1.4vh, 14px) 10px;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(3px, 1.4vh, 16px);
+}
+.mdc2-nav-titulo {
+  display: block;
+  padding: 0 8px clamp(2px, 0.6vh, 6px);
+  font-size: clamp(10px, 1.3vh, 11px);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mdc2-texto-suave);
+}
+.mdc2-nav-itens { display: flex; flex-direction: column; gap: clamp(2px, 0.6vh, 6px); }
+.mdc2-nav-itens > .relative { width: 100%; }
+
+/* Botões movidos da versão antiga (menu esquerdo e cartão Contratação) */
+.mdc2-overlay .mdc2-nav button,
+.mdc2-overlay .mdc2-card-botoes button {
+  width: 100%;
+  display: flex !important;
+  align-items: center;
+  justify-content: flex-start !important;
+  gap: 10px;
+  padding: 0 12px !important;
+  height: var(--mdc2-btn-altura);
+  min-height: 0 !important;
+  border-radius: 12px !important;
+  background: rgba(255, 255, 255, 0.6) !important;
+  border: 1px solid rgba(255, 255, 255, 0.85) !important;
+  color: #374151 !important;
+  font-size: var(--mdc2-fonte) !important;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: left;
+  box-shadow: none !important;
+  transition: background 0.15s, color 0.15s;
+}
+.mdc2-overlay .mdc2-nav button:hover,
+.mdc2-overlay .mdc2-card-botoes button:hover {
+  background: rgba(var(--mdc2-acc-rgb), 0.10) !important;
+  color: var(--mdc2-acc) !important;
+}
+.mdc2-overlay .mdc2-nav button > span {
+  width: auto !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+  font-size: var(--mdc2-fonte) !important;
+}
+.mdc2-overlay .mdc2-nav button i,
+.mdc2-overlay .mdc2-card-botoes button i {
+  width: 18px;
+  margin: 0 !important;
+  text-align: center;
+  font-size: calc(var(--mdc2-fonte) + 1px) !important;
+  color: var(--mdc2-acc);
+  flex-shrink: 0;
+}
+/* "Fechar" da versão antiga vira o X, último item do cabeçalho */
+.mdc2-slot-fechar { display: contents; }
+.mdc2-overlay .mdc2-header-acoes #btn-fechar-modal {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: clamp(28px, 4.6vh, 38px);
+  height: clamp(28px, 4.6vh, 38px);
+  padding: 0 !important;
+  border-radius: 12px !important;
+  background: rgba(255, 255, 255, 0.85) !important;
+  border: 1px solid rgba(17, 24, 39, 0.08) !important;
+  box-shadow: 0 2px 8px rgba(17, 24, 39, 0.06) !important;
+  color: var(--mdc2-texto) !important;
+  font-size: 0 !important; /* esconde o texto "Fechar" */
+}
+.mdc2-overlay .mdc2-header-acoes #btn-fechar-modal::before {
+  content: '\f00d';
+  font-family: 'Font Awesome 6 Free';
+  font-weight: 900;
+  font-size: 15px;
+}
+.mdc2-overlay .mdc2-header-acoes #btn-fechar-modal:hover { background: #fff !important; color: var(--mdc2-acc) !important; }
+.mdc2-overlay .mdc2-nav #btnColunasAula .fa-chevron-down { margin-left: auto !important; font-size: 10px !important; }
+.mdc2-overlay .mdc2-nav #btnAdicionarAula,
+.mdc2-overlay .mdc2-card-botoes #btn-salvar-alteracoes {
+  background: linear-gradient(135deg, var(--mdc2-acc), var(--mdc2-acc-forte)) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+}
+.mdc2-overlay .mdc2-nav #btnAdicionarAula i,
+.mdc2-overlay .mdc2-card-botoes #btn-salvar-alteracoes i { color: #fff; }
+.mdc2-overlay .mdc2-nav #btnAdicionarAula:hover,
+.mdc2-overlay .mdc2-card-botoes #btn-salvar-alteracoes:hover { filter: brightness(1.08); }
+/* O menu "Colunas" abre embutido, abaixo do botão */
+.mdc2-overlay .mdc2-nav #menuColunasAula {
+  position: static !important;
+  margin-top: 4px !important;
+  box-shadow: none !important;
+  background: rgba(255, 255, 255, 0.75) !important;
+  border-color: rgba(var(--mdc2-acc-rgb), 0.15) !important;
+}
+
+/* Centro: Aulas Agendadas */
+.mdc2-centro {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: clamp(8px, 1.4vh, 16px);
+  overflow: hidden;
+}
+.mdc2-secao-titulo {
+  margin: 0 0 clamp(6px, 1.2vh, 10px);
+  font-family: 'Lexend', sans-serif;
+  font-weight: 700;
+  font-size: clamp(13px, 1.9vh, 15px);
+  color: var(--mdc2-texto);
+}
+.mdc2-secao-titulo i { color: var(--mdc2-acc); margin-right: 6px; }
+.mdc2-tabela { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.mdc2-overlay .mdc2-tabela .table-container-double-scroll {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.85);
+}
+.mdc2-overlay .mdc2-tabela .table-wrapper {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--mdc2-acc) rgba(var(--mdc2-acc-rgb), 0.08);
+}
+/* Todas as colunas cabem na largura, sem rolagem horizontal e sem quebra de linha:
+   no lugar do min-width de 800px global de .table-details, a fonte e os espaços
+   diminuem com a largura da tela. Só o nome do professor pode quebrar, e apenas
+   quando a tela é estreita demais para ele inteiro. */
+@media (min-width: 769px) {
+  .mdc2-overlay .mdc2-tabela .table-wrapper { overflow-x: hidden; }
+  .mdc2-overlay .mdc2-tabela .table-details { min-width: 0; width: 100%; }
+  .mdc2-overlay .mdc2-tabela .table-details th,
+  .mdc2-overlay .mdc2-tabela .table-details td {
+    padding: clamp(2px, 0.55vh, 6px) clamp(2px, 0.3vw, 7px);
+    white-space: nowrap;
+    font-size: clamp(9px, 0.68vw, 12px);
+    line-height: 1.25;
+    vertical-align: middle;
+  }
+  .mdc2-overlay .mdc2-tabela .table-details td button:not(.btn-relatorio-aula):not(.btn-observacao-aula) {
+    padding: 2px !important;
+    text-align: left;
+    font-size: inherit;
+  }
+  /* Ícones de Relatório/Observações e o switch mais baixos: linhas compactas */
+  .mdc2-overlay .mdc2-tabela .btn-relatorio-aula,
+  .mdc2-overlay .mdc2-tabela .btn-observacao-aula {
+    width: clamp(20px, 1.7vw, 32px) !important;
+    height: clamp(20px, 1.7vw, 32px) !important;
+  }
+  .mdc2-overlay .mdc2-tabela .btn-status-aula { padding: 2px 6px !important; }
+  /* Copiar e Excluir sempre lado a lado */
+  .mdc2-overlay .mdc2-tabela .table-details td:last-child { white-space: nowrap; }
+  .mdc2-overlay .mdc2-tabela .btn-copiar-aula-detalhe { margin-right: 6px !important; }
+}
+/* Telas estreitas: a fonte já está no mínimo; só Matéria e Professor (células, não
+   cabeçalhos) podem quebrar para todas as colunas continuarem cabendo. */
+@media (min-width: 769px) and (max-width: 1365px) {
+  .mdc2-overlay .mdc2-tabela .table-details td:nth-child(4),
+  .mdc2-overlay .mdc2-tabela .table-details td:nth-child(5) { white-space: normal; }
+}
+.mdc2-overlay .mdc2-tabela .table-wrapper::-webkit-scrollbar { width: 10px; height: 10px; display: block; }
+.mdc2-overlay .mdc2-tabela .table-wrapper::-webkit-scrollbar-track { background: rgba(var(--mdc2-acc-rgb), 0.08); border-radius: 6px; }
+.mdc2-overlay .mdc2-tabela .table-wrapper::-webkit-scrollbar-thumb { background: var(--mdc2-acc); border-radius: 6px; }
+.mdc2-overlay .mdc2-tabela .table-wrapper::-webkit-scrollbar-thumb:hover { background: var(--mdc2-acc-forte); }
+
+/* Lateral direita: cards */
+.mdc2-lateral {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mdc2-gap);
+}
+.mdc2-card { padding: clamp(5px, 1.5vh, 18px) clamp(10px, 1vw, 18px); flex-shrink: 0; }
+.mdc2-card-titulo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: clamp(2px, 0.5vh, 6px);
+  font-family: 'Lexend', sans-serif;
+  font-weight: 700;
+  font-size: clamp(12px, 1.85vh, 15px);
+}
+.mdc2-card-icone {
+  width: clamp(20px, 3.6vh, 32px);
+  height: clamp(20px, 3.6vh, 32px);
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--mdc2-acc), var(--mdc2-acc-forte));
+  color: #fff;
+  font-size: calc(var(--mdc2-fonte) + 1px);
+  flex-shrink: 0;
+}
+.mdc2-linha {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: var(--mdc2-linha-pad) 0;
+  border-top: 1px solid rgba(var(--mdc2-acc-rgb), 0.10);
+}
+.mdc2-card-titulo + .mdc2-linha { border-top: 0; }
+.mdc2-linha-rotulo { font-size: var(--mdc2-fonte); color: #4b5563; }
+.mdc2-linha-valor,
+.mdc2-overlay .mdc2-linha-valor > div {
+  font-size: clamp(12.5px, 2vh, 17px) !important;
+  font-weight: 700 !important;
+  color: #1f2a44 !important;
+  text-align: right;
+  white-space: nowrap;
+}
+.mdc2-overlay .mdc2-linha-valor > #display-lucro-master-contrato,
+.mdc2-overlay .mdc2-linha-valor.mdc2-valor-lucro { color: #16a34a !important; }
+.mdc2-card-acao { margin-top: clamp(4px, 0.8vh, 8px); }
+.mdc2-overlay .mdc2-card-acao button {
+  width: 100%;
+  justify-content: center;
+  height: var(--mdc2-btn-altura);
+  padding: 0 12px !important;
+  border-radius: 12px !important;
+  background: rgba(var(--mdc2-acc-rgb), 0.08) !important;
+  border: 1px solid rgba(var(--mdc2-acc-rgb), 0.20) !important;
+  color: var(--mdc2-acc) !important;
+  font-size: var(--mdc2-fonte) !important;
+  font-weight: 600;
+}
+.mdc2-overlay .mdc2-card-acao button:hover { background: rgba(var(--mdc2-acc-rgb), 0.15) !important; }
+.mdc2-card-botoes { display: flex; flex-direction: column; gap: clamp(3px, 0.6vh, 6px); margin-top: clamp(2px, 0.5vh, 6px); }
+
+/* ---------- Responsivo ---------- */
+/* Telas muito baixas (ex.: notebook com zoom): cartões mais compactos */
+@media (max-height: 560px) and (min-width: 769px) {
+  .mdc2-card-icone { display: none; }
+  .mdc2-card-titulo { margin-bottom: 0; }
+  .mdc2-card-botoes { display: grid; grid-template-columns: 1fr 1fr; }
+  .mdc2-card-botoes > :first-child { grid-column: 1 / -1; }
+}
+
+/* Telas médias: cartões descem para baixo da tabela, em linha */
+@media (max-width: 1180px) {
+  .mdc2-main {
+    grid-template-columns: clamp(180px, 20vw, 220px) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+  .mdc2-nav { grid-row: 1 / span 2; }
+  .mdc2-lateral { flex-direction: row; overflow: visible; }
+  .mdc2-lateral > .mdc2-card { flex: 1 1 0; min-width: 0; }
+}
+
+/* Celular / tablet em pé: tudo empilhado, a camada inteira rola */
+@media (max-width: 768px) {
+  .mdc2-overlay { overflow-y: auto; padding: 6px; --mdc2-fonte: 12.5px; --mdc2-btn-altura: 36px; --mdc2-linha-pad: 8px; }
+  .mdc2-shell { flex: none; width: 100%; min-height: max-content; }
+  .mdc2-header-topo { flex-direction: column; align-items: stretch; }
+  .mdc2-header-acoes { flex-wrap: wrap; }
+  .mdc2-btn-perfil { flex: 1; }
+  .mdc2-main { display: flex; flex-direction: column; }
+  .mdc2-main > * { flex-shrink: 0; }
+  .mdc2-nav { overflow: visible; }
+  .mdc2-nav-itens { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mdc2-centro { overflow: visible; }
+  .mdc2-overlay .mdc2-tabela .table-wrapper { max-height: 65vh; }
+  .mdc2-lateral { flex-direction: column; overflow: visible; }
+}

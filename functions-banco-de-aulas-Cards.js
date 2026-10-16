@@ -8,6 +8,26 @@ const BancoDeAulasCards = (function() {
   let _aulaDetalhesAtual = null; // Armazena aula ativa para acesso em setupAulaDetailsEventListeners
   let _modalDetalhesAtivo = null; // Referência ao modal de detalhes em exibição (evita instâncias duplicadas empilhadas)
   let _cancelarCarregamentoAtual = null; // Handle para parar o timer/progresso do carregamento de aulas em andamento (ver loadAulasDetalhadas)
+  let _autoSalvarAtual = null; // Salvamento automático do modal de detalhes aberto (ver _agendarAutoSalvar)
+
+  // Salva o modal de detalhes aberto (mesma rotina do botão "Salvar Alterações", sem
+  // toast) logo após cada alteração. Agrupa alterações seguidas e nunca roda duas
+  // vezes ao mesmo tempo: o que chegar durante um salvamento roda logo depois dele.
+  function _agendarAutoSalvar() {
+    const auto = _autoSalvarAtual;
+    if (!auto) return;
+    clearTimeout(auto.timer);
+    auto.timer = setTimeout(async function executar() {
+      if (auto.emAndamento) { auto.pendente = true; return; }
+      auto.emAndamento = true;
+      try {
+        await auto.salvar({ silencioso: true });
+      } finally {
+        auto.emAndamento = false;
+        if (auto.pendente) { auto.pendente = false; executar(); }
+      }
+    }, 800);
+  }
 
   // Sentinela para ordenação por data: aulas sem data (ou com data ilegível) vão para o
   // fim da lista, não para o início — usar Date.now() distorceria a ordem entre elas.
@@ -383,6 +403,10 @@ const BancoDeAulasCards = (function() {
               Detalhes da Contratação - ${aula.codigoContratacao || 'Sem código'}${(aula.nome || aula.nomeCliente) ? ' - ' + (aula.nome || aula.nomeCliente) : ''}
             </h3>
             <div class="flex items-center gap-2">
+              <button type="button" id="btn-nova-versao-detalhes" class="btn-secondary btn-compact text-xs" title="Voltar ao layout novo deste modal">
+                <i class="fas fa-wand-magic-sparkles mr-1"></i>
+                Voltar à nova versão
+              </button>
               <button class="modal-fullscreen-toggle text-gray-400 hover:text-gray-600" title="Alternar tela cheia">
                 <i class="fas fa-expand"></i>
               </button>
@@ -683,6 +707,9 @@ const BancoDeAulasCards = (function() {
         _cancelarCarregamentoAtual = null;
       }
       if (_modalDetalhesAtivo === modalContainer) _modalDetalhesAtivo = null;
+      // Um salvamento automático já agendado ainda roda (a alteração não se perde);
+      // só deixa de aceitar novos agendamentos deste modal.
+      _autoSalvarAtual = null;
       modalContainer.remove();
     };
     modalContainer._fecharModal = closeModal;
@@ -705,6 +732,16 @@ const BancoDeAulasCards = (function() {
         modalContainerEl.classList.remove('modal-fullscreen');
         fullscreenBtn.querySelector('i').classList.replace('fa-compress', 'fa-expand');
         fullscreenBtn.title = 'Alternar tela cheia';
+      }
+    });
+
+    // Volta para a nova versão (detalhes-contratacao-v2.js), que reaproveita os
+    // mesmos elementos deste modal.
+    modal.querySelector('#btn-nova-versao-detalhes').addEventListener('click', () => {
+      if (window.DetalhesContratacaoV2) {
+        window.DetalhesContratacaoV2.abrir(modal, aula);
+      } else {
+        showToast('Módulo da nova versão não carregado.', 'error');
       }
     });
 
@@ -986,39 +1023,9 @@ const BancoDeAulasCards = (function() {
     // Configurar botão "Ver dados do cliente"
     const btnVerDadosCliente = modal.querySelector('#btn-ver-dados-cliente');
     if (btnVerDadosCliente) {
-      btnVerDadosCliente.addEventListener('click', () => {
-        const cpf = aula.cpf || '';
-        if (!cpf) { showToast('CPF do cliente não encontrado na contratação', 'error'); return; }
-        db.collection('cadastroClientes').where('cpf', '==', cpf).get().then(snap => {
-          if (snap.empty) { showToast('Cliente não encontrado no BD Clientes', 'error'); return; }
-          const clientId = snap.docs[0].id;
-          const clientData = { ...snap.docs[0].data(), id: clientId };
-
-          // Garantir que o DC está inicializado e o HTML do modal existe no DOM
-          if (!window.dashboardCliente || !document.getElementById('dc-modal-detalhes')) {
-            if (typeof loadDashboardCliente === 'function') loadDashboardCliente();
-          }
-
-          const abrir = (tentativas) => {
-            const dc = window.dashboardCliente;
-            const modalDetalhesEl = document.getElementById('dc-modal-detalhes');
-            if (dc && modalDetalhesEl) {
-              // O modal vive dentro da seção "clientes" (display:none quando a aba não está ativa).
-              // Move-lo para o body garante que fique visível mesmo aberto a partir de Banco de Aulas.
-              if (modalDetalhesEl.parentElement !== document.body) {
-                document.body.appendChild(modalDetalhesEl);
-              }
-              if (!dc.clients.find(c => c.id === clientId)) dc.clients.push(clientData);
-              dc.openModalDetalhes(clientId);
-            } else if (tentativas > 0) {
-              setTimeout(() => abrir(tentativas - 1), 100);
-            } else {
-              showToast('Erro ao abrir dados do cliente', 'error');
-            }
-          };
-          abrir(20);
-        }).catch(() => showToast('Erro ao buscar dados do cliente', 'error'));
-      });
+      // abrirPerfilClientePorCpf (functions-dashboardCliente.js) leva todos os overlays
+      // do perfil (Detalhes, Dados NF, Local Aula, Estudantes, Editar) para o body.
+      btnVerDadosCliente.addEventListener('click', () => abrirPerfilClientePorCpf(aula.cpf || ''));
     }
 
     // Configurar botão "Gerar mensagem de NF-e"
@@ -1264,16 +1271,22 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
     // Configurar botão "Salvar Alterações"
     const btnSalvarAlteracoes = modal.querySelector('#btn-salvar-alteracoes');
     if (btnSalvarAlteracoes) {
-      btnSalvarAlteracoes.addEventListener('click', async () => {
+      // O mesmo salvamento roda pelo botão e, silencioso (sem toast nem mudança no
+      // botão), a cada alteração feita no modal — ver _agendarAutoSalvar.
+      const salvarAlteracoes = async ({ silencioso = false } = {}) => {
         try {
-          btnSalvarAlteracoes.disabled = true;
-          btnSalvarAlteracoes.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Salvando...';
+          if (!silencioso) {
+            btnSalvarAlteracoes.disabled = true;
+            btnSalvarAlteracoes.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Salvando...';
+          }
 
           const codigoDoc = aula.codigoContratacao;
           if (!codigoDoc) {
-            showToast('❌ Código de contratação não encontrado', 'error');
-            btnSalvarAlteracoes.disabled = false;
-            btnSalvarAlteracoes.innerHTML = '<i class="fas fa-save mr-2"></i> Salvar Alterações';
+            if (!silencioso) {
+              showToast('❌ Código de contratação não encontrado', 'error');
+              btnSalvarAlteracoes.disabled = false;
+              btnSalvarAlteracoes.innerHTML = '<i class="fas fa-save mr-2"></i> Salvar Alterações';
+            }
             return;
           }
 
@@ -1510,6 +1523,11 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
             console.log(`✅ BancoDeAulas-Lista: ${aulasAtualizadas} aulas atualizadas`);
           }
 
+          if (silencioso) {
+            if (aulasComErro > 0) console.warn(`⚠️ Salvamento automático: ${aulasComErro} aula(s) não encontrada(s)`);
+            return;
+          }
+
           // Feedback final
           let mensagem = '✅ Alterações salvas com sucesso!';
           if (aulasAtualizadas > 0) {
@@ -1528,11 +1546,16 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
 
         } catch (err) {
           console.error('Erro ao salvar alterações:', err);
-          showToast('❌ Erro ao salvar: ' + (err && err.message ? err.message : ''), 'error');
-          btnSalvarAlteracoes.disabled = false;
-          btnSalvarAlteracoes.innerHTML = '<i class="fas fa-save mr-2"></i> Salvar Alterações';
+          // Mesmo no automático o erro aparece: sem ele a alteração se perderia sem aviso.
+          showToast(`❌ ${silencioso ? 'Não foi possível salvar automaticamente' : 'Erro ao salvar'}: ` + (err && err.message ? err.message : ''), 'error');
+          if (!silencioso) {
+            btnSalvarAlteracoes.disabled = false;
+            btnSalvarAlteracoes.innerHTML = '<i class="fas fa-save mr-2"></i> Salvar Alterações';
+          }
         }
-      });
+      };
+      btnSalvarAlteracoes.addEventListener('click', () => salvarAlteracoes());
+      _autoSalvarAtual = { salvar: salvarAlteracoes, carregamentos: 0, timer: null, emAndamento: false, pendente: false };
     }
 
     // Preencher Estudante e Série a partir da coleção cadastroClientes usando CPF
@@ -1792,8 +1815,12 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
         }
       });
     });
+
+    // A nova versão (detalhes-contratacao-v2.js) é a principal: abre por cima já com
+    // todos os listeners acima ligados. "Visualizar versão antiga" volta a este layout.
+    if (window.DetalhesContratacaoV2) window.DetalhesContratacaoV2.abrir(modal, aula);
   }
-  
+
   // ── Conteúdos das aulas ────────────────────────────────────────────────
   // conteudosContratacoes/{código da contratação} (fora de BancoDeAulas: o
   // professor lê os conteúdos, mas não pode ler valores do pacote). O
@@ -2804,6 +2831,14 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
       // Adicionar event listeners para os botões de relatório e observação
       setupAulaDetailsEventListeners();
 
+      // Toda alteração no modal (submodais, Editar valores, copiar/excluir, Vista
+      // Calendário) termina recarregando esta tabela: a partir da 2ª carga, salva tudo.
+      // A 1ª é só a abertura do modal — não há o que salvar.
+      if (_autoSalvarAtual) {
+        _autoSalvarAtual.carregamentos++;
+        if (_autoSalvarAtual.carregamentos > 1) _agendarAutoSalvar();
+      }
+
       // Sincronizar com o calendário visual se estiver aberto
       if (typeof window.refreshCalendarioVisual === 'function') {
         window.refreshCalendarioVisual().catch(() => {});
@@ -2983,6 +3018,7 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
 
         try {
           await BANCO.updateConfirmacaoProfessorAula(idAula, novoValor);
+          _agendarAutoSalvar(); // o switch não recarrega a tabela
         } catch (err) {
           // Reverter visualmente em caso de erro
           this.classList.toggle('switch-active', !novoValor);
@@ -5091,17 +5127,20 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
             </button>
           </div>
 
-          <div class="modal-body">
-            <div class="form-group">
+          <!-- Sem rolagem no modal: o campo Observação encolhe quando falta altura
+               (mín. 72px) e só o Planejamento da aula tem barra de rolagem. O modal
+               só rola em telas tão baixas que nem esse mínimo cabe. -->
+          <div class="modal-body" style="display:flex; flex-direction:column; min-height:0;">
+            <div class="form-group" style="flex:1 1 auto; min-height:104px; display:flex; flex-direction:column;">
               <label class="block text-sm font-medium text-gray-700 mb-2">Observação</label>
-              <textarea id="observacaoTexto" class="w-full p-4 border border-gray-300 rounded-lg text-sm resize-none" rows="8" placeholder="Nenhuma observação registrada">${escapeHtml(observacaoOriginal)}</textarea>
+              <textarea id="observacaoTexto" class="w-full p-4 border border-gray-300 rounded-lg text-sm resize-none overflow-y-auto" style="flex:1 1 auto; min-height:72px;" rows="8" placeholder="Nenhuma observação registrada">${escapeHtml(observacaoOriginal)}</textarea>
             </div>
-            <div class="form-group mt-4 pt-4 border-t border-gray-200">
+            <div class="form-group mt-4 pt-4 border-t border-gray-200" style="flex:none;">
               <label class="block text-sm font-medium text-gray-700 mb-2">
                 <i class="fas fa-clipboard-list text-orange-500 mr-1"></i> Planejamento da aula
                 <span class="text-xs text-gray-400 font-normal">(do professor; o cliente vê no portal)</span>
               </label>
-              <textarea id="planejamentoTexto" class="w-full p-4 border border-gray-300 rounded-lg text-sm resize-none" rows="6" maxlength="5000" placeholder="Carregando..." disabled></textarea>
+              <textarea id="planejamentoTexto" class="w-full p-4 border border-gray-300 rounded-lg text-sm resize-none overflow-y-auto" rows="2" maxlength="5000" placeholder="Carregando..." disabled></textarea>
               <div class="flex justify-end mt-2">
                 <button id="btnSalvarPlanejamento" class="btn-secondary btn-compact" disabled><i class="fas fa-save mr-2"></i>Salvar planejamento</button>
               </div>
@@ -5401,58 +5440,26 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
     };
     
     if (!relatorioTexto) return resultado;
-    
-    const linhas = relatorioTexto.split('\n');
-    let secaoAtual = '';
-    let conteudoAtual = [];
-    
-    for (const linha of linhas) {
-      const linhaTrim = linha.trim();
-      
-      if (linhaTrim === '---') {
-        if (secaoAtual && conteudoAtual.length > 0) {
-          const conteudo = conteudoAtual.join('\n').trim();
-          if (secaoAtual === 'descricao') resultado.descricao = conteudo;
-          else if (secaoAtual === 'comportamento') resultado.comportamento = conteudo;
-          else if (secaoAtual === 'recomendacoes') resultado.recomendacoes = conteudo;
-        }
-        secaoAtual = '';
-        conteudoAtual = [];
-        continue;
-      }
-      
-      if (linhaTrim.startsWith('Descrição da Aula')) {
-        secaoAtual = 'descricao';
-        continue;
-      }
-      
-      if (linhaTrim.startsWith('Comportamento do estudante')) {
-        secaoAtual = 'comportamento';
-        continue;
-      }
-      
-      if (linhaTrim.startsWith('Recomendações')) {
-        secaoAtual = 'recomendacoes';
-        continue;
-      }
-      
-      if (linhaTrim.startsWith('Enviado em:')) {
-        resultado.dataEnvio = linhaTrim.replace('Enviado em:', '').trim();
-        continue;
-      }
-      
-      if (secaoAtual && linhaTrim) {
-        conteudoAtual.push(linha);
-      }
+
+    // Três formatos gravados em RelatorioAula, todos com as seções separadas por "---":
+    //  - este modal:        "Descrição da Aula\n..."  (salvarRelatorioAula)
+    //  - Painel Central:    "Descrição da aula\n..." / "Comportamento do Estudante\n..."
+    //  - portal do professor (SistemMaster-Login/professor.js): só o texto, SEM títulos.
+    // Antes só o primeiro era lido (busca por título com maiúsculas exatas): relatórios
+    // enviados pelo portal abriam com os três campos vazios. Mesma regra do portal
+    // (lerSecoesRelatorio): separa pelo "---" e remove o título, se houver.
+    let texto = String(relatorioTexto);
+    const envio = texto.match(/Enviado em:\s*(.+)\s*$/);
+    if (envio) {
+      resultado.dataEnvio = envio[1].trim();
+      texto = texto.slice(0, envio.index);
     }
-    
-    if (secaoAtual && conteudoAtual.length > 0) {
-      const conteudo = conteudoAtual.join('\n').trim();
-      if (secaoAtual === 'descricao') resultado.descricao = conteudo;
-      else if (secaoAtual === 'comportamento') resultado.comportamento = conteudo;
-      else if (secaoAtual === 'recomendacoes') resultado.recomendacoes = conteudo;
-    }
-    
+    const partes = texto.split(/^\s*---\s*$/m);
+    const titulos = [/^descri[çc][ãa]o da aula\s*:?\s*/i, /^comportamento do estudante\s*:?\s*/i, /^recomenda[çc][õo]es\s*:?\s*/i];
+    ['descricao', 'comportamento', 'recomendacoes'].forEach((chave, i) => {
+      resultado[chave] = (partes[i] || '').trim().replace(titulos[i], '').trim();
+    });
+
     return resultado;
   }
   

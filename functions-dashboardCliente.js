@@ -2513,6 +2513,65 @@ async function abrirDetalhesClienteStandalone(clientId) {
 }
 
 // ============================================================
+// PERFIL DO CLIENTE A PARTIR DE OUTRAS TELAS (ex.: Detalhes da Contratação)
+// Os overlays dc-modal-* vivem dentro da seção #clientes (display:none quando a aba
+// não está ativa). Levar só o de Detalhes para o body deixava as abas Dados NF /
+// Local Aula / Estudantes / Editar invisíveis. Todos são levados para o container
+// #dc-standalone-modais — o mesmo que loadDashboardCliente() remove ao remontar a
+// seção, então nunca ficam ids duplicados.
+// ============================================================
+const DC_IDS_MODAIS_CLIENTE = [
+  'dc-toast-container', 'dc-modal-detalhes', 'dc-modal-nf', 'dc-modal-aula',
+  'dc-modal-estudante', 'dc-modal-editar', 'dc-modal-confirm'
+];
+
+function _dcLevarModaisParaBody() {
+  let container = document.getElementById('dc-standalone-modais');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'dc-standalone-modais';
+    document.body.appendChild(container);
+  }
+  DC_IDS_MODAIS_CLIENTE.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && !container.contains(el)) container.appendChild(el);
+  });
+}
+
+async function abrirPerfilClientePorCpf(cpf) {
+  if (!cpf) { showToast('CPF do cliente não encontrado na contratação', 'error'); return; }
+  try {
+    const snap = await firebase.firestore().collection('cadastroClientes').where('cpf', '==', cpf).get();
+    if (snap.empty) { showToast('Cliente não encontrado no BD Clientes', 'error'); return; }
+    const doc = snap.docs[0];
+    const dc = window.dashboardCliente;
+
+    if (!dc || !document.getElementById('dc-modal-detalhes')) {
+      abrirDetalhesClienteStandalone(doc.id);
+      return;
+    }
+
+    _dcLevarModaisParaBody();
+    if (!dc.clients.find(c => c.id === doc.id)) {
+      const d = doc.data();
+      const estudantes = Array.isArray(d.estudantes) ? d.estudantes : [];
+      dc.clients.push({
+        id: doc.id,
+        ...d,
+        estudantes,
+        quantidadeEstudantes: estudantes.length,
+        status: dc._normalizeStatus(d.status) || 'Potencial',
+        dataCadastroLegivel: d.dataCadastroLegivel || '—'
+      });
+    }
+    dc.openModalDetalhes(doc.id);
+  } catch (err) {
+    console.error('❌ Erro ao abrir perfil do cliente:', err);
+    showToast('Erro ao buscar dados do cliente', 'error');
+  }
+}
+
+// ============================================================
 // FUNÇÃO DE CARREGAMENTO PARA SEÇÃO
 // ============================================================
 function loadDashboardCliente() {
