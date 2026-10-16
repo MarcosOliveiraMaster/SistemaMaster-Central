@@ -127,7 +127,7 @@ window.DetalhesContratacaoV2 = (function () {
                 <button type="button" class="mdc2-btn-icone" data-v2="expandir" aria-expanded="false" title="Mostrar informações do cliente">
                   <i class="fas fa-chevron-down"></i>
                 </button>
-                <button type="button" class="mdc2-btn-perfil" data-v2="versao-antiga" title="Abrir o layout anterior deste modal">
+                <button type="button" class="mdc2-btn-perfil mdc2-btn-versao" data-v2="versao-antiga" aria-label="Visualizar versão antiga">
                   <i class="fas fa-clock-rotate-left"></i><span>Visualizar versão antiga</span>
                 </button>
                 <span class="mdc2-slot-fechar" data-v2="fechar"></span>

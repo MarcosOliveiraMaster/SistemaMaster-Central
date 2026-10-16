@@ -170,6 +170,33 @@ body.theme-blue .mdc2-overlay {
 .mdc2-btn-icone { width: clamp(28px, 4.6vh, 38px); }
 .mdc2-btn-perfil:hover,
 .mdc2-btn-icone:hover { background: #fff; color: var(--mdc2-acc); }
+/* "Visualizar versão antiga": só o ícone; no hover (ou foco pelo teclado) a largura
+   cresce mostrando o texto. Como o grupo fica alinhado à direita, os botões à
+   esquerda deslizam junto com a animação da largura. */
+.mdc2-btn-versao {
+  gap: 0;
+  padding: 0 clamp(8px, 1.2vh, 11px);
+  transition: background 0.15s, color 0.15s, padding 0.3s ease;
+}
+.mdc2-btn-versao > span {
+  display: inline-block;
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: max-width 0.35s ease, opacity 0.25s ease, margin-left 0.35s ease;
+}
+.mdc2-btn-versao:hover,
+.mdc2-btn-versao:focus-visible { padding: 0 14px; }
+.mdc2-btn-versao:hover > span,
+.mdc2-btn-versao:focus-visible > span {
+  max-width: 200px;
+  opacity: 1;
+  margin-left: 8px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mdc2-btn-versao, .mdc2-btn-versao > span { transition: none; }
+}
 .mdc2-btn-icone[data-v2="expandir"] i { transition: transform 0.2s ease; }
 .mdc2-header-aberto .mdc2-btn-icone[data-v2="expandir"] i { transform: rotate(180deg); }
 
@@ -474,6 +501,7 @@ body.theme-blue .mdc2-overlay {
   .mdc2-header-topo { flex-direction: column; align-items: stretch; }
   .mdc2-header-acoes { flex-wrap: wrap; }
   .mdc2-btn-perfil { flex: 1; }
+  .mdc2-btn-perfil.mdc2-btn-versao { flex: none; }
   .mdc2-main { display: flex; flex-direction: column; }
   .mdc2-main > * { flex-shrink: 0; }
   .mdc2-nav { overflow: visible; }
