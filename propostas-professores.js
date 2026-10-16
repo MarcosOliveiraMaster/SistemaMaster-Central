@@ -41,13 +41,13 @@
     estilo = true;
     const s = document.createElement('style');
     s.textContent = `
-    .pe-fundo{position:fixed;inset:0;z-index:10050;background:rgba(17,24,39,.55);display:flex;align-items:center;justify-content:center;padding:1rem;}
+    .pe-fundo{--pe-acc:#f28705;--pe-acc-esc:#d97804;--pe-claro:#fff7eb;--pe-hover:#fcd9a8;--pe-sombra:rgba(242,135,5,.2);--pe-aviso-bg:#fefce8;--pe-aviso-borda:#facc15;--pe-aviso-txt:#854d0e;--pe-ok:#16a34a;position:fixed;inset:0;z-index:10050;background:rgba(17,24,39,.55);display:flex;align-items:center;justify-content:center;padding:1rem;}
     .pe-caixa{background:#fff;border-radius:18px;width:100%;max-width:1040px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3);font-family:'Comfortaa',sans-serif;}
-    .pe-topo{background:#f28705;color:#fff;padding:.9rem 1.2rem;display:flex;align-items:center;gap:.7rem;}
+    .pe-topo{background:var(--pe-acc);color:#fff;padding:.9rem 1.2rem;display:flex;align-items:center;gap:.7rem;}
     .pe-topo h3{font-family:'Lexend',sans-serif;font-size:1.05rem;margin:0;flex:1;min-width:0;}
     .pe-passos{display:flex;gap:.35rem;font-size:.72rem;font-weight:700;}
     .pe-passos span{background:rgba(255,255,255,.25);border-radius:999px;padding:.2rem .6rem;}
-    .pe-passos span.on{background:#fff;color:#d97804;}
+    .pe-passos span.on{background:#fff;color:var(--pe-acc-esc);}
     .pe-x{background:rgba(255,255,255,.2);border:0;color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:1.1rem;}
     .pe-trilho{flex:1;min-height:0;overflow:hidden;position:relative;}
     .pe-palco{display:flex;width:200%;height:100%;transition:transform .45s cubic-bezier(.4,0,.2,1);}
@@ -58,30 +58,58 @@
     .pe-rodape .pe-info{flex:1;font-size:.85rem;color:#374151;}
     .pe-rodape .pe-info b{color:#15803d;font-family:'Lexend',sans-serif;}
     .pe-btn{border-radius:10px;padding:.6rem 1.1rem;font:700 .88rem 'Comfortaa',sans-serif;cursor:pointer;border:2px solid #e5e7eb;background:#fff;color:#374151;display:inline-flex;gap:.45rem;align-items:center;}
-    .pe-btn.pri{background:#f28705;border-color:#f28705;color:#fff;}
+    .pe-btn.pri{background:var(--pe-acc);border-color:var(--pe-acc);color:#fff;}
     .pe-btn.perigo{background:#dc2626;border-color:#dc2626;color:#fff;}
     .pe-btn:disabled{opacity:.5;cursor:not-allowed;}
     .pe-aula{display:flex;gap:.75rem;align-items:center;border:1.5px solid #e5e7eb;border-radius:12px;padding:.6rem .8rem;margin-bottom:.5rem;cursor:pointer;}
-    .pe-aula:has(input:checked){border-color:#f28705;background:#fff7eb;}
-    .pe-aula input{width:18px;height:18px;accent-color:#f28705;flex-shrink:0;}
+    .pe-aula:has(input:checked){border-color:var(--pe-acc);background:var(--pe-claro);}
+    .pe-aula input{width:18px;height:18px;accent-color:var(--pe-acc);flex-shrink:0;}
     .pe-aula .pe-a1{flex:1;min-width:0;font-size:.85rem;color:#374151;line-height:1.45;}
     .pe-aula .pe-a1 b{color:#111827;}
     .pe-aula .pe-a2{font-family:'Lexend',sans-serif;font-weight:700;color:#15803d;white-space:nowrap;}
     .pe-todas{display:flex;gap:.5rem;align-items:center;font-size:.85rem;font-weight:700;margin-bottom:.7rem;cursor:pointer;}
-    .pe-todas input{width:18px;height:18px;accent-color:#f28705;}
-    .pe-filtros{display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:.9rem;}
+    .pe-todas input{width:18px;height:18px;accent-color:var(--pe-acc);}
+    .pe-filtros{display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:.9rem;align-items:stretch;}
     .pe-filtros input,.pe-filtros select{border:2px solid #e5e7eb;border-radius:10px;padding:.55rem .7rem;font:.9rem 'Comfortaa',sans-serif;min-height:42px;}
-    .pe-filtros input{flex:1 1 220px;} .pe-filtros select{flex:0 1 220px;}
-    .pe-grade{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.8rem;}
+    .pe-filtros input{flex:1 1 220px;}
+    .pe-multi{position:relative;flex:0 1 240px;min-width:0;}
+    .pe-multi-btn{width:100%;min-height:42px;border:2px solid #e5e7eb;border-radius:10px;padding:.55rem .7rem;background:#fff;font:.9rem Comfortaa,sans-serif;color:#374151;display:flex;align-items:center;gap:.5rem;cursor:pointer;text-align:left;}
+    .pe-multi-btn span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .pe-multi-btn[aria-expanded="true"]{border-color:var(--pe-acc);}
+    .pe-multi-btn[aria-expanded="true"] i{transform:rotate(180deg);}
+    .pe-multi-btn i{transition:transform .2s;color:#9ca3af;font-size:.8rem;}
+    .pe-multi-painel{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:5;background:#fff;border:1px solid #e5e7eb;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.15);padding:.35rem;max-height:280px;overflow-y:auto;}
+    .pe-multi-painel[hidden]{display:none;}
+    .pe-multi-painel label{display:flex;gap:.55rem;align-items:center;padding:.45rem .55rem;border-radius:8px;cursor:pointer;font-size:.86rem;color:#374151;}
+    .pe-multi-painel label:hover{background:var(--pe-claro);}
+    .pe-multi-painel input{width:16px;height:16px;min-height:0;accent-color:var(--pe-acc);flex:none;}
+    .pe-multi-limpar{width:100%;margin-top:.25rem;border:0;border-top:1px solid #e5e7eb;background:none;padding:.5rem;font:700 .8rem Comfortaa,sans-serif;color:var(--pe-acc-esc);cursor:pointer;}
+    .pe-verif{min-height:42px;border-color:var(--pe-acc);color:var(--pe-acc-esc);background:var(--pe-claro);}
+    .pe-verif:hover:not(:disabled){background:var(--pe-acc);color:#fff;}
+    .pe-cel{display:flex;flex-direction:column;gap:.45rem;min-width:0;}
+    .pe-prof .pe-ok{position:absolute;top:6px;right:6px;font-size:1.05rem;line-height:1;}
+    .pe-prof.pe-verificado .pe-marca{right:34px;}
+    .pe-pend{border-radius:12px;padding:.6rem .7rem;font-size:.78rem;line-height:1.4;text-align:left;}
+    .pe-pend b{display:block;font-family:Lexend,sans-serif;font-size:.78rem;margin-bottom:.25rem;}
+    .pe-pend ul{margin:0;padding-left:1.05rem;list-style:disc;}
+    .pe-pend li{margin:.1rem 0;}
+    .pe-pend small{display:block;opacity:.85;margin-bottom:.45rem;}
+    .pe-conf{background:var(--pe-claro);border:1.5px solid var(--pe-hover);color:#374151;}
+    .pe-conf b{color:var(--pe-acc-esc);}
+    .pe-aviso{background:var(--pe-aviso-bg);border:1.5px solid var(--pe-aviso-borda);color:var(--pe-aviso-txt);}
+    .pe-ver-disp{width:100%;justify-content:center;padding:.4rem .6rem;font-size:.76rem;border-color:var(--pe-aviso-borda);color:var(--pe-aviso-txt);background:#fff;}
+    .pe-ver-disp:hover{background:var(--pe-aviso-borda);color:#fff;}
+    body.theme-blue .pe-fundo{--pe-acc:#00255f;--pe-acc-esc:#00255f;--pe-claro:#eef3fb;--pe-hover:#b9c9e6;--pe-sombra:rgba(0,37,95,.2);--pe-aviso-bg:#e8f0fc;--pe-aviso-borda:#4d668f;--pe-aviso-txt:#00255f;}
+    .pe-grade{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.8rem;align-items:start;}
     .pe-prof{position:relative;border:2px solid #e5e7eb;border-radius:14px;padding:.8rem .6rem;text-align:center;cursor:pointer;background:#fff;font:inherit;transition:border-color .15s,box-shadow .15s,transform .15s;}
-    .pe-prof:hover{border-color:#fcd9a8;transform:translateY(-2px);}
-    .pe-prof[aria-pressed="true"]{border-color:#f28705;background:#fff7eb;box-shadow:0 6px 18px rgba(242,135,5,.2);}
-    .pe-prof .pe-foto{width:84px;height:84px;border-radius:50%;object-fit:cover;margin:0 auto .5rem;display:block;background:#f3f4f6;}
-    .pe-prof .pe-iniciais{width:84px;height:84px;border-radius:50%;margin:0 auto .5rem;display:flex;align-items:center;justify-content:center;background:#fff7eb;color:#d97804;font:700 1.6rem 'Lexend',sans-serif;}
+    .pe-prof:hover{border-color:var(--pe-hover);transform:translateY(-2px);}
+    .pe-prof[aria-pressed="true"]{border-color:var(--pe-acc);background:var(--pe-claro);box-shadow:0 6px 18px var(--pe-sombra);}
+    .pe-prof .pe-foto{width:84px;height:84px;border-radius:16px;object-fit:cover;margin:0 auto .5rem;display:block;background:#f3f4f6;}
+    .pe-prof .pe-iniciais{width:84px;height:84px;border-radius:16px;margin:0 auto .5rem;display:flex;align-items:center;justify-content:center;background:var(--pe-claro);color:var(--pe-acc-esc);font:700 1.6rem 'Lexend',sans-serif;}
     .pe-prof b{display:block;font-family:'Lexend',sans-serif;font-size:.92rem;color:#111827;}
     .pe-prof small{display:block;font-size:.75rem;color:#6b7280;line-height:1.35;margin-top:.15rem;}
     .pe-prof .pe-ouro{position:absolute;top:8px;left:8px;color:#eab308;font-size:.9rem;}
-    .pe-prof .pe-marca{position:absolute;top:8px;right:8px;width:24px;height:24px;border-radius:50%;background:#f28705;color:#fff;display:none;align-items:center;justify-content:center;font-size:.75rem;}
+    .pe-prof .pe-marca{position:absolute;top:8px;right:8px;width:24px;height:24px;border-radius:50%;background:var(--pe-acc);color:#fff;display:none;align-items:center;justify-content:center;font-size:.75rem;}
     .pe-prof[aria-pressed="true"] .pe-marca{display:flex;}
     .pe-vazio{text-align:center;color:#6b7280;padding:2rem;font-size:.9rem;}
     @media (max-width:900px){ .pe-grade{grid-template-columns:repeat(3,minmax(0,1fr));} }
@@ -91,7 +119,8 @@
       .pe-rodape{padding-bottom:calc(.8rem + env(safe-area-inset-bottom));}
       .pe-rodape .pe-info{flex-basis:100%;order:-1;font-size:.8rem;}
       .pe-rodape .pe-btn{flex:1;justify-content:center;}
-      .pe-prof .pe-foto,.pe-prof .pe-iniciais{width:60px;height:60px;font-size:1.2rem;}
+      .pe-prof .pe-foto,.pe-prof .pe-iniciais{width:60px;height:60px;font-size:1.2rem;border-radius:12px;}
+      .pe-multi,.pe-verif{flex:1 1 100%;justify-content:center;}
       .pe-topo h3{font-size:.95rem;}
     }
     /* Notificações */
@@ -144,6 +173,55 @@
   const fotoDe = (p) => p.fotoUpload || (p.fotoPerfil && p.fotoPerfil !== 'icone-padrao' ? `img-professor/${p.fotoPerfil}` : '');
   const ehOuro = (p) => p.prof_ouro === true || p.prof_ouro === 'true';
   const iniciais = (n) => String(n || '?').trim().split(/\s+/).slice(0, 2).map(x => x[0] || '').join('').toUpperCase();
+
+  // Disponibilidade: campos segManha, segTarde ... sabTarde do professor (mesma
+  // convenção de functions-verificar-datas.js / match.js: antes de 12h = Manhã).
+  // Domingo nunca tem disponibilidade cadastrada. Sem horário não dá pra checar.
+  const DIAS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
+  const STATUS_SEM_CONFLITO = ['Cancelada', 'Reagendada'];
+  const verdadeiro = (v) => v === true || v === 1 || ['true', '1', 'sim', 's', 'yes', 'on'].includes(String(v ?? '').toLowerCase().trim());
+  const diaMes = (data) => { const m = String(data || '').match(/(\d{2})\/(\d{2})/); return m ? `${m[1]}/${m[2]}` : String(data || ''); };
+  function disponivelEm(p, data, horario) {
+    const d = String(data || '').match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    const h = String(horario || '').match(/^(\d{1,2}):/);
+    if (!d || !h) return true;
+    const dia = DIAS[new Date(+d[3], +d[2] - 1, +d[1]).getDay()];
+    if (dia === 'dom') return false;
+    return verdadeiro(p[dia + (parseInt(h[1], 10) < 12 ? 'Manha' : 'Tarde')]);
+  }
+
+  // Abre o perfil do professor da Galeria (aba "Aulas" mostra a disponibilidade).
+  // O overlay vive dentro de #galeria-professores (escondida fora da aba), então
+  // vai pro body enquanto aberto — com as variáveis --gp-* copiadas — e volta ao
+  // lugar quando fecha.
+  async function abrirPerfilProfessor(p) {
+    const G = window.GaleriaProfessores;
+    if (!G || typeof G.abrirDetalhes !== 'function') { aviso('Módulo de professores não carregado.', 'error'); return; }
+    try {
+      if (!document.getElementById('gp-detOverlay') && typeof G.init === 'function') await G.init();
+      const ov = document.getElementById('gp-detOverlay');
+      if (!ov) { aviso('Não foi possível abrir o perfil do professor.', 'error'); return; }
+      const pai = ov.parentElement, prox = ov.nextSibling;
+      const raiz = document.getElementById('galeria-professores');
+      const css = (document.getElementById('gp-styles') || {}).textContent || '';
+      const vars = [...new Set(css.match(/--gp-[\w-]+(?=\s*:)/g) || [])];
+      if (raiz) { const cs = getComputedStyle(raiz); vars.forEach(v => { const val = cs.getPropertyValue(v); if (val) ov.style.setProperty(v, val.trim()); }); }
+      ov.style.zIndex = '10070';
+      document.body.appendChild(ov);
+      G.abrirDetalhes(p);
+      const obs = new MutationObserver(() => {
+        if (ov.classList.contains('gp-open')) return;
+        obs.disconnect();
+        ov.style.zIndex = '';
+        vars.forEach(v => ov.style.removeProperty(v));
+        if (pai && pai.isConnected && pai !== document.body) pai.insertBefore(ov, prox && prox.parentNode === pai ? prox : null);
+      });
+      obs.observe(ov, { attributes: true, attributeFilter: ['class'] });
+    } catch (err) {
+      console.error('[Propostas] Erro ao abrir perfil do professor:', err);
+      aviso('Não foi possível abrir o perfil do professor.', 'error');
+    }
+  }
 
   async function carregarOrigem(origem, id) {
     const col = origem === 'simulacao' ? 'simulacoes' : 'BancoDeAulas';
@@ -223,8 +301,14 @@
             <div class="pe-corpo">
               <div class="pe-filtros">
                 <input type="search" id="pe-busca" placeholder="Buscar professor pelo nome ou apelido" aria-label="Buscar professor">
-                <select id="pe-disc" aria-label="Disciplina"><option value="">Todas as disciplinas</option>
-                  ${disciplinas.map(d => `<option value="${esc(norm(d))}">${esc(d)}</option>`).join('')}</select>
+                <div class="pe-multi" id="pe-disc">
+                  <button type="button" class="pe-multi-btn" aria-haspopup="true" aria-expanded="false" aria-label="Disciplinas"><span>Todas as disciplinas</span><i class="fas fa-chevron-down"></i></button>
+                  <div class="pe-multi-painel" hidden>
+                    ${disciplinas.map(d => `<label><input type="checkbox" value="${esc(norm(d))}" data-rotulo="${esc(d)}"> ${esc(d)}</label>`).join('') || '<p class="pe-vazio" style="padding:.6rem">Nenhuma disciplina cadastrada.</p>'}
+                    <button type="button" class="pe-multi-limpar">Limpar seleção</button>
+                  </div>
+                </div>
+                <button type="button" class="pe-btn pe-verif" id="pe-verificar" title="Confere agenda e disponibilidade dos professores para as aulas marcadas"><i class="fas fa-user-check"></i> Verificar professores</button>
               </div>
               <div class="pe-grade" id="pe-grade"></div>
             </div>
@@ -239,7 +323,11 @@
     document.body.appendChild(fundo);
     const $ = (s) => fundo.querySelector(s);
     const fechar = () => { fundo.remove(); document.removeEventListener('keydown', teclas); };
-    const teclas = (e) => { if (e.key === 'Escape') fechar(); };
+    const teclas = (e) => {
+      if (e.key !== 'Escape' || document.querySelector('#gp-detOverlay.gp-open')) return;
+      if (!$('.pe-multi-painel').hidden) { abrirDisc(false); return; }
+      fechar();
+    };
     document.addEventListener('keydown', teclas);
     $('.pe-x').onclick = fechar;
     fundo.addEventListener('mousedown', e => { if (e.target === fundo) fechar(); });
@@ -254,28 +342,45 @@
       $('#pe-enviar').disabled = !s.length || !escolhidos.size;
       $('#pe-todas').checked = s.length === dados.aulas.length;
     }
-    $('#pe-todas').onchange = (e) => { fundo.querySelectorAll('.pe-chk').forEach(c => { c.checked = e.target.checked; }); resumo(); };
-    fundo.querySelectorAll('.pe-chk').forEach(c => { c.onchange = resumo; });
+    let verif = null; // Map professorId → { conflitos, fora } do último "Verificar professores"
+    const aulasMudaram = () => { if (verif) { verif = null; desenharGrade(); } resumo(); };
+    $('#pe-todas').onchange = (e) => { fundo.querySelectorAll('.pe-chk').forEach(c => { c.checked = e.target.checked; }); aulasMudaram(); };
+    fundo.querySelectorAll('.pe-chk').forEach(c => { c.onchange = aulasMudaram; });
 
     function passo(n) {
       $('.pe-palco').classList.toggle('passo2', n === 2);
       fundo.querySelectorAll('.pe-passos span').forEach(s => s.classList.toggle('on', s.dataset.p === String(n)));
-      setTimeout(() => (n === 2 ? $('#pe-busca') : $('#pe-avancar')).focus(), 460);
+      setTimeout(() => { (n === 2 ? $('#pe-busca') : $('#pe-avancar')).focus({ preventScroll: true }); $('.pe-trilho').scrollLeft = 0; }, 460);
     }
     $('#pe-avancar').onclick = () => passo(2);
     $('#pe-voltar').onclick = () => passo(1);
 
+    // Disciplinas marcadas no dropdown: o professor precisa dar TODAS.
+    const discMarcadas = () => [...fundo.querySelectorAll('.pe-multi-painel input:checked')];
     function desenharGrade() {
-      const busca = norm($('#pe-busca').value), disc = $('#pe-disc').value;
+      const busca = norm($('#pe-busca').value), discs = discMarcadas().map(c => c.value);
       const lista = elegiveis.filter(p => (!busca || norm(p.nome).includes(busca) || norm(p.apelido).includes(busca))
-        && (!disc || disciplinasDe(p).some(d => norm(d) === disc)));
+        && (!discs.length || (() => { const dp = disciplinasDe(p).map(norm); return discs.every(d => dp.includes(d)); })()));
+      const variasDatas = verif && new Set(selecionadas().map(a => a.data).filter(Boolean)).size > 1;
       $('#pe-grade').innerHTML = lista.length ? lista.map(p => {
         const foto = fotoDe(p);
-        return `<button type="button" class="pe-prof" data-id="${esc(p.id)}" aria-pressed="${escolhidos.has(p.id)}">
+        const v = verif && verif.get(p.id);
+        const ok = v && !v.conflitos.length && !v.fora.length;
+        return `<div class="pe-cel"><button type="button" class="pe-prof${ok ? ' pe-verificado' : ''}" data-id="${esc(p.id)}" aria-pressed="${escolhidos.has(p.id)}">
           ${ehOuro(p) ? '<i class="fas fa-star pe-ouro" title="Professor de ouro"></i>' : ''}<span class="pe-marca"><i class="fas fa-check"></i></span>
+          ${ok ? '<span class="pe-ok" title="Sem pendências para as aulas marcadas" aria-label="Sem pendências">✅</span>' : ''}
           ${foto ? `<img class="pe-foto" src="${esc(foto)}" alt="" loading="lazy">` : `<span class="pe-iniciais">${esc(iniciais(p.nome))}</span>`}
-          <b>${esc(p.apelido || String(p.nome || '').split(' ')[0] || 'Professor')}</b><small>${esc(p.nome || '')}</small></button>`;
+          <b>${esc(p.apelido || String(p.nome || '').split(' ')[0] || 'Professor')}</b><small>${esc(p.nome || '')}</small></button>
+          ${v && v.conflitos.length ? `<div class="pe-pend pe-conf"><b>Este professor já tem aula neste dia com:</b><ul>${v.conflitos.map(c =>
+            `<li>${variasDatas ? esc(diaMes(c.data)) + ' · ' : ''}${esc(c.cliente)} às ${esc(c.horario || '--:--')}</li>`).join('')}</ul></div>` : ''}
+          ${v && v.fora.length ? `<div class="pe-pend pe-aviso"><b>O dia e horário está fora da disponibilidade do professor</b>
+            <small>${v.fora.map(a => esc(diaMes(a.data) + (a.horario ? ' às ' + a.horario : ''))).join(' · ')}</small>
+            <button type="button" class="pe-btn pe-ver-disp" data-id="${esc(p.id)}"><i class="fas fa-calendar-week"></i> Ver disponibilidade</button></div>` : ''}
+        </div>`;
       }).join('') : '<p class="pe-vazio" style="grid-column:1/-1">Nenhum professor com acesso à plataforma encontrado para este filtro.</p>';
+      fundo.querySelectorAll('.pe-ver-disp').forEach(b => {
+        b.onclick = () => { const p = elegiveis.find(x => x.id === b.dataset.id); if (p) abrirPerfilProfessor(p); };
+      });
       fundo.querySelectorAll('.pe-prof').forEach(b => {
         b.onclick = () => {
           const pid = b.dataset.id;
@@ -286,9 +391,61 @@
       });
     }
     $('#pe-busca').oninput = desenharGrade;
-    $('#pe-disc').onchange = desenharGrade;
+
+    // Dropdown de múltiplas disciplinas
+    const btnDisc = $('.pe-multi-btn'), painelDisc = $('.pe-multi-painel');
+    function abrirDisc(abrir) { painelDisc.hidden = !abrir; btnDisc.setAttribute('aria-expanded', String(abrir)); }
+    function rotuloDisc() {
+      const m = discMarcadas().map(c => c.dataset.rotulo);
+      btnDisc.querySelector('span').textContent = !m.length ? 'Todas as disciplinas' : m.length <= 2 ? m.join(' + ') : `${m.length} disciplinas`;
+      btnDisc.title = m.join(', ');
+    }
+    btnDisc.onclick = () => abrirDisc(painelDisc.hidden);
+    painelDisc.querySelectorAll('input').forEach(c => { c.onchange = () => { rotuloDisc(); desenharGrade(); }; });
+    $('.pe-multi-limpar').onclick = () => { painelDisc.querySelectorAll('input').forEach(c => { c.checked = false; }); rotuloDisc(); desenharGrade(); };
+    fundo.addEventListener('mousedown', e => { if (!painelDisc.hidden && !e.target.closest('.pe-multi')) abrirDisc(false); });
+
+    // Verificar professores: aulas do mesmo dia em outros contratos (BancoDeAulas-Lista)
+    // e disponibilidade cadastrada, para as aulas marcadas no passo 1.
+    $('#pe-verificar').onclick = async () => {
+      const aulas = selecionadas().filter(a => a.data);
+      if (!aulas.length) { aviso('Marque ao menos uma aula com data para verificar.', 'warning'); return; }
+      const btn = $('#pe-verificar'), html = btn.innerHTML;
+      btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verificando...';
+      try {
+        const datas = [...new Set(aulas.map(a => a.data))];
+        const snaps = await Promise.all(datas.map(d => fdb().collection('BancoDeAulas-Lista').where('data', '==', d).get()));
+        const porProf = new Map();
+        snaps.forEach(snap => snap.forEach(doc => {
+          const a = doc.data();
+          if (!a.idProfessor || a.idProfessor === 'A definir' || STATUS_SEM_CONFLITO.includes(a.StatusAula)) return;
+          // Aulas desta mesma contratação não são conflito.
+          if (dados.origem !== 'simulacao' && String(a.codigoContratacao || '') === String(dados.codigo)) return;
+          const k = String(a.idProfessor);
+          if (!porProf.has(k)) porProf.set(k, []);
+          porProf.get(k).push({ cliente: a.nomeCliente || a.nome || 'Cliente', data: a.data || '', horario: a.horario || '' });
+        }));
+        const chave = (c) => { const m = String(c.data).match(/(\d{2})\/(\d{2})\/(\d{4})/); return (m ? m[3] + m[2] + m[1] : '') + c.horario; };
+        verif = new Map();
+        elegiveis.forEach(p => {
+          const ids = [...new Set([p.cpf, p.id].filter(Boolean).map(String))];
+          const conflitos = ids.flatMap(k => porProf.get(k) || []).sort((x, y) => chave(x).localeCompare(chave(y)));
+          verif.set(p.id, { conflitos, fora: aulas.filter(a => !disponivelEm(p, a.data, a.horario)) });
+        });
+        desenharGrade();
+      } catch (err) {
+        console.error('[Propostas] Erro ao verificar professores:', err);
+        aviso('Não foi possível verificar os professores.', 'error');
+      } finally {
+        btn.disabled = false; btn.innerHTML = html;
+      }
+    };
     desenharGrade();
     resumo();
+    // Altura fixa na inicial (grade completa): filtrar professores não encolhe o modal;
+    // o conteúdo extra (verificação) rola dentro de .pe-corpo. max-height 92vh continua valendo.
+    const caixa = $('.pe-caixa');
+    caixa.style.height = caixa.offsetHeight + 'px';
 
     $('#pe-enviar').onclick = async () => {
       // idAula liga cada aula da proposta à aula real (BancoDeAulas-Lista) para
