@@ -265,6 +265,15 @@ window.DetalhesContratacaoV2 = (function () {
       btnFechar.setAttribute('aria-label', 'Fechar');
     }
 
+    // Peso de cada grupo/cartão das laterais = nº de itens (+1 do título): com o CSS,
+    // ocupam toda a altura com os itens equidistantes.
+    el.querySelectorAll('.mdc2-nav-grupo').forEach(g => {
+      g.style.setProperty('--mdc2-peso', g.querySelector('.mdc2-nav-itens').children.length + 1);
+    });
+    el.querySelectorAll('.mdc2-lateral > .mdc2-card').forEach(c => {
+      c.style.setProperty('--mdc2-peso', c.querySelectorAll('.mdc2-linha, .mdc2-card-acao, .mdc2-card-botoes > *').length + 1);
+    });
+
     // Cabeçalho expansível: Informações do Cliente.
     const info = daV1('#body-info-cliente');
     if (info) {

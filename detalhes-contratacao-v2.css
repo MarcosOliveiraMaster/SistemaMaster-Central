@@ -474,6 +474,28 @@ body.theme-blue .mdc2-overlay {
 .mdc2-overlay .mdc2-card-acao button:hover { background: rgba(var(--mdc2-acc-rgb), 0.15) !important; }
 .mdc2-card-botoes { display: flex; flex-direction: column; gap: clamp(3px, 0.6vh, 6px); margin-top: clamp(2px, 0.5vh, 6px); }
 
+/* Menus laterais ocupam toda a altura, com os itens equidistantes. Cada grupo/cartão
+   cresce na proporção do número de itens (--mdc2-peso, definido no JS), então o
+   espaço entre botões é o mesmo em grupos de tamanhos diferentes. */
+@media (min-width: 769px) {
+  .mdc2-nav-grupo {
+    display: flex;
+    flex-direction: column;
+    flex: var(--mdc2-peso, 1) 1 0;
+    min-height: min-content;
+  }
+  .mdc2-nav-itens { flex: 1; justify-content: space-between; }
+  .mdc2-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    flex: var(--mdc2-peso, 1) 1 0;
+    min-height: min-content;
+  }
+  .mdc2-card-botoes { display: contents; }
+  .mdc2-card-acao { margin-top: 0; }
+}
+
 /* ---------- Responsivo ---------- */
 /* Telas muito baixas (ex.: notebook com zoom): cartões mais compactos */
 @media (max-height: 560px) and (min-width: 769px) {
