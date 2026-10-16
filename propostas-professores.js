@@ -136,16 +136,18 @@
     .pe-barra-trilho > div{height:100%;background:var(--pe-acc);border-radius:inherit;transition:width .5s ease;}
     .pe-media{font-size:.76rem;color:#6b7280;}
     .pe-media b{color:#111827;font-family:'Lexend',sans-serif;}
-    .pe-ind-rodape{margin-top:auto;display:flex;align-items:center;gap:.45rem;min-height:32px;}
-    .pe-pend-ico{position:relative;width:32px;height:32px;border-radius:10px;border:1.5px solid;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.9rem;flex:none;}
+    /* Rodapé em terços: 1º disponibilidade, 2º choque de aulas, 3º justificativa (posições fixas) */
+    .pe-ind-rodape{margin-top:auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem;align-items:center;min-height:42px;}
+    .pe-ind-rodape > span{display:flex;}
+    .pe-ind-rodape > *{justify-self:center;}
+    .pe-pend-ico{position:relative;width:42px;height:42px;border-radius:12px;border:1.5px solid;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1.25rem;flex:none;}
     .pe-pend-ico.dia{border-color:#facc15;color:#a16207;}
     .pe-pend-ico.fora{border-color:#fb923c;color:#c2410c;}
-    .pe-pend-ico.ok{border-color:#4ade80;color:#15803d;cursor:default;}
     .pe-pend-ico:not(.ok):hover{filter:brightness(.95);transform:translateY(-1px);}
-    .pe-pend-ico .pe-n{position:absolute;top:-7px;right:-7px;min-width:17px;height:17px;padding:0 4px;border-radius:999px;background:#a16207;color:#fff;font:700 .62rem 'Lexend',sans-serif;display:flex;align-items:center;justify-content:center;}
+    .pe-pend-ico .pe-n{position:absolute;top:-8px;right:-8px;min-width:20px;height:20px;padding:0 4px;border-radius:999px;background:#a16207;color:#fff;font:700 .7rem 'Lexend',sans-serif;display:flex;align-items:center;justify-content:center;}
     .pe-pend-ico.fora .pe-n{background:#c2410c;}
-    .pe-info-ico{margin-left:auto;width:30px;height:30px;border-radius:50%;border:1.5px solid var(--pe-hover);background:#fff;color:var(--pe-acc-esc);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.9rem;}
-    .pe-info-ico:hover{background:var(--pe-acc);border-color:var(--pe-acc);color:#fff;}
+    .pe-info-ico{grid-column:3;justify-self:end;align-self:end;width:21px;height:21px;border-radius:50%;border:1.5px solid var(--pe-hover);background:#fff;color:var(--pe-acc-esc);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.55rem;opacity:.8;}
+    .pe-info-ico:hover,.pe-info-ico:focus-visible{opacity:1;background:var(--pe-acc);border-color:var(--pe-acc);color:#fff;}
     .pe-pop{position:fixed;z-index:10065;background:#fff;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 14px 40px rgba(0,0,0,.2);padding:.7rem .9rem .8rem;width:min(340px,92vw);max-height:60vh;overflow-y:auto;font:.8rem 'Comfortaa',sans-serif;color:#374151;}
     .pe-pop h4{display:flex;justify-content:space-between;gap:.5rem;font:700 .85rem 'Lexend',sans-serif;color:var(--pe-acc-esc);margin:.45rem 0 .25rem;}
     .pe-pop ul{margin:0;padding:0;list-style:none;}
@@ -452,6 +454,12 @@
           // Cor do card: verde (ok), amarelo (aula no dia), laranja (fora da disponibilidade), vermelho (os dois).
           const st = dia && fora ? 'st-ambos' : dia ? 'st-dia' : fora ? 'st-fora' : 'st-ok';
           const id = esc(p.id);
+          // Ícones de pendência ocupam os terços da esquerda para a direita: com uma só, ela vai
+          // para o 1º terço; com as duas, disponibilidade no 1º e choque de aulas no 2º.
+          const pend = [
+            fora ? `<button type="button" class="pe-pend-ico fora" data-id="${id}" data-pop="fora" title="Fora da disponibilidade" aria-label="Fora da disponibilidade — ver detalhes"><i class="far fa-clock"></i><span class="pe-n">${v.fora.length}</span></button>` : '',
+            dia ? `<button type="button" class="pe-pend-ico dia" data-id="${id}" data-pop="dia" title="Aula no mesmo dia" aria-label="${v.conflitos.length} aula(s) no mesmo dia — ver detalhes"><i class="fas fa-calendar-xmark"></i><span class="pe-n">${v.conflitos.length}</span></button>` : ''
+          ].filter(Boolean);
           return `<div class="pe-ind ${st}" role="button" tabindex="0" data-id="${id}" aria-pressed="${escolhidos.has(p.id)}">
             <div class="pe-ind-foto">${fotoHtml(p)}${ehOuro(p) ? '<i class="fas fa-star pe-ouro" title="Professor de ouro"></i>' : ''}
               ${v.media !== null ? `<span class="pe-selo" style="--p:${v.media}" title="Match${v.materias.length > 1 ? ' (média das matérias)' : ''}"><b>${v.media}%</b><small>Match</small></span>` : ''}</div>
@@ -463,9 +471,8 @@
                 <div class="pe-barra-trilho" role="progressbar" aria-label="Match em ${esc(m.nome)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${m.taxa}"><div style="width:${m.taxa}%"></div></div></div>`).join('')}</div>`
                 : '<div class="pe-media">Sem matéria definida nas aulas marcadas.</div>'}
               <div class="pe-ind-rodape">
-                ${dia ? `<button type="button" class="pe-pend-ico dia" data-id="${id}" data-pop="dia" title="Aula no mesmo dia" aria-label="${v.conflitos.length} aula(s) no mesmo dia — ver detalhes"><i class="fas fa-calendar-xmark"></i><span class="pe-n">${v.conflitos.length}</span></button>` : ''}
-                ${fora ? `<button type="button" class="pe-pend-ico fora" data-id="${id}" data-pop="fora" title="Fora da disponibilidade" aria-label="Fora da disponibilidade — ver detalhes"><i class="far fa-clock"></i><span class="pe-n">${v.fora.length}</span></button>` : ''}
-                ${!dia && !fora ? '<span class="pe-pend-ico ok" title="Sem pendências para as aulas marcadas" aria-label="Sem pendências"><i class="fas fa-check"></i></span>' : ''}
+                <span>${pend[0] || ''}</span>
+                <span>${pend[1] || ''}</span>
                 ${v.materias.length ? `<button type="button" class="pe-info-ico" data-id="${id}" data-pop="just" title="Ver justificativa do match" aria-label="Ver justificativa do match"><i class="fas fa-info"></i></button>` : ''}
               </div>
             </div>
