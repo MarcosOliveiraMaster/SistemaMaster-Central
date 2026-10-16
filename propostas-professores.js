@@ -102,16 +102,24 @@
     body.theme-blue .pe-fundo{--pe-acc:#00255f;--pe-acc-esc:#00255f;--pe-claro:#eef3fb;--pe-hover:#b9c9e6;--pe-sombra:rgba(0,37,95,.2);--pe-aviso-bg:#e8f0fc;--pe-aviso-borda:#4d668f;--pe-aviso-txt:#00255f;}
     .pe-grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.8rem;align-items:start;}
     /* Vista de indicadores completa: 1 a 4 colunas conforme a largura */
-    .pe-grade.pe-grade-ind{grid-template-columns:repeat(auto-fill,minmax(max(340px,calc((100% - 2.7rem)/4)),1fr));gap:.9rem;}
-    .pe-ind{position:relative;display:grid;grid-template-columns:40% minmax(0,1fr);gap:.85rem;align-items:start;border:2px solid #e5e7eb;border-radius:16px;padding:.8rem;background:#fff;cursor:pointer;text-align:left;transition:border-color .15s,box-shadow .15s;}
-    .pe-ind:hover{border-color:var(--pe-hover);}
+    .pe-grade.pe-grade-ind{grid-template-columns:repeat(auto-fill,minmax(max(340px,calc((100% - 2.7rem)/4)),1fr));grid-auto-rows:1fr;align-items:stretch;gap:.9rem;}
+    .pe-ind{--st-bg:#fff;--st-borda:#e5e7eb;position:relative;display:grid;grid-template-columns:40% minmax(0,1fr);gap:.85rem;align-items:start;border:2px solid var(--st-borda);border-radius:16px;padding:.8rem;background:var(--st-bg);cursor:pointer;text-align:left;transition:box-shadow .15s,transform .15s;}
+    /* Situação do professor para as aulas marcadas (mesmas cores nos dois temas) */
+    .pe-ind.st-ok{--st-bg:#f0fdf4;--st-borda:#4ade80;}
+    .pe-ind.st-dia{--st-bg:#fefce8;--st-borda:#facc15;}
+    .pe-ind.st-fora{--st-bg:#fff7ed;--st-borda:#fb923c;}
+    .pe-ind.st-ambos{--st-bg:#fef2f2;--st-borda:#f87171;}
+    .pe-ind:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,.08);}
     .pe-ind:focus-visible{outline:3px solid var(--pe-hover);outline-offset:2px;}
-    .pe-ind[aria-pressed="true"]{border-color:var(--pe-acc);background:var(--pe-claro);box-shadow:0 6px 18px var(--pe-sombra);}
+    .pe-ind[aria-pressed="true"]{box-shadow:0 0 0 3px var(--pe-acc),0 8px 20px var(--pe-sombra);}
     .pe-ind-foto{position:relative;}
-    .pe-ind-foto img,.pe-ind-foto .pe-iniciais{width:100%;aspect-ratio:1/1;border-radius:14px;object-fit:cover;display:flex;align-items:center;justify-content:center;background:var(--pe-claro);color:var(--pe-acc-esc);font:700 2.2rem 'Lexend',sans-serif;}
-    .pe-ind[aria-pressed="true"] .pe-ind-foto .pe-iniciais{background:#fff;}
+    .pe-ind-foto img,.pe-ind-foto .pe-iniciais{width:100%;aspect-ratio:1/1;border-radius:14px;object-fit:cover;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.75);color:var(--pe-acc-esc);font:700 2.2rem 'Lexend',sans-serif;}
+    .pe-selo{position:absolute;right:-8px;bottom:-8px;width:62px;height:62px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,.15);}
+    .pe-selo::before{content:"";position:absolute;inset:3px;border-radius:50%;background:conic-gradient(var(--pe-acc) calc(var(--p) * 1%),#eef0f3 0);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 0);mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 0);}
+    .pe-selo b{font:700 1rem 'Lexend',sans-serif;color:var(--pe-acc-esc);line-height:1;}
+    .pe-selo small{font-size:.6rem;color:#6b7280;margin-top:1px;}
     .pe-ind-foto .pe-ouro{position:absolute;top:6px;left:6px;width:26px;height:26px;border-radius:50%;background:#fff;color:#eab308;display:flex;align-items:center;justify-content:center;font-size:.8rem;box-shadow:0 2px 6px rgba(0,0,0,.15);}
-    .pe-ind-info{min-width:0;display:flex;flex-direction:column;gap:.5rem;padding-bottom:1.9rem;}
+    .pe-ind-info{min-width:0;height:100%;display:flex;flex-direction:column;gap:.5rem;}
     .pe-ind-topo{display:flex;gap:.5rem;align-items:flex-start;}
     .pe-ind-topo > div{flex:1;min-width:0;}
     .pe-ind-topo b{display:block;font:700 1rem 'Lexend',sans-serif;color:#111827;}
@@ -128,12 +136,15 @@
     .pe-barra-trilho > div{height:100%;background:var(--pe-acc);border-radius:inherit;transition:width .5s ease;}
     .pe-media{font-size:.76rem;color:#6b7280;}
     .pe-media b{color:#111827;font-family:'Lexend',sans-serif;}
-    .pe-ind .pe-conf ul{columns:2 170px;column-gap:1.2rem;}
-    .pe-ind .pe-aviso{display:flex;flex-wrap:wrap;align-items:center;gap:.35rem .6rem;}
-    .pe-ind .pe-aviso b{flex-basis:100%;margin:0;}
-    .pe-ind .pe-aviso small{flex:1 1 140px;margin:0;}
-    .pe-ind .pe-ver-disp{width:auto;}
-    .pe-info-ico{position:absolute;right:.6rem;bottom:.6rem;width:30px;height:30px;border-radius:50%;border:1.5px solid var(--pe-hover);background:#fff;color:var(--pe-acc-esc);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.9rem;}
+    .pe-ind-rodape{margin-top:auto;display:flex;align-items:center;gap:.45rem;min-height:32px;}
+    .pe-pend-ico{position:relative;width:32px;height:32px;border-radius:10px;border:1.5px solid;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.9rem;flex:none;}
+    .pe-pend-ico.dia{border-color:#facc15;color:#a16207;}
+    .pe-pend-ico.fora{border-color:#fb923c;color:#c2410c;}
+    .pe-pend-ico.ok{border-color:#4ade80;color:#15803d;cursor:default;}
+    .pe-pend-ico:not(.ok):hover{filter:brightness(.95);transform:translateY(-1px);}
+    .pe-pend-ico .pe-n{position:absolute;top:-7px;right:-7px;min-width:17px;height:17px;padding:0 4px;border-radius:999px;background:#a16207;color:#fff;font:700 .62rem 'Lexend',sans-serif;display:flex;align-items:center;justify-content:center;}
+    .pe-pend-ico.fora .pe-n{background:#c2410c;}
+    .pe-info-ico{margin-left:auto;width:30px;height:30px;border-radius:50%;border:1.5px solid var(--pe-hover);background:#fff;color:var(--pe-acc-esc);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.9rem;}
     .pe-info-ico:hover{background:var(--pe-acc);border-color:var(--pe-acc);color:#fff;}
     .pe-pop{position:fixed;z-index:10065;background:#fff;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 14px 40px rgba(0,0,0,.2);padding:.7rem .9rem .8rem;width:min(340px,92vw);max-height:60vh;overflow-y:auto;font:.8rem 'Comfortaa',sans-serif;color:#374151;}
     .pe-pop h4{display:flex;justify-content:space-between;gap:.5rem;font:700 .85rem 'Lexend',sans-serif;color:var(--pe-acc-esc);margin:.45rem 0 .25rem;}
@@ -141,6 +152,12 @@
     .pe-pop li{display:flex;justify-content:space-between;gap:.6rem;padding:.22rem 0;border-bottom:1px dashed #eef0f3;}
     .pe-pop li b{color:#15803d;white-space:nowrap;}
     .pe-pop p{margin:.2rem 0;color:#6b7280;}
+    .pe-pop .pe-pop-tit{font:700 .82rem 'Lexend',sans-serif;margin:0 0 .35rem;}
+    .pe-pop.dia{border-color:#facc15;} .pe-pop.dia .pe-pop-tit{color:#a16207;}
+    .pe-pop.fora{border-color:#fb923c;} .pe-pop.fora .pe-pop-tit{color:#c2410c;}
+    .pe-pop.dia li,.pe-pop.fora li{display:list-item;border:0;padding:.12rem 0;margin-left:1rem;list-style:disc;}
+    .pe-pop .pe-ver-disp{margin-top:.55rem;border-color:#fb923c;color:#c2410c;}
+    .pe-pop .pe-ver-disp:hover{background:#fb923c;color:#fff;}
     .pe-carregando{grid-column:1/-1;text-align:center;padding:3rem 1rem;color:#6b7280;font-size:.9rem;}
     .pe-prof{position:relative;border:2px solid #e5e7eb;border-radius:14px;padding:.8rem .6rem;text-align:center;cursor:pointer;background:#fff;font:inherit;transition:border-color .15s,box-shadow .15s,transform .15s;}
     .pe-prof:hover{border-color:var(--pe-hover);transform:translateY(-2px);}
@@ -426,29 +443,32 @@
         grade.innerHTML = '<p class="pe-carregando">Não foi possível calcular o match. <button type="button" class="pe-btn" id="pe-recalcular"><i class="fas fa-rotate-right"></i> Tentar de novo</button></p>';
         $('#pe-recalcular').onclick = calcular;
       } else {
-        const variasDatas = new Set(selecionadas().map(a => a.data).filter(Boolean)).size > 1;
         const nota = (p) => { const v = verif.get(p.id); return v && v.media !== null ? v.media : -1; };
         // Maior média primeiro; empate: professor de ouro, depois nome.
         const ordem = [...lista].sort((a, b) => nota(b) - nota(a) || (ehOuro(b) - ehOuro(a)) || String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'));
         grade.innerHTML = ordem.length ? ordem.map(p => {
           const v = verif.get(p.id) || { conflitos: [], fora: [], materias: [], media: null };
-          const ok = !v.conflitos.length && !v.fora.length;
-          return `<div class="pe-ind" role="button" tabindex="0" data-id="${esc(p.id)}" aria-pressed="${escolhidos.has(p.id)}">
-            <div class="pe-ind-foto">${fotoHtml(p)}${ehOuro(p) ? '<i class="fas fa-star pe-ouro" title="Professor de ouro"></i>' : ''}</div>
+          const dia = v.conflitos.length > 0, fora = v.fora.length > 0;
+          // Cor do card: verde (ok), amarelo (aula no dia), laranja (fora da disponibilidade), vermelho (os dois).
+          const st = dia && fora ? 'st-ambos' : dia ? 'st-dia' : fora ? 'st-fora' : 'st-ok';
+          const id = esc(p.id);
+          return `<div class="pe-ind ${st}" role="button" tabindex="0" data-id="${id}" aria-pressed="${escolhidos.has(p.id)}">
+            <div class="pe-ind-foto">${fotoHtml(p)}${ehOuro(p) ? '<i class="fas fa-star pe-ouro" title="Professor de ouro"></i>' : ''}
+              ${v.media !== null ? `<span class="pe-selo" style="--p:${v.media}" title="Match${v.materias.length > 1 ? ' (média das matérias)' : ''}"><b>${v.media}%</b><small>Match</small></span>` : ''}</div>
             <div class="pe-ind-info">
               <div class="pe-ind-topo"><div><b>${esc(apelidoDe(p))}</b><small>${esc(p.nome || '')}</small></div>
-                <span class="pe-ind-sinais">${ok ? '<span title="Sem pendências para as aulas marcadas" aria-label="Sem pendências">✅</span>' : ''}<span class="pe-marca"><i class="fas fa-check"></i></span></span></div>
+                <span class="pe-ind-sinais"><span class="pe-marca"><i class="fas fa-check"></i></span></span></div>
               ${v.materias.length ? `<div class="pe-barras">${v.materias.map(m => `<div class="pe-barra${m.leciona ? '' : ' nao'}">
                 <div class="pe-barra-rot"><span title="${esc(m.nome)}">${esc(m.nome)}</span><b>${m.leciona ? m.taxa + '%' : 'Não leciona'}</b></div>
-                <div class="pe-barra-trilho" role="progressbar" aria-label="Match em ${esc(m.nome)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${m.taxa}"><div style="width:${m.taxa}%"></div></div></div>`).join('')}</div>
-                ${v.materias.length > 1 ? `<div class="pe-media">Média do match: <b>${v.media}%</b></div>` : ''}` : '<div class="pe-media">Sem matéria definida nas aulas marcadas.</div>'}
-              ${v.conflitos.length ? `<div class="pe-pend pe-conf"><b>Este professor já tem aula neste dia com:</b><ul>${v.conflitos.map(c =>
-                `<li>${variasDatas ? esc(diaMes(c.data)) + ' · ' : ''}${esc(c.cliente)} às ${esc(c.horario || '--:--')}</li>`).join('')}</ul></div>` : ''}
-              ${v.fora.length ? `<div class="pe-pend pe-aviso"><b>O dia e horário está fora da disponibilidade do professor</b>
-                <small>${v.fora.map(a => esc(diaMes(a.data) + (a.horario ? ' às ' + a.horario : ''))).join(' · ')}</small>
-                <button type="button" class="pe-btn pe-ver-disp" data-id="${esc(p.id)}"><i class="fas fa-calendar-week"></i> Ver disponibilidade</button></div>` : ''}
+                <div class="pe-barra-trilho" role="progressbar" aria-label="Match em ${esc(m.nome)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${m.taxa}"><div style="width:${m.taxa}%"></div></div></div>`).join('')}</div>`
+                : '<div class="pe-media">Sem matéria definida nas aulas marcadas.</div>'}
+              <div class="pe-ind-rodape">
+                ${dia ? `<button type="button" class="pe-pend-ico dia" data-id="${id}" data-pop="dia" title="Aula no mesmo dia" aria-label="${v.conflitos.length} aula(s) no mesmo dia — ver detalhes"><i class="fas fa-calendar-xmark"></i><span class="pe-n">${v.conflitos.length}</span></button>` : ''}
+                ${fora ? `<button type="button" class="pe-pend-ico fora" data-id="${id}" data-pop="fora" title="Fora da disponibilidade" aria-label="Fora da disponibilidade — ver detalhes"><i class="far fa-clock"></i><span class="pe-n">${v.fora.length}</span></button>` : ''}
+                ${!dia && !fora ? '<span class="pe-pend-ico ok" title="Sem pendências para as aulas marcadas" aria-label="Sem pendências"><i class="fas fa-check"></i></span>' : ''}
+                ${v.materias.length ? `<button type="button" class="pe-info-ico" data-id="${id}" data-pop="just" title="Ver justificativa do match" aria-label="Ver justificativa do match"><i class="fas fa-info"></i></button>` : ''}
+              </div>
             </div>
-            ${v.materias.length ? `<button type="button" class="pe-info-ico" data-id="${esc(p.id)}" title="Ver justificativa do match" aria-label="Ver justificativa do match"><i class="fas fa-info"></i></button>` : ''}
           </div>`;
         }).join('') : vazio;
       }
@@ -456,7 +476,7 @@
       fundo.querySelectorAll('.pe-ver-disp').forEach(b => {
         b.onclick = () => { const p = elegiveis.find(x => x.id === b.dataset.id); if (p) abrirPerfilProfessor(p); };
       });
-      fundo.querySelectorAll('.pe-info-ico').forEach(b => { b.onclick = () => abrirPop(b); });
+      fundo.querySelectorAll('.pe-info-ico, .pe-pend-ico[data-pop]').forEach(b => { b.onclick = () => abrirPop(b); });
       const alternar = (el) => {
         const pid = el.dataset.id;
         if (escolhidos.has(pid)) escolhidos.delete(pid); else escolhidos.add(pid);
@@ -470,32 +490,52 @@
       });
     }
 
-    // Balão com a justificativa do match (critérios que pontuaram, por matéria).
+    // Balões sobre os cards: justificativa do match (ⓘ), aulas no mesmo dia e fora
+    // da disponibilidade (ícones do rodapé do card). Clicar de novo no mesmo ícone fecha.
     let pop = null;
     function fecharPop() { if (!pop) return false; pop.remove(); pop = null; return true; }
     function abrirPop(botao) {
-      const aberto = pop && pop.dataset.id === botao.dataset.id;
+      const tipo = botao.dataset.pop || 'just';
+      const chave = botao.dataset.id + ':' + tipo;
+      const aberto = pop && pop.dataset.chave === chave;
       fecharPop();
       if (aberto) return;
       const v = verif && verif.get(botao.dataset.id);
       if (!v) return;
+      const variasDatas = new Set(selecionadas().map(a => a.data).filter(Boolean)).size > 1;
       pop = document.createElement('div');
-      pop.className = 'pe-pop';
-      pop.dataset.id = botao.dataset.id;
+      pop.className = 'pe-pop' + (tipo === 'just' ? '' : ' ' + tipo);
+      pop.dataset.chave = chave;
       pop.setAttribute('role', 'dialog');
-      pop.setAttribute('aria-label', 'Justificativa do match');
-      pop.innerHTML = v.materias.map(m => `<h4><span>${esc(m.nome)}</span><span>${m.leciona ? m.taxa + '%' : 'Não leciona'}</span></h4>
-        ${!m.leciona ? '<p>O professor não leciona esta matéria (conta 0% na média).</p>'
-          : m.detalhes.length ? `<ul>${m.detalhes.map(d => `<li><span>${esc(d.label)}</span><b>+${d.pontos}</b></li>`).join('')}</ul>
-            <p>${m.pontos} de ${m.max} pontos possíveis.</p>` : '<p>Nenhum critério pontuou.</p>'}`).join('');
+      if (tipo === 'dia') {
+        pop.setAttribute('aria-label', 'Aulas no mesmo dia');
+        pop.innerHTML = `<p class="pe-pop-tit">Este professor já tem aula neste dia com:</p><ul>${v.conflitos.map(c =>
+          `<li>${variasDatas ? esc(diaMes(c.data)) + ' · ' : ''}${esc(c.cliente)} às ${esc(c.horario || '--:--')}</li>`).join('')}</ul>`;
+      } else if (tipo === 'fora') {
+        pop.setAttribute('aria-label', 'Fora da disponibilidade');
+        pop.innerHTML = `<p class="pe-pop-tit">O dia e horário está fora da disponibilidade do professor</p><ul>${v.fora.map(a =>
+          `<li>${esc(diaMes(a.data))}${a.horario ? ' às ' + esc(a.horario) : ''}</li>`).join('')}</ul>
+          <button type="button" class="pe-btn pe-ver-disp"><i class="fas fa-calendar-week"></i> Ver disponibilidade</button>`;
+        pop.querySelector('.pe-ver-disp').onclick = () => {
+          const p = elegiveis.find(x => x.id === botao.dataset.id);
+          fecharPop();
+          if (p) abrirPerfilProfessor(p);
+        };
+      } else {
+        pop.setAttribute('aria-label', 'Justificativa do match');
+        pop.innerHTML = v.materias.map(m => `<h4><span>${esc(m.nome)}</span><span>${m.leciona ? m.taxa + '%' : 'Não leciona'}</span></h4>
+          ${!m.leciona ? '<p>O professor não leciona esta matéria (conta 0% na média).</p>'
+            : m.detalhes.length ? `<ul>${m.detalhes.map(d => `<li><span>${esc(d.label)}</span><b>+${d.pontos}</b></li>`).join('')}</ul>
+              <p>${m.pontos} de ${m.max} pontos possíveis.</p>` : '<p>Nenhum critério pontuou.</p>'}`).join('');
+      }
       fundo.appendChild(pop);
       const r = botao.getBoundingClientRect(), pr = pop.getBoundingClientRect();
-      let top = r.bottom + 6, left = r.right - pr.width;
+      let top = r.bottom + 6, left = tipo === 'just' ? r.right - pr.width : r.left;
       if (top + pr.height > innerHeight - 8) top = Math.max(8, r.top - pr.height - 6);
       pop.style.top = top + 'px';
       pop.style.left = Math.max(8, Math.min(left, innerWidth - pr.width - 8)) + 'px';
     }
-    fundo.addEventListener('mousedown', e => { if (pop && !e.target.closest('.pe-pop, .pe-info-ico')) fecharPop(); });
+    fundo.addEventListener('mousedown', e => { if (pop && !e.target.closest('.pe-pop, .pe-info-ico, .pe-pend-ico')) fecharPop(); });
     fundo.addEventListener('scroll', () => fecharPop(), true);
     $('#pe-busca').oninput = desenharGrade;
 
