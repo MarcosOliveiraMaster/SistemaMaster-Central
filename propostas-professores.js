@@ -42,7 +42,7 @@
     const s = document.createElement('style');
     s.textContent = `
     .pe-fundo{--pe-acc:#f28705;--pe-acc-esc:#d97804;--pe-claro:#fff7eb;--pe-hover:#fcd9a8;--pe-sombra:rgba(242,135,5,.2);--pe-aviso-bg:#fefce8;--pe-aviso-borda:#facc15;--pe-aviso-txt:#854d0e;--pe-ok:#16a34a;position:fixed;inset:0;z-index:10050;background:rgba(17,24,39,.55);display:flex;align-items:center;justify-content:center;padding:1rem;}
-    .pe-caixa{background:#fff;border-radius:18px;width:100%;max-width:1040px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3);font-family:'Comfortaa',sans-serif;}
+    .pe-caixa{background:#fff;border-radius:18px;width:100%;max-width:96vw;height:92vh;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3);font-family:'Comfortaa',sans-serif;}
     .pe-topo{background:var(--pe-acc);color:#fff;padding:.9rem 1.2rem;display:flex;align-items:center;gap:.7rem;}
     .pe-topo h3{font-family:'Lexend',sans-serif;font-size:1.05rem;margin:0;flex:1;min-width:0;}
     .pe-passos{display:flex;gap:.35rem;font-size:.72rem;font-weight:700;}
@@ -52,7 +52,7 @@
     .pe-trilho{flex:1;min-height:0;overflow:hidden;position:relative;}
     .pe-palco{display:flex;width:200%;height:100%;transition:transform .45s cubic-bezier(.4,0,.2,1);}
     .pe-palco.passo2{transform:translateX(-50%);}
-    .pe-pag{width:50%;display:flex;flex-direction:column;min-height:0;max-height:calc(92vh - 60px);}
+    .pe-pag{width:50%;display:flex;flex-direction:column;min-height:0;}
     .pe-corpo{padding:1rem 1.2rem;overflow-y:auto;flex:1;}
     .pe-rodape{border-top:1px solid #e5e7eb;padding:.8rem 1.2rem;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;}
     .pe-rodape .pe-info{flex:1;font-size:.85rem;color:#374151;}
@@ -100,7 +100,48 @@
     .pe-ver-disp{width:100%;justify-content:center;padding:.4rem .6rem;font-size:.76rem;border-color:var(--pe-aviso-borda);color:var(--pe-aviso-txt);background:#fff;}
     .pe-ver-disp:hover{background:var(--pe-aviso-borda);color:#fff;}
     body.theme-blue .pe-fundo{--pe-acc:#00255f;--pe-acc-esc:#00255f;--pe-claro:#eef3fb;--pe-hover:#b9c9e6;--pe-sombra:rgba(0,37,95,.2);--pe-aviso-bg:#e8f0fc;--pe-aviso-borda:#4d668f;--pe-aviso-txt:#00255f;}
-    .pe-grade{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.8rem;align-items:start;}
+    .pe-grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.8rem;align-items:start;}
+    /* Vista de indicadores completa: 1 a 4 colunas conforme a largura */
+    .pe-grade.pe-grade-ind{grid-template-columns:repeat(auto-fill,minmax(max(340px,calc((100% - 2.7rem)/4)),1fr));gap:.9rem;}
+    .pe-ind{position:relative;display:grid;grid-template-columns:40% minmax(0,1fr);gap:.85rem;align-items:start;border:2px solid #e5e7eb;border-radius:16px;padding:.8rem;background:#fff;cursor:pointer;text-align:left;transition:border-color .15s,box-shadow .15s;}
+    .pe-ind:hover{border-color:var(--pe-hover);}
+    .pe-ind:focus-visible{outline:3px solid var(--pe-hover);outline-offset:2px;}
+    .pe-ind[aria-pressed="true"]{border-color:var(--pe-acc);background:var(--pe-claro);box-shadow:0 6px 18px var(--pe-sombra);}
+    .pe-ind-foto{position:relative;}
+    .pe-ind-foto img,.pe-ind-foto .pe-iniciais{width:100%;aspect-ratio:1/1;border-radius:14px;object-fit:cover;display:flex;align-items:center;justify-content:center;background:var(--pe-claro);color:var(--pe-acc-esc);font:700 2.2rem 'Lexend',sans-serif;}
+    .pe-ind[aria-pressed="true"] .pe-ind-foto .pe-iniciais{background:#fff;}
+    .pe-ind-foto .pe-ouro{position:absolute;top:6px;left:6px;width:26px;height:26px;border-radius:50%;background:#fff;color:#eab308;display:flex;align-items:center;justify-content:center;font-size:.8rem;box-shadow:0 2px 6px rgba(0,0,0,.15);}
+    .pe-ind-info{min-width:0;display:flex;flex-direction:column;gap:.5rem;padding-bottom:1.9rem;}
+    .pe-ind-topo{display:flex;gap:.5rem;align-items:flex-start;}
+    .pe-ind-topo > div{flex:1;min-width:0;}
+    .pe-ind-topo b{display:block;font:700 1rem 'Lexend',sans-serif;color:#111827;}
+    .pe-ind-topo small{display:block;font-size:.76rem;color:#6b7280;line-height:1.35;}
+    .pe-ind-sinais{display:flex;gap:.3rem;align-items:center;flex:none;font-size:1.05rem;line-height:1;}
+    .pe-ind .pe-marca{width:24px;height:24px;border-radius:50%;background:var(--pe-acc);color:#fff;display:none;align-items:center;justify-content:center;font-size:.75rem;}
+    .pe-ind[aria-pressed="true"] .pe-marca{display:flex;}
+    .pe-barras{display:flex;flex-direction:column;gap:.4rem;}
+    .pe-barra-rot{display:flex;justify-content:space-between;gap:.5rem;font-size:.76rem;color:#374151;margin-bottom:.2rem;}
+    .pe-barra-rot span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .pe-barra-rot b{font-family:'Lexend',sans-serif;color:var(--pe-acc-esc);white-space:nowrap;}
+    .pe-barra.nao .pe-barra-rot b{color:#9ca3af;font-family:inherit;font-weight:700;}
+    .pe-barra-trilho{height:8px;border-radius:999px;background:#eef0f3;overflow:hidden;}
+    .pe-barra-trilho > div{height:100%;background:var(--pe-acc);border-radius:inherit;transition:width .5s ease;}
+    .pe-media{font-size:.76rem;color:#6b7280;}
+    .pe-media b{color:#111827;font-family:'Lexend',sans-serif;}
+    .pe-ind .pe-conf ul{columns:2 170px;column-gap:1.2rem;}
+    .pe-ind .pe-aviso{display:flex;flex-wrap:wrap;align-items:center;gap:.35rem .6rem;}
+    .pe-ind .pe-aviso b{flex-basis:100%;margin:0;}
+    .pe-ind .pe-aviso small{flex:1 1 140px;margin:0;}
+    .pe-ind .pe-ver-disp{width:auto;}
+    .pe-info-ico{position:absolute;right:.6rem;bottom:.6rem;width:30px;height:30px;border-radius:50%;border:1.5px solid var(--pe-hover);background:#fff;color:var(--pe-acc-esc);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.9rem;}
+    .pe-info-ico:hover{background:var(--pe-acc);border-color:var(--pe-acc);color:#fff;}
+    .pe-pop{position:fixed;z-index:10065;background:#fff;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 14px 40px rgba(0,0,0,.2);padding:.7rem .9rem .8rem;width:min(340px,92vw);max-height:60vh;overflow-y:auto;font:.8rem 'Comfortaa',sans-serif;color:#374151;}
+    .pe-pop h4{display:flex;justify-content:space-between;gap:.5rem;font:700 .85rem 'Lexend',sans-serif;color:var(--pe-acc-esc);margin:.45rem 0 .25rem;}
+    .pe-pop ul{margin:0;padding:0;list-style:none;}
+    .pe-pop li{display:flex;justify-content:space-between;gap:.6rem;padding:.22rem 0;border-bottom:1px dashed #eef0f3;}
+    .pe-pop li b{color:#15803d;white-space:nowrap;}
+    .pe-pop p{margin:.2rem 0;color:#6b7280;}
+    .pe-carregando{grid-column:1/-1;text-align:center;padding:3rem 1rem;color:#6b7280;font-size:.9rem;}
     .pe-prof{position:relative;border:2px solid #e5e7eb;border-radius:14px;padding:.8rem .6rem;text-align:center;cursor:pointer;background:#fff;font:inherit;transition:border-color .15s,box-shadow .15s,transform .15s;}
     .pe-prof:hover{border-color:var(--pe-hover);transform:translateY(-2px);}
     .pe-prof[aria-pressed="true"]{border-color:var(--pe-acc);background:var(--pe-claro);box-shadow:0 6px 18px var(--pe-sombra);}
@@ -112,10 +153,11 @@
     .pe-prof .pe-marca{position:absolute;top:8px;right:8px;width:24px;height:24px;border-radius:50%;background:var(--pe-acc);color:#fff;display:none;align-items:center;justify-content:center;font-size:.75rem;}
     .pe-prof[aria-pressed="true"] .pe-marca{display:flex;}
     .pe-vazio{text-align:center;color:#6b7280;padding:2rem;font-size:.9rem;}
-    @media (max-width:900px){ .pe-grade{grid-template-columns:repeat(3,minmax(0,1fr));} }
     @media (max-width:640px){
-      .pe-fundo{padding:0;align-items:flex-end;} .pe-caixa{border-radius:18px 18px 0 0;max-height:94vh;}
+      .pe-fundo{padding:0;align-items:flex-end;} .pe-caixa{border-radius:18px 18px 0 0;max-width:100vw;height:94vh;max-height:94vh;}
       .pe-grade{grid-template-columns:repeat(2,minmax(0,1fr));} .pe-passos{display:none;}
+      .pe-grade.pe-grade-ind{grid-template-columns:1fr;}
+      .pe-ind{grid-template-columns:34% minmax(0,1fr);gap:.65rem;padding:.65rem;}
       .pe-rodape{padding-bottom:calc(.8rem + env(safe-area-inset-bottom));}
       .pe-rodape .pe-info{flex-basis:100%;order:-1;font-size:.8rem;}
       .pe-rodape .pe-btn{flex:1;justify-content:center;}
@@ -247,7 +289,7 @@
     return {
       origem, id: String(id),
       codigo: origem === 'simulacao' ? (d.idSimulacao || id) : (d.codigoContratacao || id),
-      clienteNome: d.nomeCliente || d.nome || '', clienteApelido: apelido, aulas
+      clienteNome: d.nomeCliente || d.nome || '', clienteApelido: apelido, cpf: d.cpf || '', aulas
     };
   }
 
@@ -308,7 +350,7 @@
                     <button type="button" class="pe-multi-limpar">Limpar seleção</button>
                   </div>
                 </div>
-                <button type="button" class="pe-btn pe-verif" id="pe-verificar" title="Confere agenda e disponibilidade dos professores para as aulas marcadas"><i class="fas fa-user-check"></i> Verificar professores</button>
+                <button type="button" class="pe-btn pe-verif" id="pe-vista"></button>
               </div>
               <div class="pe-grade" id="pe-grade"></div>
             </div>
@@ -325,6 +367,7 @@
     const fechar = () => { fundo.remove(); document.removeEventListener('keydown', teclas); };
     const teclas = (e) => {
       if (e.key !== 'Escape' || document.querySelector('#gp-detOverlay.gp-open')) return;
+      if (fecharPop()) return;
       if (!$('.pe-multi-painel').hidden) { abrirDisc(false); return; }
       fechar();
     };
@@ -342,8 +385,11 @@
       $('#pe-enviar').disabled = !s.length || !escolhidos.size;
       $('#pe-todas').checked = s.length === dados.aulas.length;
     }
-    let verif = null; // Map professorId → { conflitos, fora } do último "Verificar professores"
-    const aulasMudaram = () => { if (verif) { verif = null; desenharGrade(); } resumo(); };
+    // Vista de indicadores (padrão) x vista geral (grade antiga). verif guarda o
+    // cálculo das aulas marcadas: Map professorId → { conflitos, fora, materias, media }.
+    let modo = 'indicadores';
+    let verif = null, calculando = false, erroCalculo = false, calcId = 0, bairroP = null;
+    const aulasMudaram = () => { verif = null; erroCalculo = false; resumo(); };
     $('#pe-todas').onchange = (e) => { fundo.querySelectorAll('.pe-chk').forEach(c => { c.checked = e.target.checked; }); aulasMudaram(); };
     fundo.querySelectorAll('.pe-chk').forEach(c => { c.onchange = aulasMudaram; });
 
@@ -352,7 +398,7 @@
       fundo.querySelectorAll('.pe-passos span').forEach(s => s.classList.toggle('on', s.dataset.p === String(n)));
       setTimeout(() => { (n === 2 ? $('#pe-busca') : $('#pe-avancar')).focus({ preventScroll: true }); $('.pe-trilho').scrollLeft = 0; }, 460);
     }
-    $('#pe-avancar').onclick = () => passo(2);
+    $('#pe-avancar').onclick = () => { passo(2); if (modo === 'indicadores' && !verif) calcular(); else desenharGrade(); };
     $('#pe-voltar').onclick = () => passo(1);
 
     // Disciplinas marcadas no dropdown: o professor precisa dar TODAS.
@@ -361,35 +407,96 @@
       const busca = norm($('#pe-busca').value), discs = discMarcadas().map(c => c.value);
       const lista = elegiveis.filter(p => (!busca || norm(p.nome).includes(busca) || norm(p.apelido).includes(busca))
         && (!discs.length || (() => { const dp = disciplinasDe(p).map(norm); return discs.every(d => dp.includes(d)); })()));
-      const variasDatas = verif && new Set(selecionadas().map(a => a.data).filter(Boolean)).size > 1;
-      $('#pe-grade').innerHTML = lista.length ? lista.map(p => {
-        const foto = fotoDe(p);
-        const v = verif && verif.get(p.id);
-        const ok = v && !v.conflitos.length && !v.fora.length;
-        return `<div class="pe-cel"><button type="button" class="pe-prof${ok ? ' pe-verificado' : ''}" data-id="${esc(p.id)}" aria-pressed="${escolhidos.has(p.id)}">
+      const grade = $('#pe-grade');
+      const ind = modo === 'indicadores';
+      grade.classList.toggle('pe-grade-ind', ind);
+      $('#pe-vista').innerHTML = ind ? '<i class="fas fa-table-cells"></i> Vista geral de professores' : '<i class="fas fa-chart-simple"></i> Vista de indicadores completa';
+      fecharPop();
+      const vazio = '<p class="pe-vazio" style="grid-column:1/-1">Nenhum professor com acesso à plataforma encontrado para este filtro.</p>';
+      const apelidoDe = (p) => p.apelido || String(p.nome || '').split(' ')[0] || 'Professor';
+      const fotoHtml = (p) => { const foto = fotoDe(p); return foto ? `<img class="pe-foto" src="${esc(foto)}" alt="" loading="lazy">` : `<span class="pe-iniciais">${esc(iniciais(p.nome))}</span>`; };
+
+      if (!ind) {
+        grade.innerHTML = lista.length ? lista.map(p => `<button type="button" class="pe-prof" data-id="${esc(p.id)}" aria-pressed="${escolhidos.has(p.id)}">
           ${ehOuro(p) ? '<i class="fas fa-star pe-ouro" title="Professor de ouro"></i>' : ''}<span class="pe-marca"><i class="fas fa-check"></i></span>
-          ${ok ? '<span class="pe-ok" title="Sem pendências para as aulas marcadas" aria-label="Sem pendências">✅</span>' : ''}
-          ${foto ? `<img class="pe-foto" src="${esc(foto)}" alt="" loading="lazy">` : `<span class="pe-iniciais">${esc(iniciais(p.nome))}</span>`}
-          <b>${esc(p.apelido || String(p.nome || '').split(' ')[0] || 'Professor')}</b><small>${esc(p.nome || '')}</small></button>
-          ${v && v.conflitos.length ? `<div class="pe-pend pe-conf"><b>Este professor já tem aula neste dia com:</b><ul>${v.conflitos.map(c =>
-            `<li>${variasDatas ? esc(diaMes(c.data)) + ' · ' : ''}${esc(c.cliente)} às ${esc(c.horario || '--:--')}</li>`).join('')}</ul></div>` : ''}
-          ${v && v.fora.length ? `<div class="pe-pend pe-aviso"><b>O dia e horário está fora da disponibilidade do professor</b>
-            <small>${v.fora.map(a => esc(diaMes(a.data) + (a.horario ? ' às ' + a.horario : ''))).join(' · ')}</small>
-            <button type="button" class="pe-btn pe-ver-disp" data-id="${esc(p.id)}"><i class="fas fa-calendar-week"></i> Ver disponibilidade</button></div>` : ''}
-        </div>`;
-      }).join('') : '<p class="pe-vazio" style="grid-column:1/-1">Nenhum professor com acesso à plataforma encontrado para este filtro.</p>';
+          ${fotoHtml(p)}<b>${esc(apelidoDe(p))}</b><small>${esc(p.nome || '')}</small></button>`).join('') : vazio;
+      } else if (calculando || (!verif && !erroCalculo)) {
+        grade.innerHTML = '<p class="pe-carregando"><i class="fas fa-spinner fa-spin"></i> Calculando match dos professores...</p>';
+      } else if (!verif) {
+        grade.innerHTML = '<p class="pe-carregando">Não foi possível calcular o match. <button type="button" class="pe-btn" id="pe-recalcular"><i class="fas fa-rotate-right"></i> Tentar de novo</button></p>';
+        $('#pe-recalcular').onclick = calcular;
+      } else {
+        const variasDatas = new Set(selecionadas().map(a => a.data).filter(Boolean)).size > 1;
+        const nota = (p) => { const v = verif.get(p.id); return v && v.media !== null ? v.media : -1; };
+        // Maior média primeiro; empate: professor de ouro, depois nome.
+        const ordem = [...lista].sort((a, b) => nota(b) - nota(a) || (ehOuro(b) - ehOuro(a)) || String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'));
+        grade.innerHTML = ordem.length ? ordem.map(p => {
+          const v = verif.get(p.id) || { conflitos: [], fora: [], materias: [], media: null };
+          const ok = !v.conflitos.length && !v.fora.length;
+          return `<div class="pe-ind" role="button" tabindex="0" data-id="${esc(p.id)}" aria-pressed="${escolhidos.has(p.id)}">
+            <div class="pe-ind-foto">${fotoHtml(p)}${ehOuro(p) ? '<i class="fas fa-star pe-ouro" title="Professor de ouro"></i>' : ''}</div>
+            <div class="pe-ind-info">
+              <div class="pe-ind-topo"><div><b>${esc(apelidoDe(p))}</b><small>${esc(p.nome || '')}</small></div>
+                <span class="pe-ind-sinais">${ok ? '<span title="Sem pendências para as aulas marcadas" aria-label="Sem pendências">✅</span>' : ''}<span class="pe-marca"><i class="fas fa-check"></i></span></span></div>
+              ${v.materias.length ? `<div class="pe-barras">${v.materias.map(m => `<div class="pe-barra${m.leciona ? '' : ' nao'}">
+                <div class="pe-barra-rot"><span title="${esc(m.nome)}">${esc(m.nome)}</span><b>${m.leciona ? m.taxa + '%' : 'Não leciona'}</b></div>
+                <div class="pe-barra-trilho" role="progressbar" aria-label="Match em ${esc(m.nome)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${m.taxa}"><div style="width:${m.taxa}%"></div></div></div>`).join('')}</div>
+                ${v.materias.length > 1 ? `<div class="pe-media">Média do match: <b>${v.media}%</b></div>` : ''}` : '<div class="pe-media">Sem matéria definida nas aulas marcadas.</div>'}
+              ${v.conflitos.length ? `<div class="pe-pend pe-conf"><b>Este professor já tem aula neste dia com:</b><ul>${v.conflitos.map(c =>
+                `<li>${variasDatas ? esc(diaMes(c.data)) + ' · ' : ''}${esc(c.cliente)} às ${esc(c.horario || '--:--')}</li>`).join('')}</ul></div>` : ''}
+              ${v.fora.length ? `<div class="pe-pend pe-aviso"><b>O dia e horário está fora da disponibilidade do professor</b>
+                <small>${v.fora.map(a => esc(diaMes(a.data) + (a.horario ? ' às ' + a.horario : ''))).join(' · ')}</small>
+                <button type="button" class="pe-btn pe-ver-disp" data-id="${esc(p.id)}"><i class="fas fa-calendar-week"></i> Ver disponibilidade</button></div>` : ''}
+            </div>
+            ${v.materias.length ? `<button type="button" class="pe-info-ico" data-id="${esc(p.id)}" title="Ver justificativa do match" aria-label="Ver justificativa do match"><i class="fas fa-info"></i></button>` : ''}
+          </div>`;
+        }).join('') : vazio;
+      }
+
       fundo.querySelectorAll('.pe-ver-disp').forEach(b => {
         b.onclick = () => { const p = elegiveis.find(x => x.id === b.dataset.id); if (p) abrirPerfilProfessor(p); };
       });
-      fundo.querySelectorAll('.pe-prof').forEach(b => {
-        b.onclick = () => {
-          const pid = b.dataset.id;
-          if (escolhidos.has(pid)) escolhidos.delete(pid); else escolhidos.add(pid);
-          b.setAttribute('aria-pressed', String(escolhidos.has(pid)));
-          resumo();
-        };
+      fundo.querySelectorAll('.pe-info-ico').forEach(b => { b.onclick = () => abrirPop(b); });
+      const alternar = (el) => {
+        const pid = el.dataset.id;
+        if (escolhidos.has(pid)) escolhidos.delete(pid); else escolhidos.add(pid);
+        el.setAttribute('aria-pressed', String(escolhidos.has(pid)));
+        resumo();
+      };
+      fundo.querySelectorAll('.pe-prof').forEach(b => { b.onclick = () => alternar(b); });
+      fundo.querySelectorAll('.pe-ind').forEach(c => {
+        c.onclick = (e) => { if (!e.target.closest('button')) alternar(c); };
+        c.onkeydown = (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === c) { e.preventDefault(); alternar(c); } };
       });
     }
+
+    // Balão com a justificativa do match (critérios que pontuaram, por matéria).
+    let pop = null;
+    function fecharPop() { if (!pop) return false; pop.remove(); pop = null; return true; }
+    function abrirPop(botao) {
+      const aberto = pop && pop.dataset.id === botao.dataset.id;
+      fecharPop();
+      if (aberto) return;
+      const v = verif && verif.get(botao.dataset.id);
+      if (!v) return;
+      pop = document.createElement('div');
+      pop.className = 'pe-pop';
+      pop.dataset.id = botao.dataset.id;
+      pop.setAttribute('role', 'dialog');
+      pop.setAttribute('aria-label', 'Justificativa do match');
+      pop.innerHTML = v.materias.map(m => `<h4><span>${esc(m.nome)}</span><span>${m.leciona ? m.taxa + '%' : 'Não leciona'}</span></h4>
+        ${!m.leciona ? '<p>O professor não leciona esta matéria (conta 0% na média).</p>'
+          : m.detalhes.length ? `<ul>${m.detalhes.map(d => `<li><span>${esc(d.label)}</span><b>+${d.pontos}</b></li>`).join('')}</ul>
+            <p>${m.pontos} de ${m.max} pontos possíveis.</p>` : '<p>Nenhum critério pontuou.</p>'}`).join('');
+      fundo.appendChild(pop);
+      const r = botao.getBoundingClientRect(), pr = pop.getBoundingClientRect();
+      let top = r.bottom + 6, left = r.right - pr.width;
+      if (top + pr.height > innerHeight - 8) top = Math.max(8, r.top - pr.height - 6);
+      pop.style.top = top + 'px';
+      pop.style.left = Math.max(8, Math.min(left, innerWidth - pr.width - 8)) + 'px';
+    }
+    fundo.addEventListener('mousedown', e => { if (pop && !e.target.closest('.pe-pop, .pe-info-ico')) fecharPop(); });
+    fundo.addEventListener('scroll', () => fecharPop(), true);
     $('#pe-busca').oninput = desenharGrade;
 
     // Dropdown de múltiplas disciplinas
@@ -405,16 +512,33 @@
     $('.pe-multi-limpar').onclick = () => { painelDisc.querySelectorAll('input').forEach(c => { c.checked = false; }); rotuloDisc(); desenharGrade(); };
     fundo.addEventListener('mousedown', e => { if (!painelDisc.hidden && !e.target.closest('.pe-multi')) abrirDisc(false); });
 
-    // Verificar professores: aulas do mesmo dia em outros contratos (BancoDeAulas-Lista)
-    // e disponibilidade cadastrada, para as aulas marcadas no passo 1.
-    $('#pe-verificar').onclick = async () => {
-      const aulas = selecionadas().filter(a => a.data);
-      if (!aulas.length) { aviso('Marque ao menos uma aula com data para verificar.', 'warning'); return; }
-      const btn = $('#pe-verificar'), html = btn.innerHTML;
-      btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verificando...';
+    // Cálculo da vista de indicadores, para as aulas marcadas no passo 1:
+    //  • conflitos: aulas do mesmo dia em outros contratos (BancoDeAulas-Lista);
+    //  • fora: aulas fora da disponibilidade cadastrada;
+    //  • match por matéria: mesma pontuação do botão "Match" (match.js). Em vez de
+    //    baixar todas as aulas do sistema, basta o que a pontuação usa: as aulas nas
+    //    datas marcadas (agenda) e as aulas deste cliente ("já atendeu antes").
+    async function calcular() {
+      const meu = ++calcId;
+      calculando = true; erroCalculo = false; verif = null;
+      desenharGrade();
       try {
+        const marcadas = selecionadas();
+        const aulas = marcadas.filter(a => a.data);
+        const M = window.Match && typeof window.Match.pontuarProfessor === 'function' ? window.Match : null;
         const datas = [...new Set(aulas.map(a => a.data))];
-        const snaps = await Promise.all(datas.map(d => fdb().collection('BancoDeAulas-Lista').where('data', '==', d).get()));
+        const col = fdb().collection('BancoDeAulas-Lista');
+        if (M && !bairroP) bairroP = M.resolverBairroCliente(dados.cpf).catch(() => ({ bairro: '', origemCep: false }));
+        const [snaps, snapCliente, bairro] = await Promise.all([
+          Promise.all(datas.map(d => col.where('data', '==', d).get())),
+          M && dados.cpf ? col.where('cpf', '==', dados.cpf).get() : Promise.resolve(null),
+          M ? bairroP : Promise.resolve(null)
+        ]);
+        if (meu !== calcId) return;
+        const sistema = new Map();
+        [...snaps, snapCliente].forEach(snap => snap && snap.forEach(doc => sistema.set(doc.id, { id: doc.id, ...doc.data() })));
+        const grupos = M ? M.montarGruposPorDisciplina(marcadas) : {};
+        const chaves = Object.keys(grupos);
         const porProf = new Map();
         snaps.forEach(snap => snap.forEach(doc => {
           const a = doc.data();
@@ -426,26 +550,37 @@
           porProf.get(k).push({ cliente: a.nomeCliente || a.nome || 'Cliente', data: a.data || '', horario: a.horario || '' });
         }));
         const chave = (c) => { const m = String(c.data).match(/(\d{2})\/(\d{2})\/(\d{4})/); return (m ? m[3] + m[2] + m[1] : '') + c.horario; };
-        verif = new Map();
+        const listaSistema = [...sistema.values()];
+        const novo = new Map();
         elegiveis.forEach(p => {
           const ids = [...new Set([p.cpf, p.id].filter(Boolean).map(String))];
           const conflitos = ids.flatMap(k => porProf.get(k) || []).sort((x, y) => chave(x).localeCompare(chave(y)));
-          verif.set(p.id, { conflitos, fora: aulas.filter(a => !disponivelEm(p, a.data, a.horario)) });
+          // Uma barra por matéria das aulas marcadas; "Não leciona" conta 0% na média.
+          const materias = chaves.map(k => {
+            if (!M.professorLecionaMateria(p, k)) return { nome: grupos[k].nome, leciona: false, taxa: 0, detalhes: [], pontos: 0, max: 0 };
+            const r = M.pontuarProfessor(p, grupos[k], bairro, listaSistema, String(dados.codigo), dados.cpf);
+            return { nome: grupos[k].nome, leciona: true, taxa: r.taxaMatch, detalhes: r.detalhes, pontos: r.pontos, max: r.maxPontos };
+          });
+          const media = materias.length ? Math.round(materias.reduce((t, m) => t + m.taxa, 0) / materias.length) : null;
+          novo.set(p.id, { conflitos, fora: aulas.filter(a => !disponivelEm(p, a.data, a.horario)), materias, media });
         });
-        desenharGrade();
+        verif = novo;
       } catch (err) {
-        console.error('[Propostas] Erro ao verificar professores:', err);
-        aviso('Não foi possível verificar os professores.', 'error');
-      } finally {
-        btn.disabled = false; btn.innerHTML = html;
+        if (meu !== calcId) return;
+        console.error('[Propostas] Erro ao calcular o match dos professores:', err);
+        erroCalculo = true;
       }
+      calculando = false;
+      if (modo === 'indicadores') desenharGrade();
+    }
+
+    // Alterna entre a vista de indicadores completa e a vista geral (grade antiga).
+    $('#pe-vista').onclick = () => {
+      modo = modo === 'indicadores' ? 'geral' : 'indicadores';
+      if (modo === 'indicadores' && !verif && !calculando) calcular(); else desenharGrade();
     };
     desenharGrade();
     resumo();
-    // Altura fixa na inicial (grade completa): filtrar professores não encolhe o modal;
-    // o conteúdo extra (verificação) rola dentro de .pe-corpo. max-height 92vh continua valendo.
-    const caixa = $('.pe-caixa');
-    caixa.style.height = caixa.offsetHeight + 'px';
 
     $('#pe-enviar').onclick = async () => {
       // idAula liga cada aula da proposta à aula real (BancoDeAulas-Lista) para

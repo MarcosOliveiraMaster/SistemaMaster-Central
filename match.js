@@ -545,5 +545,7 @@ window.Match = (function () {
     }
   }
 
-  return { abrirModalMatch };
+  // As funções de pontuação também são usadas pela vista de indicadores do
+  // "Enviar proposta" (propostas-professores.js) — mesma régua de match nos dois lugares.
+  return { abrirModalMatch, pontuarProfessor, resolverBairroCliente, montarGruposPorDisciplina, professorLecionaMateria, normalizarTexto };
 })();
