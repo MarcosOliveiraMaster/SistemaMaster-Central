@@ -41,6 +41,7 @@
     'clientes':                { secao: 'clientes', nome: 'BD Clientes', icone: 'fas fa-database' },
     'orientacoes-alunos':      { secao: 'orientacoes-alunos', nome: 'Orientações para alunos', icone: 'fas fa-hand-holding-heart' },
     'galeria-professores':     { secao: 'galeria-professores', nome: 'BD Professores', icone: 'fas fa-database' },
+    'lista-materias':          { secao: 'lista-materias', nome: 'Lista de matérias', icone: 'fas fa-shapes' },
     'avaliacao-candidatos':    { secao: 'professores', aba: 'dp-tab-candidatos', nome: 'Avaliação de Candidatos', icone: 'fas fa-user-check' },
     'desempenho-equipe':       { secao: 'professores', aba: 'dp-tab-equipe', nome: 'Análise e Desempenho de Equipe', icone: 'fas fa-chart-line' },
     'agendamento-entrevistas': { secao: 'professores', aba: 'dp-tab-agendamento', nome: 'Agendamento de Entrevistas', icone: 'fas fa-calendar-check' },
@@ -75,7 +76,7 @@
         { tipo: 'gaveta', id: 'g-clientes-professores', nome: 'Clientes e Professores', icone: 'fas fa-tachometer-alt', itens: [
           { tipo: 'gaveta', id: 'g-clientes', nome: 'Clientes', icone: 'fas fa-users', itens: [f('clientes'), f('orientacoes-alunos')] },
           { tipo: 'gaveta', id: 'g-professores', nome: 'Professores', icone: 'fas fa-chalkboard-user', itens: [
-            f('galeria-professores'), f('avaliacao-candidatos'),
+            f('galeria-professores'), f('lista-materias'), f('avaliacao-candidatos'),
             f('desempenho-equipe'), f('agendamento-entrevistas')
           ] }
         ] },
@@ -154,7 +155,7 @@
 
     // Funções novas entram no lugar previsto quando ele existe no menu salvo
     // (ex.: "Orientações para alunos" na gaveta Clientes); senão, no fim.
-    const LUGAR_NOVAS = { 'orientacoes-alunos': 'g-clientes' };
+    const LUGAR_NOVAS = { 'orientacoes-alunos': 'g-clientes', 'lista-materias': 'g-professores' };
     const acharGaveta = (itens, id) => {
       for (const n of itens) {
         if (n.tipo !== 'gaveta') continue;

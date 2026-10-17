@@ -44,7 +44,7 @@ window.DisciplinasStore = (function () {
     }
 
     return snap.docs
-      .map(d => ({ id: d.id, nome: d.data().nome || '' }))
+      .map(d => ({ id: d.id, nome: d.data().nome || '', icone: d.data().icone || '' }))
       .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
   }
 
@@ -74,13 +74,49 @@ window.DisciplinasStore = (function () {
     return { id: ref.id, nome: nomeLimpo };
   }
 
+  // Atualiza nome e/ou ícone (classe Font Awesome) — usado pela área "Lista de matérias".
+  async function update(id, dados) {
+    const campos = {};
+    if (dados && typeof dados.nome === 'string') {
+      const nomeLimpo = dados.nome.trim();
+      if (!nomeLimpo) throw new Error('Nome da disciplina não pode ser vazio');
+      campos.nome = nomeLimpo;
+    }
+    if (dados && typeof dados.icone === 'string') campos.icone = dados.icone.trim();
+    campos.atualizadoEm = firebase.firestore.FieldValue.serverTimestamp();
+    await firebase.firestore().collection('Disciplinas').doc(id).update(campos);
+    cache = null;
+    await getAll();
+  }
+
+  // Força nova leitura (ex.: ao abrir o "Enviar proposta", para pegar ícones recém-editados).
+  function limparCache() { cache = null; }
+
   async function remove(id) {
     await firebase.firestore().collection('Disciplinas').doc(id).delete();
     cache = null;
     await getAll();
   }
 
-  return { getAll, add, remove };
+  // Ícone sugerido pelo nome, para disciplinas que ainda não têm ícone escolhido.
+  const normNome = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+  const ICONE_POR_NOME = [
+    [/educacao fisica/, 'fas fa-person-running'], [/matematic/, 'fas fa-calculator'], [/fisic/, 'fas fa-atom'], [/quimic/, 'fas fa-flask'],
+    [/biolog/, 'fas fa-dna'], [/ciencias da natureza|^ciencias$/, 'fas fa-microscope'], [/ciencias humanas/, 'fas fa-people-group'],
+    [/geograf/, 'fas fa-earth-americas'], [/histor/, 'fas fa-landmark'], [/ingles|inglesa/, 'fas fa-language'],
+    [/espanhol/, 'fas fa-language'], [/portugu/, 'fas fa-book-open'], [/literatura/, 'fas fa-feather-pointed'],
+    [/redac/, 'fas fa-pen-nib'], [/filosof/, 'fas fa-lightbulb'], [/sociolog/, 'fas fa-people-group'],
+    [/pedagog/, 'fas fa-chalkboard-user'], [/arte/, 'fas fa-palette'], [/music/, 'fas fa-music'],
+    [/program|informatic|computa/, 'fas fa-laptop-code']
+  ];
+  function iconePadrao(nome) {
+    const n = normNome(nome);
+    const achado = ICONE_POR_NOME.find(([re]) => re.test(n));
+    return achado ? achado[1] : 'fas fa-book';
+  }
+  const iconeDe = (d) => (d && d.icone) || iconePadrao(d && d.nome);
+
+  return { getAll, add, update, remove, limparCache, iconePadrao, iconeDe };
 })();
 
 // ──────────────────────────────────────────────────────────

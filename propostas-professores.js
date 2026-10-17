@@ -67,6 +67,7 @@
     .pe-aula .pe-a1{flex:1;min-width:0;font-size:.85rem;color:#374151;line-height:1.45;}
     .pe-aula .pe-a1 b{color:#111827;}
     .pe-aula .pe-a2{font-family:'Lexend',sans-serif;font-weight:700;color:#15803d;white-space:nowrap;}
+    .pe-aula .pe-status{flex-shrink:0;min-width:84px;text-align:center;border:1.5px solid;border-radius:8px;padding:.15rem .5rem;font-size:.72rem;font-weight:700;white-space:nowrap;}
     .pe-todas{display:flex;gap:.5rem;align-items:center;font-size:.85rem;font-weight:700;margin-bottom:.7rem;cursor:pointer;}
     .pe-todas input{width:18px;height:18px;accent-color:var(--pe-acc);}
     .pe-filtros{display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:.9rem;align-items:stretch;}
@@ -104,11 +105,16 @@
     /* Vista de indicadores completa: 1 a 4 colunas conforme a largura */
     .pe-grade.pe-grade-ind{grid-template-columns:repeat(auto-fill,minmax(max(340px,calc((100% - 2.7rem)/4)),1fr));grid-auto-rows:1fr;align-items:stretch;gap:.9rem;}
     .pe-ind{--st-bg:#fff;--st-borda:#e5e7eb;position:relative;display:grid;grid-template-columns:40% minmax(0,1fr);gap:.85rem;align-items:start;border:2px solid var(--st-borda);border-radius:16px;padding:.8rem;background:var(--st-bg);cursor:pointer;text-align:left;transition:box-shadow .15s,transform .15s;}
-    /* Situação do professor para as aulas marcadas (mesmas cores nos dois temas) */
-    .pe-ind.st-ok{--st-bg:#f0fdf4;--st-borda:#4ade80;}
-    .pe-ind.st-dia{--st-bg:#fefce8;--st-borda:#facc15;}
-    .pe-ind.st-fora{--st-bg:#fff7ed;--st-borda:#fb923c;}
-    .pe-ind.st-ambos{--st-bg:#fef2f2;--st-borda:#f87171;}
+    /* ── CORES DOS CARDS (ajuste aqui) ──────────────────────────────────────
+       Situação do professor para as aulas marcadas (mesmas cores nos dois temas).
+       --st-bg = fundo do card · --st-borda = borda do card.
+       Mais suave: tons mais claros (ex.: verde #f0fdf4 / #4ade80).
+       Mais forte: tons mais escuros (ex.: verde #dcfce7 / #16a34a).
+       A espessura da borda vem de .pe-ind (border:2px). */
+    .pe-ind.st-ok{--st-bg:#effdf3;--st-borda:#38db73;}
+    .pe-ind.st-dia{--st-bg:#fefce6;--st-borda:#fac700;}
+    .pe-ind.st-fora{--st-bg:#fff6eb;--st-borda:#fb8728;}
+    .pe-ind.st-ambos{--st-bg:#fef1f1;--st-borda:#f76363;}
     .pe-ind:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,.08);}
     .pe-ind:focus-visible{outline:3px solid var(--pe-hover);outline-offset:2px;}
     .pe-ind[aria-pressed="true"]{box-shadow:0 0 0 3px var(--pe-acc),0 8px 20px var(--pe-sombra);}
@@ -127,26 +133,29 @@
     .pe-ind-sinais{display:flex;gap:.3rem;align-items:center;flex:none;font-size:1.05rem;line-height:1;}
     .pe-ind .pe-marca{width:24px;height:24px;border-radius:50%;background:var(--pe-acc);color:#fff;display:none;align-items:center;justify-content:center;font-size:.75rem;}
     .pe-ind[aria-pressed="true"] .pe-marca{display:flex;}
-    .pe-barras{display:flex;flex-direction:column;gap:.4rem;}
-    .pe-barra-rot{display:flex;justify-content:space-between;gap:.5rem;font-size:.76rem;color:#374151;margin-bottom:.2rem;}
-    .pe-barra-rot span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-    .pe-barra-rot b{font-family:'Lexend',sans-serif;color:var(--pe-acc-esc);white-space:nowrap;}
-    .pe-barra.nao .pe-barra-rot b{color:#9ca3af;font-family:inherit;font-weight:700;}
-    .pe-barra-trilho{height:8px;border-radius:999px;background:#eef0f3;overflow:hidden;}
-    .pe-barra-trilho > div{height:100%;background:var(--pe-acc);border-radius:inherit;transition:width .5s ease;}
+    /* Matérias das aulas marcadas: ícone na cor do tema se o professor leciona, cinza se não */
+    .pe-mats{display:grid;grid-template-columns:repeat(auto-fill,minmax(36px,36px));gap:.4rem;}
+    .pe-mat{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.05rem;background:color-mix(in srgb,var(--pe-acc) 14%,#fff);color:var(--pe-acc);border:1.5px solid color-mix(in srgb,var(--pe-acc) 45%,#fff);}
+    .pe-mat.nao{background:#f3f4f6;color:#9ca3af;border-color:#e5e7eb;}
     .pe-media{font-size:.76rem;color:#6b7280;}
     .pe-media b{color:#111827;font-family:'Lexend',sans-serif;}
-    /* Rodapé em terços: 1º disponibilidade, 2º choque de aulas, 3º justificativa (posições fixas) */
-    .pe-ind-rodape{margin-top:auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem;align-items:center;min-height:42px;}
-    .pe-ind-rodape > span{display:flex;}
-    .pe-ind-rodape > *{justify-self:center;}
-    .pe-pend-ico{position:relative;width:42px;height:42px;border-radius:12px;border:1.5px solid;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1.25rem;flex:none;}
-    .pe-pend-ico.dia{border-color:#facc15;color:#a16207;}
-    .pe-pend-ico.fora{border-color:#fb923c;color:#c2410c;}
+    /* Rodapé em duas partes, preenchidas da esquerda: disponibilidade e aulas agendadas */
+    .pe-ind-rodape{margin-top:auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem;align-items:center;min-height:42px;align-items:end;}
+    .pe-ind-rodape > span{justify-self:stretch;display:flex;justify-content:center;min-width:0;}
+    .pe-pend-ico{position:relative;width:42px;height:42px;border-radius:50%;border:1.5px solid;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1.25rem;flex:none;}
+    .pe-pend-ico.dia{border-color:#fac700;color:#a16207;}
+    .pe-pend-ico.fora{border-color:#fb8728;color:#c2410c;}
     .pe-pend-ico:not(.ok):hover{filter:brightness(.95);transform:translateY(-1px);}
     .pe-pend-ico .pe-n{position:absolute;top:-8px;right:-8px;min-width:20px;height:20px;padding:0 4px;border-radius:999px;background:#a16207;color:#fff;font:700 .7rem 'Lexend',sans-serif;display:flex;align-items:center;justify-content:center;}
     .pe-pend-ico.fora .pe-n{background:#c2410c;}
-    .pe-info-ico{grid-column:3;justify-self:end;align-self:end;width:21px;height:21px;border-radius:50%;border:1.5px solid var(--pe-hover);background:#fff;color:var(--pe-acc-esc);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.55rem;opacity:.8;}
+    .pe-slot{display:flex;flex-direction:column;align-items:center;gap:.6rem;width:100%;min-width:0;text-align:center;}
+    .pe-slot > small{font:700 .64rem 'Lexend',sans-serif;line-height:1.2;}
+    .pe-slot.dia > small{color:#a16207;} .pe-slot.fora > small{color:#c2410c;}
+    .pe-ordem{display:flex;align-items:center;gap:.4rem;border:2px solid #e5e7eb;border-radius:10px;padding:0 .4rem 0 .7rem;min-height:42px;background:#fff;font:700 .82rem 'Comfortaa',sans-serif;color:#374151;}
+    .pe-ordem[hidden]{display:none;}
+    .pe-ordem select{border:0;outline:0;background:transparent;font:.86rem 'Comfortaa',sans-serif;color:#111827;padding:.4rem .2rem;min-height:0;cursor:pointer;}
+    .pe-ordem:focus-within{border-color:var(--pe-acc);}
+    .pe-info-ico{position:absolute;right:.45rem;bottom:.45rem;width:21px;height:21px;border-radius:50%;border:1.5px solid var(--pe-hover);background:#fff;color:var(--pe-acc-esc);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.55rem;opacity:.8;}
     .pe-info-ico:hover,.pe-info-ico:focus-visible{opacity:1;background:var(--pe-acc);border-color:var(--pe-acc);color:#fff;}
     .pe-pop{position:fixed;z-index:10065;background:#fff;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 14px 40px rgba(0,0,0,.2);padding:.7rem .9rem .8rem;width:min(340px,92vw);max-height:60vh;overflow-y:auto;font:.8rem 'Comfortaa',sans-serif;color:#374151;}
     .pe-pop h4{display:flex;justify-content:space-between;gap:.5rem;font:700 .85rem 'Lexend',sans-serif;color:var(--pe-acc-esc);margin:.45rem 0 .25rem;}
@@ -155,11 +164,11 @@
     .pe-pop li b{color:#15803d;white-space:nowrap;}
     .pe-pop p{margin:.2rem 0;color:#6b7280;}
     .pe-pop .pe-pop-tit{font:700 .82rem 'Lexend',sans-serif;margin:0 0 .35rem;}
-    .pe-pop.dia{border-color:#facc15;} .pe-pop.dia .pe-pop-tit{color:#a16207;}
-    .pe-pop.fora{border-color:#fb923c;} .pe-pop.fora .pe-pop-tit{color:#c2410c;}
+    .pe-pop.dia{border:2px solid #fac700;} .pe-pop.dia .pe-pop-tit{color:#a16207;}
+    .pe-pop.fora{border:2px solid #fb8728;} .pe-pop.fora .pe-pop-tit{color:#c2410c;}
     .pe-pop.dia li,.pe-pop.fora li{display:list-item;border:0;padding:.12rem 0;margin-left:1rem;list-style:disc;}
-    .pe-pop .pe-ver-disp{margin-top:.55rem;border-color:#fb923c;color:#c2410c;}
-    .pe-pop .pe-ver-disp:hover{background:#fb923c;color:#fff;}
+    .pe-pop .pe-ver-disp{margin-top:.55rem;border-color:#fb8728;color:#c2410c;}
+    .pe-pop .pe-ver-disp:hover{background:#fb8728;color:#fff;}
     .pe-carregando{grid-column:1/-1;text-align:center;padding:3rem 1rem;color:#6b7280;font-size:.9rem;}
     .pe-prof{position:relative;border:2px solid #e5e7eb;border-radius:14px;padding:.8rem .6rem;text-align:center;cursor:pointer;background:#fff;font:inherit;transition:border-color .15s,box-shadow .15s,transform .15s;}
     .pe-prof:hover{border-color:var(--pe-hover);transform:translateY(-2px);}
@@ -240,7 +249,22 @@
   // Domingo nunca tem disponibilidade cadastrada. Sem horário não dá pra checar.
   const DIAS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
   const STATUS_SEM_CONFLITO = ['Cancelada', 'Reagendada'];
+  // Mesmas cores do status na tabela "Aulas Agendadas".
+  const CORES_STATUS = {
+    'Pendente': ['#6B7280', '#F3F4F6', '#D1D5DB'],
+    'Reagendada': ['#D97706', '#FEF3C7', '#FCD34D'],
+    'Concluída': ['#059669', '#D1FAE5', '#6EE7B7'],
+    'Reposição': ['#2563EB', '#DBEAFE', '#93C5FD'],
+    'Cancelada': ['#DC2626', '#FEE2E2', '#FCA5A5']
+  };
+  const corStatus = (st) => { const [c, bg, b] = CORES_STATUS[st] || ['#6B7280', '#F3F4F6', '#D1D5DB']; return `color:${c};background:${bg};border-color:${b}`; };
   const verdadeiro = (v) => v === true || v === 1 || ['true', '1', 'sim', 's', 'yes', 'on'].includes(String(v ?? '').toLowerCase().trim());
+  // "Sex - 16/10": dia da semana calculado pela própria data (dd/mm/aaaa).
+  const SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  const diaSemanaMes = (data) => {
+    const m = String(data || '').match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    return m ? `${SEMANA[new Date(+m[3], +m[2] - 1, +m[1]).getDay()]} - ${m[1]}/${m[2]}` : diaMes(data);
+  };
   const diaMes = (data) => { const m = String(data || '').match(/(\d{2})\/(\d{2})/); return m ? `${m[1]}/${m[2]}` : String(data || ''); };
   function disponivelEm(p, data, horario) {
     const d = String(data || '').match(/(\d{2})\/(\d{2})\/(\d{4})/);
@@ -284,17 +308,56 @@
     }
   }
 
+  // Ícones das matérias (área "Lista de matérias" → coleção Disciplinas).
+  let iconesMaterias = new Map();
+  async function carregarIconesMaterias() {
+    const D = window.DisciplinasStore;
+    if (!D) return;
+    try {
+      D.limparCache();
+      const lista = await D.getAll();
+      iconesMaterias = new Map(lista.map(d => [norm(d.nome), D.iconeDe(d)]));
+    } catch (_) { /* sem lista: usa o ícone padrão pelo nome */ }
+  }
+  function iconeMateria(nome) {
+    const D = window.DisciplinasStore;
+    return iconesMaterias.get(norm(nome)) || (D && D.iconePadrao ? D.iconePadrao(nome) : 'fas fa-book');
+  }
+
+  // Aulas do contrato em BancoDeAulas-Lista (prefixo do id-Aula), por data e horário.
+  async function aulasDaLista(codigo) {
+    const snap = await fdb().collection('BancoDeAulas-Lista')
+      .where('id-Aula', '>=', codigo).where('id-Aula', '<', codigo + '\uf8ff').get();
+    const chave = (a) => { const m = String(a.data || '').match(/(\d{2})\/(\d{2})\/(\d{4})/); return (m ? m[3] + m[2] + m[1] : '99999999') + (a.horario || ''); };
+    const aulas = [];
+    snap.forEach(doc => { const a = doc.data(); if (String(a['id-Aula'] || '').slice(0, codigo.length) === codigo) aulas.push(a); });
+    return aulas.sort((x, y) => chave(x).localeCompare(chave(y)));
+  }
+
   async function carregarOrigem(origem, id) {
     const col = origem === 'simulacao' ? 'simulacoes' : 'BancoDeAulas';
     const snap = await fdb().collection(col).doc(String(id)).get();
     if (!snap.exists) return null;
     const d = snap.data();
     const hora = Number(origem === 'simulacao' ? d.valorHoraProfessor : d.horaAulaProfessor) || HORA_PADRAO;
-    const aulas = (d.aulas || []).map((a, i) => {
+    // Contratação: a lista `aulas` do documento é a cópia de quando o contrato foi
+    // criado; as edições da tabela "Aulas Agendadas" (datas, matérias, professores,
+    // status) ficam em BancoDeAulas-Lista. Usa a lista antiga só se não houver nada lá.
+    let fonte = d.aulas || [];
+    if (origem !== 'simulacao') {
+      try {
+        const lista = await aulasDaLista(String(d.codigoContratacao || id));
+        if (lista.length) {
+          const doContrato = new Map(fonte.map(a => [a['id-Aula'], a]));
+          fonte = lista.map(a => ({ ...a, estudante: a.estudante || (doContrato.get(a['id-Aula']) || {}).estudante || '' }));
+        }
+      } catch (err) { console.warn('[Propostas] BancoDeAulas-Lista indisponível, usando as aulas do contrato:', err); }
+    }
+    const aulas = fonte.map((a, i) => {
       const valorSalvo = Number(a.ValorAula);
       return {
         i, idAula: a['id-Aula'] || '', data: a.data || '', horario: a.horario || '', duracao: a.duracao || '', materia: a.materia || '',
-        estudante: a.estudante || '', professor: a.professor || '', status: a.StatusAula || '',
+        estudante: a.estudante || '', professor: a.professor || '', status: a.StatusAula || (origem !== 'simulacao' ? 'Pendente' : ''),
         valor: Number((valorSalvo > 0 ? valorSalvo : hora * horasDe(a.duracao)).toFixed(2))
       };
     });
@@ -318,7 +381,7 @@
     if (!id) { aviso('Salve antes de enviar a proposta para professores.', 'warning'); return; }
     let dados, profs;
     try {
-      [dados, profs] = await Promise.all([carregarOrigem(origem, id), carregarProfessores()]);
+      [dados, profs] = await Promise.all([carregarOrigem(origem, id), carregarProfessores(), carregarIconesMaterias()]);
     } catch (err) {
       console.error('[Propostas] Erro ao carregar:', err);
       aviso('Não foi possível carregar os dados para a proposta.', 'error');
@@ -351,7 +414,7 @@
                 <label class="pe-aula"><input type="checkbox" class="pe-chk" value="${a.i}" checked>
                   <span class="pe-a1"><b>${esc(a.data || '—')}</b>${a.horario ? ' · ' + esc(a.horario) : ''}${a.duracao ? ' · ' + esc(a.duracao) : ''}<br>
                   ${esc(a.materia || '—')}${a.estudante ? ' · ' + esc(a.estudante) : ''}${a.professor ? ` · <span style="color:#9ca3af">atual: ${esc(a.professor)}</span>` : ''}</span>
-                  <span class="pe-a2">${moeda(a.valor)}</span></label>`).join('')}
+                  <span class="pe-a2">${moeda(a.valor)}</span>${a.status ? `<span class="pe-status" style="${corStatus(a.status)}">${esc(a.status)}</span>` : ''}</label>`).join('')}
             </div>
             <div class="pe-rodape">
               <span class="pe-info" id="pe-resumo"></span>
@@ -370,6 +433,13 @@
                   </div>
                 </div>
                 <button type="button" class="pe-btn pe-verif" id="pe-vista"></button>
+                <label class="pe-ordem" id="pe-ordem-wrap">Ordenar
+                  <select id="pe-ordem" aria-label="Ordenar professores">
+                    <option value="match">Match</option>
+                    <option value="disp">Dentro da disponibilidade</option>
+                    <option value="sem-aulas">Sem aulas alocadas</option>
+                    <option value="livre">Totalmente livre</option>
+                  </select></label>
               </div>
               <div class="pe-grade" id="pe-grade"></div>
             </div>
@@ -429,6 +499,7 @@
       const grade = $('#pe-grade');
       const ind = modo === 'indicadores';
       grade.classList.toggle('pe-grade-ind', ind);
+      $('#pe-ordem-wrap').hidden = !ind;
       $('#pe-vista').innerHTML = ind ? '<i class="fas fa-table-cells"></i> Vista geral de professores' : '<i class="fas fa-chart-simple"></i> Vista de indicadores completa';
       fecharPop();
       const vazio = '<p class="pe-vazio" style="grid-column:1/-1">Nenhum professor com acesso à plataforma encontrado para este filtro.</p>';
@@ -446,8 +517,15 @@
         $('#pe-recalcular').onclick = calcular;
       } else {
         const nota = (p) => { const v = verif.get(p.id); return v && v.media !== null ? v.media : -1; };
-        // Maior média primeiro; empate: professor de ouro, depois nome.
-        const ordem = [...lista].sort((a, b) => nota(b) - nota(a) || (ehOuro(b) - ehOuro(a)) || String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'));
+        // Ordenar: professores de ouro sempre no topo; depois quem atende o critério
+        // escolhido (disponibilidade / sem aulas no dia / os dois); depois maior match e nome.
+        const criterio = $('#pe-ordem').value;
+        const atende = (p) => {
+          const v = verif.get(p.id); if (!v) return 0;
+          const semFora = !v.fora.length, semDia = !v.conflitos.length;
+          return criterio === 'disp' ? +semFora : criterio === 'sem-aulas' ? +semDia : criterio === 'livre' ? +(semFora && semDia) : 0;
+        };
+        const ordem = [...lista].sort((a, b) => (ehOuro(b) - ehOuro(a)) || (atende(b) - atende(a)) || nota(b) - nota(a) || String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'));
         grade.innerHTML = ordem.length ? ordem.map(p => {
           const v = verif.get(p.id) || { conflitos: [], fora: [], materias: [], media: null };
           const dia = v.conflitos.length > 0, fora = v.fora.length > 0;
@@ -457,8 +535,8 @@
           // Ícones de pendência ocupam os terços da esquerda para a direita: com uma só, ela vai
           // para o 1º terço; com as duas, disponibilidade no 1º e choque de aulas no 2º.
           const pend = [
-            fora ? `<button type="button" class="pe-pend-ico fora" data-id="${id}" data-pop="fora" title="Fora da disponibilidade" aria-label="Fora da disponibilidade — ver detalhes"><i class="far fa-clock"></i><span class="pe-n">${v.fora.length}</span></button>` : '',
-            dia ? `<button type="button" class="pe-pend-ico dia" data-id="${id}" data-pop="dia" title="Aula no mesmo dia" aria-label="${v.conflitos.length} aula(s) no mesmo dia — ver detalhes"><i class="fas fa-calendar-xmark"></i><span class="pe-n">${v.conflitos.length}</span></button>` : ''
+            fora ? `<span class="pe-slot fora"><small>Fora da disponibilidade</small><button type="button" class="pe-pend-ico fora" data-id="${id}" data-pop="fora" title="Fora da disponibilidade" aria-label="Fora da disponibilidade — ver detalhes"><i class="far fa-clock"></i><span class="pe-n">${v.fora.length}</span></button></span>` : '',
+            dia ? `<span class="pe-slot dia"><small>Aulas agendadas</small><button type="button" class="pe-pend-ico dia" data-id="${id}" data-pop="dia" title="Aula no mesmo dia" aria-label="${v.conflitos.length} aula(s) no mesmo dia — ver detalhes"><i class="fas fa-calendar-xmark"></i><span class="pe-n">${v.conflitos.length}</span></button></span>` : ''
           ].filter(Boolean);
           return `<div class="pe-ind ${st}" role="button" tabindex="0" data-id="${id}" aria-pressed="${escolhidos.has(p.id)}">
             <div class="pe-ind-foto">${fotoHtml(p)}${ehOuro(p) ? '<i class="fas fa-star pe-ouro" title="Professor de ouro"></i>' : ''}
@@ -466,9 +544,8 @@
             <div class="pe-ind-info">
               <div class="pe-ind-topo"><div><b>${esc(apelidoDe(p))}</b><small>${esc(p.nome || '')}</small></div>
                 <span class="pe-ind-sinais"><span class="pe-marca"><i class="fas fa-check"></i></span></span></div>
-              ${v.materias.length ? `<div class="pe-barras">${v.materias.map(m => `<div class="pe-barra${m.leciona ? '' : ' nao'}">
-                <div class="pe-barra-rot"><span title="${esc(m.nome)}">${esc(m.nome)}</span><b>${m.leciona ? m.taxa + '%' : 'Não leciona'}</b></div>
-                <div class="pe-barra-trilho" role="progressbar" aria-label="Match em ${esc(m.nome)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${m.taxa}"><div style="width:${m.taxa}%"></div></div></div>`).join('')}</div>`
+              ${v.materias.length ? `<div class="pe-mats" role="list" aria-label="Matérias das aulas marcadas">${v.materias.map(m =>
+                `<span class="pe-mat${m.leciona ? '' : ' nao'}" role="listitem" title="${esc(m.nome)} — ${m.leciona ? 'leciona (' + m.taxa + '% de match)' : 'não leciona'}" aria-label="${esc(m.nome)}: ${m.leciona ? 'leciona, ' + m.taxa + '% de match' : 'não leciona'}"><i class="${esc(iconeMateria(m.nome))}"></i></span>`).join('')}</div>`
                 : '<div class="pe-media">Sem matéria definida nas aulas marcadas.</div>'}
               <div class="pe-ind-rodape">
                 <span>${pend[0] || ''}</span>
@@ -509,7 +586,6 @@
       if (aberto) return;
       const v = verif && verif.get(botao.dataset.id);
       if (!v) return;
-      const variasDatas = new Set(selecionadas().map(a => a.data).filter(Boolean)).size > 1;
       pop = document.createElement('div');
       pop.className = 'pe-pop' + (tipo === 'just' ? '' : ' ' + tipo);
       pop.dataset.chave = chave;
@@ -517,11 +593,11 @@
       if (tipo === 'dia') {
         pop.setAttribute('aria-label', 'Aulas no mesmo dia');
         pop.innerHTML = `<p class="pe-pop-tit">Este professor já tem aula neste dia com:</p><ul>${v.conflitos.map(c =>
-          `<li>${variasDatas ? esc(diaMes(c.data)) + ' · ' : ''}${esc(c.cliente)} às ${esc(c.horario || '--:--')}</li>`).join('')}</ul>`;
+          `<li>${esc(diaSemanaMes(c.data))} · ${esc(c.cliente)} às ${esc(c.horario || '--:--')}</li>`).join('')}</ul>`;
       } else if (tipo === 'fora') {
         pop.setAttribute('aria-label', 'Fora da disponibilidade');
         pop.innerHTML = `<p class="pe-pop-tit">O dia e horário está fora da disponibilidade do professor</p><ul>${v.fora.map(a =>
-          `<li>${esc(diaMes(a.data))}${a.horario ? ' às ' + esc(a.horario) : ''}</li>`).join('')}</ul>
+          `<li>${esc(diaSemanaMes(a.data))}${a.horario ? ' às ' + esc(a.horario) : ''}</li>`).join('')}</ul>
           <button type="button" class="pe-btn pe-ver-disp"><i class="fas fa-calendar-week"></i> Ver disponibilidade</button>`;
         pop.querySelector('.pe-ver-disp').onclick = () => {
           const p = elegiveis.find(x => x.id === botao.dataset.id);
@@ -545,6 +621,7 @@
     fundo.addEventListener('mousedown', e => { if (pop && !e.target.closest('.pe-pop, .pe-info-ico, .pe-pend-ico')) fecharPop(); });
     fundo.addEventListener('scroll', () => fecharPop(), true);
     $('#pe-busca').oninput = desenharGrade;
+    $('#pe-ordem').onchange = desenharGrade;
 
     // Dropdown de múltiplas disciplinas
     const btnDisc = $('.pe-multi-btn'), painelDisc = $('.pe-multi-painel');

@@ -8,7 +8,8 @@ const CONFIG = {
     'painel-central', 'banco-aulas', 'simulacoes', 'mensagens',
     'calendario', 'fluxo-processos', 'clientes', 'professores', 'galeria-professores',
     'area-pagamento', 'cofres-pagamento', 'exportar-dados', 'previsao-financeira',
-    'detalhes-banco-de-aulas', 'quadros-aula', 'notificacoes', 'avaliacoes-equipe', 'orientacoes-alunos'
+    'detalhes-banco-de-aulas', 'quadros-aula', 'notificacoes', 'avaliacoes-equipe', 'orientacoes-alunos',
+    'lista-materias'
   ]
 };
 
@@ -217,6 +218,9 @@ function loadSectionContent(sectionId) {
       break;
     case 'orientacoes-alunos':
       if (typeof loadOrientacoesAlunos === 'function') loadOrientacoesAlunos();
+      break;
+    case 'lista-materias':
+      if (typeof loadListaMaterias === 'function') loadListaMaterias();
       break;
   }
 }
