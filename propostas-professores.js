@@ -103,8 +103,8 @@
     body.theme-blue .pe-fundo{--pe-acc:#00255f;--pe-acc-esc:#00255f;--pe-claro:#eef3fb;--pe-hover:#b9c9e6;--pe-sombra:rgba(0,37,95,.2);--pe-aviso-bg:#e8f0fc;--pe-aviso-borda:#4d668f;--pe-aviso-txt:#00255f;}
     .pe-grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.8rem;align-items:start;}
     /* Vista de indicadores completa: 1 a 4 colunas conforme a largura */
-    .pe-grade.pe-grade-ind{grid-template-columns:repeat(auto-fill,minmax(max(340px,calc((100% - 2.7rem)/4)),1fr));grid-auto-rows:1fr;align-items:stretch;gap:.9rem;}
-    .pe-ind{--st-bg:#fff;--st-borda:#e5e7eb;position:relative;display:grid;grid-template-columns:40% minmax(0,1fr);gap:.85rem;align-items:start;border:2px solid var(--st-borda);border-radius:16px;padding:.8rem;background:var(--st-bg);cursor:pointer;text-align:left;transition:box-shadow .15s,transform .15s;}
+    .pe-grade.pe-grade-ind{grid-template-columns:repeat(auto-fill,minmax(max(230px,calc((100% - 3.6rem)/5)),1fr));grid-auto-rows:1fr;align-items:stretch;gap:.9rem;}
+    .pe-ind{--st-bg:#fff;--st-borda:#e5e7eb;position:relative;display:flex;flex-direction:column;gap:.6rem;border:2px solid var(--st-borda);border-radius:18px;padding:.6rem;background:var(--st-bg);cursor:pointer;text-align:left;min-width:0;transition:box-shadow .15s,transform .15s;}
     /* ── CORES DOS CARDS (ajuste aqui) ──────────────────────────────────────
        Situação do professor para as aulas marcadas (mesmas cores nos dois temas).
        --st-bg = fundo do card · --st-borda = borda do card.
@@ -118,44 +118,43 @@
     .pe-ind:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,.08);}
     .pe-ind:focus-visible{outline:3px solid var(--pe-hover);outline-offset:2px;}
     .pe-ind[aria-pressed="true"]{box-shadow:0 0 0 3px var(--pe-acc),0 8px 20px var(--pe-sombra);}
-    .pe-ind-foto{position:relative;}
-    .pe-ind-foto img,.pe-ind-foto .pe-iniciais{width:100%;aspect-ratio:1/1;border-radius:14px;object-fit:cover;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.75);color:var(--pe-acc-esc);font:700 2.2rem 'Lexend',sans-serif;}
-    .pe-selo{position:absolute;right:-8px;bottom:-8px;width:62px;height:62px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,.15);}
-    .pe-selo::before{content:"";position:absolute;inset:3px;border-radius:50%;background:conic-gradient(var(--pe-acc) calc(var(--p) * 1%),#eef0f3 0);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 0);mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 0);}
-    .pe-selo b{font:700 1rem 'Lexend',sans-serif;color:var(--pe-acc-esc);line-height:1;}
-    .pe-selo small{font-size:.6rem;color:#6b7280;margin-top:1px;}
-    .pe-ind-foto .pe-ouro{position:absolute;top:6px;left:6px;width:26px;height:26px;border-radius:50%;background:#fff;color:#eab308;display:flex;align-items:center;justify-content:center;font-size:.8rem;box-shadow:0 2px 6px rgba(0,0,0,.15);}
-    .pe-ind-info{min-width:0;height:100%;display:flex;flex-direction:column;gap:.5rem;}
-    .pe-ind-topo{display:flex;gap:.5rem;align-items:flex-start;}
-    .pe-ind-topo > div{flex:1;min-width:0;}
-    .pe-ind-topo b{display:block;font:700 1rem 'Lexend',sans-serif;color:#111827;}
-    .pe-ind-topo small{display:block;font-size:.76rem;color:#6b7280;line-height:1.35;}
-    .pe-ind-sinais{display:flex;gap:.3rem;align-items:center;flex:none;font-size:1.05rem;line-height:1;}
-    .pe-ind .pe-marca{width:24px;height:24px;border-radius:50%;background:var(--pe-acc);color:#fff;display:none;align-items:center;justify-content:center;font-size:.75rem;}
+    .pe-ind-foto{position:relative;margin-bottom:.25rem;}
+    .pe-ind-foto img,.pe-ind-foto .pe-iniciais{width:100%;aspect-ratio:16/11;border-radius:14px;object-fit:cover;object-position:center 22%;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.75);color:var(--pe-acc-esc);font:700 2.4rem 'Lexend',sans-serif;}
+    .pe-selo{position:absolute;right:10px;bottom:-22px;width:56px;height:56px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,.14);}
+    .pe-selo::before{content:"";position:absolute;inset:3px;border-radius:50%;background:conic-gradient(var(--pe-acc) calc(var(--p) * 1%),#eef0f3 0);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 4px),#000 0);mask:radial-gradient(farthest-side,transparent calc(100% - 4px),#000 0);}
+    .pe-selo b{font:700 .95rem 'Lexend',sans-serif;color:var(--pe-acc-esc);line-height:1;font-variant-numeric:tabular-nums;}
+    .pe-selo small{font:500 .52rem 'Lexend',sans-serif;color:#6b7280;margin-top:2px;letter-spacing:.04em;text-transform:uppercase;}
+    .pe-ind-foto .pe-ouro{position:absolute;top:8px;left:8px;width:26px;height:26px;border-radius:50%;background:#fff;color:#eab308;display:flex;align-items:center;justify-content:center;font-size:.8rem;box-shadow:0 2px 6px rgba(0,0,0,.18);}
+    .pe-ind-nome{min-width:0;padding:0 64px 0 .25rem;}
+    .pe-ind-nome b{display:block;font:700 1.05rem/1.2 'Lexend',sans-serif;color:#111827;}
+    .pe-ind-nome small{display:block;font-size:.74rem;color:#6b7280;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .pe-ind .pe-mats{padding:0 .25rem;}
+    .pe-ind .pe-media{padding:0 .25rem;}
+    .pe-ind-cantos{position:absolute;top:8px;right:8px;display:flex;gap:6px;align-items:center;}
+    .pe-ind .pe-marca{width:24px;height:24px;border-radius:50%;background:var(--pe-acc);color:#fff;display:none;align-items:center;justify-content:center;font-size:.75rem;box-shadow:0 2px 6px rgba(0,0,0,.18);}
     .pe-ind[aria-pressed="true"] .pe-marca{display:flex;}
     /* Matérias das aulas marcadas: ícone na cor do tema se o professor leciona, cinza se não */
-    .pe-mats{display:grid;grid-template-columns:repeat(auto-fill,minmax(36px,36px));gap:.4rem;}
-    .pe-mat{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.05rem;background:color-mix(in srgb,var(--pe-acc) 14%,#fff);color:var(--pe-acc);border:1.5px solid color-mix(in srgb,var(--pe-acc) 45%,#fff);}
-    .pe-mat.nao{background:#f3f4f6;color:#9ca3af;border-color:#e5e7eb;}
+    .pe-mats{display:flex;flex-wrap:wrap;gap:6px;}
+    .pe-mat{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:.9rem;background:color-mix(in srgb,var(--pe-acc) 12%,#fff);color:var(--pe-acc);border:1.5px solid color-mix(in srgb,var(--pe-acc) 35%,#fff);}
+    .pe-mat.nao{background:#f1eeea;color:#b9b1a9;border-color:transparent;}
     .pe-media{font-size:.76rem;color:#6b7280;}
     .pe-media b{color:#111827;font-family:'Lexend',sans-serif;}
-    /* Rodapé em duas partes, preenchidas da esquerda: disponibilidade e aulas agendadas */
-    .pe-ind-rodape{margin-top:auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem;align-items:center;min-height:42px;align-items:end;}
-    .pe-ind-rodape > span{justify-self:stretch;display:flex;justify-content:center;min-width:0;}
-    .pe-pend-ico{position:relative;width:42px;height:42px;border-radius:50%;border:1.5px solid;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1.25rem;flex:none;}
-    .pe-pend-ico.dia{border-color:#fac700;color:#a16207;}
-    .pe-pend-ico.fora{border-color:#fb8728;color:#c2410c;}
-    .pe-pend-ico:not(.ok):hover{filter:brightness(.95);transform:translateY(-1px);}
-    .pe-pend-ico .pe-n{position:absolute;top:-8px;right:-8px;min-width:20px;height:20px;padding:0 4px;border-radius:999px;background:#a16207;color:#fff;font:700 .7rem 'Lexend',sans-serif;display:flex;align-items:center;justify-content:center;}
-    .pe-pend-ico.fora .pe-n{background:#c2410c;}
-    .pe-slot{display:flex;flex-direction:column;align-items:center;gap:.6rem;width:100%;min-width:0;text-align:center;}
-    .pe-slot > small{font:700 .64rem 'Lexend',sans-serif;line-height:1.2;}
-    .pe-slot.dia > small{color:#a16207;} .pe-slot.fora > small{color:#c2410c;}
+    /* Barra de pendências em duas metades fixas: disponibilidade à esquerda, aulas agendadas à direita.
+       A metade zerada fica apagada; a cor do card já diz a situação. */
+    .pe-ind-barra{margin-top:auto;display:grid;grid-template-columns:1fr 1fr;border-radius:12px;overflow:hidden;border:1.5px solid #e8e0d7;background:#fff;}
+    .pe-ind-barra > button{border:0;background:transparent;display:grid;justify-items:center;gap:3px;padding:.45rem .25rem;cursor:pointer;min-width:0;font:inherit;}
+    .pe-ind-barra > button + button{border-left:1.5px solid #e8e0d7;}
+    .pe-ind-barra .pe-l1{display:flex;align-items:center;gap:5px;font:700 .95rem 'Lexend',sans-serif;font-variant-numeric:tabular-nums;}
+    .pe-ind-barra small{font:500 .6rem 'Lexend',sans-serif;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
+    .pe-ind-barra .fora .pe-l1{color:#c2410c;} .pe-ind-barra .dia .pe-l1{color:#a16207;}
+    .pe-ind-barra .off{cursor:default;} .pe-ind-barra .off .pe-l1{color:#c9c1b9;}
+    .pe-ind-barra button:not(.off):hover{background:#faf7f3;}
+    .pe-ind-barra button:focus-visible{outline:2px solid var(--pe-acc);outline-offset:-2px;}
     .pe-ordem{display:flex;align-items:center;gap:.4rem;border:2px solid #e5e7eb;border-radius:10px;padding:0 .4rem 0 .7rem;min-height:42px;background:#fff;font:700 .82rem 'Comfortaa',sans-serif;color:#374151;}
     .pe-ordem[hidden]{display:none;}
     .pe-ordem select{border:0;outline:0;background:transparent;font:.86rem 'Comfortaa',sans-serif;color:#111827;padding:.4rem .2rem;min-height:0;cursor:pointer;}
     .pe-ordem:focus-within{border-color:var(--pe-acc);}
-    .pe-info-ico{position:absolute;right:.45rem;bottom:.45rem;width:21px;height:21px;border-radius:50%;border:1.5px solid var(--pe-hover);background:#fff;color:var(--pe-acc-esc);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.55rem;opacity:.8;}
+    .pe-info-ico{width:24px;height:24px;border-radius:50%;border:0;background:rgba(255,255,255,.92);color:var(--pe-acc-esc);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.6rem;box-shadow:0 2px 6px rgba(0,0,0,.18);}
     .pe-info-ico:hover,.pe-info-ico:focus-visible{opacity:1;background:var(--pe-acc);border-color:var(--pe-acc);color:#fff;}
     .pe-pop{position:fixed;z-index:10065;background:#fff;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 14px 40px rgba(0,0,0,.2);padding:.7rem .9rem .8rem;width:min(340px,92vw);max-height:60vh;overflow-y:auto;font:.8rem 'Comfortaa',sans-serif;color:#374151;}
     .pe-pop h4{display:flex;justify-content:space-between;gap:.5rem;font:700 .85rem 'Lexend',sans-serif;color:var(--pe-acc-esc);margin:.45rem 0 .25rem;}
@@ -185,7 +184,7 @@
       .pe-fundo{padding:0;align-items:flex-end;} .pe-caixa{border-radius:18px 18px 0 0;max-width:100vw;height:94vh;max-height:94vh;}
       .pe-grade{grid-template-columns:repeat(2,minmax(0,1fr));} .pe-passos{display:none;}
       .pe-grade.pe-grade-ind{grid-template-columns:1fr;}
-      .pe-ind{grid-template-columns:34% minmax(0,1fr);gap:.65rem;padding:.65rem;}
+      .pe-ind-foto img,.pe-ind-foto .pe-iniciais{aspect-ratio:16/9;}
       .pe-rodape{padding-bottom:calc(.8rem + env(safe-area-inset-bottom));}
       .pe-rodape .pe-info{flex-basis:100%;order:-1;font-size:.8rem;}
       .pe-rodape .pe-btn{flex:1;justify-content:center;}
@@ -532,26 +531,18 @@
           // Cor do card: verde (ok), amarelo (aula no dia), laranja (fora da disponibilidade), vermelho (os dois).
           const st = dia && fora ? 'st-ambos' : dia ? 'st-dia' : fora ? 'st-fora' : 'st-ok';
           const id = esc(p.id);
-          // Ícones de pendência ocupam os terços da esquerda para a direita: com uma só, ela vai
-          // para o 1º terço; com as duas, disponibilidade no 1º e choque de aulas no 2º.
-          const pend = [
-            fora ? `<span class="pe-slot fora"><small>Fora da disponibilidade</small><button type="button" class="pe-pend-ico fora" data-id="${id}" data-pop="fora" title="Fora da disponibilidade" aria-label="Fora da disponibilidade — ver detalhes"><i class="far fa-clock"></i><span class="pe-n">${v.fora.length}</span></button></span>` : '',
-            dia ? `<span class="pe-slot dia"><small>Aulas agendadas</small><button type="button" class="pe-pend-ico dia" data-id="${id}" data-pop="dia" title="Aula no mesmo dia" aria-label="${v.conflitos.length} aula(s) no mesmo dia — ver detalhes"><i class="fas fa-calendar-xmark"></i><span class="pe-n">${v.conflitos.length}</span></button></span>` : ''
-          ].filter(Boolean);
+          const nFora = v.fora.length, nDia = v.conflitos.length;
           return `<div class="pe-ind ${st}" role="button" tabindex="0" data-id="${id}" aria-pressed="${escolhidos.has(p.id)}">
             <div class="pe-ind-foto">${fotoHtml(p)}${ehOuro(p) ? '<i class="fas fa-star pe-ouro" title="Professor de ouro"></i>' : ''}
+              <span class="pe-ind-cantos"><span class="pe-marca"><i class="fas fa-check"></i></span>${v.materias.length ? `<button type="button" class="pe-info-ico" data-id="${id}" data-pop="just" title="Ver justificativa do match" aria-label="Ver justificativa do match"><i class="fas fa-info"></i></button>` : ''}</span>
               ${v.media !== null ? `<span class="pe-selo" style="--p:${v.media}" title="Match${v.materias.length > 1 ? ' (média das matérias)' : ''}"><b>${v.media}%</b><small>Match</small></span>` : ''}</div>
-            <div class="pe-ind-info">
-              <div class="pe-ind-topo"><div><b>${esc(apelidoDe(p))}</b><small>${esc(p.nome || '')}</small></div>
-                <span class="pe-ind-sinais"><span class="pe-marca"><i class="fas fa-check"></i></span></span></div>
-              ${v.materias.length ? `<div class="pe-mats" role="list" aria-label="Matérias das aulas marcadas">${v.materias.map(m =>
-                `<span class="pe-mat${m.leciona ? '' : ' nao'}" role="listitem" title="${esc(m.nome)} — ${m.leciona ? 'leciona (' + m.taxa + '% de match)' : 'não leciona'}" aria-label="${esc(m.nome)}: ${m.leciona ? 'leciona, ' + m.taxa + '% de match' : 'não leciona'}"><i class="${esc(iconeMateria(m.nome))}"></i></span>`).join('')}</div>`
-                : '<div class="pe-media">Sem matéria definida nas aulas marcadas.</div>'}
-              <div class="pe-ind-rodape">
-                <span>${pend[0] || ''}</span>
-                <span>${pend[1] || ''}</span>
-                ${v.materias.length ? `<button type="button" class="pe-info-ico" data-id="${id}" data-pop="just" title="Ver justificativa do match" aria-label="Ver justificativa do match"><i class="fas fa-info"></i></button>` : ''}
-              </div>
+            <div class="pe-ind-nome"><b>${esc(apelidoDe(p))}</b><small title="${esc(p.nome || '')}">${esc(p.nome || '')}</small></div>
+            ${v.materias.length ? `<div class="pe-mats" role="list" aria-label="Matérias das aulas marcadas">${v.materias.map(m =>
+              `<span class="pe-mat${m.leciona ? '' : ' nao'}" role="listitem" title="${esc(m.nome)} — ${m.leciona ? 'leciona (' + m.taxa + '% de match)' : 'não leciona'}" aria-label="${esc(m.nome)}: ${m.leciona ? 'leciona, ' + m.taxa + '% de match' : 'não leciona'}"><i class="${esc(iconeMateria(m.nome))}"></i></span>`).join('')}</div>`
+              : '<div class="pe-media">Sem matéria definida nas aulas marcadas.</div>'}
+            <div class="pe-ind-barra">
+              <button type="button" class="${fora ? 'pe-pend-ico fora' : 'off'}" ${fora ? `data-id="${id}" data-pop="fora" aria-label="${nFora} aula(s) fora da disponibilidade — ver detalhes"` : 'tabindex="-1" aria-label="Dentro da disponibilidade"'} title="Fora da disponibilidade"><span class="pe-l1"><i class="far fa-clock"></i>${nFora}</span><small>Fora da disponib.</small></button>
+              <button type="button" class="${dia ? 'pe-pend-ico dia' : 'off'}" ${dia ? `data-id="${id}" data-pop="dia" aria-label="${nDia} aula(s) no mesmo dia — ver detalhes"` : 'tabindex="-1" aria-label="Sem aulas agendadas nos dias"'} title="Aulas agendadas"><span class="pe-l1"><i class="fas fa-calendar-xmark"></i>${nDia}</span><small>Aulas agendadas</small></button>
             </div>
           </div>`;
         }).join('') : vazio;
