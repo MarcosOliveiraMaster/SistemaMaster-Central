@@ -896,13 +896,13 @@ const Simulacoes = (function() {
                 <div>
                   <div class="text-xs font-medium text-gray-500 mb-1">Total de Horas</div>
                   <div class="text-lg font-bold text-orange-600" id="display-total-horas">
-                    ${valores.SomatorioDuracaoAulas}h
+                    ${formatDuration(valores.SomatorioDuracaoAulas)}
                   </div>
                 </div>
                 <div>
                   <div class="text-xs font-medium text-gray-500 mb-1">Valor Hora/Aula</div>
                   <div class="text-lg font-bold text-gray-700" id="display-valor-hora-aula">
-                      R$ ${Number(valorHoraInitial || 0).toFixed(2)}
+                      R$ ${formatBR(valorHoraInitial || 0)}
                     </div>
                 </div>
                 <div>
@@ -1096,7 +1096,7 @@ const Simulacoes = (function() {
 
         const lucro = valorPacote - valorEquipe;
 
-        if (elTotal) elTotal.textContent = `${horas}h`;
+        if (elTotal) elTotal.textContent = formatDuration(horas);
         if (elPacote) elPacote.textContent = `R$ ${formatBR(valorPacote || 0)}`;
         if (elEquipe) elEquipe.textContent = `R$ ${formatBR(valorEquipe || 0)}`;
         if (elLucro) elLucro.textContent = `R$ ${formatBR(lucro || 0)}`;
@@ -1286,6 +1286,9 @@ const Simulacoes = (function() {
 
     // Aplicar máscaras
     aplicarMascarasModal();
+
+    // Layout novo (mesmo de Detalhes da Contratação) por cima desta versão.
+    if (window.SimulacaoV2) window.SimulacaoV2.abrir(modal, editingSimulacao, { isNova, doApp: ehDoApp(simulacao) });
   }
   
   // Função para renderizar tabela de aulas na simulação
@@ -3883,9 +3886,9 @@ const Simulacoes = (function() {
 
     const lucroCalculado = valorPacoteCalc - valorEquipe;
 
-    document.getElementById('display-total-horas').textContent = `${horas}h`;
+    document.getElementById('display-total-horas').textContent = formatDuration(horas);
     const elValorHora = document.getElementById('display-valor-hora-aula');
-    if (elValorHora) elValorHora.textContent = `R$ ${Number(profRate || 0).toFixed(2)}`;
+    if (elValorHora) elValorHora.textContent = `R$ ${formatBR(profRate || 0)}`;
     document.getElementById('display-valor-pacote').textContent = `R$ ${Number(valorPacoteCalc || 0).toFixed(2)}`;
     document.getElementById('display-valor-equipe').textContent = `R$ ${Number(valorEquipe || 0).toFixed(2)}`;
     const lucroDisplay = (editingSimulacao && editingSimulacao.valorLucroMasterPorHora && editingSimulacao.valorLucroMasterPorHora > 0)

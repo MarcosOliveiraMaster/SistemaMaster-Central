@@ -1,0 +1,94 @@
+/* ==================== SIMULAÇÃO — NOVA VERSÃO ====================
+   Camada de simulacao-v2.js. Usa o layout e as classes mdc2-* de
+   detalhes-contratacao-v2.css; aqui ficam só os ajustes dos elementos que existem
+   apenas na simulação (campos editáveis no cabeçalho, seletor de valor, botões).
+   Tudo escopado em .msim2 para não afetar a contratação nem a versão antiga. */
+
+/* Cabeçalho aberto: o dropdown de busca de cliente precisa sair da caixa, então
+   o cabeçalho deixa de cortar o conteúdo (o círculo decorativo é recortado nele). */
+.msim2 .mdc2-header::after { clip-path: inset(0 60px 110px 0); }
+.msim2 .mdc2-header.mdc2-header-aberto { overflow: visible; z-index: 3; }
+.msim2 .mdc2-header-aberto .mdc2-header-info > * { overflow: visible; max-height: none; }
+
+.msim2 .msim2-dados .grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) !important;
+  gap: 10px 14px !important;
+}
+.msim2 .msim2-dados label { font-size: 11.5px !important; margin-bottom: 3px !important; color: #4b5563 !important; }
+.msim2 .msim2-dados input,
+.msim2 .msim2-dados select {
+  height: clamp(30px, 4.2vh, 36px);
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  border-radius: 10px !important;
+  border-color: rgba(var(--mdc2-acc-rgb), 0.22) !important;
+  background: rgba(255, 255, 255, 0.9);
+  font-size: 13px !important;
+}
+.msim2 .msim2-dados input:focus,
+.msim2 .msim2-dados select:focus { --tw-ring-color: rgba(var(--mdc2-acc-rgb), 0.45); border-color: var(--mdc2-acc) !important; }
+.msim2 .msim2-dados .fas { color: var(--mdc2-acc) !important; }
+.msim2 .msim2-dados > div:last-child { margin-top: 12px !important; padding-top: 10px !important; border-top-color: rgba(var(--mdc2-acc-rgb), 0.12) !important; }
+.msim2 #dropdown-cliente { z-index: 30; }
+
+.msim2 .mdc2-chip[data-tom="app"] { background: #ede9fe; border-color: #c4b5fd; color: #5b21b6; }
+.msim2 .mdc2-chip[data-tom="app"] .mdc2-chip-ponto { background: #7c3aed; }
+
+.msim2 .mdc2-btn-perfil:disabled { opacity: 0.45; cursor: not-allowed; }
+.msim2 .mdc2-btn-perfil:disabled:hover { background: rgba(255, 255, 255, 0.85); color: var(--mdc2-texto); }
+
+/* X da versão antiga no fim do cabeçalho */
+.msim2 .mdc2-header-acoes .modal-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(28px, 4.6vh, 38px);
+  height: clamp(28px, 4.6vh, 38px);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  box-shadow: 0 2px 8px rgba(17, 24, 39, 0.06);
+  color: var(--mdc2-texto) !important;
+  font-size: 15px;
+}
+.msim2 .mdc2-header-acoes .modal-close:hover { background: #fff; color: var(--mdc2-acc) !important; }
+
+/* Lucro Master em verde, como na contratação */
+.msim2 .mdc2-linha-valor > #display-lucro-master { color: #16a34a !important; }
+
+/* Seletor Valor Padrão / Novo Valor dentro do Resumo financeiro */
+.msim2 .msim2-modo .toggle-switch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: var(--mdc2-btn-altura);
+  padding: 0 10px;
+  border-radius: 12px;
+  background: rgba(var(--mdc2-acc-rgb), 0.08);
+  border: 1px solid rgba(var(--mdc2-acc-rgb), 0.20);
+}
+.msim2 .msim2-modo .toggle-switch > span { font-size: var(--mdc2-fonte) !important; font-weight: 600; color: #4b5563 !important; }
+
+/* Botões principais (mesmo destaque de "Adicionar aula" / "Salvar" da contratação) */
+.mdc2-overlay.msim2 .mdc2-nav #btn-adicionar-aula-simulacao,
+.mdc2-overlay.msim2 .mdc2-card-botoes #btn-salvar-simulacao {
+  background: linear-gradient(135deg, var(--mdc2-acc), var(--mdc2-acc-forte)) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+}
+.mdc2-overlay.msim2 .mdc2-nav #btn-adicionar-aula-simulacao i,
+.mdc2-overlay.msim2 .mdc2-card-botoes #btn-salvar-simulacao i { color: #fff; }
+.mdc2-overlay.msim2 .mdc2-nav #btn-adicionar-aula-simulacao:hover,
+.mdc2-overlay.msim2 .mdc2-card-botoes #btn-salvar-simulacao:hover { filter: brightness(1.08); }
+.mdc2-overlay.msim2 .mdc2-card-botoes #btn-excluir-simulacao,
+.mdc2-overlay.msim2 .mdc2-card-botoes #btn-excluir-simulacao i { color: #b91c1c !important; }
+.mdc2-overlay.msim2 .mdc2-card-botoes #btn-excluir-simulacao:hover { background: #fee2e2 !important; }
+
+/* Menu com poucos itens: em vez de espalhar os botões pela altura toda (como na
+   contratação, que tem o menu cheio), ficam agrupados no topo. */
+@media (min-width: 769px) {
+  .msim2 .mdc2-nav-grupo { flex: none; }
+  .msim2 .mdc2-nav-itens { justify-content: flex-start; }
+}
