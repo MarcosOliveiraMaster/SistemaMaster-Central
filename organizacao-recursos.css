@@ -433,3 +433,48 @@ body.or-aberto #barra-inferior, body.or-aberto #menu-toggle { display: none !imp
 }
 
 
+
+/* Formulário de áreas: nome (70%) | ícones rápidos + "+" (30%); ações embaixo.
+   No protótipo os 26 ícones ficavam na mesma linha e espremiam o campo de nome. */
+.or-app .area-form.or-area-form { display: block; position: relative; }
+.or-app .or-area-linha { display: flex; align-items: center; gap: 10px; }
+.or-app .or-area-linha > input { flex: 0 0 calc(70% - 5px); width: calc(70% - 5px); min-width: 0; height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; outline: 0; background: #fffdfa; color: var(--ink); font-size: 12px; }
+.or-app .or-area-linha > input:focus { border-color: #ffc59d; box-shadow: 0 0 0 2px #fff1e7; }
+.or-app .or-icones-rapidos { position: relative; flex: 1 1 30%; min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
+.or-app .or-icone-opcao, .or-app .or-icone-mais { flex: 0 0 auto; width: 31px; height: 31px; display: grid; place-items: center; color: var(--muted); border-radius: 9px; background: #fffdfa; transition: background .15s, color .15s; }
+.or-app .or-icone-opcao.selected, .or-app .or-icone-opcao:hover, .or-app .or-icone-mais:hover, .or-app .or-icone-mais.selected { color: var(--orange-deep); background: var(--orange-soft); }
+.or-app .or-icone-mais { border: 1px dashed #f3c6a3; color: var(--orange-deep); }
+.or-app .or-area-acoes { display: flex; justify-content: flex-end; gap: 8px; margin-top: 11px; }
+.or-app .or-area-acoes .primary-button, .or-app .or-area-acoes .secondary-button { padding: 10px 16px; }
+
+/* Biblioteca de ícones (popover do "+"): busca + grade de 4 colunas */
+.or-app .or-icones-pop { position: absolute; z-index: 45; top: calc(100% + 8px); right: 0; width: 284px; padding: 10px; border: 1px solid #eadfd5; border-radius: 14px; background: #fffdfa; box-shadow: 12px 16px 30px rgba(65, 46, 30, .18); }
+.or-app .or-icones-pop > input { width: 100%; height: 32px; margin-bottom: 8px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; outline: 0; background: #fff; font-size: 11px; }
+.or-app .or-icones-pop > input:focus { border-color: #ffc59d; }
+.or-app .or-icones-grade { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; max-height: 248px; overflow-y: auto; padding-right: 2px; }
+.or-app .or-icones-grade button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-width: 0; height: 58px; padding: 4px 2px; color: var(--muted-deep); border-radius: 9px; background: #f7f3ee; }
+.or-app .or-icones-grade button span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 8.5px; }
+.or-app .or-icones-grade button:hover, .or-app .or-icones-grade button.selected { color: var(--orange-deep); background: var(--orange-soft); }
+.or-app .or-icones-vazio { grid-column: 1 / -1; padding: 16px 4px; color: var(--muted); font-size: 11px; text-align: center; }
+@media (max-width: 520px) {
+  .or-app .or-area-linha { flex-wrap: wrap; }
+  .or-app .or-area-linha > input { flex-basis: 100%; width: 100%; }
+  .or-app .or-icones-rapidos { flex-basis: 100%; justify-content: flex-start; }
+  .or-app .or-icones-pop { left: 0; right: auto; width: min(284px, calc(100vw - 72px)); }
+}
+
+/* Saldo projetado como 4º card da linha de métricas (antes ficava solto no
+   título e a linha de 4 colunas tinha só 3 cards) */
+.or-app .metric-card.or-metric-saldo { background: #fff3e7; border-color: #ffe0c7; box-shadow: 5px 6px 15px rgba(225, 157, 105, .12); }
+.or-app .or-metric-saldo .metric-label { color: #b37d5c; }
+.or-app .or-metric-saldo > strong { color: var(--orange-deep); }
+.or-app .or-metric-saldo .metric-icon { color: var(--orange-deep); }
+
+/* Campo de valor: o destaque de foco envolve o campo inteiro (com o "R$"),
+   em vez de um contorno no input interno cortado pelo prefixo */
+.or-app .entry-table .money-input { border: 1px solid transparent; }
+.or-app .entry-table .money-input:focus-within { border-color: #ffc59d; box-shadow: 0 0 0 2px #fff1e7; background: #fff; }
+.or-app .entry-table .money-input input, .or-app .entry-table .money-input input:focus { height: 100%; border: 0; box-shadow: none; background: transparent; }
+.or-app .money-input input::-webkit-inner-spin-button, .or-app .money-input input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.or-app .money-input input[type="number"] { -moz-appearance: textfield; }
+
