@@ -389,3 +389,30 @@ body.or-aberto #barra-inferior, body.or-aberto #menu-toggle { display: none !imp
 .or-app .brand-mark.or-brand-master { background: #fff; transform: none; padding: 5px; box-shadow: var(--shadow-small); }
 .or-app .brand-mark.or-brand-master img { width: 100%; height: 100%; object-fit: contain; }
 .or-app .brand strong { white-space: nowrap; }
+
+/* Cards mensais: 2 colunas só quando cada card tem espaço para a tabela;
+   em telas médias (tablet) a grade passa a 1 coluna. O nome do mês não quebra. */
+.or-app .monthly-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 430px), 1fr)); }
+.or-app .monthly-title { min-width: 0; }
+.or-app .monthly-title h3 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Data do lançamento acompanha a largura da coluna (o protótipo fixava 100px
+   e a data aparecia cortada nos cards estreitos do celular) */
+.or-app .entry-table .date-cell { width: 100% !important; min-width: 0; }
+.or-app .entry-table th:first-child { width: 31%; }
+.or-app .entry-table th:nth-child(2) { width: 18%; }
+.or-app .entry-table th:nth-child(3) { width: 23%; }
+.or-app .entry-table th:nth-child(4) { width: 22%; }
+.or-app .entry-table th:last-child { width: 6%; }
+@media (max-width: 480px) {
+  .or-app .entry-table th:first-child { width: 31%; }
+  .or-app .entry-table th:nth-child(2) { width: 20%; }
+  .or-app .entry-table th:nth-child(3) { width: 26%; }
+  .or-app .entry-table th:nth-child(4) { width: 16%; }
+  .or-app .entry-table th:last-child { width: 7%; }
+  .or-app .entry-table .date-cell { padding: 0 3px; }
+  .or-app .entry-table .date-cell::-webkit-calendar-picker-indicator { display: none; }
+  .or-app .area-trigger > span:not(.area-icon) { display: none; }
+  .or-app .area-trigger { justify-content: center; gap: 2px; }
+}
+
