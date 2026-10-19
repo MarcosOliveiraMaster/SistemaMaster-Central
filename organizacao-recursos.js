@@ -862,12 +862,12 @@
   }
 
   function htmlModalAnalise(m, sim) {
-    const { linhas, grupos } = dadosAnalise(sim);
+    const { linhas } = dadosAnalise(sim);
     const ordenadas = [...linhas].sort((a, b) => (m.ordem === 'nome'
       ? (a.descricao || '').localeCompare(b.descricao || '', 'pt-BR')
       : m.ordem === 'area' ? a.area.nome.localeCompare(b.area.nome, 'pt-BR') || b.valor - a.valor : b.valor - a.valor));
     return `<div class="modal-backdrop" data-fundo="1"><div class="analysis-modal"><div class="analysis-header"><div><span class="eyebrow">Leitura da simulação</span><h2>Análise de investimento por área</h2></div><button type="button" class="icon-button" data-acao="fechar-modal" aria-label="Fechar">${ic('x', 20)}</button></div>
-      <div class="analysis-body"><div class="analysis-visual"><div class="analysis-tabs"><button type="button" class="${m.modo === 'radar' ? 'active' : ''}" data-acao="analise-modo" data-modo="radar">Radar</button><button type="button" class="${m.modo === 'barras' ? 'active' : ''}" data-acao="analise-modo" data-modo="barras">Barras</button></div><div class="analysis-chart"><canvas id="or-grafico-analise"></canvas></div><div class="analysis-areas">${grupos.map((g) => `<span><span class="area-icon">${icArea(g.icone, 13)}</span>${esc(g.nome)}</span>`).join('')}</div></div>
+      <div class="analysis-body"><div class="analysis-visual"><div class="analysis-tabs"><button type="button" class="${m.modo === 'radar' ? 'active' : ''}" data-acao="analise-modo" data-modo="radar">Radar</button><button type="button" class="${m.modo === 'barras' ? 'active' : ''}" data-acao="analise-modo" data-modo="barras">Barras</button></div><div class="analysis-chart"><canvas id="or-grafico-analise"></canvas></div></div>
       <div class="analysis-table-panel"><div class="analysis-table-top"><div><span class="eyebrow">Detalhamento</span><strong>Saídas registradas</strong></div><select data-campo="analise-ordem"><option value="valor"${m.ordem === 'valor' ? ' selected' : ''}>Ordenar por valor</option><option value="nome"${m.ordem === 'nome' ? ' selected' : ''}>Ordenar por nome</option><option value="area"${m.ordem === 'area' ? ' selected' : ''}>Ordenar por área</option></select></div>
       <div class="analysis-table"><div class="analysis-row analysis-head"><span>Descrição</span><span>Valor</span><span>Área</span></div>${ordenadas.map((l) => `<div class="analysis-row"><span>${esc(l.descricao || 'Sem descrição')}</span><strong>${moeda(l.valor)}</strong><span class="area-name">${icArea(l.area.icone, 12)} ${esc(l.area.nome)}</span></div>`).join('')}${ordenadas.length === 0 ? '<div class="analysis-empty">Ainda não há saídas destinadas a uma área.</div>' : ''}</div></div></div>
     </div></div>`;
