@@ -132,6 +132,10 @@ function updateSectionTitle(title) {
 async function loadSection(sectionId) {
   if (!CONFIG.sections.includes(sectionId)) return;
   if (sectionId !== APP_STATE.currentSection) APP_STATE.previousSection = APP_STATE.currentSection;
+  // Saída por outro caminho que não o "Voltar à Central": fecha a tela cheia
+  if (APP_STATE.currentSection === 'organizacao-recursos' && sectionId !== 'organizacao-recursos' && window.OrganizacaoRecursos) {
+    OrganizacaoRecursos.fechar();
+  }
 
   const currentSection = document.querySelector('.section-content.active');
   if (currentSection) {

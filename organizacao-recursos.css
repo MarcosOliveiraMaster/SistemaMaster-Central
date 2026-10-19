@@ -384,3 +384,8 @@ body.or-aberto #barra-inferior, body.or-aberto #menu-toggle { display: none !imp
   .or-app .app-shell.or-menu-aberto .sidebar { display: flex; position: fixed; inset: 0 auto 0 0; z-index: 26; width: min(280px, 86vw); height: 100%; background: var(--background); box-shadow: 12px 0 30px rgba(49, 42, 36, .18); }
   .or-app .app-shell.or-menu-aberto .or-sidebar-fundo { display: block; position: fixed; inset: 0; z-index: 25; background: rgba(49, 42, 36, .24); }
 }
+
+/* Marca Master no lugar do "G" do protótipo */
+.or-app .brand-mark.or-brand-master { background: #fff; transform: none; padding: 5px; box-shadow: var(--shadow-small); }
+.or-app .brand-mark.or-brand-master img { width: 100%; height: 100%; object-fit: contain; }
+.or-app .brand strong { white-space: nowrap; }

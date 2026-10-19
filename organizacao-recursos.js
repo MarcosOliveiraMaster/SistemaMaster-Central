@@ -453,19 +453,22 @@
   }
 
   function htmlMarca(compacta) {
-    return `<div class="brand"><div class="brand-mark"><span>G</span></div>${compacta ? '<strong>Gasto<span>Flow</span></strong>' : '<div><strong>Gasto<span>Flow</span></strong><small>organização de recursos</small></div>'}</div>`;
+    const logo = '<div class="brand-mark or-brand-master"><img src="img/logo2.png" alt="Logo Master Educação"></div>';
+    return `<div class="brand">${logo}${compacta ? '<strong>Master <span>Educação</span></strong>' : '<div><strong>Master <span>Educação</span></strong><small>organização de recursos</small></div>'}</div>`;
+  }
+
+  function htmlLinhaSimulacao(item) {
+    const ativo = S.selecionadaId === item.id ? ' active' : '';
+    const conteudo = S.renomeandoId === item.id
+      ? `<div class="nav-item simulation-nav"><input class="or-renomear" data-campo="renomear" maxlength="120" value="${esc(S.renomeValor)}" aria-label="Novo nome da simulação" /></div>`
+      : `<button type="button" class="nav-item simulation-nav" data-acao="abrir-sim" data-id="${esc(item.id)}" title="${esc(item.titulo)} — clique duplo para renomear">${ic('clipboard-list', 15)}<span>${esc(item.titulo)}</span></button>`;
+    return `<div class="simulation-nav-row${ativo}">${conteudo}<button type="button" class="simulation-delete" aria-label="Apagar ${esc(item.titulo)}" data-acao="pedir-apagar-sim" data-id="${esc(item.id)}">${ic('trash2', 14)}</button></div>`;
   }
 
   function htmlSidebar() {
     const email = usuario();
-    const iniciais = (email.split('@')[0] || 'GF').replace(/[^a-zA-Z]/g, '').slice(0, 2).toUpperCase() || 'GF';
-    const linhas = S.simulacoes.map((item) => {
-      const ativo = S.selecionadaId === item.id ? ' active' : '';
-      const conteudo = S.renomeandoId === item.id
-        ? `<div class="nav-item simulation-nav"><input class="or-renomear" data-campo="renomear" maxlength="120" value="${esc(S.renomeValor)}" aria-label="Novo nome da simulação" /></div>`
-        : `<button type="button" class="nav-item simulation-nav" data-acao="abrir-sim" data-id="${esc(item.id)}" title="${esc(item.titulo)} — clique duplo para renomear">${ic('clipboard-list', 15)}<span>${esc(item.titulo)}</span></button>`;
-      return `<div class="simulation-nav-row${ativo}">${conteudo}<button type="button" class="simulation-delete" aria-label="Apagar ${esc(item.titulo)}" data-acao="pedir-apagar-sim" data-id="${esc(item.id)}">${ic('trash2', 14)}</button></div>`;
-    }).join('');
+    const iniciais = (email.split('@')[0] || 'ME').replace(/[^a-zA-Z]/g, '').slice(0, 2).toUpperCase() || 'ME';
+    const linhas = S.simulacoes.map(htmlLinhaSimulacao).join('');
 
     return `<aside class="sidebar">
       ${htmlMarca(false)}
@@ -595,7 +598,7 @@
     return `<div class="monthly-card${movida}" data-tabela="${esc(t.id)}">
       <div class="monthly-heading" title="Arraste para mover este mês"><div class="monthly-title">${ic('grip-vertical', 17, 'drag-icon')}<div><h3>${rotuloMes(t.mes)}</h3><span data-ref="qtd-${esc(t.id)}">${qtd} lançamento${qtd === 1 ? '' : 's'}</span></div></div><div class="monthly-actions"><button type="button" class="icon-button subtle" aria-label="Editar mês e ano" data-acao="abrir-mes" data-tabela="${esc(t.id)}">${ic('pencil', 15)}</button><button type="button" class="icon-button subtle monthly-delete-button" aria-label="Apagar card mensal" data-acao="apagar-tabela" data-tabela="${esc(t.id)}">${ic('trash2', 15)}</button>${picker}</div></div>
       <div class="monthly-summary"><span><i class="dot dot-expense"></i> <span data-ref="soma-${esc(t.id)}">${moeda(somaTabela(t))} em saídas</span></span><span>${qtd} ${qtd === 1 ? 'item' : 'itens'}</span></div>
-      <div class="entry-table-wrap"><table class="entry-table"><thead><tr><th>Descrição</th><th>Investimento</th><th>Data</th><th>Área de destino</th><th></th></tr></thead><tbody>${linhas}</tbody></table></div>
+      <div class="entry-table-wrap"><table class="entry-table sem-cartao"><thead><tr><th>Descrição</th><th>Investimento</th><th>Data</th><th>Área de destino</th><th></th></tr></thead><tbody>${linhas}</tbody></table></div>
       <button type="button" class="add-entry-button" data-acao="add-lanc" data-tabela="${esc(t.id)}">${ic('plus', 15)} Adicionar lançamento</button>
     </div>`;
   }
@@ -603,7 +606,7 @@
   function htmlSeletorArea(t, l) {
     const area = S.areas.find((a) => a.id === l.areaId);
     const aberto = S.areaAberta === l.id;
-    const menu = aberto ? `<div class="area-menu"><div class="area-menu-title">Área de destino</div>${S.areas.map((a) => `<button type="button" title="${esc(a.nome)}" data-acao="area-escolher" data-tabela="${esc(t.id)}" data-lanc="${esc(l.id)}" data-area="${esc(a.id)}"><span class="area-icon">${icArea(a.icone, 14)}</span>${esc(a.nome)}</button>`).join('')}<button type="button" class="area-add" data-acao="abrir-areas">${ic('plus', 13)} Adicionar área</button></div>` : '';
+    const menu = aberto ? `<div class="area-menu"><div class="area-menu-title">Área de destino</div>${S.areas.map((a) => `<button type="button" title="${esc(a.nome)}" data-acao="area-escolher" data-tabela="${esc(t.id)}" data-lanc="${esc(l.id)}" data-area="${esc(a.id)}"><span class="area-icon">${icArea(a.icone, 14)}</span>${esc(a.nome)}</button>`).join('')}<button type="button" class="area-add" data-acao="abrir-areas" data-tabela="${esc(t.id)}">${ic('plus', 13)} Adicionar área</button></div>` : '';
     return `<div class="area-picker"><button type="button" class="area-trigger${area ? '' : ' or-sem-area'}" data-acao="area-abrir" data-tabela="${esc(t.id)}" data-lanc="${esc(l.id)}" title="${esc(area ? area.nome : 'Área removida — escolha outra')}"><span class="area-icon">${icArea(area ? area.icone : 'settings', 13)}</span><span>${esc(area ? area.nome : 'Sem área')}</span>${ic('chevron-down', 12)}</button>${menu}</div>`;
   }
 
@@ -729,6 +732,7 @@
 
   // Mudança vinda do banco: não re-renderiza por baixo de quem está digitando
   function renderSeguro() {
+    if (S.arrastandoId) { renderPendente = true; return; }
     const ativo = document.activeElement;
     if (raiz && ativo && raiz.contains(ativo) && (ativo.matches('input, select, textarea') || ativo.isContentEditable)) {
       renderPendente = true;
@@ -960,7 +964,7 @@
     // Editar: o período define os meses; meses com lançamentos fora dele são
     // mantidos (o protótipo os apagava sem aviso).
     const sim = selecionada();
-    if (!sim) return;
+    if (!sim) { S.modal = null; renderModal(); return; }
     const permitidos = mesesEntre(valores.dataInicio, valores.dataFim);
     const porMes = new Map(sim.tabelas.map((t) => [t.mes, t]));
     const tabelas = permitidos.map((mes) => porMes.get(mes) || novaTabela(mes));
@@ -1028,11 +1032,19 @@
 
   function confirmarRenomear() {
     const id = S.renomeandoId;
-    const nome = S.renomeValor.trim();
+    const nome = S.renomeValor.trim().slice(0, 120);
     S.renomeandoId = null;
     const sim = S.simulacoes.find((s) => s.id === id);
-    if (sim && nome && nome !== sim.titulo) alterarSimulacao({ ...sim, titulo: nome.slice(0, 120) });
-    render();
+    if (sim && nome && nome !== sim.titulo) alterarSimulacao({ ...sim, titulo: nome });
+    // Redesenha só a linha do menu e o título: um redesenho completo aqui
+    // engoliria o clique que tirou o foco do campo
+    const campo = raiz && raiz.querySelector('.or-renomear');
+    const linha = campo && campo.closest('.simulation-nav-row');
+    const atual = S.simulacoes.find((s) => s.id === id);
+    if (!linha || !atual) { render(); return; }
+    linha.outerHTML = htmlLinhaSimulacao(atual);
+    const titulo = S.tela === 'painel' && S.selecionadaId === id && raiz.querySelector('.dashboard-title-row h1');
+    if (titulo) titulo.textContent = atual.titulo;
   }
 
   function salvarArea(m) {
@@ -1070,6 +1082,7 @@
     if (!alvo) return;
     const { acao, id, tabela, lanc } = alvo.dataset;
     const sim = selecionada();
+    if (/^(mes-|ano-)/.test(acao) && !S.mesAberto) return;
 
     switch (acao) {
       case 'voltar-central': voltarCentral(); break;
@@ -1079,7 +1092,7 @@
       case 'recarregar': recarregar(); break;
       case 'tentar-sync': Array.from(falhas).forEach((fid) => gravar(fid)); break;
       case 'abrir-areas':
-        S.areaAberta = null;
+        if (S.areaAberta) { S.areaAberta = null; if (tabela) renderCartao(tabela); }
         S.modal = { tipo: 'areas', nome: '', icone: 'briefcase', editandoId: null };
         renderModal();
         break;
@@ -1259,7 +1272,7 @@
   function aoTeclar(e) {
     if (e.target.classList && e.target.classList.contains('or-renomear')) {
       if (e.key === 'Enter') { e.preventDefault(); confirmarRenomear(); }
-      if (e.key === 'Escape') { S.renomeandoId = null; render(); }
+      if (e.key === 'Escape') { S.renomeValor = ''; confirmarRenomear(); }
       return;
     }
     if (e.key !== 'Escape') return;
@@ -1286,6 +1299,10 @@
   // Botões do editor não podem tirar o foco do texto selecionado
   function aoPressionarMouse(e) {
     if (e.target.closest('[data-comando]')) e.preventDefault();
+  }
+  // Rolar a página com o cursor sobre um valor focado não deve alterá-lo
+  function aoRolar(e) {
+    if (e.target.type === 'number' && e.target === document.activeElement) e.target.blur();
   }
   function aoSoltarPonteiro() {
     if (!S.arrastandoId && raiz) raiz.querySelectorAll('.monthly-card[draggable="true"]').forEach((c) => { c.draggable = false; });
@@ -1345,6 +1362,7 @@
   function limparArraste() {
     S.arrastandoId = null;
     if (!raiz) return;
+    if (renderPendente) setTimeout(renderSeguro, 0);
     raiz.querySelectorAll('.is-dragging, .is-drag-target').forEach((n) => n.classList.remove('is-dragging', 'is-drag-target'));
     raiz.querySelectorAll('.is-dragging-grid').forEach((n) => n.classList.remove('is-dragging-grid'));
     raiz.querySelectorAll('.monthly-card[draggable="true"]').forEach((c) => { c.draggable = false; });
@@ -1386,6 +1404,7 @@
     document.body.appendChild(raiz);
     document.body.classList.add('or-aberto');
     EVENTOS.forEach(([tipo, fn]) => raiz.addEventListener(tipo, fn));
+    raiz.addEventListener('wheel', aoRolar, { passive: true });
     window.addEventListener('beforeunload', antesDeSair);
     // No document: depois de um redesenho o foco pode ficar no <body>
     document.addEventListener('keydown', aoTeclar);
