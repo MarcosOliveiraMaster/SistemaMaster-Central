@@ -16,6 +16,26 @@ window.DetalhesContratacaoV2 = (function () {
 
   let ativo = null; // { el, overlayV1, movidos, rotulos, observer, info, infoEstavaOculta }
 
+  // Menus laterais recolhidos (só ícones): preferência salva no navegador, uma por lado.
+  // Só tem efeito em telas largas (> 1180px) — abaixo disso o CSS ignora as classes.
+  const LADOS = {
+    nav: { chave: 'mdc2_navRecolhido', classe: 'mdc2-nav-recolhida', botao: 'recolher-nav', rotulo: 'menu de ações' },
+    lateral: { chave: 'mdc2_lateralRecolhida', classe: 'mdc2-lateral-recolhida', botao: 'recolher-lateral', rotulo: 'painel de valores' }
+  };
+  function lerRecolhido(lado) {
+    try { return localStorage.getItem(LADOS[lado].chave) === '1'; } catch (e) { return false; }
+  }
+  function salvarRecolhido(lado, recolhido) {
+    try { localStorage.setItem(LADOS[lado].chave, recolhido ? '1' : '0'); } catch (e) { /* sem armazenamento local */ }
+  }
+  function aplicarRecolhido(el, lado, recolhido) {
+    const { classe, botao, rotulo } = LADOS[lado];
+    el.classList.toggle(classe, recolhido);
+    const btn = el.querySelector(`[data-v2="${botao}"]`);
+    btn.setAttribute('aria-expanded', String(!recolhido));
+    btn.setAttribute('aria-label', (recolhido ? 'Expandir ' : 'Recolher ') + rotulo);
+  }
+
   const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   // Rótulos que mudam só nesta versão (voltam ao original na versão antiga).
@@ -138,6 +158,9 @@ window.DetalhesContratacaoV2 = (function () {
 
           <div class="mdc2-main">
             <nav class="mdc2-nav mdc2-glass" aria-label="Ações da contratação">
+              <button type="button" class="mdc2-recolher" data-v2="recolher-nav">
+                <i class="fas fa-angles-left"></i><span>Recolher menu</span>
+              </button>
               <div class="mdc2-nav-grupo">
                 <span class="mdc2-nav-titulo">Aulas</span>
                 <div class="mdc2-nav-itens" data-v2="nav-aulas"></div>
@@ -154,22 +177,25 @@ window.DetalhesContratacaoV2 = (function () {
             </section>
 
             <aside class="mdc2-lateral">
+              <button type="button" class="mdc2-recolher mdc2-glass" data-v2="recolher-lateral">
+                <i class="fas fa-angles-right"></i><span>Recolher</span>
+              </button>
               <div class="mdc2-card mdc2-glass">
-                <div class="mdc2-card-titulo"><span class="mdc2-card-icone"><i class="fas fa-wallet"></i></span>Resumo financeiro</div>
+                <div class="mdc2-card-titulo"><span class="mdc2-card-icone"><i class="fas fa-wallet"></i></span><span class="mdc2-card-titulo-texto">Resumo financeiro</span></div>
                 ${linhaResumo('Valor do pacote', 'pacote')}
                 ${linhaResumo('Valor para Equipe', 'equipe')}
                 ${linhaResumo('Lucro Master', 'lucro')}
                 <div class="mdc2-card-acao" data-v2="editar-valores"></div>
               </div>
               <div class="mdc2-card mdc2-glass">
-                <div class="mdc2-card-titulo"><span class="mdc2-card-icone"><i class="fas fa-clock"></i></span>Valores por aula</div>
+                <div class="mdc2-card-titulo"><span class="mdc2-card-icone"><i class="fas fa-clock"></i></span><span class="mdc2-card-titulo-texto">Valores por aula</span></div>
                 ${linhaResumo('Total de horas', 'total-horas')}
                 ${linhaResumo('Hora/aula professor', 'hora-aula')}
                 ${linhaResumo('Lucro por aula', 'lucro-aula', ' mdc2-valor-lucro')}
                 ${linhaResumo('Total por aula', 'total-aula')}
               </div>
               <div class="mdc2-card mdc2-glass">
-                <div class="mdc2-card-titulo"><span class="mdc2-card-icone"><i class="fas fa-file-signature"></i></span>Contratação</div>
+                <div class="mdc2-card-titulo"><span class="mdc2-card-icone"><i class="fas fa-file-signature"></i></span><span class="mdc2-card-titulo-texto">Contratação</span></div>
                 <div class="mdc2-card-botoes" data-v2="contratacao"></div>
               </div>
             </aside>
@@ -217,6 +243,8 @@ window.DetalhesContratacaoV2 = (function () {
     const wrap = document.createElement('div');
     wrap.innerHTML = montarHTML(aula);
     const el = wrap.firstElementChild;
+    // Estado do último acesso aplicado antes de entrar no DOM: abre sem animação.
+    Object.keys(LADOS).forEach(lado => aplicarRecolhido(el, lado, lerRecolhido(lado)));
     overlayV1.appendChild(el);
     overlayV1.classList.add('mdc2-v1-oculta');
     ativo = { el, overlayV1, movidos: [], rotulos: [], observer: null, info: null, infoEstavaOculta: false };
@@ -288,6 +316,19 @@ window.DetalhesContratacaoV2 = (function () {
       const aberto = el.querySelector('.mdc2-header').classList.toggle('mdc2-header-aberto');
       btnExpandir.setAttribute('aria-expanded', String(aberto));
       btnExpandir.title = aberto ? 'Ocultar informações do cliente' : 'Mostrar informações do cliente';
+    });
+    Object.keys(LADOS).forEach(lado => {
+      slot(LADOS[lado].botao).addEventListener('click', () => {
+        const recolhido = !el.classList.contains(LADOS[lado].classe);
+        aplicarRecolhido(el, lado, recolhido);
+        salvarRecolhido(lado, recolhido);
+      });
+    });
+    // Lateral direita recolhida: clicar em qualquer cartão (o ícone) expande de volta.
+    el.querySelector('.mdc2-lateral').addEventListener('click', (e) => {
+      if (!el.classList.contains(LADOS.lateral.classe) || !e.target.closest('.mdc2-card')) return;
+      aplicarRecolhido(el, 'lateral', false);
+      salvarRecolhido('lateral', false);
     });
     slot('perfil').addEventListener('click', () => abrirPerfilClientePorCpf(aula.cpf || ''));
     slot('versao-antiga').addEventListener('click', fechar);
