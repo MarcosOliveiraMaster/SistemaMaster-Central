@@ -9,12 +9,13 @@ const CONFIG = {
     'calendario', 'fluxo-processos', 'clientes', 'professores', 'galeria-professores',
     'area-pagamento', 'cofres-pagamento', 'exportar-dados', 'previsao-financeira',
     'detalhes-banco-de-aulas', 'quadros-aula', 'notificacoes', 'avaliacoes-equipe', 'orientacoes-alunos',
-    'lista-materias'
+    'lista-materias', 'organizar-menu', 'organizacao-recursos'
   ]
 };
 
 const APP_STATE = {
   currentSection: 'painel-central',
+  previousSection: null,
   cache: { bancoDeAulas: null, cadastroClientes: null, dataBaseProfessores: null, lastUpdated: {} },
   filters: {},
   isLoading: false
@@ -95,6 +96,8 @@ function setupMenuNavigation() {
     const tabId     = btn.getAttribute('data-tab');
     if (!sectionId) return;
     if (sectionId === APP_STATE.currentSection && !tabId) return;
+    if (APP_STATE.currentSection === 'organizar-menu' && window.MenuLateral && MenuLateral.temAlteracoes()
+        && !window.confirm('Há alterações não salvas no menu. Sair mesmo assim?')) return;
 
     nav.querySelectorAll('button.active').forEach(i => i.classList.remove('active'));
     btn.classList.add('active');
@@ -128,6 +131,7 @@ function updateSectionTitle(title) {
 
 async function loadSection(sectionId) {
   if (!CONFIG.sections.includes(sectionId)) return;
+  if (sectionId !== APP_STATE.currentSection) APP_STATE.previousSection = APP_STATE.currentSection;
 
   const currentSection = document.querySelector('.section-content.active');
   if (currentSection) {
@@ -149,7 +153,7 @@ function showSection(sectionId) {
   section.innerHTML = '';
   section.classList.add('active');
 
-  if (sectionId === 'mensagens' || sectionId === 'previsao-financeira') {
+  if (sectionId === 'mensagens' || sectionId === 'previsao-financeira' || sectionId === 'organizacao-recursos') {
     loadSectionContent(sectionId);
   } else {
     setTimeout(() => loadSectionContent(sectionId), 500);
@@ -221,6 +225,12 @@ function loadSectionContent(sectionId) {
       break;
     case 'lista-materias':
       if (typeof loadListaMaterias === 'function') loadListaMaterias();
+      break;
+    case 'organizar-menu':
+      if (window.MenuLateral) MenuLateral.abrirEditor();
+      break;
+    case 'organizacao-recursos':
+      if (window.OrganizacaoRecursos) OrganizacaoRecursos.abrir();
       break;
   }
 }

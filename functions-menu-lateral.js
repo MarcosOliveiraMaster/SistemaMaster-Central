@@ -38,6 +38,7 @@
     'cofres-pagamento':        { secao: 'cofres-pagamento', nome: 'Cofres e Reservas', icone: 'fas fa-vault' },
     'previsao-financeira':     { secao: 'previsao-financeira', nome: 'Previsão Financeira', icone: 'fas fa-chart-pie' },
     'simulacoes':              { secao: 'simulacoes', nome: 'Simulações', icone: 'fas fa-chart-line' },
+    'organizacao-recursos':    { secao: 'organizacao-recursos', nome: 'Organização de recursos', icone: 'fas fa-diagram-project' },
     'clientes':                { secao: 'clientes', nome: 'BD Clientes', icone: 'fas fa-database' },
     'orientacoes-alunos':      { secao: 'orientacoes-alunos', nome: 'Orientações para alunos', icone: 'fas fa-hand-holding-heart' },
     'galeria-professores':     { secao: 'galeria-professores', nome: 'BD Professores', icone: 'fas fa-database' },
@@ -72,6 +73,7 @@
         f('mensagens'), f('area-pagamento'), f('cofres-pagamento'),
         f('previsao-financeira'), f('simulacoes')
       ] },
+      { id: 's-planejamento', nome: 'Planejamento', itens: [f('organizacao-recursos')] },
       { id: 's-pessoas', nome: 'Pessoas', itens: [
         { tipo: 'gaveta', id: 'g-clientes-professores', nome: 'Clientes e Professores', icone: 'fas fa-tachometer-alt', itens: [
           { tipo: 'gaveta', id: 'g-clientes', nome: 'Clientes', icone: 'fas fa-users', itens: [f('clientes'), f('orientacoes-alunos')] },
@@ -100,7 +102,8 @@
     'fas fa-screwdriver-wrench', 'fas fa-toolbox', 'fas fa-sitemap', 'fas fa-list-check', 'fas fa-clipboard-list',
     'fas fa-envelope', 'fas fa-comments', 'fas fa-phone', 'fas fa-money-bill-wave', 'fas fa-coins',
     'fas fa-receipt', 'fas fa-briefcase', 'fas fa-building', 'fas fa-star', 'fas fa-flag',
-    'fas fa-lightbulb', 'fas fa-shield-halved', 'fas fa-magnifying-glass'
+    'fas fa-lightbulb', 'fas fa-shield-halved', 'fas fa-magnifying-glass', 'fas fa-diagram-project',
+    'fas fa-piggy-bank', 'fas fa-scale-balanced', 'fas fa-bullseye'
   ];
   const ICONE_VALIDO = /^(fas|far|fab|fa-solid|fa-regular|fa-brands)( fa-[a-z0-9-]+)+$/;
   const ICONE_GAVETA = 'fas fa-folder';
@@ -156,6 +159,9 @@
     // Funções novas entram no lugar previsto quando ele existe no menu salvo
     // (ex.: "Orientações para alunos" na gaveta Clientes); senão, no fim.
     const LUGAR_NOVAS = { 'orientacoes-alunos': 'g-clientes', 'lista-materias': 'g-professores' };
+    // Funções novas com seção própria: a seção é criada (depois de `depois`)
+    // quando o menu salvo ainda não a tem.
+    const SECAO_NOVAS = { 'organizacao-recursos': { id: 's-planejamento', nome: 'Planejamento', depois: 's-financeiro' } };
     const acharGaveta = (itens, id) => {
       for (const n of itens) {
         if (n.tipo !== 'gaveta') continue;
@@ -167,6 +173,17 @@
     };
     Object.keys(FUNCOES).forEach((chave) => {
       if (usadas.has(chave)) return;
+      const lugar = SECAO_NOVAS[chave];
+      if (lugar) {
+        let secao = secoes.find((s) => s.id === lugar.id);
+        if (!secao) {
+          secao = { id: lugar.id, nome: lugar.nome, itens: [] };
+          const ref = secoes.findIndex((s) => s.id === lugar.depois);
+          secoes.splice(ref >= 0 ? ref + 1 : secoes.length, 0, secao);
+        }
+        secao.itens.push({ tipo: 'funcao', funcao: chave });
+        return;
+      }
       const gaveta = LUGAR_NOVAS[chave] && secoes.map(s => acharGaveta(s.itens, LUGAR_NOVAS[chave])).find(Boolean);
       (gaveta ? gaveta.itens : secoes[secoes.length - 1].itens).push({ tipo: 'funcao', funcao: chave });
     });
@@ -307,7 +324,7 @@
     s.id = 'om-estilos';
     s.textContent = `
       .om-wrap{max-width:860px;margin:0 auto;font-family:'Open Sans',sans-serif;}
-      .om-topo{display:flex;flex-wrap:wrap;gap:.75rem;align-items:center;justify-content:space-between;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem;position:sticky;top:0;z-index:5;}
+      .om-topo{display:flex;flex-wrap:wrap;gap:.75rem;align-items:center;justify-content:space-between;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem;position:sticky;top:var(--om-topo,0px);z-index:5;}
       .om-topo h2{font:700 1.1rem 'Lexend',sans-serif;color:#1f2937;margin:0;}
       .om-topo p{font-size:.8rem;color:#6b7280;margin:.15rem 0 0;}
       .om-acoes{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;}
@@ -564,6 +581,7 @@
   }
 
   document.addEventListener('click', fecharSeletorIcone);
+  document.addEventListener('scroll', (e) => { if (seletorIcone && !seletorIcone.contains(e.target)) fecharSeletorIcone(); }, true);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') fecharSeletorIcone(); });
 
   // ── Ações ──
@@ -614,9 +632,13 @@
     const secao = document.getElementById('organizar-menu');
     if (!secao) return;
     injetarEstilos();
+    alterado = false;
     secao.innerHTML = '';
     raiz = el('div', 'om-wrap');
     secao.appendChild(raiz);
+    // A barra de ações gruda logo abaixo do cabeçalho fixo (#app-header)
+    const cabecalho = document.getElementById('app-header');
+    raiz.style.setProperty('--om-topo', (cabecalho ? cabecalho.offsetHeight + 8 : 0) + 'px');
 
     if (typeof Sortable === 'undefined') {
       raiz.innerHTML = '<div class="om-ajuda">Não foi possível carregar a biblioteca de arrastar (SortableJS). Recarregue a página.</div>';
@@ -664,5 +686,8 @@
     desenharArvore(config);
   }
 
-  window.MenuLateral = { abrirEditor, renderizar: () => renderizarMenu(configAtual) };
+  // Editor aberto com mudanças não salvas (script.js pergunta antes de sair da tela)
+  function temAlteracoes() { return !!(alterado && raiz && raiz.isConnected); }
+
+  window.MenuLateral = { abrirEditor, temAlteracoes, renderizar: () => renderizarMenu(configAtual) };
 })();
