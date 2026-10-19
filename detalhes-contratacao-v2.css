@@ -24,6 +24,11 @@
   --mdc2-fonte: clamp(10.5px, 1.6vh, 13.5px);
   --mdc2-btn-altura: clamp(21px, 4.1vh, 40px);
   --mdc2-linha-pad: clamp(1px, 0.85vh, 10px);
+  --mdc2-nav-w: clamp(190px, 14vw, 250px);
+  --mdc2-lat-w: clamp(230px, 18vw, 310px);
+  --mdc2-card-pad-y: clamp(5px, 1.5vh, 18px);
+  --mdc2-card-pad-x: clamp(10px, 1vw, 18px);
+  --mdc2-card-icone: clamp(20px, 3.6vh, 32px);
 
   position: fixed;
   inset: 0;
@@ -225,7 +230,7 @@ body.theme-blue .mdc2-overlay {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: clamp(190px, 14vw, 250px) minmax(0, 1fr) clamp(230px, 18vw, 310px);
+  grid-template-columns: var(--mdc2-nav-col, var(--mdc2-nav-w)) minmax(0, 1fr) var(--mdc2-lat-col, var(--mdc2-lat-w));
   gap: var(--mdc2-gap);
 }
 .mdc2-nav,
@@ -417,7 +422,7 @@ body.theme-blue .mdc2-overlay {
   flex-direction: column;
   gap: var(--mdc2-gap);
 }
-.mdc2-card { padding: clamp(5px, 1.5vh, 18px) clamp(10px, 1vw, 18px); flex-shrink: 0; }
+.mdc2-card { padding: var(--mdc2-card-pad-y) var(--mdc2-card-pad-x); flex-shrink: 0; }
 .mdc2-card-titulo {
   display: flex;
   align-items: center;
@@ -428,8 +433,8 @@ body.theme-blue .mdc2-overlay {
   font-size: clamp(12px, 1.85vh, 15px);
 }
 .mdc2-card-icone {
-  width: clamp(20px, 3.6vh, 32px);
-  height: clamp(20px, 3.6vh, 32px);
+  width: var(--mdc2-card-icone);
+  height: var(--mdc2-card-icone);
   border-radius: 10px;
   display: grid;
   place-items: center;
@@ -503,6 +508,117 @@ body.theme-blue .mdc2-overlay {
   .mdc2-card-titulo { margin-bottom: 0; }
   .mdc2-card-botoes { display: grid; grid-template-columns: 1fr 1fr; }
   .mdc2-card-botoes > :first-child { grid-column: 1 / -1; }
+}
+
+/* ---------- Menus laterais recolhidos (só ícones) ----------
+   Classes no .mdc2-overlay (JS, preferência salva por lado). Só em telas largas: abaixo
+   de 1181px o layout é outro e os botões de recolher somem.
+   Menu esquerdo: a coluna encolhe até sobrar só a coluna dos ícones — que não mudam de
+   lugar —, e os textos esmaecem.
+   Lateral direita: os cartões mantêm altura e posição (o conteúdo tem largura fixa,
+   então não reflui) e só o ícone fica visível, centralizado no cartão; ao expandir, ele
+   desliza para cima até o título e o conteúdo aparece em seguida. */
+.mdc2-overlay .mdc2-nav .mdc2-recolher,
+.mdc2-overlay .mdc2-lateral .mdc2-recolher { display: none !important; }
+@media (min-width: 1181px) {
+  .mdc2-main { transition: grid-template-columns 0.35s ease; }
+  .mdc2-overlay.mdc2-nav-recolhida { --mdc2-nav-col: 64px; }
+  .mdc2-overlay.mdc2-lateral-recolhida { --mdc2-lat-col: calc(var(--mdc2-card-icone) + 2 * var(--mdc2-card-pad-x) + 2px); }
+
+  /* Botões de recolher, no topo de cada lateral, no alinhamento dos ícones */
+  .mdc2-overlay .mdc2-nav .mdc2-recolher,
+  .mdc2-overlay .mdc2-lateral .mdc2-recolher { display: flex !important; flex-shrink: 0; cursor: pointer; }
+  .mdc2-recolher > i { transition: transform 0.35s ease; }
+  .mdc2-nav-recolhida .mdc2-nav .mdc2-recolher > i,
+  .mdc2-lateral-recolhida .mdc2-lateral .mdc2-recolher > i { transform: rotate(180deg); }
+  .mdc2-overlay .mdc2-nav .mdc2-recolher {
+    background: transparent !important;
+    border-color: transparent !important;
+    color: var(--mdc2-texto-suave) !important;
+  }
+  .mdc2-overlay .mdc2-nav .mdc2-recolher:hover { background: rgba(var(--mdc2-acc-rgb), 0.10) !important; }
+  .mdc2-lateral .mdc2-recolher {
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    height: var(--mdc2-btn-altura);
+    padding: 0 var(--mdc2-card-pad-x);
+    overflow: hidden;
+    white-space: nowrap;
+    color: var(--mdc2-texto-suave);
+    font-size: var(--mdc2-fonte);
+    font-weight: 600;
+    transition: color 0.15s;
+  }
+  .mdc2-lateral .mdc2-recolher:hover { color: var(--mdc2-acc); }
+  .mdc2-lateral .mdc2-recolher > i { width: var(--mdc2-card-icone); text-align: center; color: var(--mdc2-acc); flex-shrink: 0; }
+
+  /* Textos que esmaecem: somem rápido ao recolher, voltam depois do movimento ao expandir */
+  .mdc2-nav-titulo,
+  .mdc2-lateral .mdc2-recolher > span,
+  .mdc2-card-titulo-texto,
+  .mdc2-card > :not(.mdc2-card-titulo):not(.mdc2-card-botoes),
+  .mdc2-card-botoes > * {
+    transition: opacity 0.25s ease 0.12s, visibility 0s linear 0s;
+  }
+  .mdc2-nav-recolhida .mdc2-nav-titulo,
+  .mdc2-lateral-recolhida .mdc2-lateral .mdc2-recolher > span,
+  .mdc2-lateral-recolhida .mdc2-card-titulo-texto,
+  .mdc2-lateral-recolhida .mdc2-card > :not(.mdc2-card-titulo):not(.mdc2-card-botoes),
+  .mdc2-lateral-recolhida .mdc2-card-botoes > * {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.15s ease, visibility 0s linear 0.15s;
+  }
+
+  /* Menu esquerdo recolhido */
+  .mdc2-nav-titulo { overflow: hidden; white-space: nowrap; }
+  .mdc2-overlay .mdc2-nav button { overflow: hidden; }
+  .mdc2-overlay.mdc2-nav-recolhida .mdc2-nav button { white-space: nowrap; }
+  .mdc2-overlay.mdc2-nav-recolhida .mdc2-nav button,
+  .mdc2-overlay.mdc2-nav-recolhida .mdc2-nav button:hover,
+  .mdc2-overlay.mdc2-nav-recolhida .mdc2-nav #btnAdicionarAula { color: transparent !important; }
+  .mdc2-overlay.mdc2-nav-recolhida .mdc2-nav #btnColunasAula .fa-chevron-down { opacity: 0; }
+  /* "Colunas" abre flutuando ao lado, por cima da tabela */
+  .mdc2-overlay.mdc2-nav-recolhida .mdc2-nav { overflow: visible; position: relative; z-index: 2; }
+  .mdc2-overlay.mdc2-nav-recolhida .mdc2-nav #menuColunasAula {
+    position: absolute !important;
+    top: 0 !important;
+    left: calc(100% + 20px) !important;
+    margin-top: 0 !important;
+    background: #fff !important;
+    box-shadow: 0 10px 30px rgba(17, 24, 39, 0.15) !important;
+  }
+
+  /* Lateral direita: ícone do cartão posicionado à parte para poder deslizar */
+  .mdc2-card { position: relative; overflow: hidden; }
+  .mdc2-card > :not(.mdc2-card-botoes),
+  .mdc2-overlay .mdc2-lateral .mdc2-card-botoes > * {
+    width: calc(var(--mdc2-lat-w) - 2 * var(--mdc2-card-pad-x) - 2px);
+    flex-shrink: 0;
+  }
+  .mdc2-card-titulo {
+    min-height: var(--mdc2-card-icone);
+    padding-left: calc(var(--mdc2-card-icone) + 10px);
+    white-space: nowrap;
+  }
+  .mdc2-card-icone {
+    position: absolute;
+    top: var(--mdc2-card-pad-y);
+    left: var(--mdc2-card-pad-x);
+    transform: translateY(0);
+    transition: top 0.35s ease, transform 0.35s ease;
+  }
+  .mdc2-lateral-recolhida .mdc2-card { cursor: pointer; }
+  .mdc2-lateral-recolhida .mdc2-card-icone { top: 50%; transform: translateY(-50%); }
+}
+@media (max-height: 560px) and (min-width: 1181px) {
+  .mdc2-card-titulo { padding-left: 0; min-height: 0; }
+  .mdc2-lateral-recolhida .mdc2-card-icone { display: grid; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mdc2-main, .mdc2-recolher > i, .mdc2-card-icone, .mdc2-nav-titulo, .mdc2-card-titulo-texto,
+  .mdc2-lateral .mdc2-recolher > span, .mdc2-card > *, .mdc2-card-botoes > * { transition: none !important; }
 }
 
 /* Telas médias: cartões descem para baixo da tabela, em linha */
