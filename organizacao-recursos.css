@@ -405,14 +405,31 @@ body.or-aberto #barra-inferior, body.or-aberto #menu-toggle { display: none !imp
 .or-app .entry-table th:nth-child(4) { width: 22%; }
 .or-app .entry-table th:last-child { width: 6%; }
 @media (max-width: 480px) {
-  .or-app .entry-table th:first-child { width: 31%; }
-  .or-app .entry-table th:nth-child(2) { width: 20%; }
-  .or-app .entry-table th:nth-child(3) { width: 26%; }
-  .or-app .entry-table th:nth-child(4) { width: 16%; }
-  .or-app .entry-table th:last-child { width: 7%; }
-  .or-app .entry-table .date-cell { padding: 0 3px; }
+  /* Celular: cada lançamento em duas linhas —
+     [ descrição + anotações | excluir ] / [ valor | data | área (ícone) ] */
+  .or-app .entry-table, .or-app .entry-table tbody { display: block; width: 100%; min-width: 0; }
+  .or-app .entry-table thead { display: none; }
+  .or-app .entry-table tr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 30px 34px; grid-template-areas: "desc desc desc del" "valor data area area"; gap: 6px; margin-bottom: 8px; padding: 8px; border-radius: 12px; background: rgba(243, 240, 236, .55); border: 1px solid #efe9e2; }
+  .or-app .entry-table td { display: block; padding: 0; min-width: 0; }
+  .or-app .entry-table td:nth-child(1) { grid-area: desc; }
+  .or-app .entry-table td:nth-child(2) { grid-area: valor; }
+  .or-app .entry-table td:nth-child(3) { grid-area: data; }
+  .or-app .entry-table td:nth-child(4) { grid-area: area; }
+  .or-app .entry-table td:nth-child(5) { grid-area: del; align-self: center; }
+  .or-app .entry-table input, .or-app .money-input, .or-app .area-trigger { height: 34px; font-size: 12px; }
+  .or-app .entry-table tr input { background: #fff; }
+  .or-app .money-input { min-width: 0; background: #fff; }
+  .or-app .money-input span { font-size: 10px; }
+  .or-app .area-trigger { background: #fff; justify-content: center; gap: 3px; }
+  .or-app .area-trigger > span:nth-child(2) { display: none; }
+  .or-app .area-trigger svg:last-child { margin-left: 0; }
+  .or-app .money-input input { font-size: 11px; }
+  .or-app .money-input input::-webkit-inner-spin-button, .or-app .money-input input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  .or-app .money-input input[type="number"] { -moz-appearance: textfield; }
+  .or-app .entry-table .date-cell { font-size: 11px !important; padding: 0 4px; }
   .or-app .entry-table .date-cell::-webkit-calendar-picker-indicator { display: none; }
-  .or-app .area-trigger > span:not(.area-icon) { display: none; }
-  .or-app .area-trigger { justify-content: center; gap: 2px; }
+  .or-app .details-button { width: 34px; height: 34px; flex: 0 0 34px; }
+  .or-app .delete-row { width: 34px; height: 34px; }
 }
+
 
