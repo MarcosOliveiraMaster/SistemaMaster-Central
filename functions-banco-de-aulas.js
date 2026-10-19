@@ -608,7 +608,9 @@ function computeAndRenderFilters() {
   // Pagamento
   const pagamento = document.getElementById('filter-pagamento')?.value;
   if (pagamento) {
-    result = result.filter(aula => aula.statusPagamento === pagamento);
+    // A opção "Pagamento Pendente" (valor "Aguardando 1º Pagamento") também traz o status "Pagamento pendente".
+    result = result.filter(aula => aula.statusPagamento === pagamento ||
+      (pagamento === 'Aguardando 1º Pagamento' && aula.statusPagamento === 'Pagamento pendente'));
     partes.push('💰 pagamento');
   }
 

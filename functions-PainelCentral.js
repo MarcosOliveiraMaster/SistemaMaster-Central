@@ -1484,7 +1484,13 @@ function _pgtoTimestampToDate(valor) {
 // - "Pix dividido" -> pendente só quando statusPagamento for "Aguardando 1º/2º Pagamento"
 //   (qualquer outro valor, incluindo "Pagamento completo" ou algo não reconhecido, não é pendente).
 // - vazio ou qualquer valor fora dessas 3 opções -> método ainda não definido, sempre pendente.
+// - statusPagamento "Pagamento pendente" (escolhido no Editar contratação) -> pendente em qualquer método.
+function _pgtoStatusPendenteManual(contrato) {
+  return (contrato.statusPagamento || '').trim().toLowerCase() === 'pagamento pendente';
+}
+
 function _pgtoPagamentoEstaPendente(contrato) {
+  if (_pgtoStatusPendenteManual(contrato)) return true;
   const modoPg = (contrato.modoPagamento || '').trim().toLowerCase();
   if (modoPg === 'pix completo' || modoPg === 'cartão de crédito') return false;
   if (modoPg !== 'pix dividido') return true;
@@ -1508,6 +1514,11 @@ function _pgtoDataNoMesSelecionado(d) {
 
 function _pgtoContratoNoMesSelecionado(contrato, situacao) {
   if (situacao === 'pagamento') {
+    // "Pagamento pendente": mês da 1ª parcela; sem ela, a data da contratação.
+    if (_pgtoStatusPendenteManual(contrato)) {
+      const d1 = _pgtoTimestampToDate(contrato.dataPrimeiraParcela);
+      return _pgtoDataNoMesSelecionado(d1 || _pgtoTimestampToDate(contrato.timestamp));
+    }
     const modoPg = (contrato.modoPagamento || '').trim().toLowerCase();
 
     // Método ainda não definido: usa a data de criação da contratação como mês de referência
@@ -1695,6 +1706,7 @@ function formatarDataContrato(timestamp) {
 // Rótulo e cor exibidos na coluna "Pagamento", derivados de modoPagamento (+ statusPagamento
 // quando o método for "Pix dividido") — mesma regra usada em _pgtoPagamentoEstaPendente.
 function _pgtoLabelStatusPagamento(contrato) {
+  if (_pgtoStatusPendenteManual(contrato)) return { texto: 'Pendente', cor: 'bg-red-100 text-red-700' };
   const modoPg = (contrato.modoPagamento || '').trim().toLowerCase();
   if (modoPg === 'pix completo' || modoPg === 'cartão de crédito') {
     return { texto: 'Pagamento completo', cor: 'bg-green-100 text-green-700' };

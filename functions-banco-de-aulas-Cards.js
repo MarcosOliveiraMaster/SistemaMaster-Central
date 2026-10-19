@@ -1982,6 +1982,23 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
   // Função para abrir modal de edição
   function openEditModal(aula) {
     console.log('✏️ Abrindo modal de edição para:', aula.id);
+
+    // Status do pagamento: sempre um dropdown, com "Pagamento pendente" em qualquer método.
+    // Pix dividido mantém as parcelas; nos demais métodos o padrão continua "Pagamento completo".
+    function htmlStatusPagamento(metodo, statusAtual) {
+      const opcoes = metodo === 'Pix dividido'
+        ? ['Aguardando 1º Pagamento', 'Aguardando 2º Pagamento', 'Pagamento completo', 'Pagamento pendente']
+        : ['Pagamento completo', 'Pagamento pendente'];
+      return `
+        <select 
+          id="status-pagamento" 
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+        >
+          ${opcoes.map(o => `<option value="${o}" ${statusAtual === o ? 'selected' : ''}>${o}</option>`).join('')}
+        </select>
+        ${metodo === 'Pix dividido' ? '' : '<p class="text-xs text-gray-500 mt-1">Para métodos não Pix dividido, o padrão é "Pagamento completo"; use "Pagamento pendente" enquanto o pagamento não for confirmado.</p>'}
+      `;
+    }
     
     // HTML do modal de edição
     const modalHtml = `
@@ -2065,25 +2082,7 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
                       Status do Pagamento
                     </label>
                     <div id="container-status-pagamento">
-                      ${aula.modoPagamento === 'Pix dividido' ? `
-                        <select 
-                          id="status-pagamento" 
-                          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-                        >
-                          <option value="Aguardando 1º Pagamento" ${aula.statusPagamento === 'Aguardando 1º Pagamento' ? 'selected' : ''}>Aguardando 1º Pagamento</option>
-                          <option value="Aguardando 2º Pagamento" ${aula.statusPagamento === 'Aguardando 2º Pagamento' ? 'selected' : ''}>Aguardando 2º Pagamento</option>
-                          <option value="Pagamento completo" ${aula.statusPagamento === 'Pagamento completo' ? 'selected' : ''}>Pagamento completo</option>
-                        </select>
-                      ` : `
-                        <input 
-                          type="text" 
-                          id="status-pagamento" 
-                          value="Pagamento completo" 
-                          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                          readonly
-                        />
-                        <p class="text-xs text-gray-500 mt-1">Para métodos não Pix dividido, o status é automaticamente "Pagamento completo"</p>
-                      `}
+                      ${htmlStatusPagamento(aula.modoPagamento, aula.statusPagamento)}
                     </div>
                   </div>
                   
@@ -2176,31 +2175,11 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
     
     // Evento para mudança no método de pagamento
     metodoPagamentoSelect.addEventListener('change', function() {
-      const metodoSelecionado = this.value;
-      
-      if (metodoSelecionado === 'Pix dividido') {
-        containerStatusPagamento.innerHTML = `
-          <select 
-            id="status-pagamento" 
-            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-          >
-            <option value="Aguardando 1º Pagamento" ${aula.statusPagamento === 'Aguardando 1º Pagamento' ? 'selected' : ''}>Aguardando 1º Pagamento</option>
-            <option value="Aguardando 2º Pagamento" ${aula.statusPagamento === 'Aguardando 2º Pagamento' ? 'selected' : ''}>Aguardando 2º Pagamento</option>
-            <option value="Pagamento completo" ${aula.statusPagamento === 'Pagamento completo' ? 'selected' : ''}>Pagamento completo</option>
-          </select>
-        `;
-      } else {
-        containerStatusPagamento.innerHTML = `
-          <input 
-            type="text" 
-            id="status-pagamento" 
-            value="Pagamento completo" 
-            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-500"
-            readonly
-          />
-          <p class="text-xs text-gray-500 mt-1">Para métodos não Pix dividido, o status é automaticamente "Pagamento completo"</p>
-        `;
-      }
+      // "Pagamento pendente" continua selecionado ao trocar de método; os demais seguem a regra de antes.
+      const atual = containerStatusPagamento.querySelector('#status-pagamento');
+      const status = atual && atual.value === 'Pagamento pendente' ? 'Pagamento pendente'
+        : (this.value === 'Pix dividido' ? aula.statusPagamento : 'Pagamento completo');
+      containerStatusPagamento.innerHTML = htmlStatusPagamento(this.value, status);
     });
     
     // Adicionar máscara de data aos campos
