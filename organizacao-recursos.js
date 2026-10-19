@@ -716,11 +716,12 @@
     const saldo = sim.saldoInicial - tot.gasto;
     return `<div class="page-content dashboard-page">
       <div class="breadcrumb-row"><button type="button" class="back-button" data-acao="visao-geral">${ic('arrow-left', 16)} Todas as simulações</button><div class="dashboard-actions"><button type="button" class="secondary-button compact" data-acao="analise">${ic('sliders-horizontal', 15)} Análise por área</button><button type="button" class="secondary-button compact" data-acao="editar-sim">${ic('edit3', 15)} Editar simulação</button><button type="button" class="primary-button compact" data-acao="nova-tabela">${ic('plus', 16)} Nova tabela</button></div></div>
-      <div class="dashboard-title-row"><div><span class="eyebrow">Simulação ativa <span class="eyebrow-dot"></span></span><h1>${esc(sim.titulo)}</h1><div class="simulation-subline"><span>${ic('calendar-days', 14)} ${fmtData(sim.dataInicio)} — ${fmtData(sim.dataFim)}</span><span class="description-preview">${esc(textoDescricao(sim.descricao, 170))}</span></div></div><div class="balance-hero"><span>Saldo projetado</span><strong data-ref="saldo">${moeda(saldo)}</strong><small>${ic('trending-down', 14)} <span data-ref="saldo-detalhe">${tot.gasto > 0 ? `${moeda(tot.gasto)} em despesas acompanhadas` : 'Adicione sua primeira despesa'}</span></small></div></div>
+      <div class="dashboard-title-row"><div><span class="eyebrow">Simulação ativa <span class="eyebrow-dot"></span></span><h1>${esc(sim.titulo)}</h1><div class="simulation-subline"><span>${ic('calendar-days', 14)} ${fmtData(sim.dataInicio)} — ${fmtData(sim.dataFim)}</span><span class="description-preview">${esc(textoDescricao(sim.descricao, 170))}</span></div></div></div>
       <div class="metrics-grid">
         ${htmlMetrica('circle-dollar-sign', 'Saldo inicial', moeda(sim.saldoInicial), 'neutral', 'valor recebido', '')}
         ${htmlMetrica('trending-down', 'Investimento', moeda(tot.gasto), 'negative', 'saídas acompanhadas', 'gasto')}
         ${htmlMetrica('receipt-text', 'Lançamentos', String(tot.lancamentos).padStart(2, '0'), 'neutral', 'em todas as tabelas', 'qtd')}
+        <div class="metric-card or-metric-saldo"><div class="metric-topline"><span class="metric-icon">${ic('wallet', 18)}</span><span class="metric-label">Saldo projetado</span></div><strong data-ref="saldo">${moeda(saldo)}</strong><span class="metric-detail" data-ref="saldo-detalhe">${tot.gasto > 0 ? `${moeda(tot.gasto)} em despesas acompanhadas` : 'Adicione sua primeira despesa'}</span></div>
       </div>
       <section class="chart-card soft-card"><div class="section-heading"><div><span class="eyebrow">Visão acumulada</span><h2>Evolução do saldo</h2></div><div class="chart-legend"><span><i class="legend-line"></i> Saldo projetado</span><span><i class="legend-dot"></i> Atualizado agora</span></div></div><div class="chart-wrap"><canvas id="or-grafico-saldo" aria-label="Gráfico da evolução do saldo"></canvas></div><div class="chart-caption"><span><span class="caption-arrow">↗</span> Sua projeção parte de ${moeda(sim.saldoInicial)} e considera os lançamentos abaixo.</span><span>Arraste uma tabela pelo título para reorganizar os meses.</span></div></section>
       <section class="tables-section"><div class="tables-heading"><div><span class="eyebrow">Organização por período</span><h2>Meses da simulação</h2><p>Acompanhe apenas os meses cadastrados e filtre por descrição, mês ou ano.</p></div><div class="tables-tools"><label class="table-filter">${ic('search', 15)}<input data-campo="busca-tabelas" value="${esc(S.buscaTabelas)}" placeholder="Descrição, mês ou ano" /></label><button type="button" class="text-button" data-acao="nova-tabela">${ic('plus', 16)} Adicionar tabela</button></div></div><div class="tables-scroller"><div class="monthly-grid" data-ref="grade-tabelas">${htmlGradeTabelas(sim)}</div></div></section>
@@ -974,6 +975,9 @@
       const { rotulos, valores } = dadosGrafico(sim);
       graficoSaldo.data.labels = rotulos;
       graficoSaldo.data.datasets[0].data = valores;
+      const { min, max } = limitesEixo(valores);
+      graficoSaldo.options.scales.y.min = min;
+      graficoSaldo.options.scales.y.max = max;
       graficoSaldo.update('none');
     }
   }
@@ -999,6 +1003,14 @@
       valores.push(acumulado);
     });
     return { rotulos, valores };
+  }
+
+  // Teto = saldo inicial (ou o maior valor, se houver); piso = 0, descendo
+  // abaixo de zero só se o saldo ficar negativo
+  function limitesEixo(valores) {
+    const max = Math.max(...valores, 0);
+    const min = Math.min(...valores, 0);
+    return { min, max: max > min ? max : min + 1 };
   }
 
   function tooltipSaldo(contexto) {
@@ -1054,7 +1066,9 @@
         plugins: { legend: { display: false }, datalabels: { display: false }, tooltip: { enabled: false, external: tooltipSaldo } },
         scales: {
           x: { grid: { display: false, drawBorder: false }, ticks: { color: '#9b9389', font: { size: 11 }, padding: 9 } },
-          y: { grid: { color: '#ebe6df', borderDash: [4, 5], drawBorder: false }, ticks: { color: '#9b9389', font: { size: 11 }, callback: eixoMoeda, maxTicksLimit: 6 } }
+          // Escala fixa de 0 até o saldo inicial: cada gasto desce a linha na
+          // proporção do valor (sem zoom automático que exagerava quedas pequenas)
+          y: { min: limitesEixo(valores).min, max: limitesEixo(valores).max, grid: { color: '#ebe6df', borderDash: [4, 5], drawBorder: false }, ticks: { color: '#9b9389', font: { size: 11 }, callback: eixoMoeda, maxTicksLimit: 6 } }
         }
       }
     });

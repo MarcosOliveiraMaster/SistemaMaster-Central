@@ -462,3 +462,19 @@ body.or-aberto #barra-inferior, body.or-aberto #menu-toggle { display: none !imp
   .or-app .or-icones-rapidos { flex-basis: 100%; justify-content: flex-start; }
   .or-app .or-icones-pop { left: 0; right: auto; width: min(284px, calc(100vw - 72px)); }
 }
+
+/* Saldo projetado como 4º card da linha de métricas (antes ficava solto no
+   título e a linha de 4 colunas tinha só 3 cards) */
+.or-app .metric-card.or-metric-saldo { background: #fff3e7; border-color: #ffe0c7; box-shadow: 5px 6px 15px rgba(225, 157, 105, .12); }
+.or-app .or-metric-saldo .metric-label { color: #b37d5c; }
+.or-app .or-metric-saldo > strong { color: var(--orange-deep); }
+.or-app .or-metric-saldo .metric-icon { color: var(--orange-deep); }
+
+/* Campo de valor: o destaque de foco envolve o campo inteiro (com o "R$"),
+   em vez de um contorno no input interno cortado pelo prefixo */
+.or-app .entry-table .money-input { border: 1px solid transparent; }
+.or-app .entry-table .money-input:focus-within { border-color: #ffc59d; box-shadow: 0 0 0 2px #fff1e7; background: #fff; }
+.or-app .entry-table .money-input input, .or-app .entry-table .money-input input:focus { height: 100%; border: 0; box-shadow: none; background: transparent; }
+.or-app .money-input input::-webkit-inner-spin-button, .or-app .money-input input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.or-app .money-input input[type="number"] { -moz-appearance: textfield; }
+
