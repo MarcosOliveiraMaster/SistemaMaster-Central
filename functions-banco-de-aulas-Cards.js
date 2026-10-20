@@ -6453,8 +6453,9 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
       } else if (aula['valor-aula'] !== undefined) {
         valorAula = typeof aula['valor-aula'] === 'string' ? parseFloat(aula['valor-aula'].replace(/[^0-9,.-]+/g, '').replace(',', '.')) : Number(aula['valor-aula']);
       }
+      // divergente: horário sugerido pelo professor numa contraproposta (borda amarela leve).
       linhasAulasHtml += `
-        <tr class="${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}">
+        <tr class="${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}"${aula.divergente ? ' style="background:#fffbeb;outline:1.5px solid #fcd34d;outline-offset:-1.5px;" title="Data ou horário sugerido pelo professor"' : ''}>
           ${colunasVisiveis.includes('data') ? `<td class="py-2 px-3 text-sm border-r border-gray-200">${aula.data}</td>` : ''}
           ${colunasVisiveis.includes('horario') ? `<td class="py-2 px-3 text-sm text-center border-r border-gray-200">${aula.horario}</td>` : ''}
           ${colunasVisiveis.includes('duracao') ? `<td class="py-2 px-3 text-sm text-center border-r border-gray-200">${aula.duracao}</td>` : ''}
