@@ -953,7 +953,9 @@ async function addListaTarefas(data) {
   }
 }
 
-// Função para buscar todas as listas de tarefas (usado no grid do Calendário Master)
+// Função para buscar todas as listas de tarefas.
+// Lança o erro em vez de devolver [] — uma lista "vazia" por falha de leitura
+// fazia o modal criar listas duplicadas ou apagar a lista real.
 async function fetchListasTarefas() {
   try {
     const querySnapshot = await db.collection("listasTarefas").get();
@@ -962,7 +964,107 @@ async function fetchListasTarefas() {
     return listas;
   } catch (error) {
     console.error('❌ Erro ao buscar listas de tarefas:', error.message);
-    return [];
+    throw error;
+  }
+}
+
+// Listas de uma data ("dd/mm/yyyy") — normalmente 0 ou 1; mais de uma é
+// duplicata antiga, que o modal junta com mesclarListasTarefas
+async function fetchListasTarefasPorData(dataBR) {
+  try {
+    const snap = await db.collection("listasTarefas").where('data', '==', dataBR).get();
+    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  } catch (error) {
+    console.error('❌ Erro ao buscar lista de tarefas do dia:', error.message);
+    throw error;
+  }
+}
+
+// Listas de um mês (grid do Calendário Master). A data é gravada como texto
+// "dd/mm/yyyy", então busca pelas datas exatas do mês em lotes de 30 ("in").
+async function fetchListasTarefasDoMes(mes, ano) {
+  try {
+    const diasNoMes = new Date(ano, mes + 1, 0).getDate();
+    const mm = String(mes + 1).padStart(2, '0');
+    const datas = [];
+    for (let d = 1; d <= diasNoMes; d++) datas.push(`${String(d).padStart(2, '0')}/${mm}/${ano}`);
+    const lotes = [datas.slice(0, 30), datas.slice(30)].filter(l => l.length);
+    const snaps = await Promise.all(lotes.map(l => db.collection("listasTarefas").where('data', 'in', l).get()));
+    const listas = [];
+    snaps.forEach(snap => snap.forEach(doc => listas.push({ id: doc.id, ...doc.data() })));
+    return listas;
+  } catch (error) {
+    console.error('❌ Erro ao buscar listas de tarefas do mês:', error.message);
+    throw error;
+  }
+}
+
+async function fetchListaTarefas(listaId) {
+  try {
+    const doc = await db.collection("listasTarefas").doc(listaId).get();
+    return doc.exists ? { id: doc.id, ...doc.data() } : null;
+  } catch (error) {
+    console.error('❌ Erro ao buscar lista de tarefas:', error.message);
+    throw error;
+  }
+}
+
+// Junta listas duplicadas do mesmo dia na principal: cada item é recriado com o
+// MESMO id (parentId continua valendo) e apagado da lista de origem.
+async function mesclarListasTarefas(principalId, outrasIds) {
+  const colPrincipal = db.collection("listasTarefas").doc(principalId).collection("itens");
+  for (const outraId of outrasIds) {
+    const refOutra = db.collection("listasTarefas").doc(outraId);
+    const itensSnap = await refOutra.collection("itens").get();
+    let batch = db.batch();
+    let ops = 0;
+    for (const doc of itensSnap.docs) {
+      batch.set(colPrincipal.doc(doc.id), doc.data());
+      batch.delete(doc.ref);
+      ops += 2;
+      if (ops >= 400) { await batch.commit(); batch = db.batch(); ops = 0; }
+    }
+    batch.delete(refOutra);
+    await batch.commit();
+  }
+  return true;
+}
+
+// Apaga o doc da lista só se o servidor confirmar que ela não tem nenhum item —
+// a cópia local do modal pode estar desatualizada (outra pessoa editando junto).
+async function deleteListaTarefasSeVazia(listaId) {
+  try {
+    const ref = db.collection("listasTarefas").doc(listaId);
+    const itensSnap = await ref.collection("itens").limit(1).get();
+    if (!itensSnap.empty) return false;
+    await ref.delete();
+    return true;
+  } catch (error) {
+    console.error('❌ Erro ao excluir lista vazia de tarefas:', error.message);
+    throw error;
+  }
+}
+
+// Id novo de item, gerado no cliente — permite gravar uma árvore inteira num batch
+function novoIdItemTarefa(listaId) {
+  return db.collection("listasTarefas").doc(listaId).collection("itens").doc().id;
+}
+
+// Cria vários itens de uma vez (cópia de tarefa + subárvore): tudo ou nada.
+// Cada item já vem com "id" (novoIdItemTarefa) e nasce pendente.
+async function addItensTarefaEmLote(listaId, itensComId) {
+  try {
+    const col = db.collection("listasTarefas").doc(listaId).collection("itens");
+    const agora = firebase.firestore.FieldValue.serverTimestamp();
+    const batch = db.batch();
+    itensComId.forEach(({ id, ...dados }) => {
+      batch.set(col.doc(id), { ...dados, status: 'pendente', criadoEm: agora, ultimaEdicao: agora });
+    });
+    await batch.commit();
+    return true;
+  } catch (error) {
+    console.error('❌ Erro ao copiar itens da lista de tarefas:', error.message);
+    throw error;
   }
 }
 
@@ -1022,7 +1124,7 @@ async function fetchItensTarefa(listaId) {
     return itens;
   } catch (error) {
     console.error('❌ Erro ao buscar itens da lista de tarefas:', error.message);
-    return [];
+    throw error;
   }
 }
 
@@ -1136,6 +1238,13 @@ if (typeof window !== 'undefined') {
     deleteEventoCalendario,
     addListaTarefas,
     fetchListasTarefas,
+    fetchListasTarefasPorData,
+    fetchListasTarefasDoMes,
+    fetchListaTarefas,
+    mesclarListasTarefas,
+    deleteListaTarefasSeVazia,
+    novoIdItemTarefa,
+    addItensTarefaEmLote,
     updateListaTarefasData,
     atualizarAgregadosListaTarefas,
     deleteListaTarefas,

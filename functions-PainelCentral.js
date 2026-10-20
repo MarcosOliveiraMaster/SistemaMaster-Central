@@ -2777,9 +2777,11 @@ function _calMasterBRparaISO(br) {
   return `${m[3]}-${m[2]}-${m[1]}`;
 }
 
+let calMasterGeracaoRender = 0;
 async function renderGradeCalendarioMaster() {
   const grid = document.getElementById('calMaster-grid');
   if (!grid) return;
+  const geracaoRender = ++calMasterGeracaoRender;
 
   grid.innerHTML = `
     <div class="cal-master-loading">
@@ -2939,6 +2941,9 @@ async function renderGradeCalendarioMaster() {
   }
 
   await Promise.all(promessas);
+  // Trocou de mês (ou redesenhou de novo) enquanto este carregava: a resposta
+  // atrasada não pode pintar os eventos do mês antigo por cima do atual.
+  if (geracaoRender !== calMasterGeracaoRender) return;
 
   // Ordenar eventos de cada dia por horário
   Object.keys(eventosPorDia).forEach(dia => {

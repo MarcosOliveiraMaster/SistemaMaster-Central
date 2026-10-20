@@ -235,7 +235,11 @@ function _cmAbrirSeletorHora(valorAtual, onConfirmar) {
   const fechar = () => container.remove();
   modal.querySelector('#cmHoraBtnX').addEventListener('click', fechar);
   modal.querySelector('#cmHoraBtnCancelar').addEventListener('click', fechar);
-  modal.addEventListener('click', (e) => { if (e.target === modal) fechar(); });
+  // Só fecha pelo fundo se o clique começou no fundo (arrastar o ponteiro do
+  // relógio e soltar fora gerava um "click" no fundo e descartava a escolha)
+  let pressionouNoFundo = false;
+  modal.addEventListener('pointerdown', (e) => { pressionouNoFundo = e.target === modal; });
+  modal.addEventListener('click', (e) => { if (e.target === modal && pressionouNoFundo) fechar(); });
   modal.querySelector('#cmHoraBtnOk').addEventListener('click', () => {
     const valor = _cm12para24(hora12, minuto, periodo);
     fechar();
@@ -421,10 +425,10 @@ let cmProfessoresAtivosCache = null;
 let cmProfessoresAtivosCacheTimestamp = 0;
 const CM_PROFESSORES_ATIVOS_TTL = 5 * 60 * 1000;
 
-// Mesmo critério usado em "BD professores" (dashboardProfessores.js): sem status
-// definido conta como ativo, só "Desligado" (sem acento/caixa) é excluído.
+// Mesmo critério do Match e do "Enviar proposta": sem status definido conta
+// como ativo; Desligado, Suspenso, Inativo, Férias etc. ficam de fora.
 function _cmProfessorEstaAtivo(p) {
-  return _cmNormalizarBusca(p.status || '') !== 'desligado';
+  return _cmNormalizarBusca(p.status || 'Ativo') === 'ativo';
 }
 
 async function _cmBuscarProfessoresAtivos() {
@@ -698,38 +702,75 @@ async function _cmAbrirDetalhesProfessor(professorId) {
 // GRID DO CALENDÁRIO — barra de progresso acima do quadrado do dia
 // ============================================================
 
+// Cada carregamento ganha um número: trocar de mês rápido dispara vários em
+// paralelo, e só o mais recente pode gravar no cache (que é indexado só pelo dia
+// — uma resposta atrasada de outubro pintaria as barras de novembro).
+let cmTarefasGeracaoCache = 0;
+
 async function carregarCacheDoMes(mes, ano) {
-  cmTarefasCacheDia = {};
+  const geracao = ++cmTarefasGeracaoCache;
   let listas = [];
   try {
-    listas = await BANCO.fetchListasTarefas();
+    listas = await BANCO.fetchListasTarefasDoMes(mes, ano);
   } catch (error) {
     console.error('❌ Erro ao carregar listas de tarefas do mês:', error);
+    if (geracao === cmTarefasGeracaoCache) cmTarefasCacheDia = {};
     return;
   }
 
-  const listasDoMes = listas.filter(l => {
-    const d = _parseDataAula(l.data);
-    return d && d.getMonth() === mes && d.getFullYear() === ano;
-  });
-
-  await Promise.all(listasDoMes.map(async (lista) => {
+  const novoCache = {};
+  await Promise.all(listas.map(async (lista) => {
     let itens = [];
     try {
       itens = await BANCO.fetchItensTarefa(lista.id);
     } catch (error) {
       console.error('❌ Erro ao carregar itens da lista de tarefas:', error);
     }
-    const nivel1 = itens
-      .filter(i => i.nivel === 1)
-      .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0))
-      .slice(0, CM_TAREFAS_MAX_FATIAS);
     const d = _parseDataAula(lista.data);
     if (!d) return;
-    cmTarefasCacheDia[d.getDate()] = { listaId: lista.id, dataBR: lista.data, itens: nivel1 };
+    // Duas listas no mesmo dia (duplicata antiga) somam as tarefas em vez de uma
+    // esconder a outra; o modal junta as duas de vez ao abrir esse dia.
+    const atual = novoCache[d.getDate()];
+    novoCache[d.getDate()] = {
+      listaId: atual ? atual.listaId : lista.id,
+      dataBR: lista.data,
+      itens: (atual ? atual.itens : []).concat(itens.filter(i => i.nivel === 1))
+    };
   }));
 
+  if (geracao !== cmTarefasGeracaoCache) return;
+  Object.values(novoCache).forEach(info => {
+    info.itens = info.itens.sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0)).slice(0, CM_TAREFAS_MAX_FATIAS);
+  });
+  cmTarefasCacheDia = novoCache;
   iniciarAtualizacaoCores();
+}
+
+// Lista de uma data, já sem duplicatas: se houver mais de uma (bug antigo),
+// junta todas na mais antiga antes de devolver. null = o dia não tem lista.
+async function _cmResolverListaDoDia(dataBR) {
+  const listas = await BANCO.fetchListasTarefasPorData(dataBR);
+  if (!listas.length) return null;
+  if (listas.length === 1) return listas[0];
+  const ms = (l) => (l.timestamp && typeof l.timestamp.toMillis === 'function') ? l.timestamp.toMillis() : 0;
+  listas.sort((a, b) => ms(a) - ms(b));
+  const [principal, ...outras] = listas;
+  await BANCO.mesclarListasTarefas(principal.id, outras.map(l => l.id));
+  console.log(`🔀 ${outras.length} lista(s) de tarefas duplicada(s) de ${dataBR} juntada(s) em ${principal.id}`);
+  return principal;
+}
+
+// Criação da lista de um dia passa por aqui: uma só por data, mesmo com várias
+// chamadas ao mesmo tempo (tarefas salvando juntas, "copiar" com clique duplo).
+const cmCriandoListaPorData = {};
+function _cmGarantirListaDaData(dataBR) {
+  if (!cmCriandoListaPorData[dataBR]) {
+    cmCriandoListaPorData[dataBR] = (async () => {
+      const existente = await _cmResolverListaDoDia(dataBR);
+      return existente ? existente.id : await BANCO.addListaTarefas(dataBR);
+    })().finally(() => { delete cmCriandoListaPorData[dataBR]; });
+  }
+  return cmCriandoListaPorData[dataBR];
 }
 
 // Classe de cor da fatia da barra de progresso: concluído(verde) > cancelado(vermelho)
@@ -787,37 +828,32 @@ function abrirModalCriarTarefas() {
   abrirListaTarefas(null);
 }
 
-async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
-  const modoEdicao = !!listaIdExistente;
-  let listaIdAtual = listaIdExistente || null;
-  let dataAtualBR = dataPresetBR || '';
-  let itens = [];
+// Só um modal de tarefas por vez — clique duplo na barra do dia ou em "Criar
+// tarefas" abria dois modais empilhados, com ids repetidos.
+let cmTarefasModalAberto = false;
 
-  if (modoEdicao) {
-    try {
-      const [listas, itensCarregados] = await Promise.all([
-        BANCO.fetchListasTarefas(),
-        BANCO.fetchItensTarefa(listaIdExistente)
-      ]);
-      const listaAtual = listas.find(l => l.id === listaIdExistente);
-      dataAtualBR = listaAtual ? (listaAtual.data || '') : '';
-      itens = itensCarregados;
-      itens.forEach(i => { i._persisted = true; });
-    } catch (error) {
-      console.error('❌ Erro ao carregar tarefas:', error);
-      showToast('❌ Erro ao carregar tarefas', 'error');
-      return;
-    }
-  }
+async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
+  if (cmTarefasModalAberto) return;
+  cmTarefasModalAberto = true;
+
+  // O modal fica aberto ao trocar de dia. "dia" é o contexto do dia exibido e é
+  // substituído inteiro a cada troca; cada item guarda o contexto em que nasceu
+  // (item._dia), então um salvamento que termina depois da troca grava na lista
+  // certa e não mexe na tela do dia novo.
+  const novoContextoDia = (dataBR, listaId, itensDoDia) => ({ dataBR, listaId, itens: itensDoDia || [], fila: Promise.resolve(), erroCarregamento: false });
+  let dia = novoContextoDia(dataPresetBR || '', null, []);
+  let geracaoDia = 0;              // cresce a cada troca de dia; respostas atrasadas são descartadas
+  let dataSolicitada = dia.dataBR; // destino da última navegação (setas clicadas rápido somam dias)
+  let carregando = false;
+  let fechando = false;
+  let intervaloUrgencia = null;
 
   let editorAtual = _cmEditorAtual();
   const filtroPessoas = new Set();       // vazio = mostra todo mundo
   const filtroTags = new Set();          // vazio = mostra todas as tags
-  // ids com subárvore recolhida (só nesta sessão do modal) — ao abrir uma lista
-  // existente, todo item que tem filhos já começa recolhido
-  const recolhidos = new Set(
-    modoEdicao ? itens.filter(i => i.parentId).map(i => i.parentId) : []
-  );
+  // ids com subárvore recolhida (por dia) — ao abrir um dia, todo item que tem
+  // filhos já começa recolhido
+  const recolhidos = new Set();
   const comentariosAbertos = new Set();  // ids com o campo de comentário expandido
   let tagPopoverAbertoId = null;         // id do item com o popover de tags aberto (só 1 por vez)
   let funcoesAbertoId = null;            // id do item com a barra de ícones (tag/hora/comentário/etc.) aberta (só 1 por vez)
@@ -830,24 +866,28 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
   // popover de sugestão de clientes não está aberto
   let mencaoState = null;
 
+  const reduzirMovimento = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const telaDeToque = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+
   const modalHtml = `
-    <div class="modal-overlay" id="modalTarefasCalendario">
+    <div class="modal-overlay cm-tarefas-overlay" id="modalTarefasCalendario">
       <div class="modal-container cm-tarefas-modal">
         <div class="modal-header">
           <h3 class="font-lexend font-bold text-lg text-gray-800">
             <i class="fas fa-list-check text-pink-500 mr-2"></i>
-            ${modoEdicao ? 'Tarefas' : 'Criar tarefas'}
+            Tarefas
           </h3>
           <button class="modal-close text-gray-400 hover:text-gray-600">
             <i class="fas fa-times"></i>
           </button>
         </div>
         <div class="modal-body">
-          <div class="cm-dia-navegador">
+          <div class="cm-dia-navegador" id="cmDiaNavegador">
             <button type="button" id="cmDiaBtnAnterior" class="cm-dia-navegador-btn" title="Dia anterior"><i class="fas fa-chevron-left"></i></button>
             <div class="cm-dia-navegador-label" id="cmDiaNavegadorLabel">Selecione uma data</div>
             <button type="button" id="cmDiaBtnProximo" class="cm-dia-navegador-btn" title="Próximo dia"><i class="fas fa-chevron-right"></i></button>
           </div>
+          <div class="cm-tarefas-carregando" id="cmTarefasCarregando" aria-hidden="true"><span></span></div>
           <div class="cm-toolbar">
             <div class="cm-data-picker-wrap" id="cmDataPickerWrap">
               <button type="button" id="cmTarefasDataBtn" class="cm-data-picker-btn">
@@ -910,10 +950,10 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
               Nova Tarefa
             </button>
           </div>
-          <div id="cmTarefasLista" class="space-y-2"></div>
+          <div id="cmTarefasLista" class="cm-tarefas-lista space-y-2"></div>
         </div>
         <div class="modal-footer">
-          ${modoEdicao ? '<button id="cmTarefasBtnExcluirLista" class="btn-secondary btn-compact text-red-600 hover:bg-red-50"><i class="fas fa-trash mr-2"></i>Excluir lista</button>' : ''}
+          <button id="cmTarefasBtnExcluirLista" class="btn-secondary btn-compact text-red-600 hover:bg-red-50" style="display:none"><i class="fas fa-trash mr-2"></i>Excluir lista</button>
           <button id="cmTarefasBtnFechar" class="btn-secondary btn-compact">Fechar</button>
           <button id="cmTarefasBtnSalvarTudo" class="btn-primary btn-compact">
             <i class="fas fa-save mr-2"></i>
@@ -937,6 +977,7 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
   const btnFiltroMarcos = modal.querySelector('#cmFiltroMarcos');
   const btnFiltroEster = modal.querySelector('#cmFiltroEster');
   const botoesEditor = modal.querySelectorAll('.cm-editor-btn');
+  const barraCarregando = modal.querySelector('#cmTarefasCarregando');
 
   // ---- Popover genérico: só um aberto por vez, fecha ao clicar fora ----
   let popoverAberto = null; // { wrap, fechar }
@@ -959,16 +1000,71 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
     mencaoState = null;
   };
 
-  const closeModal = () => {
+  // ---- Filas de gravação ----
+  // Toda gravação de um item passa pela fila dele (item._fila), uma por vez: um
+  // item novo era criado DUAS vezes quando um segundo salvamento (sair do campo,
+  // Enter, autosave) começava antes do primeiro voltar do Firestore. Na fila, o
+  // segundo espera e vira uma atualização. Criar/apagar a lista do dia usa a
+  // fila do contexto do dia (dia.fila), pelo mesmo motivo.
+  const filasEmAndamento = new Set();
+  const rastrear = (p) => {
+    filasEmAndamento.add(p);
+    const remover = () => filasEmAndamento.delete(p);
+    p.then(remover, remover);
+    return p;
+  };
+  const enfileirarItem = (item, tarefa) => {
+    item._fila = (item._fila || Promise.resolve()).catch(() => {}).then(tarefa);
+    return rastrear(item._fila);
+  };
+  const enfileirarDia = (ctx, tarefa) => {
+    ctx.fila = ctx.fila.catch(() => {}).then(tarefa);
+    return rastrear(ctx.fila);
+  };
+  const aguardarFilas = async () => {
+    while (filasEmAndamento.size) await Promise.allSettled(Array.from(filasEmAndamento));
+  };
+
+  // Lista do dia no Firestore — criada só quando a 1ª tarefa é salva, uma única
+  // vez por data (_cmGarantirListaDaData também confere se já existe no servidor).
+  const garantirLista = (ctx) => enfileirarDia(ctx, async () => {
+    if (!ctx.listaId) ctx.listaId = await _cmGarantirListaDaData(ctx.dataBR);
+    if (ctx === dia) atualizarLabelData();
+    return ctx.listaId;
+  });
+
+  // ---- Fechar ----
+  const closeModal = async () => {
+    if (fechando) return;
+    fechando = true;
     document.removeEventListener('click', onClickForaDoPopover, true);
     fecharMencaoPopover();
-    if (cmModalIntervaloUrgencia) clearInterval(cmModalIntervaloUrgencia);
+    if (intervaloUrgencia) clearInterval(intervaloUrgencia);
+    modal.classList.add('cm-tarefas-saindo');
+    // Antes o modal sumia sem esperar o autosave (700ms) — o grid redesenhava
+    // com os dados antigos. Agora some na tela e só sai de vez depois de gravar.
+    try {
+      await flushPendentes();
+      await aguardarFilas();
+    } catch (error) {
+      console.error('❌ Erro ao salvar tarefas ao fechar:', error);
+    }
     container.remove();
+    cmTarefasModalAberto = false;
     if (typeof renderGradeCalendarioMaster === 'function') renderGradeCalendarioMaster();
   };
   modal.querySelector('.modal-close').addEventListener('click', closeModal);
   btnFechar.addEventListener('click', closeModal);
-  modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+  // Clique no fundo escuro só fecha se o toque/clique COMEÇOU no fundo: selecionar
+  // texto arrastando até fora do quadro gerava um "click" no fundo e fechava o
+  // modal. Em tela de toque o fundo não fecha (o teclado virtual reorganiza a
+  // tela e o toque seguinte caía no fundo) — só o X e o "Fechar".
+  let pressionouNoFundo = false;
+  modal.addEventListener('pointerdown', (e) => { pressionouNoFundo = e.target === modal; });
+  modal.addEventListener('click', (e) => {
+    if (e.target !== modal || !pressionouNoFundo || telaDeToque) return;
+    closeModal();
+  });
 
   // ---- Editando como ----
   const atualizarBotoesEditor = () => {
@@ -1054,87 +1150,177 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
     render();
   });
 
-  // ---- Navegador de dia (seta anterior/próximo, acima da toolbar) ----
+  // ---- Rótulos de data (navegador, botão do seletor) e estado dos botões ----
   const labelDiaNavegador = modal.querySelector('#cmDiaNavegadorLabel');
   const btnDiaAnterior = modal.querySelector('#cmDiaBtnAnterior');
   const btnDiaProximo = modal.querySelector('#cmDiaBtnProximo');
+  const dataLabel = modal.querySelector('#cmTarefasDataLabel');
 
-  // Fecha a lista atual (salvando qualquer edição pendente) e reabre já no dia
-  // vizinho — usa a lista existente daquele dia se houver, ou entra em modo
-  // "criar" com a data já preenchida, sem precisar abrir o seletor de novo.
-  const navegarParaDia = async (delta) => {
-    if (!dataAtualBR) {
+  const atualizarLabelData = (dataBR = dia.dataBR) => {
+    dataLabel.textContent = dataBR || 'Selecionar data';
+    btnNova.disabled = !dia.dataBR || carregando || dia.erroCarregamento;
+    btnExcluirLista.style.display = (!dia.listaId || carregando) ? "none" : "";
+    if (!dataBR) {
+      labelDiaNavegador.textContent = carregando ? 'Carregando...' : 'Selecione uma data';
+      return;
+    }
+    const d = _parseDataAula(dataBR);
+    labelDiaNavegador.textContent = d ? `${CM_TAREFAS_DIAS_SEMANA_COMPLETO[d.getDay()]}, ${dataBR}` : dataBR;
+  };
+
+  // ---- Transição entre dias: a lista sai deslizando pra cima com fade, a barra
+  // de carregamento aparece enquanto busca, e o dia novo entra de baixo pra cima ----
+  const DURACAO_SAIDA_MS = 180;
+  const animarSaidaLista = () => new Promise(resolve => {
+    if (reduzirMovimento) { resolve(); return; }
+    listaEl.classList.remove('cm-lista-entrando');
+    listaEl.classList.add('cm-lista-saindo');
+    setTimeout(resolve, DURACAO_SAIDA_MS);
+  });
+  const animarEntradaLista = () => {
+    listaEl.classList.remove('cm-lista-saindo');
+    if (reduzirMovimento) return;
+    listaEl.classList.add('cm-lista-entrando');
+    void listaEl.offsetWidth; // força reflow pra transição partir do estado "entrando"
+    listaEl.classList.remove('cm-lista-entrando');
+  };
+  const mostrarCarregando = (ativo) => {
+    carregando = ativo;
+    barraCarregando.classList.toggle('ativo', ativo);
+    atualizarLabelData(ativo ? dataSolicitada : dia.dataBR);
+  };
+
+  // Troca o dia exibido sem fechar o modal. O que estava em digitação no dia que
+  // sai é gravado em segundo plano (cada item grava na lista do próprio contexto).
+  const carregarDia = async (dataBR, opcoes = {}) => {
+    const geracao = ++geracaoDia;
+    dataSolicitada = dataBR;
+    fecharPopoverAberto();
+    fecharMencaoPopover();
+    if (document.activeElement && listaEl.contains(document.activeElement)) document.activeElement.blur();
+    flushPendentes();
+    mostrarCarregando(true);
+    const saida = animarSaidaLista();
+
+    let listaId = null;
+    let itensDoDia = [];
+    let erro = null;
+    try {
+      if (!dataBR && opcoes.listaId) {
+        const lista = await BANCO.fetchListaTarefas(opcoes.listaId);
+        dataBR = lista ? (lista.data || '') : '';
+        if (geracao === geracaoDia) dataSolicitada = dataBR;
+      }
+      if (dataBR) {
+        const lista = await _cmResolverListaDoDia(dataBR);
+        if (lista) {
+          listaId = lista.id;
+          itensDoDia = await BANCO.fetchItensTarefa(lista.id);
+        }
+      }
+    } catch (error) {
+      erro = error;
+    }
+    await saida;
+    if (geracao !== geracaoDia || fechando) return;
+
+    const ctx = novoContextoDia(dataBR, listaId, []);
+    if (erro) {
+      console.error('❌ Erro ao carregar tarefas do dia:', erro);
+      ctx.erroCarregamento = true;
+    }
+    ctx.itens = itensDoDia.map(i => ({ ...i, _persisted: true, _textoSalvo: i.texto, _dia: ctx }));
+    dia = ctx;
+    recolhidos.clear();
+    ctx.itens.forEach(i => { if (i.parentId) recolhidos.add(i.parentId); });
+    comentariosAbertos.clear();
+    funcoesAbertoId = null;
+    tagPopoverAbertoId = null;
+    copiarPopoverAbertoId = null;
+    if (dataBR) {
+      const base = _parseDataAula(dataBR);
+      if (base) { dataPickerMes = base.getMonth(); dataPickerAno = base.getFullYear(); }
+    }
+    mostrarCarregando(false);
+    render();
+    animarEntradaLista();
+  };
+
+  // ---- Navegador de dia (setas e deslizar o dedo) ----
+  const navegarParaDia = (delta) => {
+    const base = dataSolicitada || dia.dataBR;
+    if (!base) {
       showToast('Selecione uma data primeiro', 'error');
       return;
     }
-    await flushPendentes();
-    const novaData = _cmAdicionarDias(dataAtualBR, delta);
-    let listaAlvo = null;
-    try {
-      const listas = await BANCO.fetchListasTarefas();
-      listaAlvo = listas.find(l => l.data === novaData) || null;
-    } catch (error) {
-      console.error('❌ Erro ao buscar lista do dia:', error);
-    }
-    closeModal();
-    abrirListaTarefas(listaAlvo ? listaAlvo.id : null, listaAlvo ? undefined : novaData);
+    carregarDia(_cmAdicionarDias(base, delta));
   };
   btnDiaAnterior.addEventListener('click', () => navegarParaDia(-1));
   btnDiaProximo.addEventListener('click', () => navegarParaDia(1));
 
+  // Deslizar na horizontal troca de dia (celular). Não vale começando num campo
+  // de texto, popover ou alça de arraste — ali o gesto é seleção/rolagem.
+  const corpoModal = modal.querySelector('.modal-body');
+  let toqueInicio = null;
+  corpoModal.addEventListener('touchstart', (e) => {
+    const alvo = e.target;
+    if (e.touches.length !== 1 || alvo.closest('[contenteditable="true"], .cm-popover, .cm-tarefa-handle, input')) { toqueInicio = null; return; }
+    toqueInicio = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() };
+  }, { passive: true });
+  corpoModal.addEventListener('touchend', (e) => {
+    if (!toqueInicio) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - toqueInicio.x;
+    const dy = t.clientY - toqueInicio.y;
+    const rapido = (Date.now() - toqueInicio.t) < 600;
+    toqueInicio = null;
+    if (rapido && Math.abs(dx) > 70 && Math.abs(dy) < 50) navegarParaDia(dx < 0 ? 1 : -1);
+  }, { passive: true });
+
   // ---- Seletor de data (mini-calendário com feriados, igual ao de "Detalhes da contratação") ----
+  // Escolher uma data abre aquele dia no próprio modal (com a lista dele, se houver).
   const dataWrap = modal.querySelector('#cmDataPickerWrap');
   const dataBtn = modal.querySelector('#cmTarefasDataBtn');
-  const dataLabel = modal.querySelector('#cmTarefasDataLabel');
   const dataPopover = modal.querySelector('#cmTarefasDataPopover');
   const dataMonthYearEl = modal.querySelector('#cmDataMonthYear');
   const dataDaysEl = modal.querySelector('#cmDataDays');
   const dataPrevBtn = modal.querySelector('#cmDataPrevMonth');
   const dataNextBtn = modal.querySelector('#cmDataNextMonth');
 
-  const atualizarLabelData = () => {
-    dataLabel.textContent = dataAtualBR || 'Selecionar data';
-    btnNova.disabled = !dataAtualBR;
-    if (!dataAtualBR) {
-      labelDiaNavegador.textContent = 'Selecione uma data';
-      return;
-    }
-    const d = _parseDataAula(dataAtualBR);
-    labelDiaNavegador.textContent = d ? `${CM_TAREFAS_DIAS_SEMANA_COMPLETO[d.getDay()]}, ${dataAtualBR}` : dataAtualBR;
-  };
-
   const renderDataPicker = () => {
     dataMonthYearEl.textContent = `${CM_TAREFAS_MESES[dataPickerMes]} ${dataPickerAno}`;
     const primeiroDia = new Date(dataPickerAno, dataPickerMes, 1).getDay();
     const diasNoMes = new Date(dataPickerAno, dataPickerMes + 1, 0).getDate();
     const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
-    const selecionado = dataAtualBR ? _parseDataAula(dataAtualBR) : null;
+    const dataSel = dataSolicitada || dia.dataBR;
+    const selecionado = dataSel ? _parseDataAula(dataSel) : null;
 
     let html = '';
     for (let i = 0; i < primeiroDia; i++) html += '<div class="calendar-day-empty"></div>';
-    for (let dia = 1; dia <= diasNoMes; dia++) {
+    for (let d = 1; d <= diasNoMes; d++) {
       const classes = ['calendar-day', 'cm-data-picker-day'];
       let title = '';
       if (typeof Feriados !== 'undefined' && Feriados.doDia) {
-        const feriadosDoDia = Feriados.doDia(dia, dataPickerMes, dataPickerAno);
+        const feriadosDoDia = Feriados.doDia(d, dataPickerMes, dataPickerAno);
         if (feriadosDoDia.length > 0) {
           classes.push('calendar-day-feriado');
           title = feriadosDoDia.map(f => f.nome).join(', ');
         }
       }
-      const dataDoDia = new Date(dataPickerAno, dataPickerMes, dia);
+      const dataDoDia = new Date(dataPickerAno, dataPickerMes, d);
       const ehSelecionado = selecionado && dataDoDia.getTime() === new Date(selecionado.getFullYear(), selecionado.getMonth(), selecionado.getDate()).getTime();
       const ehHoje = dataDoDia.getTime() === hoje.getTime();
       if (ehSelecionado) classes.push('bg-orange-500', 'text-white', 'font-bold');
       else if (ehHoje) classes.push('cm-data-picker-day-hoje');
-      html += `<button type="button" class="${classes.join(' ')}" data-dia="${dia}" title="${escapeHtml(title)}">${dia}</button>`;
+      html += `<button type="button" class="${classes.join(' ')}" data-dia="${d}" title="${escapeHtml(title)}">${d}</button>`;
     }
     dataDaysEl.innerHTML = html;
   };
 
   dataBtn.addEventListener('click', () => {
     if (dataPopover.classList.contains('aberto')) { fecharPopoverAberto(); return; }
-    const base = dataAtualBR ? _parseDataAula(dataAtualBR) : new Date();
+    const dataSel = dataSolicitada || dia.dataBR;
+    const base = (dataSel && _parseDataAula(dataSel)) || new Date();
     dataPickerMes = base.getMonth();
     dataPickerAno = base.getFullYear();
     renderDataPicker();
@@ -1151,100 +1337,100 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
     if (dataPickerMes > 11) { dataPickerMes = 0; dataPickerAno++; }
     renderDataPicker();
   });
-  dataDaysEl.addEventListener('click', async (e) => {
+  dataDaysEl.addEventListener('click', (e) => {
     const btn = e.target.closest('.cm-data-picker-day');
     if (!btn) return;
-    const dia = Number(btn.dataset.dia);
-    dataAtualBR = `${String(dia).padStart(2, '0')}/${String(dataPickerMes + 1).padStart(2, '0')}/${dataPickerAno}`;
-    atualizarLabelData();
+    const d = Number(btn.dataset.dia);
+    const novaData = `${String(d).padStart(2, '0')}/${String(dataPickerMes + 1).padStart(2, '0')}/${dataPickerAno}`;
     fecharPopoverAberto();
-    if (listaIdAtual) {
-      try {
-        await BANCO.updateListaTarefasData(listaIdAtual, dataAtualBR);
-      } catch (error) {
-        console.error('❌ Erro ao atualizar data da lista de tarefas:', error);
-        showToast('❌ Erro ao atualizar data', 'error');
-      }
-    }
-    render();
+    if (novaData === (dataSolicitada || dia.dataBR) && !carregando) return;
+    carregarDia(novaData);
   });
 
-  if (dataAtualBR) {
-    const base = _parseDataAula(dataAtualBR);
-    dataPickerMes = base.getMonth();
-    dataPickerAno = base.getFullYear();
-  } else {
-    const hoje = new Date();
-    dataPickerMes = hoje.getMonth();
-    dataPickerAno = hoje.getFullYear();
-  }
+  const hojeInicial = new Date();
+  dataPickerMes = hojeInicial.getMonth();
+  dataPickerAno = hojeInicial.getFullYear();
   atualizarLabelData();
 
   // ---- Helpers de árvore ----
-  const filhosOrdenados = (parentId) => itens
-    .filter(i => i.parentId === parentId)
+  const visivel = (i) => !i._removido;
+  const filhosOrdenados = (parentId) => dia.itens
+    .filter(i => i.parentId === parentId && visivel(i))
     .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
 
   const proximaOrdem = (parentId) => {
-    const irmaos = itens.filter(i => i.parentId === parentId);
+    const irmaos = dia.itens.filter(i => i.parentId === parentId);
     if (!irmaos.length) return 0;
     return Math.max(...irmaos.map(i => i.ordem ?? 0)) + 1;
   };
 
   // Todos os descendentes (objetos completos) de um item, em qualquer profundidade
   const coletarSubarvoreObjetos = (itemId) => {
-    const diretos = itens.filter(i => i.parentId === itemId);
+    const diretos = dia.itens.filter(i => i.parentId === itemId);
     return diretos.reduce((acc, filho) => acc.concat(filho, coletarSubarvoreObjetos(filho.id)), []);
+  };
+
+  // Chave estável do item pras pendências de autosave — o id muda (temp -> id do
+  // Firestore) na 1ª gravação, a chave não.
+  const chaveItem = (item) => {
+    if (!item._chave) item._chave = item.id;
+    return item._chave;
   };
 
   // ---- Copiar tarefa (nível 1) + toda a subárvore pra outro dia ----
   // Sempre copia (não move): o item original continua no dia atual. A cópia nasce
-  // sempre desmarcada (BANCO.addItemTarefa já força status:'pendente') e entra no fim
-  // da lista de nível 1 do dia de destino, seja ele um dia com lista existente ou não.
+  // sempre desmarcada e entra no fim da lista de nível 1 do dia de destino. Vai
+  // num batch só (tudo ou nada) e um 2º clique durante a cópia é ignorado.
   const copiarItemParaData = async (itemOrigem, dataDestinoBR) => {
+    if (itemOrigem._copiando) return;
+    itemOrigem._copiando = true;
     try {
-      const listas = await BANCO.fetchListasTarefas();
-      const listaDestino = listas.find(l => l.data === dataDestinoBR);
-      const listaDestinoId = listaDestino ? listaDestino.id : await BANCO.addListaTarefas(dataDestinoBR);
+      const ctxDestino = dataDestinoBR === dia.dataBR ? dia : null;
+      const listaDestinoId = ctxDestino ? await garantirLista(ctxDestino) : await _cmGarantirListaDaData(dataDestinoBR);
 
       const itensExistentesDestino = await BANCO.fetchItensTarefa(listaDestinoId);
       const nivel1Existentes = itensExistentesDestino.filter(i => i.nivel === 1);
       const ordemInicial = nivel1Existentes.length ? Math.max(...nivel1Existentes.map(i => i.ordem ?? 0)) + 1 : 0;
 
+      const subarvore = coletarSubarvoreObjetos(itemOrigem.id)
+        .filter(i => i._persisted && !i._removido)
+        .sort((a, b) => a.nivel - b.nivel);
       const mapaIds = new Map(); // id no dia de origem -> id novo no dia de destino
-      const novoIdPrincipal = await BANCO.addItemTarefa(listaDestinoId, {
-        texto: itemOrigem.texto, nivel: 1, parentId: null,
-        responsavel: itemOrigem.responsavel || '', prazo: itemOrigem.prazo || '',
-        comentario: itemOrigem.comentario || '', tags: itemOrigem.tags || [],
-        ordem: ordemInicial, ultimaEdicaoPor: editorAtual
+      const novos = [itemOrigem, ...subarvore].map(orig => {
+        const id = BANCO.novoIdItemTarefa(listaDestinoId);
+        mapaIds.set(orig.id, id);
+        const principal = orig === itemOrigem;
+        return {
+          id,
+          texto: (orig.texto || '').trim(), nivel: orig.nivel,
+          parentId: principal ? null : (mapaIds.get(orig.parentId) || null),
+          responsavel: orig.responsavel || '', prazo: orig.prazo || '',
+          comentario: orig.comentario || '', tags: orig.tags || [],
+          ordem: principal ? ordemInicial : (orig.ordem ?? 0), ultimaEdicaoPor: editorAtual
+        };
       });
-      mapaIds.set(itemOrigem.id, novoIdPrincipal);
+      await BANCO.addItensTarefaEmLote(listaDestinoId, novos);
 
-      const subarvore = coletarSubarvoreObjetos(itemOrigem.id).sort((a, b) => a.nivel - b.nivel);
-      for (const filho of subarvore) {
-        const novoId = await BANCO.addItemTarefa(listaDestinoId, {
-          texto: filho.texto, nivel: filho.nivel, parentId: mapaIds.get(filho.parentId),
-          responsavel: filho.responsavel || '', prazo: filho.prazo || '',
-          comentario: filho.comentario || '', tags: filho.tags || [],
-          ordem: filho.ordem ?? 0, ultimaEdicaoPor: editorAtual
-        });
-        mapaIds.set(filho.id, novoId);
-      }
-
-      const itensFinaisDestino = await BANCO.fetchItensTarefa(listaDestinoId);
-      const nivel1Finais = itensFinaisDestino.filter(i => i.nivel === 1);
-      await BANCO.atualizarAgregadosListaTarefas(listaDestinoId, nivel1Finais.length, nivel1Finais.filter(i => i.status === 'concluido').length);
+      const concluidosDestino = nivel1Existentes.filter(i => i.status === 'concluido').length;
+      BANCO.atualizarAgregadosListaTarefas(listaDestinoId, nivel1Existentes.length + 1, concluidosDestino)
+        .catch(err => console.error('❌ Erro ao atualizar agregados da lista de destino:', err));
 
       showToast(`✅ "${_cmTextoPlano(itemOrigem.texto)}" copiada para ${dataDestinoBR}!`, 'success');
 
-      // se o destino é o próprio dia aberto no modal agora, reflete os itens novos na tela
-      if (listaDestinoId === listaIdAtual) {
-        itens = itensFinaisDestino.map(i => ({ ...i, _persisted: true }));
+      // Destino é o próprio dia aberto: acrescenta as cópias na tela sem recarregar
+      // (antes a lista era substituída e as tarefas ainda não salvas sumiam)
+      if (ctxDestino && ctxDestino === dia) {
+        novos.forEach(n => dia.itens.push({
+          ...n, status: 'pendente', ultimaEdicao: new Date(),
+          _persisted: true, _textoSalvo: n.texto, _dia: dia
+        }));
         render();
       }
     } catch (error) {
       console.error('❌ Erro ao copiar tarefa:', error);
       showToast('❌ Erro ao copiar tarefa', 'error');
+    } finally {
+      itemOrigem._copiando = false;
     }
   };
 
@@ -1258,7 +1444,7 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
     const responsavelAtual = item.responsavel || '';
     const recolhido = recolhidos.has(item.id);
     const comentarioAberto = comentariosAbertos.has(item.id);
-    const urgente = _cmEhUrgente(item, dataAtualBR);
+    const urgente = _cmEhUrgente(item, dia.dataBR);
     const tags = item.tags || [];
 
     const tagIconHtml = item.nivel === 1 ? `
@@ -1361,21 +1547,15 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
     `;
   };
 
-  // render() é chamado várias vezes em sequência pra uma mesma ação (ex.: Enter
-  // cria+foca o item novo, e o persistirTexto do item ANTERIOR — que roda em
-  // paralelo, sem bloquear — termina um instante depois e chama render() de novo,
-  // já que ele reconstrói o innerHTML da lista inteira). Sem isso, esse segundo
-  // render() trocaria o nó do campo recém-focado por um novo e derrubaria o foco
-  // — daí o "seleciona e desseleciona". Por isso o próprio render() sempre guarda
-  // e restaura foco+cursor do campo de texto ativo, não importa quem o chamou.
+  // render() reconstrói o innerHTML da lista inteira — por isso NÃO é chamado
+  // pelo autosave do texto (no celular, destruir o campo em foco derrubava o
+  // teclado e a tela "pulava", parecendo que o modal tinha fechado). O autosave
+  // só atualiza o próprio item no DOM (atualizarItemNoDom). Para as ações que
+  // ainda redesenham tudo, render() guarda e restaura foco+cursor do campo ativo.
   const render = () => {
     // Um popover de menção aberto referencia nós de texto de um campo que está
-    // prestes a ser destruído (innerHTML da lista inteira é reconstruído abaixo)
-    // — sem isso ficaria um popover "fantasma" apontando pra um nó desconectado.
-    // Mas se o campo com a menção ainda está em foco, esse render() não é uma
-    // ação do usuário fechando a menção — é só o autosave (debounce de texto)
-    // disparando no meio da digitação. Guarda a intenção aqui pra reabrir a
-    // sugestão no campo restaurado logo abaixo, em vez de deixá-la sumir sozinha.
+    // prestes a ser destruído — sem isso ficaria um popover "fantasma". Se o
+    // campo com a menção ainda está em foco, reabre a sugestão no campo novo.
     const mencaoAtivaAntes = (mencaoState && mencaoState.el === document.activeElement)
       ? { item: mencaoState.item, campo: mencaoState.campo, entidadeSelecionada: mencaoState.sugestoes[mencaoState.indiceAtivo] || null }
       : null;
@@ -1390,12 +1570,25 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
       ? { id: ativo.dataset.itemId, classe: classeAtiva, offset: _cmOffsetTextoAntesDoCursor(ativo) }
       : null;
 
+    if (dia.erroCarregamento) {
+      listaEl.innerHTML = `
+        <div class="cm-tarefas-erro">
+          <i class="fas fa-triangle-exclamation"></i>
+          <p>Não foi possível carregar as tarefas deste dia.</p>
+          <button type="button" class="btn-secondary btn-compact" id="cmTarefasBtnTentarDeNovo"><i class="fas fa-rotate-right mr-2"></i>Tentar de novo</button>
+        </div>`;
+      return;
+    }
+
     let raiz = filhosOrdenados(null);
     if (filtroPessoas.size > 0) raiz = raiz.filter(i => filtroPessoas.has(i.responsavel));
     if (filtroTags.size > 0) raiz = raiz.filter(i => (i.tags || []).some(t => filtroTags.has(t)));
+    const vazio = !dia.dataBR
+      ? 'Selecione uma data para ver ou criar tarefas.'
+      : (filtroPessoas.size || filtroTags.size) ? 'Nenhuma tarefa encontrada para esse filtro.' : 'Nenhuma tarefa ainda.';
     listaEl.innerHTML = raiz.length
       ? raiz.map(renderNode).join('')
-      : `<p class="text-sm text-gray-400 text-center py-4">${(filtroPessoas.size || filtroTags.size) ? 'Nenhuma tarefa encontrada para esse filtro.' : 'Nenhuma tarefa ainda.'}</p>`;
+      : `<p class="text-sm text-gray-400 text-center py-4">${vazio}</p>`;
     ajustarAlturasComentarios();
     ajustarAlturasTextos();
     posicionarMetas();
@@ -1405,10 +1598,6 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
       if (el) {
         el.focus();
         if (focoAtivo.offset != null) _cmRestaurarCursorNoOffset(el, focoAtivo.offset);
-        // Reabre a sugestão de menção no nó novo (o de antes foi destruído pelo
-        // innerHTML acima) — re-detecta o "@query" a partir do cursor já restaurado,
-        // então continua funcionando mesmo se o usuário tiver digitado mais letras
-        // entre o disparo do autosave e este ponto.
         if (mencaoAtivaAntes) atualizarMencao(el, mencaoAtivaAntes.item, mencaoAtivaAntes.campo, mencaoAtivaAntes.entidadeSelecionada);
       }
     }
@@ -1438,63 +1627,87 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
   // fechado (o texto estica pra ocupar o espaço livre) — por isso a margem da
   // meta é recalculada a cada render(), pra continuar alinhada com a borda
   // direita do campo de texto daquele item específico.
+  const posicionarMeta = (itemEl) => {
+    const meta = itemEl.querySelector(':scope > .cm-tarefa-meta');
+    const texto = itemEl.querySelector(':scope > .cm-tarefa-row > .cm-tarefa-texto');
+    if (!meta || !texto) return;
+    const distancia = itemEl.getBoundingClientRect().right - texto.getBoundingClientRect().right;
+    meta.style.marginRight = `${Math.max(distancia, 0)}px`;
+  };
   const posicionarMetas = () => {
-    listaEl.querySelectorAll('.cm-tarefa-item').forEach(itemEl => {
-      const meta = itemEl.querySelector(':scope > .cm-tarefa-meta');
-      const texto = itemEl.querySelector(':scope > .cm-tarefa-row > .cm-tarefa-texto');
-      if (!meta || !texto) return;
-      const distancia = itemEl.getBoundingClientRect().right - texto.getBoundingClientRect().right;
-      meta.style.marginRight = `${Math.max(distancia, 0)}px`;
-    });
+    listaEl.querySelectorAll('.cm-tarefa-item').forEach(posicionarMeta);
   };
 
-  render();
+  // Atualiza só o item salvo no DOM (checkbox habilitado + "Editado em..."), sem
+  // reconstruir a lista — mantém o foco e o teclado do celular onde estão.
+  const atualizarItemNoDom = (item) => {
+    const itemEl = listaEl.querySelector(`.cm-tarefa-item[data-item-id="${item.id}"]`);
+    if (!itemEl) return;
+    const chk = itemEl.querySelector(':scope > .cm-tarefa-row > .cm-tarefa-checkbox');
+    if (chk) chk.disabled = !item._persisted;
+    const metaTexto = item._persisted ? _cmFormatarMeta(item) : '';
+    let metaEl = itemEl.querySelector(':scope > .cm-tarefa-meta');
+    if (metaTexto) {
+      if (!metaEl) {
+        metaEl = document.createElement('div');
+        metaEl.className = 'cm-tarefa-meta';
+        const comentarioWrap = itemEl.querySelector(':scope > .cm-tarefa-comentario-wrap');
+        if (comentarioWrap) comentarioWrap.before(metaEl); else itemEl.appendChild(metaEl);
+      }
+      metaEl.textContent = metaTexto;
+      posicionarMeta(itemEl);
+    } else if (metaEl) {
+      metaEl.remove();
+    }
+  };
 
-  // ---- Agregados (total/concluídos de nível 1) exibidos na barra do grid ----
-  const salvarAgregados = async () => {
-    if (!listaIdAtual) return;
-    const persistidosNivel1 = itens.filter(i => i._persisted && i.nivel === 1);
-    const total = persistidosNivel1.length;
-    const concluidos = persistidosNivel1.filter(i => i.status === 'concluido').length;
-    if (total === 0 && itens.filter(i => i._persisted).length === 0) {
+  // ---- Agregados (total/concluídos de nível 1) gravados no doc da lista ----
+  // Lista sem nenhuma tarefa é apagada — mas só se o SERVIDOR confirmar que está
+  // vazia: a cópia local pode estar velha (Marcos e Ester com o mesmo dia aberto)
+  // e antes isso apagava as tarefas da outra pessoa junto.
+  const salvarAgregados = (ctx) => enfileirarDia(ctx, async () => {
+    if (!ctx.listaId) return;
+    const persistidos = ctx.itens.filter(i => i._persisted && !i._removido);
+    if (!persistidos.length) {
+      if (ctx.itens.some(i => i._criando && !i._removido)) return;
       try {
-        await BANCO.deleteListaTarefas(listaIdAtual);
+        if (await BANCO.deleteListaTarefasSeVazia(ctx.listaId)) ctx.listaId = null;
       } catch (error) {
         console.error('❌ Erro ao excluir lista vazia de tarefas:', error);
       }
-      listaIdAtual = null;
-      // Sem isso, o botão de Data continuava mostrando a data da lista excluída
-      // e "Nova Tarefa" seguia habilitado — dando a impressão de que o
-      // preenchimento anterior "voltava" mesmo com a lista já apagada.
-      dataAtualBR = '';
-      atualizarLabelData();
+      if (ctx === dia) atualizarLabelData();
       return;
     }
+    const nivel1 = persistidos.filter(i => i.nivel === 1);
     try {
-      await BANCO.atualizarAgregadosListaTarefas(listaIdAtual, total, concluidos);
+      await BANCO.atualizarAgregadosListaTarefas(ctx.listaId, nivel1.length, nivel1.filter(i => i.status === 'concluido').length);
     } catch (error) {
       console.error('❌ Erro ao atualizar agregados da lista de tarefas:', error);
     }
-  };
+  });
 
   // Avança o status de um item (ciclo vazio → andamento → concluido → cancelado → vazio).
-  // Independente por item: tarefa principal e subtarefas não se propagam mais entre si.
-  // Otimista, como persistirCampoSimples: muda local antes do await, desfaz e
-  // re-renderiza só se a gravação falhar.
-  const avancarStatusTarefa = async (item) => {
+  // Independente por item: tarefa principal e subtarefas não se propagam entre si.
+  // Otimista: muda local na hora, desfaz e re-renderiza só se a gravação falhar.
+  const avancarStatusTarefa = (item) => {
     const statusAnterior = item.status;
     const novoStatus = _cmProximoStatusTarefa(item.status);
     item.status = novoStatus;
     item.ultimaEdicao = new Date();
     item.ultimaEdicaoPor = editorAtual;
-    try {
-      await BANCO.updateItemTarefa(listaIdAtual, item.id, { status: novoStatus, ultimaEdicaoPor: editorAtual });
-    } catch (error) {
-      console.error('❌ Erro ao atualizar status da tarefa:', error);
-      showToast('❌ Erro ao atualizar tarefa', 'error');
-      item.status = statusAnterior;
-      render();
-    }
+    return enfileirarItem(item, async () => {
+      if (!item._persisted || item._removido) return;
+      const ctx = item._dia;
+      try {
+        await BANCO.updateItemTarefa(ctx.listaId, item.id, { status: novoStatus, ultimaEdicaoPor: editorAtual });
+        salvarAgregados(ctx);
+      } catch (error) {
+        console.error('❌ Erro ao atualizar status da tarefa:', error);
+        showToast('❌ Erro ao atualizar tarefa', 'error');
+        item.status = statusAnterior;
+        if (ctx === dia) render();
+      }
+    });
   };
 
   // Foca (e posiciona o cursor no fim de) o campo de texto do item recém-criado.
@@ -1508,45 +1721,45 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
     _cmFocarFimDoCampo(inputNovo);
   };
 
+  const novoItemLocal = (nivel, parentId, ordem) => {
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    return {
+      id: tempId, _chave: tempId, texto: '', status: 'pendente', nivel, parentId,
+      responsavel: '', prazo: '', comentario: '', tags: [], ordem,
+      ultimaEdicao: null, ultimaEdicaoPor: '', _persisted: false, _dia: dia
+    };
+  };
+
   // ---- Criação de item local ----
   const criarItemLocal = (nivel, parentId) => {
-    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    itens.push({
-      id: tempId, texto: '', status: 'pendente', nivel, parentId,
-      responsavel: '', prazo: '', comentario: '', tags: [], ordem: proximaOrdem(parentId),
-      ultimaEdicao: null, ultimaEdicaoPor: '', _persisted: false
-    });
+    const novo = novoItemLocal(nivel, parentId, proximaOrdem(parentId));
+    dia.itens.push(novo);
     render();
-    focarItem(tempId);
+    focarItem(novo.id);
   };
 
   // Cria um item novo logo ABAIXO de "itemAtual" (mesmo pai/nível) — usado ao apertar
   // Enter no campo de texto. Renumera a ordem dos irmãos e persiste, igual ao
   // arrastar-e-soltar, pra o item entrar na posição certa (não no fim da lista).
   const criarItemAposIrmao = (itemAtual) => {
-    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const novoItem = {
-      id: tempId, texto: '', status: 'pendente', nivel: itemAtual.nivel, parentId: itemAtual.parentId,
-      responsavel: '', prazo: '', comentario: '', tags: [], ordem: 0,
-      ultimaEdicao: null, ultimaEdicaoPor: '', _persisted: false
-    };
+    const novoItem = novoItemLocal(itemAtual.nivel, itemAtual.parentId, 0);
     const irmaos = filhosOrdenados(itemAtual.parentId);
     const indiceAtual = irmaos.findIndex(i => i.id === itemAtual.id);
     irmaos.splice(indiceAtual + 1, 0, novoItem);
     irmaos.forEach((it, idx) => { it.ordem = idx; });
-    itens.push(novoItem);
+    dia.itens.push(novoItem);
 
     const persistidos = irmaos.filter(i => i._persisted && i.id !== novoItem.id).map(i => ({ id: i.id, ordem: i.ordem }));
-    if (persistidos.length && listaIdAtual) {
-      BANCO.reordenarItensTarefa(listaIdAtual, persistidos).catch(err => console.error('❌ Erro ao reordenar tarefas:', err));
+    if (persistidos.length && dia.listaId) {
+      BANCO.reordenarItensTarefa(dia.listaId, persistidos).catch(err => console.error('❌ Erro ao reordenar tarefas:', err));
     }
 
     render();
-    focarItem(tempId);
+    focarItem(novoItem.id);
   };
 
   btnNova.addEventListener('click', () => {
-    if (!dataAtualBR) {
+    if (!dia.dataBR) {
       showToast('Selecione a data antes de adicionar uma tarefa', 'error');
       return;
     }
@@ -1559,6 +1772,11 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
     if (pendentes[chave]) clearTimeout(pendentes[chave].timeoutId);
     const timeoutId = setTimeout(() => { delete pendentes[chave]; fn(); }, ms);
     pendentes[chave] = { timeoutId, flush: fn };
+  };
+  const cancelarPendente = (chave) => {
+    if (!pendentes[chave]) return;
+    clearTimeout(pendentes[chave].timeoutId);
+    delete pendentes[chave];
   };
 
   const flushPendentes = async () => {
@@ -1574,36 +1792,39 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
 
   btnSalvarTudo.addEventListener('click', async () => {
     await flushPendentes();
+    await aguardarFilas();
     showToast('✅ Alterações salvas!', 'success');
   });
 
   // Item recém-criado troca de id temporário (client-side) pelo id real do
-  // Firestore ao ser persistido pela 1ª vez. Sem isso, o campo "perde a seleção"
-  // na primeira pausa de digitação: render() (chamado logo depois) captura o
-  // foco lendo data-item-id do DOM ANTES desse patch (ainda com o id antigo),
-  // mas reconstrói a lista já com item.id novo — a busca pós-rebuild não acha
-  // o elemento e o foco não é restaurado.
+  // Firestore ao ser persistido pela 1ª vez — atualiza o DOM e os estados de
+  // tela (comentário aberto, barra de ações...) que estavam no id antigo.
   const sincronizarIdNoDom = (idAntigo, idNovo) => {
+    if (comentariosAbertos.delete(idAntigo)) comentariosAbertos.add(idNovo);
+    if (recolhidos.delete(idAntigo)) recolhidos.add(idNovo);
+    if (funcoesAbertoId === idAntigo) funcoesAbertoId = idNovo;
+    if (tagPopoverAbertoId === idAntigo) tagPopoverAbertoId = idNovo;
+    if (copiarPopoverAbertoId === idAntigo) copiarPopoverAbertoId = idNovo;
     const itemEl = listaEl.querySelector(`.cm-tarefa-item[data-item-id="${idAntigo}"]`);
     if (!itemEl) return;
     itemEl.dataset.itemId = idNovo;
     itemEl.querySelectorAll(`[data-item-id="${idAntigo}"]`).forEach(el => { el.dataset.itemId = idNovo; });
   };
 
-  // ---- Persistência do texto (cria o item — e a lista, se ainda não existir — ao sair do campo) ----
-  const persistirTexto = async (item) => {
+  // ---- Persistência do texto (cria o item — e a lista, se ainda não existir) ----
+  const persistirTexto = (item) => enfileirarItem(item, async () => {
+    const ctx = item._dia;
     const textoLimpo = (item.texto || '').trim();
-    if (!textoLimpo) return; // itens sem texto não são salvos
+    if (!textoLimpo || item._removido) return; // itens sem texto não são salvos
     try {
       if (!item._persisted) {
-        if (!listaIdAtual) {
-          if (!dataAtualBR) {
-            showToast('Selecione a data antes de adicionar uma tarefa', 'error');
-            return;
-          }
-          listaIdAtual = await BANCO.addListaTarefas(dataAtualBR);
+        if (!ctx.dataBR) {
+          showToast('Selecione a data antes de adicionar uma tarefa', 'error');
+          return;
         }
-        const novoId = await BANCO.addItemTarefa(listaIdAtual, {
+        item._criando = true;
+        const listaId = await garantirLista(ctx);
+        const novoId = await BANCO.addItemTarefa(listaId, {
           texto: textoLimpo,
           nivel: item.nivel,
           parentId: item.parentId,
@@ -1617,28 +1838,65 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
         const idAntigo = item.id;
         item.id = novoId;
         item._persisted = true;
+        item._criando = false;
+        item._textoSalvo = textoLimpo;
         item.ultimaEdicao = new Date();
         item.ultimaEdicaoPor = editorAtual;
-        itens.forEach(i => { if (i.parentId === idAntigo) i.parentId = novoId; });
-        sincronizarIdNoDom(idAntigo, novoId);
+        ctx.itens.forEach(i => { if (i.parentId === idAntigo) i.parentId = novoId; });
+        // Excluído enquanto a criação estava a caminho: apaga já, senão "voltava" ao reabrir
+        if (item._removido) {
+          await BANCO.deleteItensTarefa(listaId, [novoId]);
+          item._persisted = false;
+          salvarAgregados(ctx);
+          return;
+        }
+        if (ctx === dia) {
+          sincronizarIdNoDom(idAntigo, novoId);
+          atualizarItemNoDom(item);
+        }
       } else {
-        await BANCO.updateItemTarefa(listaIdAtual, item.id, { texto: textoLimpo, ultimaEdicaoPor: editorAtual });
+        if (textoLimpo === item._textoSalvo) return; // nada mudou desde a última gravação
+        await BANCO.updateItemTarefa(ctx.listaId, item.id, { texto: textoLimpo, ultimaEdicaoPor: editorAtual });
+        item._textoSalvo = textoLimpo;
         item.ultimaEdicao = new Date();
         item.ultimaEdicaoPor = editorAtual;
+        if (ctx === dia) atualizarItemNoDom(item);
       }
-      await salvarAgregados();
-      render();
+      salvarAgregados(ctx);
     } catch (error) {
+      item._criando = false;
       console.error('❌ Erro ao salvar tarefa:', error);
       showToast('❌ Erro ao salvar tarefa', 'error');
     }
+  });
+
+  // Atualização otimista: muda o valor local na hora (a tela já reflete) e grava
+  // pela fila do item — se o item ainda está sendo criado, a gravação espera a
+  // criação terminar em vez de se perder. Se falhar, desfaz e re-renderiza.
+  const persistirCampoSimples = (item, campo, valor) => {
+    const valorAnterior = item[campo];
+    item[campo] = valor;
+    item.ultimaEdicao = new Date();
+    item.ultimaEdicaoPor = editorAtual;
+    return enfileirarItem(item, async () => {
+      // item ainda não existe no Firestore: o valor vai junto quando o texto for salvo
+      if (!item._persisted || item._removido) return;
+      const ctx = item._dia;
+      try {
+        await BANCO.updateItemTarefa(ctx.listaId, item.id, { [campo]: valor, ultimaEdicaoPor: editorAtual });
+      } catch (error) {
+        console.error(`❌ Erro ao atualizar ${campo} da tarefa:`, error);
+        showToast(`❌ Erro ao atualizar ${campo}`, 'error');
+        item[campo] = valorAnterior;
+        if (ctx === dia) render();
+      }
+    });
   };
 
-  const persistirComentario = async (item) => {
-    if (!item._persisted) return;
+  const persistirComentario = (item) => {
     const campoTexto = listaEl.querySelector(`.cm-tarefa-comentario-texto[data-item-id="${item.id}"]`);
     const valor = campoTexto ? _cmSerializarConteudoEditavel(campoTexto) : (item.comentario || '');
-    await persistirCampoSimples(item, 'comentario', valor);
+    return persistirCampoSimples(item, 'comentario', valor);
   };
 
   // ---- Popover de sugestão de menção (@) ----
@@ -1732,18 +1990,17 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
     item[campo] = _cmSerializarConteudoEditavel(el);
     if (campo === 'texto') {
       ajustarAlturaTexto(el);
-      debounce(`texto-${item.id}`, () => persistirTexto(item), 700);
+      debounce(`texto-${chaveItem(item)}`, () => persistirTexto(item), 700);
     } else {
       ajustarAlturaComentario(el);
-      debounce(`comentario-${item.id}`, () => persistirComentario(item), 700);
+      debounce(`comentario-${chaveItem(item)}`, () => persistirComentario(item), 700);
     }
   };
 
   // Chamado a cada "input" nos campos de texto/comentário — detecta um "@consulta"
   // sendo digitado perto do cursor e abre/atualiza/fecha o popover de sugestão.
   // "entidadeParaManterSelecionada" é usado só no reabrimento silencioso feito por
-  // render() (ver mencaoAtivaAntes): sem isso, toda vez que o autosave reabre o
-  // popover sem o usuário ter digitado nada novo, a navegação por seta feita antes
+  // render() (ver mencaoAtivaAntes): sem isso, a navegação por seta feita antes
   // (indiceAtivo) seria perdida e a seleção voltaria pro primeiro item da lista.
   const atualizarMencao = async (el, item, campo, entidadeParaManterSelecionada) => {
     const consulta = _cmDetectarConsultaMencao(el);
@@ -1765,24 +2022,26 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
     renderizarPopoverMencao();
   };
 
+  const itemDoCampo = (el) => dia.itens.find(i => i.id === el.dataset.itemId);
+
   listaEl.addEventListener('input', (e) => {
     const txt = e.target.closest('.cm-tarefa-texto');
     if (txt) {
       ajustarAlturaTexto(txt);
-      const item = itens.find(i => i.id === txt.dataset.itemId);
+      const item = itemDoCampo(txt);
       if (!item) return;
       item.texto = _cmSerializarConteudoEditavel(txt);
-      debounce(`texto-${item.id}`, () => persistirTexto(item), 700);
+      debounce(`texto-${chaveItem(item)}`, () => persistirTexto(item), 700);
       atualizarMencao(txt, item, 'texto');
       return;
     }
     const comentario = e.target.closest('.cm-tarefa-comentario-texto');
     if (comentario) {
       ajustarAlturaComentario(comentario);
-      const item = itens.find(i => i.id === comentario.dataset.itemId);
+      const item = itemDoCampo(comentario);
       if (!item) return;
       item.comentario = _cmSerializarConteudoEditavel(comentario);
-      debounce(`comentario-${item.id}`, () => persistirComentario(item), 700);
+      debounce(`comentario-${chaveItem(item)}`, () => persistirComentario(item), 700);
       atualizarMencao(comentario, item, 'comentario');
     }
   });
@@ -1790,18 +2049,21 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
   listaEl.addEventListener('focusout', (e) => {
     const txt = e.target.closest('.cm-tarefa-texto');
     if (txt) {
-      // Um render() no meio da digitação (ex.: criar o próximo item com Enter)
-      // troca o innerHTML da lista e remove esse campo do DOM — isso dispara um
-      // "focusout fantasma" nele mesmo já desconectado. Reagir a esse evento
-      // chamaria persistirTexto()+render() de novo bem depois do foco já ter
-      // sido movido pro item novo, derrubando esse foco. Só processa focusout
-      // de campo que realmente perdeu o foco enquanto ainda estava na tela.
+      // Um render() no meio da digitação troca o innerHTML da lista e remove esse
+      // campo do DOM — isso dispara um "focusout fantasma" nele já desconectado.
+      // Só processa focusout de campo que realmente perdeu o foco na tela.
       if (!txt.isConnected) return;
-      const item = itens.find(i => i.id === txt.dataset.itemId);
+      const item = itemDoCampo(txt);
       if (!item) return;
-      if (pendentes[`texto-${item.id}`]) {
-        clearTimeout(pendentes[`texto-${item.id}`].timeoutId);
-        delete pendentes[`texto-${item.id}`];
+      cancelarPendente(`texto-${chaveItem(item)}`);
+      // Tarefa já salva com o texto apagado: o Firestore guardava o texto antigo e
+      // ele "voltava" ao reabrir. Restaura e orienta a usar a lixeira.
+      if (item._persisted && !(item.texto || '').trim()) {
+        item.texto = item._textoSalvo || '';
+        txt.innerHTML = _cmRenderConteudoComMencoes(item.texto);
+        ajustarAlturaTexto(txt);
+        showToast('Para excluir a tarefa, use a lixeira', 'info');
+        return;
       }
       persistirTexto(item);
       return;
@@ -1809,12 +2071,9 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
     const comentario = e.target.closest('.cm-tarefa-comentario-texto');
     if (comentario) {
       if (!comentario.isConnected) return;
-      const item = itens.find(i => i.id === comentario.dataset.itemId);
+      const item = itemDoCampo(comentario);
       if (!item) return;
-      if (pendentes[`comentario-${item.id}`]) {
-        clearTimeout(pendentes[`comentario-${item.id}`].timeoutId);
-        delete pendentes[`comentario-${item.id}`];
-      }
+      cancelarPendente(`comentario-${chaveItem(item)}`);
       persistirComentario(item);
     }
   });
@@ -1858,17 +2117,14 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
     const éCampoTexto = alvo.classList.contains('cm-tarefa-texto');
     if (éCampoTexto && !e.ctrlKey && !e.metaKey) {
       e.preventDefault();
-      const item = itens.find(i => i.id === alvo.dataset.itemId);
+      const item = itemDoCampo(alvo);
       if (!item) return;
       item.texto = _cmSerializarConteudoEditavel(alvo);
       if (!item.texto.trim()) return;
 
-      if (pendentes[`texto-${item.id}`]) {
-        clearTimeout(pendentes[`texto-${item.id}`].timeoutId);
-        delete pendentes[`texto-${item.id}`];
-      }
+      cancelarPendente(`texto-${chaveItem(item)}`);
       await persistirTexto(item);
-      if (!item._persisted) return; // sem data selecionada ou falha ao salvar — não cria o próximo
+      if (!item._persisted || item._removido || item._dia !== dia) return; // sem data, falha ao salvar ou já trocou de dia
 
       criarItemAposIrmao(item);
       return;
@@ -1877,43 +2133,30 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
     // Ctrl+Enter no campo de tarefa, ou Enter puro no campo de comentário
     e.preventDefault();
     _cmInserirQuebraLinha();
-    const item = itens.find(i => i.id === alvo.dataset.itemId);
+    const item = itemDoCampo(alvo);
     if (!item) return;
     const campo = éCampoTexto ? 'texto' : 'comentario';
     item[campo] = _cmSerializarConteudoEditavel(alvo);
     if (campo === 'texto') {
       ajustarAlturaTexto(alvo);
-      debounce(`texto-${item.id}`, () => persistirTexto(item), 700);
+      debounce(`texto-${chaveItem(item)}`, () => persistirTexto(item), 700);
     } else {
       ajustarAlturaComentario(alvo);
-      debounce(`comentario-${item.id}`, () => persistirComentario(item), 700);
+      debounce(`comentario-${chaveItem(item)}`, () => persistirComentario(item), 700);
     }
   });
 
-  // Atualização otimista: muda o valor local (síncrono, antes do 1º await) e devolve
-  // a Promise sem que o chamador precise esperá-la — a tela já reflete o novo valor
-  // no mesmo tick, e a gravação no Firestore acontece em paralelo, em segundo plano.
-  // Se a gravação falhar, desfaz o valor local e re-renderiza pra não ficar dessincronizado.
-  const persistirCampoSimples = async (item, campo, valor) => {
-    const valorAnterior = item[campo];
-    item[campo] = valor;
-    item.ultimaEdicao = new Date();
-    item.ultimaEdicaoPor = editorAtual;
-    if (!item._persisted) return; // só grava quando o item já existe no Firestore
-    try {
-      await BANCO.updateItemTarefa(listaIdAtual, item.id, { [campo]: valor, ultimaEdicaoPor: editorAtual });
-    } catch (error) {
-      console.error(`❌ Erro ao atualizar ${campo} da tarefa:`, error);
-      showToast(`❌ Erro ao atualizar ${campo}`, 'error');
-      item[campo] = valorAnterior;
-      render();
-    }
+  // Popover de tags/copiar fecha só escondendo o próprio popover — antes fechava
+  // com render(), que reconstruía a lista no meio do clique e o clique no texto
+  // de outra tarefa "se perdia" (precisava clicar duas vezes).
+  const esconderPopoverDaLista = (seletor) => {
+    listaEl.querySelectorAll(`${seletor}.aberto`).forEach(p => p.classList.remove('aberto'));
   };
 
-  listaEl.addEventListener('change', async (e) => {
+  listaEl.addEventListener('change', (e) => {
     const tagChk = e.target.closest('.cm-tag-checkbox');
     if (tagChk) {
-      const item = itens.find(i => i.id === tagChk.dataset.itemId);
+      const item = itemDoCampo(tagChk);
       if (!item) return;
       const tags = new Set(item.tags || []);
       tagChk.checked ? tags.add(tagChk.value) : tags.delete(tagChk.value);
@@ -1930,12 +2173,16 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
   });
 
   listaEl.addEventListener('click', async (e) => {
+    if (e.target.closest('#cmTarefasBtnTentarDeNovo')) {
+      carregarDia(dia.dataBR);
+      return;
+    }
+
     const chk = e.target.closest('.cm-tarefa-checkbox');
     if (chk) {
-      const item = itens.find(i => i.id === chk.dataset.itemId);
+      const item = itemDoCampo(chk);
       if (!item || !item._persisted) return;
       avancarStatusTarefa(item);
-      salvarAgregados();
       render();
       return;
     }
@@ -1953,7 +2200,7 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
 
     const handlePessoa = e.target.closest('.cm-tarefa-pessoa');
     if (handlePessoa) {
-      const item = itens.find(i => i.id === handlePessoa.dataset.itemId);
+      const item = itemDoCampo(handlePessoa);
       if (!item) return;
       const pessoa = handlePessoa.dataset.pessoa;
       const novoValor = item.responsavel === pessoa ? '' : pessoa;
@@ -1997,51 +2244,51 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
       render();
       if (tagPopoverAbertoId) {
         const wrap = listaEl.querySelector(`.cm-tarefa-tag-wrap[data-item-id="${id}"]`);
-        if (wrap) popoverAberto = { wrap, fechar: () => { tagPopoverAbertoId = null; render(); } };
+        if (wrap) popoverAberto = { wrap, fechar: () => { tagPopoverAbertoId = null; esconderPopoverDaLista('.cm-tag-popover'); } };
       }
       return;
     }
 
     const btnHora = e.target.closest('.cm-tarefa-btn-hora');
     if (btnHora) {
-      const item = itens.find(i => i.id === btnHora.dataset.itemId);
+      const item = itemDoCampo(btnHora);
       if (!item) return;
       _cmAbrirSeletorHora(item.prazo, (novoValor) => {
         persistirCampoSimples(item, 'prazo', novoValor);
-        render();
+        if (item._dia === dia) render();
       });
       return;
     }
 
     const btnCopiarAmanha = e.target.closest('.cm-tarefa-btn-copiar-amanha');
     if (btnCopiarAmanha) {
-      const item = itens.find(i => i.id === btnCopiarAmanha.dataset.itemId);
+      const item = itemDoCampo(btnCopiarAmanha);
       if (!item) return;
       if (!item._persisted) {
         showToast('Digite o texto da tarefa antes de copiar', 'error');
         return;
       }
-      copiarItemParaData(item, _cmAdicionarDias(dataAtualBR, 1));
+      copiarItemParaData(item, _cmAdicionarDias(dia.dataBR, 1));
       return;
     }
 
     const btnCopiarData = e.target.closest('.cm-tarefa-btn-copiar-data');
     if (btnCopiarData) {
       const id = btnCopiarData.dataset.itemId;
-      const item = itens.find(i => i.id === id);
+      const item = dia.itens.find(i => i.id === id);
       if (!item) return;
       if (!item._persisted) {
         showToast('Digite o texto da tarefa antes de copiar', 'error');
         return;
       }
-      if (copiarPopoverAbertoId === id) { copiarPopoverAbertoId = null; render(); return; }
-      const base = dataAtualBR ? _parseDataAula(dataAtualBR) : new Date();
+      if (copiarPopoverAbertoId === id) { fecharPopoverAberto(); return; }
+      const base = (dia.dataBR && _parseDataAula(dia.dataBR)) || new Date();
       copiarMes = base.getMonth();
       copiarAno = base.getFullYear();
       copiarPopoverAbertoId = id;
       render();
       const wrap = listaEl.querySelector(`.cm-tarefa-copiar-data-wrap[data-item-id="${id}"]`);
-      if (wrap) popoverAberto = { wrap, fechar: () => { copiarPopoverAbertoId = null; render(); } };
+      if (wrap) popoverAberto = { wrap, fechar: () => { copiarPopoverAbertoId = null; esconderPopoverDaLista('.cm-data-picker-popover'); } };
       return;
     }
 
@@ -2066,11 +2313,12 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
 
     const diaCopiar = e.target.closest('.cm-tarefa-copiar-data-wrap .calendar-day');
     if (diaCopiar) {
-      const item = itens.find(i => i.id === copiarPopoverAbertoId);
+      const item = dia.itens.find(i => i.id === copiarPopoverAbertoId);
       copiarPopoverAbertoId = null;
+      popoverAberto = null;
       if (item) {
-        const dia = Number(diaCopiar.dataset.dia);
-        const dataEscolhida = `${String(dia).padStart(2, '0')}/${String(copiarMes + 1).padStart(2, '0')}/${copiarAno}`;
+        const d = Number(diaCopiar.dataset.dia);
+        const dataEscolhida = `${String(d).padStart(2, '0')}/${String(copiarMes + 1).padStart(2, '0')}/${copiarAno}`;
         copiarItemParaData(item, dataEscolhida);
       }
       render();
@@ -2079,7 +2327,7 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
 
     const btnSubtarefa = e.target.closest('.cm-tarefa-btn-subtarefa');
     if (btnSubtarefa) {
-      const item = itens.find(i => i.id === btnSubtarefa.dataset.itemId);
+      const item = itemDoCampo(btnSubtarefa);
       if (!item) return;
       if (!item._persisted) {
         showToast('Digite o texto da tarefa antes de adicionar uma subtarefa', 'error');
@@ -2092,34 +2340,33 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
 
     const btnExcluir = e.target.closest('.cm-tarefa-btn-excluir');
     if (btnExcluir) {
-      const item = itens.find(i => i.id === btnExcluir.dataset.itemId);
+      const item = itemDoCampo(btnExcluir);
       if (!item) return;
+      const ctx = dia;
+      const objetosRemover = [item, ...coletarSubarvoreObjetos(item.id)];
 
-      const coletarDescendentes = (itemId) => {
-        const diretos = itens.filter(i => i.parentId === itemId);
-        return diretos.reduce((acc, filho) => acc.concat(filho.id, coletarDescendentes(filho.id)), []);
-      };
-      const idsRemover = [item.id, ...coletarDescendentes(item.id)];
-
-      if (item._persisted) {
+      if (objetosRemover.some(i => i._persisted || i._criando)) {
         const confirmou = await showConfirmDialog(
           'Excluir tarefa',
-          `Tem certeza que deseja excluir "${escapeHtml(_cmTextoPlano(item.texto))}"${idsRemover.length > 1 ? ' e suas subtarefas' : ''}?`
+          `Tem certeza que deseja excluir "${escapeHtml(_cmTextoPlano(item.texto))}"${objetosRemover.length > 1 ? ' e suas subtarefas' : ''}?`
         );
         if (!confirmou) return;
-        const idsPersistidos = itens.filter(i => idsRemover.includes(i.id) && i._persisted).map(i => i.id);
-        try {
-          if (idsPersistidos.length) await BANCO.deleteItensTarefa(listaIdAtual, idsPersistidos);
-        } catch (error) {
-          console.error('❌ Erro ao excluir tarefa:', error);
-          showToast('❌ Erro ao excluir tarefa', 'error');
-          return;
-        }
+      }
+      objetosRemover.forEach(i => { i._removido = true; cancelarPendente(`texto-${chaveItem(i)}`); cancelarPendente(`comentario-${chaveItem(i)}`); });
+      // Os que ainda estão sendo criados se apagam sozinhos ao terminar (persistirTexto)
+      const idsPersistidos = objetosRemover.filter(i => i._persisted).map(i => i.id);
+      try {
+        if (idsPersistidos.length) await BANCO.deleteItensTarefa(ctx.listaId, idsPersistidos);
+      } catch (error) {
+        console.error('❌ Erro ao excluir tarefa:', error);
+        showToast('❌ Erro ao excluir tarefa', 'error');
+        objetosRemover.forEach(i => { i._removido = false; });
+        return;
       }
 
-      itens = itens.filter(i => !idsRemover.includes(i.id));
-      await salvarAgregados();
-      render();
+      ctx.itens = ctx.itens.filter(i => !i._removido || i._criando);
+      salvarAgregados(ctx);
+      if (ctx === dia) render();
     }
   });
 
@@ -2130,7 +2377,7 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
     const handle = e.target.closest('.cm-tarefa-handle');
     if (!handle) return;
     const itemEl = handle.closest('.cm-tarefa-item');
-    const item = itens.find(i => i.id === itemEl?.dataset.itemId);
+    const item = dia.itens.find(i => i.id === itemEl?.dataset.itemId);
     if (!item) return;
     arrastando = { id: item.id, parentId: item.parentId };
     e.dataTransfer.effectAllowed = 'move';
@@ -2165,7 +2412,7 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
     if (!arrastando) return;
     const alvoEl = e.target.closest('.cm-tarefa-item');
     if (!alvoEl) return;
-    const alvo = itens.find(i => i.id === alvoEl.dataset.itemId);
+    const alvo = dia.itens.find(i => i.id === alvoEl.dataset.itemId);
     if (!alvo || alvo.parentId !== arrastando.parentId || alvo.id === arrastando.id) return;
     e.preventDefault();
     const rect = alvoEl.getBoundingClientRect();
@@ -2181,8 +2428,8 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
     const parentIdArrastado = arrastando.parentId;
     arrastando = null;
     if (!alvoEl) return;
-    const alvo = itens.find(i => i.id === alvoEl.dataset.itemId);
-    const item = itens.find(i => i.id === arrastandoId);
+    const alvo = dia.itens.find(i => i.id === alvoEl.dataset.itemId);
+    const item = dia.itens.find(i => i.id === arrastandoId);
     if (!alvo || !item || alvo.parentId !== parentIdArrastado || alvo.id === item.id) return;
     e.preventDefault();
 
@@ -2196,10 +2443,11 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
 
     render();
 
+    const ctx = dia;
     const persistidos = irmaos.filter(i => i._persisted).map(i => ({ id: i.id, ordem: i.ordem }));
-    if (persistidos.length && listaIdAtual) {
+    if (persistidos.length && ctx.listaId) {
       try {
-        await BANCO.reordenarItensTarefa(listaIdAtual, persistidos);
+        await BANCO.reordenarItensTarefa(ctx.listaId, persistidos);
       } catch (error) {
         console.error('❌ Erro ao reordenar tarefas:', error);
         showToast('❌ Erro ao reordenar tarefas', 'error');
@@ -2207,33 +2455,48 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
     }
   });
 
-  if (btnExcluirLista) {
-    btnExcluirLista.addEventListener('click', async () => {
-      if (!listaIdAtual) { closeModal(); return; }
-      const confirmou = await showConfirmDialog('Excluir lista de tarefas', 'Tem certeza que deseja excluir esta lista de tarefas inteira?');
-      if (!confirmou) return;
-      btnExcluirLista.disabled = true;
-      try {
-        await BANCO.deleteListaTarefas(listaIdAtual);
-        showToast('✅ Lista de tarefas excluída!', 'success');
-        closeModal();
-      } catch (error) {
-        console.error('❌ Erro ao excluir lista de tarefas:', error);
-        showToast('❌ Erro ao excluir lista de tarefas', 'error');
-        btnExcluirLista.disabled = false;
+  // Excluir a lista inteira mantém o modal aberto no mesmo dia, agora vazio
+  btnExcluirLista.addEventListener('click', async () => {
+    const ctx = dia;
+    if (!ctx.listaId) return;
+    const confirmou = await showConfirmDialog('Excluir lista de tarefas', 'Tem certeza que deseja excluir esta lista de tarefas inteira?');
+    if (!confirmou) return;
+    btnExcluirLista.disabled = true;
+    try {
+      await flushPendentes();
+      await aguardarFilas();
+      if (ctx.listaId) await BANCO.deleteListaTarefas(ctx.listaId);
+      ctx.itens.forEach(i => { i._removido = true; });
+      ctx.itens = [];
+      ctx.listaId = null;
+      showToast('✅ Lista de tarefas excluída!', 'success');
+      if (ctx === dia) {
+        atualizarLabelData();
+        render();
       }
-    });
-  }
+    } catch (error) {
+      console.error('❌ Erro ao excluir lista de tarefas:', error);
+      showToast('❌ Erro ao excluir lista de tarefas', 'error');
+    } finally {
+      btnExcluirLista.disabled = false;
+    }
+  });
 
   // ---- Atualiza o destaque "urgente" da área de prazo a cada minuto, sem refetch ----
-  var cmModalIntervaloUrgencia = setInterval(() => {
+  intervaloUrgencia = setInterval(() => {
     listaEl.querySelectorAll('.cm-tarefa-item').forEach(el => {
-      const item = itens.find(i => i.id === el.dataset.itemId);
+      const item = dia.itens.find(i => i.id === el.dataset.itemId);
       if (!item) return;
       const btnHoraEl = el.querySelector(':scope > .cm-tarefa-row .cm-tarefa-btn-hora');
-      if (btnHoraEl) btnHoraEl.classList.toggle('cm-tarefa-btn-hora-urgente', _cmEhUrgente(item, dataAtualBR));
+      if (btnHoraEl) btnHoraEl.classList.toggle('cm-tarefa-btn-hora-urgente', _cmEhUrgente(item, dia.dataBR));
     });
   }, 60000);
+
+  // ---- Carga inicial ----
+  render();
+  if (listaIdExistente || dataPresetBR) {
+    carregarDia(dataPresetBR || '', { listaId: listaIdExistente });
+  }
 }
 
 window.CalMasterTarefas = {
