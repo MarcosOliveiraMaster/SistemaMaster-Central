@@ -953,6 +953,27 @@
     .nt2-modal textarea:focus{outline:none;border-color:#f28705;}
     .nt2-modal label.chk{display:flex;gap:.6rem;align-items:flex-start;font-size:.86rem;color:#111827;cursor:pointer;}
     .nt2-modal label.chk input{width:18px;height:18px;accent-color:#dc2626;flex:none;margin-top:.1rem;}
+    .nt2-barra-dir{margin-left:auto;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;}
+    .nt2-filtro-wrap{position:relative;}
+    .nt2-badge{background:#f28705;color:#fff;border-radius:999px;font-size:.66rem;padding:.05rem .45rem;}
+    .nt2-badge[hidden]{display:none;}
+    .nt2-apagar-todas{color:#dc2626;border-color:#fecaca;}
+    .nt2-apagar-todas:hover{background:#fef2f2;}
+    .nt2-filtro{--pe-acc:#f28705;position:absolute;right:0;top:calc(100% + 6px);z-index:20;width:min(320px,90vw);background:#fff;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 14px 40px rgba(0,0,0,.16);padding:.8rem;display:flex;flex-direction:column;gap:.7rem;font:.84rem 'Comfortaa',sans-serif;color:#374151;}
+    .nt2-filtro[hidden]{display:none;}
+    .nt2-f-sec{display:flex;flex-direction:column;gap:.25rem;}
+    .nt2-f-sec b{font:700 .8rem 'Lexend',sans-serif;color:#111827;margin-bottom:.15rem;}
+    .nt2-f-sec label{display:flex;gap:.5rem;align-items:center;cursor:pointer;padding:.2rem 0;}
+    .nt2-f-sec input{width:16px;height:16px;accent-color:#f28705;}
+    .nt2-f-campo{display:flex;flex-direction:column;gap:.25rem;font:700 .8rem 'Lexend',sans-serif;color:#111827;}
+    .nt2-f-campo input{border:2px solid #e5e7eb;border-radius:10px;padding:.5rem .65rem;font:.86rem 'Comfortaa',sans-serif;}
+    .nt2-f-campo input:focus{outline:none;border-color:#f28705;}
+    .nt2-f-acoes{display:flex;gap:.5rem;justify-content:flex-end;}
+    .nt2-mes{margin-bottom:1.6rem;}
+    .nt2-mes-h{display:flex;align-items:baseline;gap:.6rem;margin:0 0 .8rem;font:700 1.15rem 'Lexend',sans-serif;color:#111827;border-bottom:2px solid #f28705;padding-bottom:.35rem;}
+    .nt2-mes-h span,.nt2-sem-h span{font:700 .72rem 'Comfortaa',sans-serif;color:#9ca3af;}
+    .nt2-semana{margin:0 0 1.1rem .2rem;}
+    .nt2-sem-h{display:flex;align-items:baseline;gap:.5rem;margin:0 0 .6rem;font:700 .9rem 'Lexend',sans-serif;color:#d97804;}
     @media (max-width:760px){
       .nt2-card{aspect-ratio:auto;} .nt2-split,.nt2-x-split{grid-template-columns:1fr;}
       .nt2-esq,.nt2-x-esq{border-right:0;border-bottom:1px solid #f1f2f4;}
@@ -1086,10 +1107,122 @@
     const p = aberta && visiveis().find(x => x.id === aberta);
     if (p) { cont.innerHTML = expandidaHtml(p); return; }
     aberta = null;
-    const lista = ordenar(visiveis().filter(x => filtro === 'todas' ? true : filtro === 'aguardando' ? x.status === 'pendente' : x.status !== 'pendente'));
-    cont.innerHTML = lista.length
-      ? `<div class="nt2-grade">${lista.map(cardHtml).join('')}</div>`
-      : `<p class="pe-vazio">${filtro === 'aguardando' ? 'Nenhuma proposta aguardando resposta.' : 'Nenhuma notificação por aqui.'}</p>`;
+    atualizarBotaoFiltro();
+    const lista = ordenar(visiveis()
+      .filter(x => filtro === 'todas' ? true : filtro === 'aguardando' ? x.status === 'pendente' : x.status !== 'pendente')
+      .filter(passaNoFiltro));
+    if (!lista.length) {
+      cont.innerHTML = `<p class="pe-vazio">${filtrosAtivos() ? 'Nenhuma proposta para este filtro.' : filtro === 'aguardando' ? 'Nenhuma proposta aguardando resposta.' : 'Nenhuma notificação por aqui.'}</p>`;
+      return;
+    }
+    cont.innerHTML = agrupar(lista).map(m => `
+      <section class="nt2-mes"><h3 class="nt2-mes-h">${m.titulo}<span>${m.total} ${m.total === 1 ? 'proposta' : 'propostas'}</span></h3>
+        ${m.semanas.map(s => `<div class="nt2-semana"><h4 class="nt2-sem-h">${s.titulo}<span>${s.itens.length}</span></h4>
+          <div class="nt2-grade">${s.itens.map(cardHtml).join('')}</div></div>`).join('')}
+      </section>`).join('');
+  }
+
+  // ── Classificação por mês e semana (data de envio da proposta) ───────────
+  const dataEnvio = (p) => (p.criadoEm && p.criadoEm.toDate ? p.criadoEm.toDate() : null);
+  function segundaDe(d) { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; }
+  const ddmm = (d) => `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}`;
+  // Meses do mais novo para o mais antigo; dentro de cada mês, semanas de segunda a domingo.
+  function agrupar(lista) {
+    const meses = new Map();
+    lista.forEach(p => {
+      const d = dataEnvio(p);
+      const chaveMes = d ? `${d.getFullYear()}-${pad2(d.getMonth() + 1)}` : '0000-00';
+      if (!meses.has(chaveMes)) meses.set(chaveMes, { titulo: d ? `${MESES[d.getMonth()].replace(/^./, c => c.toUpperCase())} ${d.getFullYear()}` : 'Sem data de envio', semanas: new Map(), total: 0 });
+      const mes = meses.get(chaveMes);
+      mes.total++;
+      const seg = d ? segundaDe(d) : null;
+      const chaveSem = seg ? seg.getTime() : 0;
+      if (!mes.semanas.has(chaveSem)) {
+        const dom = seg ? new Date(seg.getFullYear(), seg.getMonth(), seg.getDate() + 6) : null;
+        mes.semanas.set(chaveSem, { titulo: seg ? `Semana de ${ddmm(seg)} até ${ddmm(dom)}` : 'Sem data', itens: [] });
+      }
+      mes.semanas.get(chaveSem).itens.push(p);
+    });
+    return [...meses.entries()].sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([, m]) => ({ ...m, semanas: [...m.semanas.entries()].sort((a, b) => b[0] - a[0]).map(([, s]) => s) }));
+  }
+
+  // ── Filtro: status, professor e cliente ──────────────────────────────────
+  const filtros = { status: new Set(), professor: '', cliente: '' };
+  const filtrosAtivos = () => filtros.status.size + (filtros.professor ? 1 : 0) + (filtros.cliente ? 1 : 0);
+  function passaNoFiltro(p) {
+    if (filtros.status.size && !filtros.status.has(p.status)) return false;
+    if (filtros.professor && !norm(`${p.professorNome} ${p.professorApelido}`).includes(norm(filtros.professor))) return false;
+    if (filtros.cliente && !norm(`${p.clienteNome} ${p.clienteApelido}`).includes(norm(filtros.cliente))) return false;
+    return true;
+  }
+  function atualizarBotaoFiltro() {
+    const n = document.querySelector('#nt2-btn-filtro .nt2-badge');
+    if (n) { const k = filtrosAtivos(); n.textContent = k; n.hidden = !k; }
+  }
+  function painelFiltroHtml() {
+    return `<div class="nt2-filtro" id="nt2-filtro" hidden role="dialog" aria-label="Filtrar propostas">
+      <div class="nt2-f-sec"><b>Status</b>${Object.entries(ST).map(([k, [rot]]) =>
+        `<label><input type="checkbox" value="${k}" ${filtros.status.has(k) ? 'checked' : ''}> ${rot}</label>`).join('')}</div>
+      <label class="nt2-f-campo">Professor<input type="search" id="nt2-f-prof" placeholder="Nome do professor" value="${esc(filtros.professor)}"></label>
+      <label class="nt2-f-campo">Cliente<input type="search" id="nt2-f-cli" placeholder="Nome do cliente" value="${esc(filtros.cliente)}"></label>
+      <div class="nt2-f-acoes"><button type="button" class="pe-btn" id="nt2-f-limpar">Limpar filtros</button><button type="button" class="pe-btn pri" id="nt2-f-ok">Fechar</button></div>
+    </div>`;
+  }
+  function ligarFiltro(sec) {
+    const btn = sec.querySelector('#nt2-btn-filtro'), painel = sec.querySelector('#nt2-filtro');
+    const abrir = (sim) => { painel.hidden = !sim; btn.setAttribute('aria-expanded', String(sim)); if (sim) sec.querySelector('#nt2-f-prof').focus(); };
+    btn.onclick = () => abrir(painel.hidden);
+    sec.querySelector('#nt2-f-ok').onclick = () => abrir(false);
+    painel.addEventListener('change', (e) => {
+      if (e.target.type !== 'checkbox') return;
+      if (e.target.checked) filtros.status.add(e.target.value); else filtros.status.delete(e.target.value);
+      aberta = null; desenharNotificacoes();
+    });
+    sec.querySelector('#nt2-f-prof').oninput = (e) => { filtros.professor = e.target.value.trim(); aberta = null; desenharNotificacoes(); };
+    sec.querySelector('#nt2-f-cli').oninput = (e) => { filtros.cliente = e.target.value.trim(); aberta = null; desenharNotificacoes(); };
+    sec.querySelector('#nt2-f-limpar').onclick = () => {
+      filtros.status.clear(); filtros.professor = ''; filtros.cliente = '';
+      painel.querySelectorAll('input[type=checkbox]').forEach(c => { c.checked = false; });
+      sec.querySelector('#nt2-f-prof').value = ''; sec.querySelector('#nt2-f-cli').value = '';
+      desenharNotificacoes();
+    };
+    if (!ligarFiltro.fora) {
+      ligarFiltro.fora = true;
+      document.addEventListener('mousedown', (e) => {
+        const pn = document.getElementById('nt2-filtro');
+        if (pn && !pn.hidden && !e.target.closest('#nt2-filtro, #nt2-btn-filtro')) { pn.hidden = true; document.getElementById('nt2-btn-filtro')?.setAttribute('aria-expanded', 'false'); }
+      });
+    }
+  }
+
+  // ── Apagar todas as propostas (sem avisar os professores) ─────────────────
+  async function apagarTodas() {
+    const total = propostas.length;
+    if (!total) { aviso('Não há propostas para apagar.', 'info'); return; }
+    const ok = await janela({
+      titulo: 'Apagar todas as propostas',
+      corpo: `<p>Todas as <b>${total} propostas</b> enviadas aos professores serão apagadas, com respostas, contrapropostas e motivos. <b>Não dá para recuperar.</b></p>
+        <p>Elas somem também do portal dos professores, <b>sem aviso</b> para eles.</p>
+        <p class="fino">As aulas das contratações e simulações não mudam: professores já atribuídos continuam nas aulas.</p>
+        <label class="chk"><input type="checkbox" id="nt2-conf-todas"> Entendi que todas as informações das propostas serão apagadas</label>`,
+      botoes: [{ rotulo: 'Cancelar', valor: false }, { rotulo: 'Apagar todas', classe: 'perigo', valor: true, desabilitado: true }],
+      aoMontar: (f, bts) => { f.querySelector('#nt2-conf-todas').onchange = (e) => { bts[1].disabled = !e.target.checked; }; }
+    });
+    if (!ok) return;
+    try {
+      const ids = propostas.map(p => p.id);
+      for (let i = 0; i < ids.length; i += 400) {
+        const lote = fdb().batch();
+        ids.slice(i, i + 400).forEach(id => lote.delete(fdb().collection(COLECAO).doc(id)));
+        await lote.commit();
+      }
+      aberta = null;
+      aviso(`${ids.length} propostas apagadas.`, 'success');
+    } catch (err) {
+      console.error('[Propostas] Erro ao apagar todas:', err);
+      aviso('Não foi possível apagar todas as propostas. Algumas podem ter sido apagadas; atualize a página.', 'error');
+    }
   }
 
   function abrirProposta(id) {
@@ -1384,10 +1517,16 @@
         <button class="nt-chip" data-f="respondidas">Respondidas</button>
         <button class="nt-chip" data-f="aguardando">Aguardando resposta</button>
         <button class="nt-chip" data-f="todas">Todas</button>
-        <span class="nt-dica">Clique num card para ver os detalhes. Dias em amarelo: contraproposta para aprovar.</span>
+        <span class="nt2-barra-dir">
+          <span class="nt2-filtro-wrap"><button type="button" class="pe-btn" id="nt2-btn-filtro" aria-haspopup="true" aria-expanded="false"><i class="fas fa-filter"></i> Filtrar <span class="nt2-badge" hidden>0</span></button>${painelFiltroHtml()}</span>
+          <button type="button" class="pe-btn nt2-apagar-todas" id="nt2-apagar-todas"><i class="fas fa-trash"></i> Apagar todas as propostas</button>
+        </span>
       </div>
+      <p class="nt-dica" style="margin:-.4rem 0 1rem">Clique num card para ver os detalhes. Dias em amarelo: contraproposta para aprovar.</p>
       <div class="nt-conteudo"><p class="pe-vazio">Carregando…</p></div></div>`;
     sec.querySelectorAll('.nt-chip').forEach(c => { c.onclick = () => { filtro = c.dataset.f; aberta = null; desenharNotificacoes(); }; });
+    ligarFiltro(sec);
+    sec.querySelector('#nt2-apagar-todas').onclick = apagarTodas;
     const cont = sec.querySelector('.nt-conteudo');
     cont.addEventListener('click', aoClicarGrid);
     cont.addEventListener('keydown', (e) => {
