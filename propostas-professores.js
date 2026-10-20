@@ -409,8 +409,9 @@
     if (!dados) { aviso(origem === 'simulacao' ? 'Salve a simulação antes de enviar a proposta.' : 'Contratação não encontrada.', 'warning'); return; }
     if (!dados.aulas.length) { aviso('Não há aulas para enviar.', 'warning'); return; }
 
-    // Só professores com acesso à plataforma (e e-mail) — os outros não veriam a proposta.
-    const elegiveis = profs.filter(p => p.acessoPlataforma === true && p.email)
+    // Só professores ativos na equipe (mesmo critério do Match e do BD Professores:
+    // sem status = Ativo), com acesso à plataforma e e-mail — os outros não veriam a proposta.
+    const elegiveis = profs.filter(p => (p.status || 'Ativo') === 'Ativo' && p.acessoPlataforma === true && p.email)
       .sort((a, b) => (ehOuro(a) === ehOuro(b)) ? String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR') : (ehOuro(a) ? -1 : 1));
     const disciplinas = [...new Set(elegiveis.flatMap(disciplinasDe))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
     const escolhidos = new Set();
