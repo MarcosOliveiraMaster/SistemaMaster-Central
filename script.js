@@ -9,7 +9,7 @@ const CONFIG = {
     'calendario', 'fluxo-processos', 'clientes', 'professores', 'galeria-professores',
     'area-pagamento', 'cofres-pagamento', 'exportar-dados', 'previsao-financeira',
     'detalhes-banco-de-aulas', 'quadros-aula', 'notificacoes', 'avaliacoes-equipe', 'orientacoes-alunos',
-    'lista-materias', 'organizar-menu', 'organizacao-recursos'
+    'lista-materias', 'organizar-menu', 'organizacao-recursos', 'analise-recusas'
   ]
 };
 
@@ -226,6 +226,9 @@ function loadSectionContent(sectionId) {
       break;
     case 'orientacoes-alunos':
       if (typeof loadOrientacoesAlunos === 'function') loadOrientacoesAlunos();
+      break;
+    case 'analise-recusas':
+      if (typeof loadAnaliseRecusas === 'function') loadAnaliseRecusas();
       break;
     case 'lista-materias':
       if (typeof loadListaMaterias === 'function') loadListaMaterias();

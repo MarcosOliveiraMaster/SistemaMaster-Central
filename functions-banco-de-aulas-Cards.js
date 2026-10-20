@@ -6267,6 +6267,14 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
     }
   }
   
+  // "21/10/2026" → "qua - 21/10/2026" (data das aulas na Solicitação de Aula)
+  function dataComDiaSemana(data) {
+    const m = String(data || '').match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    if (!m) return data || '';
+    const dia = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][new Date(+m[3], +m[2] - 1, +m[1]).getDay()];
+    return `${dia} - ${m[1]}/${m[2]}/${m[3]}`;
+  }
+
   // Função para mostrar modal final com a solicitação formatada
   async function showModalSolicitacaoFinal(aulaContratacao, aulasSelecionadas, colunasVisiveis = ['nomeCliente', 'endereco', 'referencia', 'totalReceber', 'estudantes', 'data', 'horario', 'duracao', 'materia', 'professor', 'estudante', 'valorAula', 'status'], tipoSolicitacao = 'cliente') {
     console.log('📄 Gerando solicitação final');
@@ -6456,7 +6464,7 @@ A presente nota fiscal refere-se aos serviços contratados de aulas particulares
       // divergente: horário sugerido pelo professor numa contraproposta (borda amarela leve).
       linhasAulasHtml += `
         <tr class="${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}"${aula.divergente ? ' style="background:#fffbeb;outline:1.5px solid #fcd34d;outline-offset:-1.5px;" title="Data ou horário sugerido pelo professor"' : ''}>
-          ${colunasVisiveis.includes('data') ? `<td class="py-2 px-3 text-sm border-r border-gray-200">${aula.data}</td>` : ''}
+          ${colunasVisiveis.includes('data') ? `<td class="py-2 px-3 text-sm border-r border-gray-200">${dataComDiaSemana(aula.data)}</td>` : ''}
           ${colunasVisiveis.includes('horario') ? `<td class="py-2 px-3 text-sm text-center border-r border-gray-200">${aula.horario}</td>` : ''}
           ${colunasVisiveis.includes('duracao') ? `<td class="py-2 px-3 text-sm text-center border-r border-gray-200">${aula.duracao}</td>` : ''}
           ${colunasVisiveis.includes('materia') ? `<td class="py-2 px-3 text-sm border-r border-gray-200">${aula.materia}</td>` : ''}

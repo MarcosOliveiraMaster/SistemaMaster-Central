@@ -48,6 +48,7 @@
     'agendamento-entrevistas': { secao: 'professores', aba: 'dp-tab-agendamento', nome: 'Agendamento de Entrevistas', icone: 'fas fa-calendar-check' },
     'exportar-dados':          { secao: 'exportar-dados', nome: 'Exportar Dados', icone: 'fas fa-file-export' },
     'avaliacoes-equipe':       { secao: 'avaliacoes-equipe', nome: 'Avaliações da equipe', icone: 'fas fa-star' },
+    'analise-recusas':         { secao: 'analise-recusas', nome: 'Análise de recusas de aulas', icone: 'fas fa-chart-bar' },
     'organizar-menu':          { secao: 'organizar-menu', nome: 'Organizar Menu', icone: 'fas fa-sitemap' },
     'detalhes-banco-de-aulas': { secao: 'detalhes-banco-de-aulas', nome: 'Detalhes Banco de Aulas', icone: 'fas fa-table-cells' }
   };
@@ -82,7 +83,7 @@
             f('desempenho-equipe'), f('agendamento-entrevistas')
           ] }
         ] },
-        f('avaliacoes-equipe')
+        f('avaliacoes-equipe'), f('analise-recusas')
       ] },
       { id: 's-ferramentas', nome: 'Ferramentas e Administrativo', itens: [
         f('exportar-dados'), f('organizar-menu'),
@@ -159,6 +160,8 @@
     // Funções novas entram no lugar previsto quando ele existe no menu salvo
     // (ex.: "Orientações para alunos" na gaveta Clientes); senão, no fim.
     const LUGAR_NOVAS = { 'orientacoes-alunos': 'g-clientes', 'lista-materias': 'g-professores' };
+    // Funções novas que entram direto numa seção existente (no fim dela).
+    const SECAO_EXISTENTE = { 'analise-recusas': 's-pessoas' };
     // Funções novas com seção própria: a seção é criada (depois de `depois`)
     // quando o menu salvo ainda não a tem.
     const SECAO_NOVAS = { 'organizacao-recursos': { id: 's-planejamento', nome: 'Planejamento', depois: 's-financeiro' } };
@@ -185,7 +188,8 @@
         return;
       }
       const gaveta = LUGAR_NOVAS[chave] && secoes.map(s => acharGaveta(s.itens, LUGAR_NOVAS[chave])).find(Boolean);
-      (gaveta ? gaveta.itens : secoes[secoes.length - 1].itens).push({ tipo: 'funcao', funcao: chave });
+      const secaoDela = SECAO_EXISTENTE[chave] && secoes.find((s) => s.id === SECAO_EXISTENTE[chave]);
+      (gaveta ? gaveta.itens : secaoDela ? secaoDela.itens : secoes[secoes.length - 1].itens).push({ tipo: 'funcao', funcao: chave });
     });
     return { versao: 1, secoes };
   }

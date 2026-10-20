@@ -132,6 +132,55 @@ async function resolverEmailProfessor(filtro) {
   return prof ? String(prof.email || '').trim().toLowerCase() : '';
 }
 
+// Ao atribuir um professor a uma aula, libera para ele o que o cliente compartilha:
+// orientações do aluno (orientacoesAlunos), local da aula (locaisClientes) e
+// conteúdos do pacote (conteudosContratacoes). Antes, isso só acontecia quando o
+// cliente abria o portal. O espelho das orientações é criado se ainda não existe
+// (mesmo formato de orientacoes-aluno.js do portal). Só acrescenta o e-mail; o
+// portal do cliente tira professores antigos na próxima visita. Falhas só no console.
+async function compartilharComProfessor(aula, email) {
+  const e = String(email || '').trim().toLowerCase();
+  if (!e || !aula) return;
+  const add = firebase.firestore.FieldValue.arrayUnion(e);
+  const tarefas = [];
+  const codigo = String(aula.codigoContratacao || aula.idContratacao || '');
+  if (codigo) tarefas.push(db.collection('conteudosContratacoes').doc(codigo).update({ professoresEmails: add }));
+  try {
+    const cpf = aula.cpf || '';
+    const cad = cpf ? await db.collection('cadastroClientes').where('cpf', '==', cpf).limit(1).get() : null;
+    if (cad && !cad.empty) {
+      const id = cad.docs[0].id, c = cad.docs[0].data();
+      tarefas.push(db.collection('locaisClientes').doc(id).update({ professoresEmails: add }));
+      const ref = db.collection('orientacoesAlunos').doc(id);
+      tarefas.push(ref.get().then(s => {
+        if (s.exists) return ref.update({ professoresEmails: add });
+        const estudantes = (Array.isArray(c.estudantes) ? c.estudantes : []).map(x => {
+          const o = x && typeof x.orientacoes === 'object' && x.orientacoes ? x.orientacoes : {};
+          return {
+            nome: String(x.nomeEstudante || x.nome || '').trim().slice(0, 120),
+            serie: String(x.serieEstudante || x.serie || '').slice(0, 60),
+            orientacoes: {
+              tiposAula: Array.isArray(o.tiposAula) ? o.tiposAula : [],
+              neurodivergencias: Array.isArray(o.neurodivergencias) ? o.neurodivergencias : [],
+              recomendacoes: String(o.recomendacoes || '')
+            }
+          };
+        }).filter(x => x.nome).slice(0, 20);
+        if (!estudantes.length) return null;
+        return ref.set({
+          estudantes, clienteUid: c.uid || '', clienteNome: String(c.nome || '').slice(0, 120),
+          professoresEmails: [e], atualizadoEm: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }));
+    }
+  } catch (err) {
+    console.warn('[Compartilhar com professor] Cadastro do cliente indisponível:', err && err.code);
+  }
+  const r = await Promise.allSettled(tarefas);
+  r.filter(x => x.status === 'rejected' && x.reason && x.reason.code !== 'not-found')
+    .forEach(x => console.warn('[Compartilhar com professor]', x.reason.code || x.reason));
+}
+
 // Grava clienteUid/clientUid = uid nas aulas (BancoDeAulas-Lista) e contratações
 // (BancoDeAulas) do CPF do cliente. Aulas criadas antes de o cliente ter acesso
 // ficam com o uid vazio: ele vê a aula (o portal busca por CPF), mas não os
@@ -468,6 +517,7 @@ async function updateProfessorAula(idAula, nomeProfessor, cpfProfessor, uidProfe
       professorEmail,
       timestamp: firebase.firestore.FieldValue.serverTimestamp()
     });
+    compartilharComProfessor(querySnapshot.docs[0].data(), professorEmail);
     return true;
   } catch (error) {
     console.error('❌ Erro ao atualizar professor:', error.message);
@@ -680,6 +730,7 @@ async function updateCamposCalendario(idAula, campos) {
       campos = { ...campos, professorEmail: await resolverEmailProfessor({ cpf, nome }) };
     }
     await querySnapshot.docs[0].ref.update(campos);
+    if (campos.professorEmail) compartilharComProfessor(querySnapshot.docs[0].data(), campos.professorEmail);
     forceCacheRefresh();
     return true;
   } catch (error) {
@@ -1050,6 +1101,7 @@ if (typeof window !== 'undefined') {
     fetchCadastroClientes,
     fetchDataBaseProfessores,
     resolverEmailProfessor,
+    compartilharComProfessor,
     vincularAulasAoCliente,
     fetchClienteByCPF,
     fetchAulasByDate,

@@ -884,7 +884,8 @@
     .nt2-chg{display:flex;flex-direction:column;gap:.25rem;}
     .nt2-chg div{background:#fffbeb;border:1px solid #fde68a;border-radius:7px;padding:.25rem .45rem;font-size:.72rem;line-height:1.35;}
     .nt2-chg div.ap{background:#f0fdf4;border-color:#bbf7d0;}
-    .nt2-chg s{color:#9ca3af;} .nt2-chg b{color:#111827;}
+    .nt2-chg s{color:#9ca3af;text-decoration:none;} .nt2-chg b{color:#111827;}
+    .nt2-lista s,.nt2-modal s{color:#9ca3af !important;text-decoration:none;}
     .nt2-msg{font-size:.72rem;color:#4b5563;background:#f3f4f6;border-radius:7px;padding:.35rem .5rem;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;font-style:italic;}
     .nt2-acoes{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid #e5e7eb;flex:none;}
     .nt2-acoes button{border:0;border-right:1px solid #e5e7eb;background:#fff;min-height:48px;padding:.35rem .3rem;font:700 .68rem 'Comfortaa',sans-serif;color:#4b5563;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.25rem;line-height:1.2;cursor:pointer;}
