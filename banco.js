@@ -981,14 +981,16 @@ async function fetchListasTarefasPorData(dataBR) {
 }
 
 // Listas de um mês (grid do Calendário Master). A data é gravada como texto
-// "dd/mm/yyyy", então busca pelas datas exatas do mês em lotes de 30 ("in").
+// "dd/mm/yyyy", então busca pelas datas exatas do mês em lotes de 10 ("in") —
+// o SDK 9.6.10 usado aqui rejeita "in" com mais de 10 valores.
 async function fetchListasTarefasDoMes(mes, ano) {
   try {
     const diasNoMes = new Date(ano, mes + 1, 0).getDate();
     const mm = String(mes + 1).padStart(2, '0');
     const datas = [];
     for (let d = 1; d <= diasNoMes; d++) datas.push(`${String(d).padStart(2, '0')}/${mm}/${ano}`);
-    const lotes = [datas.slice(0, 30), datas.slice(30)].filter(l => l.length);
+    const lotes = [];
+    for (let i = 0; i < datas.length; i += 10) lotes.push(datas.slice(i, i + 10));
     const snaps = await Promise.all(lotes.map(l => db.collection("listasTarefas").where('data', 'in', l).get()));
     const listas = [];
     snaps.forEach(snap => snap.forEach(doc => listas.push({ id: doc.id, ...doc.data() })));
