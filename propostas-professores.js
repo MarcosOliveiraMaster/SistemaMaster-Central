@@ -9,10 +9,12 @@
 //    Cada professor escolhido recebe um documento com as aulas marcadas e o total
 //    que ELE recebe (hora/aula do professor × duração), mais estudantes, bairro,
 //    cidade e conteúdos da contratação. Sem CPF, pacote ou lucro.
-// 2) Área "Notificações" — grid de cards 4:3 (resumo + calendário) com as
+// 2) Área "Propostas" (antiga Notificações) — um card por contratação/simulação;
+//    dentro, os cards 4:3 (resumo + calendário) de cada proposta com as
 //    respostas: aceite, recusa com motivo e contraproposta por aula. Aprovar
 //    contraproposta, gerar solicitação, aprovar o professor, enviar para
-//    análise e apagar (detalhes no bloco "Notificações: grid das propostas").
+//    análise e apagar; aceite sem alteração vincula o professor sozinho
+//    (detalhes no bloco "Notificações: grid das propostas").
 // O professor responde pelo portal (SistemMaster-Login/propostas-professor.js).
 // Regras: SistemMaster-Login/firestore.rules → match /propostasProfessores.
 
@@ -771,9 +773,20 @@
   // Dia amarelo do calendário (ou "Aprovar" na lista) → aprovar contraproposta:
   // a aula muda de data/horário na contratação (BancoDeAulas-Lista) ou na
   // simulação. O professor só é atribuído em "Aprovar este professor".
+  //
+  // A tela principal mostra um card por SIMULAÇÃO/CONTRATAÇÃO (grupo); ao abrir,
+  // aparecem as propostas daquele grupo. "Ocultar todas" marca ocultaCentral nas
+  // propostas dos grupos exibidos (nada é apagado); o grupo volta sozinho quando
+  // chega proposta nova ou resposta depois de ocultado, e "Exibir todas" desfaz.
+  //
+  // Aceite sem alteração (status 'aceita', sem contraproposta) vincula o professor
+  // automaticamente (processarAceitesAutomaticos) se as aulas estão "A definir";
+  // se já têm outro professor, fica para o botão "Aprovar", que pergunta antes de
+  // substituir.
   let propostas = [];
-  let filtro = 'respondidas';
+  let filtro = 'todas';
   let cancelar = null;
+  let grupoAberto = null;        // chave origem|idOrigem do grupo aberto
   let aberta = null;             // id da proposta aberta no espaço do grid
   const mesDoCard = new Map();   // id → 'aaaa-mm' visível no calendário
 
@@ -814,6 +827,7 @@
       propostas = [];
       snap.forEach(d => propostas.push({ id: d.id, ...d.data() }));
       atualizarContador();
+      processarAceitesAutomaticos();
       const sec = document.getElementById('notificacoes');
       if (sec && sec.classList.contains('active') && sec.querySelector('.nt-wrap')) desenharNotificacoes();
     }, (err) => console.warn('[Notificações] Escuta indisponível:', err && err.code));
@@ -976,6 +990,33 @@
     .nt2-mes-h span,.nt2-sem-h span{font:700 .72rem 'Comfortaa',sans-serif;color:#9ca3af;}
     .nt2-semana{margin:0 0 1.1rem .2rem;}
     .nt2-sem-h{display:flex;align-items:baseline;gap:.5rem;margin:0 0 .6rem;font:700 .9rem 'Lexend',sans-serif;color:#d97804;}
+    .nt2-hit{position:relative;}
+    .nt2-auto{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;padding:1.2rem;text-align:center;background:rgba(255,255,255,.6);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);color:#15803d;font:700 1rem 'Lexend',sans-serif;line-height:1.4;}
+    .nt2-auto i{font-size:2rem;}
+    .nt2-auto small{font:600 .74rem 'Comfortaa',sans-serif;color:#4b5563;}
+    .nt2-auto-faixa{display:flex;gap:.6rem;align-items:center;background:#f0fdf4;border:1.5px solid #bbf7d0;color:#15803d;border-radius:12px;padding:.6rem .85rem;font:700 .86rem 'Lexend',sans-serif;}
+    .nt2-ggrade{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,330px),1fr));gap:1rem;}
+    .nt2-g{position:relative;background:#fff;border:1.5px solid #e5e7eb;border-radius:14px;padding:.95rem 1rem;display:flex;flex-direction:column;gap:.6rem;cursor:pointer;text-align:left;font:inherit;color:#374151;box-shadow:0 2px 8px rgba(0,0,0,.04);transition:border-color .15s,box-shadow .15s,transform .15s;}
+    .nt2-g:hover{border-color:#fdba74;box-shadow:0 8px 22px rgba(0,0,0,.08);transform:translateY(-1px);}
+    .nt2-g:focus-visible{outline:3px solid #fcd9a8;outline-offset:2px;}
+    .nt2-g.nova{border-color:#f28705;}
+    .nt2-g-topo{display:flex;gap:.65rem;align-items:center;}
+    .nt2-g-ico{width:40px;height:40px;border-radius:12px;background:#fff7ed;color:#f28705;display:grid;place-items:center;font-size:1rem;flex:none;}
+    .nt2-g-quem{flex:1;min-width:0;display:flex;flex-direction:column;}
+    .nt2-g-quem b{font:700 .95rem 'Lexend',sans-serif;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .nt2-g-quem span{font-size:.74rem;color:#9ca3af;}
+    .nt2-sino{position:relative;width:34px;height:34px;border-radius:50%;background:#f3f4f6;color:#9ca3af;display:grid;place-items:center;flex:none;}
+    .nt2-sino.on{background:#fff7ed;color:#f28705;}
+    .nt2-sino b{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 4px;border-radius:999px;background:#ef4444;color:#fff;font:700 .64rem/18px 'Lexend',sans-serif;text-align:center;}
+    .nt2-g-info{display:grid;grid-template-columns:auto 1fr;gap:.2rem .6rem;font-size:.78rem;margin:0;}
+    .nt2-g-info dt{color:#9ca3af;} .nt2-g-info dd{margin:0;color:#111827;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .nt2-g-chips{display:flex;flex-wrap:wrap;gap:.3rem;}
+    .nt2-g-conf{display:flex;gap:.45rem;align-items:center;background:#f0fdf4;border-radius:9px;padding:.4rem .6rem;color:#15803d;font-size:.78rem;font-weight:700;}
+    .nt2-g-pe{display:flex;justify-content:space-between;align-items:center;gap:.5rem;border-top:1px solid #f1f2f4;padding-top:.55rem;font-size:.72rem;color:#9ca3af;}
+    .nt2-g-pe span:last-child{color:#d97804;font-weight:700;}
+    .nt2-gv-topo{display:flex;flex-wrap:wrap;gap:.8rem;align-items:center;margin-bottom:1rem;padding:.8rem 1rem;background:#fff;border:1.5px solid #fdba74;border-radius:14px;}
+    .nt2-gv-topo .nt2-g-quem b{font-size:1.05rem;}
+    .nt2-f-datas{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;}
     @media (max-width:760px){
       .nt2-card{aspect-ratio:auto;} .nt2-split,.nt2-x-split{grid-template-columns:1fr;}
       .nt2-esq,.nt2-x-esq{border-right:0;border-bottom:1px solid #f1f2f4;}
@@ -1024,6 +1065,7 @@
     if (p.status === 'recusada') h += `<span class="nt2-mini">Motivo da recusa</span><div class="nt2-msg" style="font-style:normal">${esc(p.motivoRecusa || 'Não informado')}${p.textoRecusa ? ' · ' + esc(p.textoRecusa) : ''}</div>`;
     if (p.status === 'encerrada') h += `<p>Outro professor foi aprovado para esta ${origemNome(p).toLowerCase()}.</p>`;
     if (p.status === 'aceita') h += '<p class="ok">Aceitou todas as aulas.</p>';
+    if (p.status === 'aceita' && p.autoVinculo === 'manual') h += '<p>As aulas já têm outro professor: use "Aprovar" para substituir.</p>';
     if (p.status === 'aprovado') h += `<p class="ok">Atribuído a ${(p.aulasAtribuidas || []).length} aula(s).</p>`;
     if (nCt || nAp) {
       h += `<span class="nt2-mini">${est.length - nCt - nAp} aceitas · ${nCt} a aprovar · ${nAp} aprovadas</span>
@@ -1060,6 +1102,7 @@
       <div class="nt2-hit" role="button" tabindex="0" data-abrir="${esc(p.id)}" aria-label="Abrir detalhes da proposta de ${esc(p.professorNome || '')}">
         <div class="nt2-topo">${topo(p)}</div>
         <div class="nt2-split"><div class="nt2-esq">${resumo(p)}</div><div class="nt2-dir">${calendario(p)}</div></div>
+        ${autoConfirmada(p) ? `<div class="nt2-auto"><i class="fas fa-circle-check"></i>${TEXTO_AUTO}<small>Clique para ver os detalhes</small></div>` : ''}
       </div>
       <div class="nt2-acoes">${botoes(p, true)}</div></article>`;
   }
@@ -1076,8 +1119,9 @@
     }).join('');
     const est = Array.isArray(p.estudantes) ? p.estudantes : [];
     return `<div class="nt2-x">
-      <div class="nt2-x-topo"><button type="button" class="nt2-voltar" data-fechar><i class="fas fa-arrow-left"></i> Voltar ao grid</button>
-        <div class="nt2-topo" style="padding:0;border:0;flex:1;min-width:0">${topo(p)}</div></div>
+      <div class="nt2-x-topo"><button type="button" class="nt2-voltar" data-fechar><i class="fas fa-arrow-left"></i> Voltar às propostas</button>
+        <div class="nt2-topo" style="padding:0;border:0;flex:1;min-width:0">${topo(p)}</div>
+        ${autoConfirmada(p) ? `<div class="nt2-auto-faixa" style="flex-basis:100%"><i class="fas fa-circle-check"></i>${TEXTO_AUTO}</div>` : ''}</div>
       <div class="nt2-x-split">
         <div class="nt2-x-esq">
           <dl class="nt2-kv"><dt>Cliente</dt><dd>${esc(p.clienteNome || '—')}</dd>
@@ -1106,35 +1150,115 @@
       if (window.SolicitacoesClientes) window.SolicitacoesClientes.desenhar(cont);
       return;
     }
+    atualizarBotoesOcultar();
     const p = aberta && visiveis().find(x => x.id === aberta);
     if (p) { cont.innerHTML = expandidaHtml(p); return; }
     aberta = null;
     atualizarBotaoFiltro();
-    const lista = ordenar(visiveis()
-      .filter(x => filtro === 'todas' ? true : filtro === 'aguardando' ? x.status === 'pendente' : x.status !== 'pendente')
-      .filter(passaNoFiltro));
-    if (!lista.length) {
-      cont.innerHTML = `<p class="pe-vazio">${filtrosAtivos() ? 'Nenhuma proposta para este filtro.' : filtro === 'aguardando' ? 'Nenhuma proposta aguardando resposta.' : 'Nenhuma notificação por aqui.'}</p>`;
+
+    // Dentro de um grupo: todas as propostas daquela simulação/contratação.
+    const g = grupoAberto && grupos(visiveis()).find(x => x.chave === grupoAberto);
+    if (g) {
+      cont.innerHTML = `<div class="nt2-gv-topo">
+          <button type="button" class="nt2-voltar" data-fechar-grupo><i class="fas fa-arrow-left"></i> Voltar às contratações</button>
+          ${grupoTopoHtml(g)}</div>
+        <div class="nt2-grade">${ordenar(g.propostas).map(cardHtml).join('')}</div>`;
       return;
     }
-    cont.innerHTML = agrupar(lista).map(m => `
-      <section class="nt2-mes"><h3 class="nt2-mes-h">${m.titulo}<span>${m.total} ${m.total === 1 ? 'proposta' : 'propostas'}</span></h3>
+    grupoAberto = null;
+
+    const lista = grupos(visiveis().filter(passaNoChip).filter(passaNoFiltro)).filter(x => !x.oculto);
+    if (!lista.length) {
+      const ocultos = gruposOcultos().length;
+      cont.innerHTML = `<p class="pe-vazio">${filtrosAtivos() ? 'Nenhuma proposta para este filtro.' : filtro === 'aguardando' ? 'Nenhuma proposta aguardando resposta.' : 'Nenhuma notificação por aqui.'}${ocultos ? ` ${ocultos} ${ocultos === 1 ? 'contratação/simulação está oculta' : 'contratações/simulações estão ocultas'} — use "Exibir todas as propostas".` : ''}</p>`;
+      return;
+    }
+    cont.innerHTML = agrupar(lista, x => x.ultima).map(m => `
+      <section class="nt2-mes"><h3 class="nt2-mes-h">${m.titulo}<span>${m.total} ${m.total === 1 ? 'contratação/simulação' : 'contratações/simulações'}</span></h3>
         ${m.semanas.map(s => `<div class="nt2-semana"><h4 class="nt2-sem-h">${s.titulo}<span>${s.itens.length}</span></h4>
-          <div class="nt2-grade">${s.itens.map(cardHtml).join('')}</div></div>`).join('')}
+          <div class="nt2-ggrade">${s.itens.map(grupoCardHtml).join('')}</div></div>`).join('')}
       </section>`).join('');
   }
 
-  // ── Classificação por mês e semana (data de envio da proposta) ───────────
+  // ── Grupos: uma simulação ou contratação com todas as suas propostas ─────
+  const passaNoChip = (x) => filtro === 'todas' ? true : filtro === 'aguardando' ? x.status === 'pendente' : x.status !== 'pendente';
+  const chaveGrupo = (p) => `${p.origem || 'contratacao'}|${p.idOrigem || p.codigo || ''}`;
+  const ms = (t) => (t && t.toMillis ? t.toMillis() : 0);
+  // Última movimentação da proposta (envio, resposta ou aprovação).
+  const atividade = (p) => Math.max(ms(p.criadoEm), ms(p.respondidoEm), ms(p.aprovadoEm));
+  // Oculta pela Central e nada aconteceu depois disso (ocultaEm ainda sem hora do
+  // servidor = acabou de ocultar).
+  const ocultaP = (p) => p.ocultaCentral === true && (!p.ocultaEm || atividade(p) <= ms(p.ocultaEm));
+  const novaP = (p) => p.status !== 'pendente' && !p.lidaCentral;
+  const autoConfirmada = (p) => p.status === 'aprovado' && p.autoConfirmado === true;
+  const TEXTO_AUTO = 'Professor aceitou a aula, ele foi confirmado para o atendimento';
+
+  function grupos(lista) {
+    const mapa = new Map();
+    lista.forEach(p => {
+      const k = chaveGrupo(p);
+      if (!mapa.has(k)) mapa.set(k, []);
+      mapa.get(k).push(p);
+    });
+    // O grupo usa TODAS as propostas visíveis dele (não só as do filtro) para
+    // o resumo, o sino e a regra de oculto.
+    const todas = visiveis();
+    return [...mapa.keys()].map(k => {
+      const ps = todas.filter(p => chaveGrupo(p) === k);
+      const base = ps.slice().sort((a, b) => atividade(b) - atividade(a))[0];
+      const ultimaMs = Math.max(...ps.map(atividade));
+      return {
+        chave: k, origem: base.origem, codigo: base.codigo, clienteNome: base.clienteNome || '',
+        propostas: ps, ultima: ultimaMs ? new Date(ultimaMs) : null,
+        novas: ps.filter(novaP).length, oculto: ps.every(ocultaP)
+      };
+    }).sort((a, b) => (b.novas ? 1 : 0) - (a.novas ? 1 : 0) || (b.ultima || 0) - (a.ultima || 0));
+  }
+  const gruposOcultos = () => grupos(visiveis()).filter(g => g.oculto);
+
+  function grupoTopoHtml(g) {
+    return `<span class="nt2-g-ico"><i class="fas ${g.origem === 'simulacao' ? 'fa-calculator' : 'fa-file-signature'}"></i></span>
+      <span class="nt2-g-quem"><b>${esc(g.clienteNome || 'Cliente não identificado')}</b><span>${g.origem === 'simulacao' ? 'Simulação' : 'Contratação'} ${esc(g.codigo || '')}</span></span>
+      <span class="nt2-sino${g.novas ? ' on' : ''}" title="${g.novas ? `${g.novas} atualização(ões) não lida(s)` : 'Sem atualizações novas'}" aria-label="${g.novas} atualizações não lidas"><i class="fas fa-bell"></i>${g.novas ? `<b>${g.novas > 99 ? '99+' : g.novas}</b>` : ''}</span>`;
+  }
+
+  function grupoCardHtml(g) {
+    const n = (st) => g.propostas.filter(p => p.status === st).length;
+    const datas = g.propostas.flatMap(p => (p.aulas || []).map(a => isoDe(a.data))).filter(Boolean).sort();
+    const br = (iso) => iso.split('-').reverse().join('/');
+    const periodo = datas.length ? (datas[0] === datas[datas.length - 1] ? br(datas[0]) : `${br(datas[0])} a ${br(datas[datas.length - 1])}`) : '—';
+    const nAulas = Math.max(0, ...g.propostas.map(p => (p.aulas || []).length));
+    const alunos = [...new Set(g.propostas.flatMap(p => (Array.isArray(p.estudantes) ? p.estudantes : []).map(e => e.nome)).filter(Boolean))];
+    const bairro = (g.propostas.find(p => p.bairro) || {}).bairro || '';
+    const conf = g.propostas.filter(p => p.status === 'aprovado');
+    const chips = [['pendente', 'Aguardando'], ['aceita', 'Aceitaram'], ['contraproposta', 'Contraproposta'], ['recusada', 'Recusaram'], ['encerrada', 'Encerradas']]
+      .map(([st, rot]) => [st, rot, n(st)]).filter(x => x[2])
+      .map(([st, rot, k]) => `<span class="nt2-st ${(ST[st] || ST.pendente)[1]}">${rot} · ${k}</span>`).join('');
+    return `<button type="button" class="nt2-g${g.novas ? ' nova' : ''}" data-grupo="${esc(g.chave)}" aria-label="Abrir propostas de ${esc(g.clienteNome)}">
+      <div class="nt2-g-topo">${grupoTopoHtml(g)}</div>
+      <dl class="nt2-g-info">
+        <dt>Aulas</dt><dd>${nAulas} · ${esc(periodo)}</dd>
+        ${alunos.length ? `<dt>Aluno</dt><dd>${esc(alunos.join(', '))}</dd>` : ''}
+        ${bairro ? `<dt>Bairro</dt><dd>${esc(bairro)}</dd>` : ''}
+        <dt>Propostas</dt><dd>${g.propostas.length} ${g.propostas.length === 1 ? 'professor' : 'professores'}</dd>
+      </dl>
+      ${conf.length ? conf.map(p => `<div class="nt2-g-conf"><i class="fas fa-user-check"></i> Prof. ${esc(p.professorNome || profNome(p))} confirmado${p.autoConfirmado ? ' (aceitou a proposta)' : ''}</div>`).join('') : ''}
+      ${chips ? `<div class="nt2-g-chips">${chips}</div>` : ''}
+      <div class="nt2-g-pe"><span>${g.ultima ? `Atualizado em ${g.ultima.toLocaleDateString('pt-BR')} ${g.ultima.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : ''}</span><span>Ver propostas <i class="fas fa-arrow-right"></i></span></div>
+    </button>`;
+  }
+
+  // ── Classificação por mês e semana ───────────────────────────────────────
   const dataEnvio = (p) => (p.criadoEm && p.criadoEm.toDate ? p.criadoEm.toDate() : null);
   function segundaDe(d) { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; }
   const ddmm = (d) => `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}`;
   // Meses do mais novo para o mais antigo; dentro de cada mês, semanas de segunda a domingo.
-  function agrupar(lista) {
+  function agrupar(lista, dataDoItem) {
     const meses = new Map();
     lista.forEach(p => {
-      const d = dataEnvio(p);
+      const d = dataDoItem(p);
       const chaveMes = d ? `${d.getFullYear()}-${pad2(d.getMonth() + 1)}` : '0000-00';
-      if (!meses.has(chaveMes)) meses.set(chaveMes, { titulo: d ? `${MESES[d.getMonth()].replace(/^./, c => c.toUpperCase())} ${d.getFullYear()}` : 'Sem data de envio', semanas: new Map(), total: 0 });
+      if (!meses.has(chaveMes)) meses.set(chaveMes, { titulo: d ? `${MESES[d.getMonth()].replace(/^./, c => c.toUpperCase())} ${d.getFullYear()}` : 'Sem data', semanas: new Map(), total: 0 });
       const mes = meses.get(chaveMes);
       mes.total++;
       const seg = d ? segundaDe(d) : null;
@@ -1149,11 +1273,19 @@
       .map(([, m]) => ({ ...m, semanas: [...m.semanas.entries()].sort((a, b) => b[0] - a[0]).map(([, s]) => s) }));
   }
 
-  // ── Filtro: status, professor e cliente ──────────────────────────────────
-  const filtros = { status: new Set(), professor: '', cliente: '' };
-  const filtrosAtivos = () => filtros.status.size + (filtros.professor ? 1 : 0) + (filtros.cliente ? 1 : 0);
+  // ── Filtro: status, professor, cliente e data de envio ───────────────────
+  const filtros = { status: new Set(), professor: '', cliente: '', de: '', ate: '' };
+  const filtrosAtivos = () => filtros.status.size + (filtros.professor ? 1 : 0) + (filtros.cliente ? 1 : 0) + (filtros.de || filtros.ate ? 1 : 0);
+  const isoLocal = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
   function passaNoFiltro(p) {
     if (filtros.status.size && !filtros.status.has(p.status)) return false;
+    if (filtros.de || filtros.ate) {
+      const d = dataEnvio(p);
+      if (!d) return false;
+      const iso = isoLocal(d);
+      if (filtros.de && iso < filtros.de) return false;
+      if (filtros.ate && iso > filtros.ate) return false;
+    }
     if (filtros.professor && !norm(`${p.professorNome} ${p.professorApelido}`).includes(norm(filtros.professor))) return false;
     if (filtros.cliente && !norm(`${p.clienteNome} ${p.clienteApelido}`).includes(norm(filtros.cliente))) return false;
     return true;
@@ -1168,6 +1300,9 @@
         `<label><input type="checkbox" value="${k}" ${filtros.status.has(k) ? 'checked' : ''}> ${rot}</label>`).join('')}</div>
       <label class="nt2-f-campo">Professor<input type="search" id="nt2-f-prof" placeholder="Nome do professor" value="${esc(filtros.professor)}"></label>
       <label class="nt2-f-campo">Cliente<input type="search" id="nt2-f-cli" placeholder="Nome do cliente" value="${esc(filtros.cliente)}"></label>
+      <div class="nt2-f-sec"><b>Data de envio da proposta</b>
+        <div class="nt2-f-datas"><label class="nt2-f-campo">De<input type="date" id="nt2-f-de" value="${esc(filtros.de)}"></label>
+          <label class="nt2-f-campo">Até<input type="date" id="nt2-f-ate" value="${esc(filtros.ate)}"></label></div></div>
       <div class="nt2-f-acoes"><button type="button" class="pe-btn" id="nt2-f-limpar">Limpar filtros</button><button type="button" class="pe-btn pri" id="nt2-f-ok">Fechar</button></div>
     </div>`;
   }
@@ -1183,10 +1318,13 @@
     });
     sec.querySelector('#nt2-f-prof').oninput = (e) => { filtros.professor = e.target.value.trim(); aberta = null; desenharNotificacoes(); };
     sec.querySelector('#nt2-f-cli').oninput = (e) => { filtros.cliente = e.target.value.trim(); aberta = null; desenharNotificacoes(); };
+    sec.querySelector('#nt2-f-de').onchange = (e) => { filtros.de = e.target.value; aberta = null; grupoAberto = null; desenharNotificacoes(); };
+    sec.querySelector('#nt2-f-ate').onchange = (e) => { filtros.ate = e.target.value; aberta = null; grupoAberto = null; desenharNotificacoes(); };
     sec.querySelector('#nt2-f-limpar').onclick = () => {
-      filtros.status.clear(); filtros.professor = ''; filtros.cliente = '';
+      filtros.status.clear(); filtros.professor = ''; filtros.cliente = ''; filtros.de = ''; filtros.ate = '';
       painel.querySelectorAll('input[type=checkbox]').forEach(c => { c.checked = false; });
       sec.querySelector('#nt2-f-prof').value = ''; sec.querySelector('#nt2-f-cli').value = '';
+      sec.querySelector('#nt2-f-de').value = ''; sec.querySelector('#nt2-f-ate').value = '';
       desenharNotificacoes();
     };
     if (!ligarFiltro.fora) {
@@ -1198,39 +1336,53 @@
     }
   }
 
-  // ── Apagar todas as propostas (sem avisar os professores) ─────────────────
-  async function apagarTodas() {
-    const total = propostas.length;
-    if (!total) { aviso('Não há propostas para apagar.', 'info'); return; }
-    const ok = await janela({
-      titulo: 'Apagar todas as propostas',
-      corpo: `<p>Todas as <b>${total} propostas</b> enviadas aos professores serão apagadas, com respostas, contrapropostas e motivos. <b>Não dá para recuperar.</b></p>
-        <p>Elas somem também do portal dos professores, <b>sem aviso</b> para eles.</p>
-        <p class="fino">As aulas das contratações e simulações não mudam: professores já atribuídos continuam nas aulas.</p>
-        <label class="chk"><input type="checkbox" id="nt2-conf-todas"> Entendi que todas as informações das propostas serão apagadas</label>`,
-      botoes: [{ rotulo: 'Cancelar', valor: false }, { rotulo: 'Apagar todas', classe: 'perigo', valor: true, desabilitado: true }],
-      aoMontar: (f, bts) => { f.querySelector('#nt2-conf-todas').onchange = (e) => { bts[1].disabled = !e.target.checked; }; }
-    });
-    if (!ok) return;
-    try {
-      const ids = propostas.map(p => p.id);
-      for (let i = 0; i < ids.length; i += 400) {
-        const lote = fdb().batch();
-        ids.slice(i, i + 400).forEach(id => lote.delete(fdb().collection(COLECAO).doc(id)));
-        await lote.commit();
-      }
-      aberta = null;
-      aviso(`${ids.length} propostas apagadas.`, 'success');
-    } catch (err) {
-      console.error('[Propostas] Erro ao apagar todas:', err);
-      aviso('Não foi possível apagar todas as propostas. Algumas podem ter sido apagadas; atualize a página.', 'error');
+  // ── Ocultar / exibir (só visual: nada é apagado e o professor não vê) ─────
+  async function gravarEmLotes(ids, dados) {
+    for (let i = 0; i < ids.length; i += 400) {
+      const lote = fdb().batch();
+      ids.slice(i, i + 400).forEach(id => lote.update(fdb().collection(COLECAO).doc(id), dados));
+      await lote.commit();
     }
+  }
+
+  // Oculta os grupos que estão na tela agora (respeita chip e filtros).
+  async function ocultarTodas() {
+    const exibidos = grupos(visiveis().filter(passaNoChip).filter(passaNoFiltro)).filter(g => !g.oculto);
+    const ids = exibidos.flatMap(g => g.propostas.map(p => p.id));
+    if (!ids.length) { aviso('Não há propostas na tela para ocultar.', 'info'); return; }
+    try {
+      await gravarEmLotes(ids, { ocultaCentral: true, ocultaEm: ts() });
+      grupoAberto = null; aberta = null;
+      aviso(`${exibidos.length} ${exibidos.length === 1 ? 'contratação/simulação ocultada' : 'contratações/simulações ocultadas'}. Elas voltam sozinhas se houver resposta nova.`, 'success');
+    } catch (err) {
+      console.error('[Propostas] Erro ao ocultar:', err);
+      aviso('Não foi possível ocultar as propostas.', 'error');
+    }
+  }
+
+  async function exibirTodas() {
+    const ids = visiveis().filter(p => p.ocultaCentral === true).map(p => p.id);
+    if (!ids.length) { aviso('Não há propostas ocultas.', 'info'); return; }
+    try {
+      await gravarEmLotes(ids, { ocultaCentral: false });
+      aviso('Todas as propostas voltaram a ser exibidas.', 'success');
+    } catch (err) {
+      console.error('[Propostas] Erro ao exibir:', err);
+      aviso('Não foi possível exibir as propostas.', 'error');
+    }
+  }
+
+  function atualizarBotoesOcultar() {
+    const n = gruposOcultos().length;
+    const b = document.getElementById('nt2-exibir-todas');
+    if (b) { b.querySelector('.nt2-badge').textContent = n; b.querySelector('.nt2-badge').hidden = !n; b.disabled = !n; }
   }
 
   function abrirProposta(id) {
     const p = propostas.find(x => x.id === id);
     if (!p) return;
     aberta = id;
+    grupoAberto = chaveGrupo(p);
     if (p.status !== 'pendente' && !p.lidaCentral) {
       fdb().collection(COLECAO).doc(p.id).update({ lidaCentral: true }).catch(err => console.warn('[Notificações] Não marcou como lida:', err && err.code));
     }
@@ -1241,6 +1393,15 @@
 
   function aoClicarGrid(e) {
     if (filtro === 'clientes') return;
+    const grupo = e.target.closest('[data-grupo], [data-fechar-grupo]');
+    if (grupo) {
+      grupoAberto = grupo.hasAttribute('data-fechar-grupo') ? null : grupo.dataset.grupo;
+      aberta = null;
+      desenharNotificacoes();
+      const sec = document.getElementById('notificacoes');
+      if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
     const alvo = e.target.closest('[data-mes], [data-dia], [data-acao], [data-aprovar-aula], [data-fechar], [data-abrir]');
     if (!alvo || alvo.disabled) return;
     const p = propostas.find(x => x.id === (alvo.dataset.id || alvo.dataset.abrir));
@@ -1398,55 +1559,190 @@
     }
   }
 
+  // ── Atribuição do professor às aulas (manual e automática) ───────────────
+  const livre = (x) => !String(x.professor || '').trim() || String(x.professor).trim() === 'A definir';
+  const emailDe = (v) => String(v || '').trim().toLowerCase();
+  // A aula já está com este professor (e-mail nas contratações; nome nas simulações).
+  const ehDoProfessor = (aula, nome, email) =>
+    (email && emailDe(aula.professorEmail) === email) || (!!nome && norm(aula.professor) === norm(nome));
+  // "qua - 21/10/26"
+  const dataBullet = (br) => {
+    const iso = isoDe(br); if (!iso) return String(br || '—');
+    const [y, m, d] = iso.split('-').map(Number);
+    return `${SEM3[new Date(y, m - 1, d).getDay()]} - ${pad2(d)}/${pad2(m)}/${String(y).slice(2)}`;
+  };
+
+  async function cadastroDoProfessor(p) {
+    const s = await fdb().collection('dataBaseProfessores').doc(String(p.professorId)).get();
+    return s.exists ? s.data() : null;
+  }
+
+  // Grava o professor nas aulas indicadas (m.r = aula real achada na origem).
+  async function gravarProfessorNasAulas(p, itens, reais, prof) {
+    if (!itens.length) return;
+    const nome = prof.nome || p.professorNome || '';
+    if (p.origem === 'simulacao') {
+      const lista = reais.lista;
+      itens.forEach(m => { lista[m.r.idx] = { ...lista[m.r.idx], professor: nome, idProfessor: prof.cpf || '', professorUid: prof.uid || '' }; });
+      await fdb().collection('simulacoes').doc(String(p.idOrigem)).update({ aulas: lista });
+    } else {
+      for (const m of itens) await BANCO.updateProfessorAula(m.r.idAula, nome, prof.cpf || '', prof.uid || '');
+    }
+  }
+
+  // Proposta vira 'aprovado' (o professor vê "Nova contratação!" e o endereço) e
+  // as outras propostas abertas do grupo ficam encerradas ("As aulas foram
+  // atribuídas a outro professor"). Devolve quantas foram encerradas.
+  async function marcarAprovada(p, indices, extra) {
+    const local = await localDoCliente(p);
+    await fdb().collection(COLECAO).doc(p.id).update({
+      status: 'aprovado', aprovadoEm: ts(), atribuidaEm: ts(), emAnalise: false, avisoVisto: false, lidaCentral: true,
+      aulasAtribuidas: indices, local: local || null, ...extra
+    });
+    const outras = propostas.filter(x => x.id !== p.id && chaveGrupo(x) === chaveGrupo(p) && ['pendente', 'aceita', 'contraproposta'].includes(x.status));
+    if (outras.length) {
+      const lote = fdb().batch();
+      outras.forEach(x => lote.update(fdb().collection(COLECAO).doc(x.id), { status: 'encerrada', emAnalise: false, lidaCentral: true }));
+      await lote.commit();
+    }
+    return outras.length;
+  }
+
   async function aprovarProfessor(p) {
     const est = aulasComEstado(p);
     const cand = est.filter(a => a.estado === 'aceita' || a.estado === 'aprovada');
     const pend = est.filter(a => a.estado === 'contra');
-    let reais;
-    try { reais = await aulasReais(p); } catch (err) { console.error('[Propostas] Origem indisponível:', err); aviso('Não foi possível ler as aulas da origem.', 'error'); return; }
-    const livre = (x) => !String(x.professor || '').trim() || String(x.professor).trim() === 'A definir';
+    let reais, prof;
+    try {
+      [reais, prof] = await Promise.all([aulasReais(p), cadastroDoProfessor(p)]);
+    } catch (err) { console.error('[Propostas] Origem indisponível:', err); aviso('Não foi possível ler as aulas da origem.', 'error'); return; }
+    if (!prof) { aviso('Cadastro do professor não encontrado.', 'error'); return; }
+    const nomeY = prof.nome || p.professorNome || '';
+    const emailY = emailDe(prof.email || p.professorEmail);
     const mapa = cand.map(a => ({ a, r: reais.achar(a) }));
     const eleg = mapa.filter(m => m.r && livre(m.r.aula));
-    const ocupadas = mapa.filter(m => m.r && !livre(m.r.aula));
+    const jaDele = mapa.filter(m => m.r && !livre(m.r.aula) && ehDoProfessor(m.r.aula, nomeY, emailY));
+    const ocupadas = mapa.filter(m => m.r && !livre(m.r.aula) && !ehDoProfessor(m.r.aula, nomeY, emailY));
     const semPar = mapa.filter(m => !m.r);
-    const ok = await janela({
-      titulo: 'Aprovar este professor para o atendimento',
-      corpo: `<p><b>Prof. ${esc(p.professorNome || '')}</b> vai ser o professor de ${eleg.length} ${eleg.length === 1 ? 'aula' : 'aulas'} na ${origemNome(p).toLowerCase()} ${esc(p.codigo || '')} (onde está "A definir"):</p>
-        ${eleg.length ? `<ul>${eleg.map(m => `<li><b>${esc(curta(m.a.data))}</b> · ${esc(m.a.horario || '')} · ${esc(m.a.materia || '')}</li>`).join('')}</ul>` : ''}
-        ${ocupadas.length ? `<div class="aviso">${ocupadas.length} aula(s) já têm outro professor e ficam como estão: ${ocupadas.map(m => `${esc(curta(m.a.data))} (${esc(m.r.aula.professor)})`).join(', ')}.</div>` : ''}
-        ${pend.length ? `<div class="aviso">${pend.length} aula(s) com contraproposta ainda não aprovada ficam sem professor.</div>` : ''}
-        ${semPar.length ? `<div class="aviso">${semPar.length} aula(s) não foram encontradas na ${origemNome(p).toLowerCase()} (data ou horário mudou?).</div>` : ''}
-        <p class="fino">O professor recebe o aviso "Nova contratação! Novas aulas já agendadas" e passa a ver o endereço completo. As outras propostas abertas desta ${origemNome(p).toLowerCase()} ficam encerradas.</p>`,
-      botoes: [{ rotulo: 'Cancelar', valor: false }, { rotulo: 'Aprovar professor', valor: true, classe: 'pri', desabilitado: !eleg.length }]
-    });
+
+    let ok;
+    if (ocupadas.length) {
+      // Aulas desta proposta já estão com outro professor: confirma a troca.
+      const nomesX = [...new Set(ocupadas.map(m => String(m.r.aula.professor).trim()))];
+      ok = await janela({
+        titulo: 'Substituir professor das aulas',
+        corpo: `<p>O professor <b>"${esc(nomesX.join('", "'))}"</b> já está locado para estas aulas. Ao confirmar, você irá substituir todas as aulas pelo professor <b>"${esc(nomeY)}"</b>:</p>
+          <ul>${ocupadas.map(m => `<li>${esc(dataBullet(m.a.data))} - ${esc(String(m.r.aula.professor).trim())} → ${esc(nomeY)}</li>`).join('')}</ul>
+          ${eleg.length ? `<p class="fino">Mais ${eleg.length} aula(s) que estavam "A definir" também ficam com ${esc(nomeY)}.</p>` : ''}
+          ${pend.length ? `<div class="aviso">${pend.length} aula(s) com contraproposta ainda não aprovada ficam como estão.</div>` : ''}
+          ${semPar.length ? `<div class="aviso">${semPar.length} aula(s) não foram encontradas na ${origemNome(p).toLowerCase()} (data ou horário mudou?).</div>` : ''}
+          <p class="fino">O professor substituído vê que as aulas foram atribuídas a outro professor.</p>`,
+        botoes: [{ rotulo: 'Cancelar', valor: false }, { rotulo: 'Confirmar', valor: true, classe: 'pri' }]
+      });
+    } else {
+      ok = await janela({
+        titulo: 'Aprovar este professor para o atendimento',
+        corpo: `<p><b>Prof. ${esc(nomeY)}</b> vai ser o professor de ${eleg.length} ${eleg.length === 1 ? 'aula' : 'aulas'} na ${origemNome(p).toLowerCase()} ${esc(p.codigo || '')} (onde está "A definir"):</p>
+          ${eleg.length ? `<ul>${eleg.map(m => `<li><b>${esc(curta(m.a.data))}</b> · ${esc(m.a.horario || '')} · ${esc(m.a.materia || '')}</li>`).join('')}</ul>` : ''}
+          ${jaDele.length ? `<p class="fino">${jaDele.length} aula(s) já estão com ${esc(nomeY)}.</p>` : ''}
+          ${pend.length ? `<div class="aviso">${pend.length} aula(s) com contraproposta ainda não aprovada ficam sem professor.</div>` : ''}
+          ${semPar.length ? `<div class="aviso">${semPar.length} aula(s) não foram encontradas na ${origemNome(p).toLowerCase()} (data ou horário mudou?).</div>` : ''}
+          <p class="fino">O professor recebe o aviso "Nova contratação! Novas aulas já agendadas" e passa a ver o endereço completo. As outras propostas abertas desta ${origemNome(p).toLowerCase()} ficam encerradas.</p>`,
+        botoes: [{ rotulo: 'Cancelar', valor: false }, { rotulo: 'Aprovar professor', valor: true, classe: 'pri', desabilitado: !eleg.length && !jaDele.length }]
+      });
+    }
     if (!ok) return;
     try {
-      const profSnap = await fdb().collection('dataBaseProfessores').doc(String(p.professorId)).get();
-      if (!profSnap.exists) { aviso('Cadastro do professor não encontrado.', 'error'); return; }
-      const prof = profSnap.data();
-      const nome = prof.nome || p.professorNome || '';
-      if (p.origem === 'simulacao') {
-        const lista = reais.lista;
-        eleg.forEach(m => { lista[m.r.idx] = { ...lista[m.r.idx], professor: nome, idProfessor: prof.cpf || '', professorUid: prof.uid || '' }; });
-        await fdb().collection('simulacoes').doc(String(p.idOrigem)).update({ aulas: lista });
-      } else {
-        for (const m of eleg) await BANCO.updateProfessorAula(m.r.idAula, nome, prof.cpf || '', prof.uid || '');
-      }
-      const local = await localDoCliente(p);
-      await fdb().collection(COLECAO).doc(p.id).update({
-        status: 'aprovado', aprovadoEm: ts(), atribuidaEm: ts(), emAnalise: false, avisoVisto: false, lidaCentral: true,
-        aulasAtribuidas: eleg.map(m => m.a.i), local: local || null
-      });
-      const outras = propostas.filter(x => x.id !== p.id && String(x.idOrigem) === String(p.idOrigem) && x.origem === p.origem && ['pendente', 'aceita', 'contraproposta'].includes(x.status));
-      if (outras.length) {
+      await gravarProfessorNasAulas(p, [...eleg, ...ocupadas], reais, prof);
+      const encerradas = await marcarAprovada(p, [...eleg, ...jaDele, ...ocupadas].map(m => m.a.i), {});
+      // Professor substituído que ficou sem nenhuma aula do grupo: a proposta
+      // aprovada dele passa a "encerrada".
+      let substituidas = 0;
+      if (ocupadas.length) {
+        const trocadas = new Set(ocupadas.map(m => m.r.aula));
         const lote = fdb().batch();
-        outras.forEach(x => lote.update(fdb().collection(COLECAO).doc(x.id), { status: 'encerrada', emAnalise: false, lidaCentral: true }));
-        await lote.commit();
+        const vistos = new Set();
+        ocupadas.forEach(m => {
+          const nomeX = String(m.r.aula.professor || '').trim(), emailX = emailDe(m.r.aula.professorEmail);
+          const k = emailX || norm(nomeX);
+          if (vistos.has(k)) return;
+          vistos.add(k);
+          if (reais.lista.some(x => !trocadas.has(x) && ehDoProfessor(x, nomeX, emailX))) return;
+          propostas.filter(x => x.id !== p.id && chaveGrupo(x) === chaveGrupo(p) && x.status === 'aprovado'
+              && ((emailX && emailDe(x.professorEmail) === emailX) || norm(x.professorNome) === norm(nomeX)))
+            .forEach(x => { substituidas++; lote.update(fdb().collection(COLECAO).doc(x.id), { status: 'encerrada', emAnalise: false, lidaCentral: true, substituidoEm: ts() }); });
+        });
+        if (substituidas) await lote.commit();
       }
-      aviso(`Professor atribuído a ${eleg.length} aula(s)${outras.length ? ` · ${outras.length} outra(s) proposta(s) encerrada(s)` : ''}.`, 'success');
+      const n = eleg.length + ocupadas.length;
+      aviso(`Professor atribuído a ${n} aula(s)${ocupadas.length ? ` (${ocupadas.length} substituída(s))` : ''}${encerradas + substituidas ? ` · ${encerradas + substituidas} outra(s) proposta(s) encerrada(s)` : ''}.`, 'success');
     } catch (err) {
       console.error('[Propostas] Erro ao aprovar o professor:', err);
       aviso('Não foi possível aprovar o professor.', 'error');
+    }
+  }
+
+  // ── Aceite sem alterações → professor vinculado automaticamente ──────────
+  // Roda na Central (o projeto está no plano Spark, sem Cloud Functions): a
+  // escuta das propostas começa no login, então basta alguém estar com a Central
+  // aberta. Uma transação marca autoVinculo antes de mexer nas aulas, para duas
+  // abas abertas não processarem a mesma proposta. Resultado em autoVinculo:
+  //   'feito'  → aprovado automaticamente (autoConfirmado);
+  //   'manual' → aulas já com outro professor/não encontradas: fica "Aceitou" e a
+  //              Central decide no botão "Aprovar";
+  //   'erro'   → falhou; também fica para o "Aprovar".
+  // Só vale para aceites a partir desta versão — aceites antigos que estavam
+  // esperando a Central continuam esperando.
+  const AUTO_DESDE = Date.parse('2026-10-21T17:45:00-03:00');
+  const emAutoVinculo = new Set();
+  let filaAuto = Promise.resolve();
+
+  function processarAceitesAutomaticos() {
+    propostas
+      .filter(p => p.status === 'aceita' && !p.autoVinculo && ms(p.respondidoEm) >= AUTO_DESDE
+        && !(Array.isArray(p.alteracoes) && p.alteracoes.length) && !String(p.contraproposta || '').trim()
+        && !emAutoVinculo.has(p.id))
+      .forEach(p => {
+        emAutoVinculo.add(p.id);
+        // Uma por vez: duas propostas do mesmo grupo aceitas juntas não disputam as aulas.
+        filaAuto = filaAuto.then(() => vincularAutomaticamente(p)).catch(() => {});
+      });
+  }
+
+  async function vincularAutomaticamente(p) {
+    const ref = fdb().collection(COLECAO).doc(p.id);
+    try {
+      const minha = await fdb().runTransaction(async (t) => {
+        const s = await t.get(ref);
+        const d = s.exists ? s.data() : null;
+        if (!d || d.status !== 'aceita' || d.autoVinculo) return false;
+        t.update(ref, { autoVinculo: 'processando' });
+        return true;
+      });
+      if (!minha) return;
+    } catch (err) {
+      console.warn('[Propostas] Vínculo automático não iniciado:', err && err.code);
+      emAutoVinculo.delete(p.id);
+      return;
+    }
+    try {
+      // Estado mais recente (outra proposta do grupo pode ter acabado de ser aprovada).
+      const atual = propostas.find(x => x.id === p.id) || p;
+      const [reais, prof] = await Promise.all([aulasReais(atual), cadastroDoProfessor(atual)]);
+      if (!prof) { await ref.update({ autoVinculo: 'manual' }); return; }
+      const nome = prof.nome || atual.professorNome || '';
+      const email = emailDe(prof.email || atual.professorEmail);
+      const achadas = (atual.aulas || []).map((a, i) => ({ a: { ...a, i }, r: reais.achar({ ...a, i }) })).filter(m => m.r);
+      const deOutro = achadas.filter(m => !livre(m.r.aula) && !ehDoProfessor(m.r.aula, nome, email));
+      if (!achadas.length || deOutro.length) { await ref.update({ autoVinculo: 'manual' }); return; }
+      await gravarProfessorNasAulas(atual, achadas.filter(m => livre(m.r.aula)), reais, prof);
+      // lidaCentral false: o card acende o sino para a Central ver a confirmação.
+      const encerradas = await marcarAprovada(atual, achadas.map(m => m.a.i), { autoConfirmado: true, autoVinculo: 'feito', lidaCentral: false });
+      console.log(`✅ [Propostas] ${nome} aceitou e foi vinculado a ${achadas.length} aula(s) de ${origemNome(atual)} ${atual.codigo || ''}${encerradas ? ` · ${encerradas} proposta(s) encerrada(s)` : ''}`);
+      aviso(`Prof. ${profNome(atual)} aceitou a proposta e foi confirmado nas aulas de ${atual.clienteNome || origemNome(atual)}.`, 'success');
+    } catch (err) {
+      console.error('[Propostas] Erro no vínculo automático:', err);
+      await ref.update({ autoVinculo: 'erro' }).catch(() => {});
     }
   }
 
@@ -1521,14 +1817,16 @@
         <button class="nt-chip" data-f="todas">Todas</button>
         <span class="nt2-barra-dir">
           <span class="nt2-filtro-wrap"><button type="button" class="pe-btn" id="nt2-btn-filtro" aria-haspopup="true" aria-expanded="false"><i class="fas fa-filter"></i> Filtrar <span class="nt2-badge" hidden>0</span></button>${painelFiltroHtml()}</span>
-          <button type="button" class="pe-btn nt2-apagar-todas" id="nt2-apagar-todas"><i class="fas fa-trash"></i> Apagar todas as propostas</button>
+          <button type="button" class="pe-btn" id="nt2-ocultar-todas" title="Esconde da tela as contratações/simulações exibidas. Nada é apagado."><i class="fas fa-eye-slash"></i> Ocultar todas as propostas</button>
+          <button type="button" class="pe-btn" id="nt2-exibir-todas" title="Volta a mostrar tudo o que foi ocultado"><i class="fas fa-eye"></i> Exibir todas as propostas <span class="nt2-badge" hidden>0</span></button>
         </span>
       </div>
-      <p class="nt-dica" style="margin:-.4rem 0 1rem">Clique num card para ver os detalhes. Dias em amarelo: contraproposta para aprovar.</p>
+      <p class="nt-dica" style="margin:-.4rem 0 1rem">Cada card é uma contratação ou simulação: clique para ver as propostas enviadas aos professores. O sino mostra as respostas ainda não lidas.</p>
       <div class="nt-conteudo"><p class="pe-vazio">Carregando…</p></div></div>`;
-    sec.querySelectorAll('.nt-chip').forEach(c => { c.onclick = () => { filtro = c.dataset.f; aberta = null; desenharNotificacoes(); }; });
+    sec.querySelectorAll('.nt-chip').forEach(c => { c.onclick = () => { filtro = c.dataset.f; aberta = null; grupoAberto = null; desenharNotificacoes(); }; });
     ligarFiltro(sec);
-    sec.querySelector('#nt2-apagar-todas').onclick = apagarTodas;
+    sec.querySelector('#nt2-ocultar-todas').onclick = ocultarTodas;
+    sec.querySelector('#nt2-exibir-todas').onclick = exibirTodas;
     const cont = sec.querySelector('.nt-conteudo');
     cont.addEventListener('click', aoClicarGrid);
     cont.addEventListener('keydown', (e) => {
