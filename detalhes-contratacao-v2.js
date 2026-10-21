@@ -120,6 +120,102 @@ window.DetalhesContratacaoV2 = (function () {
     set('total-aula', moeda(horaProf + lucroHora));
   }
 
+  // "Horas contratadas": total do pacote fixado quando a simulação foi aprovada
+  // (BancoDeAulas.horasContratadas, texto "12h30"). Diferente de "Total de horas",
+  // não acompanha as aulas adicionadas/removidas depois — só muda pelo lápis.
+  // Contratações antigas ficam vazias até alguém preencher.
+  function mascaraHoras(txt) {
+    const bruto = String(txt || '');
+    const iH = bruto.toLowerCase().indexOf('h');
+    const depois = iH >= 0 ? bruto.slice(iH + 1).replace(/\D/g, '') : '';
+    if (iH >= 0 && depois.length <= 2) {
+      // Com "h": horas antes dele, até 2 dígitos de minutos depois.
+      const h = bruto.slice(0, iH).replace(/\D/g, '').slice(0, 3);
+      return h ? `${h}h${depois}` : '';
+    }
+    // Só números (ou um 3º dígito depois do "h" automático): os 2 últimos são os
+    // minutos e o "h" anda junto ("1" → "12" → "1h23" → "12h30").
+    const d = bruto.replace(/\D/g, '').slice(0, 5);
+    return d.length <= 2 ? d : `${d.slice(0, -2)}h${d.slice(-2)}`;
+  }
+
+  // Valor final a gravar: "" (vazio), "12h30"; só horas vira "12h00".
+  // null = inválido (minutos acima de 59).
+  function normalizarHoras(txt) {
+    const v = mascaraHoras(txt);
+    if (!v) return '';
+    const [h, m = ''] = v.split('h');
+    const min = m.padStart(2, '0');
+    if (Number(min) > 59) return null;
+    return `${Number(h)}h${min}`;
+  }
+
+  function montarHorasContratadas(slotEl, aula) {
+    const codigo = aula.codigoContratacao;
+    let valor = aula.horasContratadas || '';
+
+    const exibir = () => {
+      slotEl.innerHTML = `
+        <span class="mdc2-horas-texto">${valor ? esc(valor) : '—'}</span>
+        ${codigo ? '<button type="button" class="mdc2-horas-editar" title="Editar horas contratadas" aria-label="Editar horas contratadas"><i class="fas fa-pencil-alt"></i></button>' : ''}`;
+      const btn = slotEl.querySelector('.mdc2-horas-editar');
+      if (btn) btn.addEventListener('click', editar);
+    };
+
+    const editar = () => {
+      slotEl.innerHTML = `<input type="text" class="mdc2-horas-input" inputmode="numeric" placeholder="00h00" maxlength="6" aria-label="Horas contratadas" value="${esc(valor)}">`;
+      const input = slotEl.querySelector('input');
+      let encerrado = false;
+      input.addEventListener('input', () => {
+        const novo = mascaraHoras(input.value);
+        if (input.value !== novo) input.value = novo;
+      });
+      const salvar = async () => {
+        if (encerrado) return;
+        const novo = normalizarHoras(input.value);
+        if (novo === null) {
+          showToast('Minutos vão de 00 a 59', 'error');
+          input.focus();
+          return;
+        }
+        encerrado = true;
+        if (novo === valor) return exibir();
+        input.disabled = true;
+        try {
+          await db.collection('BancoDeAulas').doc(codigo).update({ horasContratadas: novo });
+          valor = novo;
+          aula.horasContratadas = novo;
+          showToast('Horas contratadas atualizadas', 'success');
+        } catch (err) {
+          console.error('❌ Erro ao salvar horas contratadas:', err);
+          showToast('Erro ao salvar horas contratadas', 'error');
+        }
+        exibir();
+      };
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); salvar(); }
+        // ESC só cancela a edição — não deixa o handler da versão antiga fechar o modal
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); encerrado = true; exibir(); }
+      });
+      input.addEventListener('blur', salvar);
+      input.focus();
+      input.select();
+    };
+
+    exibir();
+    // O objeto "aula" pode vir de um cache antigo: confere o valor salvo no banco.
+    if (codigo) {
+      db.collection('BancoDeAulas').doc(codigo).get().then(snap => {
+        const salvo = snap.exists ? (snap.data().horasContratadas || '') : '';
+        if (salvo !== valor && !slotEl.querySelector('input')) {
+          valor = salvo;
+          aula.horasContratadas = salvo;
+          exibir();
+        }
+      }).catch(err => console.error('❌ Erro ao ler horas contratadas:', err));
+    }
+  }
+
   function linhaResumo(rotulo, slot, extra = '') {
     return `<div class="mdc2-linha"><span class="mdc2-linha-rotulo">${rotulo}</span><span class="mdc2-linha-valor${extra}" data-v2="${slot}"></span></div>`;
   }
@@ -189,6 +285,10 @@ window.DetalhesContratacaoV2 = (function () {
               </div>
               <div class="mdc2-card mdc2-glass">
                 <div class="mdc2-card-titulo"><span class="mdc2-card-icone"><i class="fas fa-clock"></i></span><span class="mdc2-card-titulo-texto">Valores por aula</span></div>
+                <div class="mdc2-linha">
+                  <span class="mdc2-linha-rotulo">Horas contratadas</span>
+                  <span class="mdc2-linha-valor mdc2-horas-contratadas" data-v2="horas-contratadas"></span>
+                </div>
                 ${linhaResumo('Total de horas', 'total-horas')}
                 ${linhaResumo('Hora/aula professor', 'hora-aula')}
                 ${linhaResumo('Lucro por aula', 'lucro-aula', ' mdc2-valor-lucro')}
@@ -279,6 +379,7 @@ window.DetalhesContratacaoV2 = (function () {
     mover(daV1('#display-valor-equipe-contrato'), slot('equipe'));
     mover(daV1('#display-lucro-master-contrato'), slot('lucro'));
     mover(daV1('#btn-editar-valores-contrato'), slot('editar-valores'));
+    montarHorasContratadas(slot('horas-contratadas'), aula);
     mover(daV1('#display-total-horas-contrato'), slot('total-horas'));
     mover(daV1('#display-hora-aula-contrato'), slot('hora-aula'));
     ['#btn-proposta-professores-contratacao', '#btn-salvar-alteracoes']

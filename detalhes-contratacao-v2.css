@@ -463,6 +463,22 @@ body.theme-blue .mdc2-overlay {
 }
 .mdc2-overlay .mdc2-linha-valor > #display-lucro-master-contrato,
 .mdc2-overlay .mdc2-linha-valor.mdc2-valor-lucro { color: #16a34a !important; }
+.mdc2-horas-contratadas { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.mdc2-horas-editar {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border: 0; border-radius: 6px;
+  background: transparent; color: var(--mdc2-texto-suave); cursor: pointer;
+  font-size: 11px; transition: background .15s, color .15s;
+}
+.mdc2-horas-editar:hover,
+.mdc2-horas-editar:focus-visible { background: rgba(var(--mdc2-acc-rgb), .12); color: var(--mdc2-acc); }
+.mdc2-horas-input {
+  width: 6.5em; padding: 2px 8px; text-align: right;
+  font: inherit; font-weight: 700; color: #1f2a44;
+  border: 1px solid rgba(var(--mdc2-acc-rgb), .45); border-radius: 8px;
+  background: #fff; outline: none;
+}
+.mdc2-horas-input:focus { box-shadow: 0 0 0 3px rgba(var(--mdc2-acc-rgb), .18); }
 .mdc2-card-acao { margin-top: clamp(4px, 0.8vh, 8px); }
 .mdc2-overlay .mdc2-card-acao button {
   width: 100%;

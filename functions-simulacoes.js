@@ -4174,6 +4174,13 @@ const Simulacoes = (function() {
         horaAulaProfessor: Number((profRate || DEFAULT_PROF_RATE).toFixed(2)),
         valorLucroMasterPorHora: editingSimulacao && editingSimulacao.valorLucroMasterPorHora ? editingSimulacao.valorLucroMasterPorHora : null,
         SomatorioDuracaoAulas: horasTotais,
+        // Total contratado no momento da aprovação ("12h30"). SomatorioDuracaoAulas
+        // é recalculado quando aulas mudam; este fica fixo (só muda pelo lápis em
+        // "Valores por aula" dos detalhes da contratação).
+        horasContratadas: (() => {
+          const totalMin = Math.round(horasTotais * 60);
+          return `${Math.floor(totalMin / 60)}h${String(totalMin % 60).padStart(2, '0')}`;
+        })(),
         aulas: aulasComIds,
         ConfirmacaoProfessorAula: false,
         ObservacaoContratacao: '',
