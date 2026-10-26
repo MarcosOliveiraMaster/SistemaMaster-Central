@@ -1062,6 +1062,8 @@
     .nt2-g-pe span:last-child{color:#d97804;font-weight:700;}
     .nt2-gv-topo{display:flex;flex-wrap:wrap;gap:.8rem;align-items:center;margin-bottom:1rem;padding:.8rem 1rem;background:#fff;border:1.5px solid #fdba74;border-radius:14px;}
     .nt2-gv-topo .nt2-g-quem b{font-size:1.05rem;}
+    .nt2-gerar-sol{padding:.45rem .9rem;font-size:.82rem;border-color:#fdba74;color:#d97804;background:#fff7eb;}
+    .nt2-gerar-sol:hover:not(:disabled){background:#f28705;border-color:#f28705;color:#fff;}
     .nt2-f-datas{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;}
     @media (max-width:760px){
       .nt2-card{aspect-ratio:auto;} .nt2-split,.nt2-x-split{grid-template-columns:1fr;}
@@ -1208,7 +1210,7 @@
     if (g) {
       cont.innerHTML = `<div class="nt2-gv-topo">
           <button type="button" class="nt2-voltar" data-fechar-grupo><i class="fas fa-arrow-left"></i> Voltar às contratações</button>
-          ${grupoTopoHtml(g)}</div>
+          ${grupoTopoHtml(g, true)}</div>
         <div class="nt2-grade">${ordenar(g.propostas).map(cardHtml).join('')}</div>`;
       return;
     }
@@ -1263,9 +1265,11 @@
   }
   const gruposOcultos = () => grupos(visiveis()).filter(g => g.oculto);
 
-  function grupoTopoHtml(g) {
+  // comAcoes: topo do grupo aberto (o card da lista já é um botão, não leva outro dentro).
+  function grupoTopoHtml(g, comAcoes) {
     return `<span class="nt2-g-ico"><i class="fas ${g.origem === 'simulacao' ? 'fa-calculator' : 'fa-file-signature'}"></i></span>
       <span class="nt2-g-quem"><b>${esc(g.clienteNome || 'Cliente não identificado')}</b><span>${g.origem === 'simulacao' ? 'Simulação' : 'Contratação'} ${esc(g.codigo || '')}</span></span>
+      ${comAcoes ? `<button type="button" class="pe-btn nt2-gerar-sol" data-gerar-sol="${esc(g.chave)}"><i class="fas fa-file-contract"></i> Gerar Solicitação de aula</button>` : ''}
       <span class="nt2-sino${g.novas ? ' on' : ''}" title="${g.novas ? `${g.novas} atualização(ões) não lida(s)` : 'Sem atualizações novas'}" aria-label="${g.novas} atualizações não lidas"><i class="fas fa-bell"></i>${g.novas ? `<b>${g.novas > 99 ? '99+' : g.novas}</b>` : ''}</span>`;
   }
 
@@ -1440,6 +1444,8 @@
 
   function aoClicarGrid(e) {
     if (filtro === 'clientes') return;
+    const gerar = e.target.closest('[data-gerar-sol]');
+    if (gerar) { gerarSolicitacaoGrupo(gerar.dataset.gerarSol, gerar); return; }
     const grupo = e.target.closest('[data-grupo], [data-fechar-grupo]');
     if (grupo) {
       grupoAberto = grupo.hasAttribute('data-fechar-grupo') ? null : grupo.dataset.grupo;
@@ -1888,18 +1894,77 @@
     }
   }
 
-  async function gerarSolicitacao(p) {
+  const linhaSolicitacao = (a, data, horario, professor, divergente) => ({
+    data, horario, duracao: a.duracao, materia: a.materia, professor, estudante: a.estudante || '',
+    valorAula: a.valor, status: 'Pendente', divergente
+  });
+
+  // Abre o modal "Solicitação de Aula" (BancoDeAulasCards) com as aulas por data;
+  // divergente = horário sugerido pelo professor (borda amarela).
+  async function abrirSolicitacao(p, aulas) {
     if (!window.BancoDeAulasCards || typeof BancoDeAulasCards.showModalSolicitacaoFinal !== 'function') { aviso('Módulo de solicitação indisponível.', 'error'); return; }
     let d = null;
     try { d = await docOrigem(p); } catch (_) { /* segue sem CPF: só não busca o cadastro */ }
-    const aulas = aulasComEstado(p).map(a => ({
-      data: a.estado === 'contra' ? a.alt.data : a.data, horario: a.estado === 'contra' ? a.alt.horario : a.horario,
-      duracao: a.duracao, materia: a.materia, professor: p.professorNome || '', estudante: a.estudante || '',
-      valorAula: a.valor, status: 'Pendente', divergente: !!a.alt
-    })).sort((x, y) => (isoDe(x.data) + x.horario).localeCompare(isoDe(y.data) + y.horario));
+    aulas.sort((x, y) => (isoDe(x.data) + x.horario).localeCompare(isoDe(y.data) + y.horario));
     const contrato = { nomeCliente: p.clienteNome || '', cpf: (d && d.cpf) || '', enderecoAulas: '', referencia: '' };
     if (d && (d.ValorPacote || d.ValorPacote === 0 || d.valorPacote)) contrato.ValorPacote = Number(d.ValorPacote ?? d.valorPacote);
     BancoDeAulasCards.showModalSolicitacaoFinal(contrato, aulas, undefined, 'cliente');
+  }
+
+  async function gerarSolicitacao(p) {
+    await abrirSolicitacao(p, aulasComEstado(p).map(a => a.estado === 'contra'
+      ? linhaSolicitacao(a, a.alt.data, a.alt.horario, p.professorNome || '', true)
+      : linhaSolicitacao(a, a.data, a.horario, p.professorNome || '', !!a.alt)));
+  }
+
+  // "Gerar Solicitação de aula" do grupo: cronograma com todas as aulas da
+  // contratação/simulação, cada uma uma vez (chaveAula), assim:
+  //   • já tem professor confirmado (proposta 'aprovado' com a aula atribuída) →
+  //     linha com ele, na data aprovada;
+  //   • algum professor mandou contraproposta para ela → uma linha por sugestão,
+  //     com o nome do professor (duas ou mais = "Opção 1 · Ana", "Opção 2 · Bruno");
+  //   • senão → como o cliente pediu, professor "A definir".
+  // Propostas canceladas e recusadas não entram.
+  async function gerarSolicitacaoGrupo(chave, botao) {
+    const ps = visiveis().filter(p => chaveGrupo(p) === chave && p.status !== 'recusada');
+    if (!ps.length) return;
+    const ok = await janela({
+      titulo: 'Gerar Solicitação de aula',
+      corpo: '<p>Deseja criar uma solicitação de aula com todas as contrapropostas dos professores?</p>',
+      largura: 460,
+      botoes: [{ rotulo: 'Voltar', valor: false }, { rotulo: 'Sim', valor: true, classe: 'pri' }]
+    });
+    if (!ok) return;
+    const original = botao.innerHTML;
+    botao.disabled = true; botao.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando...';
+    try {
+      const porAula = new Map();
+      ps.forEach(p => aulasComEstado(p).forEach(a => {
+        const k = chaveAula(a);
+        if (!porAula.has(k)) porAula.set(k, { a, confirmada: null, sugestoes: [], remarcada: null });
+        const item = porAula.get(k);
+        if (p.status === 'aprovado' && (p.aulasAtribuidas || []).map(Number).includes(a.i)) item.confirmada = { p, a };
+        else if (a.alt && a.alt.aprovada) item.remarcada = a.alt; // contraproposta aprovada: a aula já mudou na origem
+        else if (a.alt && p.status !== 'encerrada') item.sugestoes.push({ p, a });
+      }));
+      const aulas = [...porAula.values()].flatMap(({ a, confirmada, sugestoes, remarcada }) => {
+        if (confirmada) {
+          const c = confirmada.a, ap = c.alt && c.alt.aprovada;
+          return [linhaSolicitacao(c, ap ? c.alt.data : c.data, ap ? c.alt.horario : c.horario, confirmada.p.professorNome || '', !!ap)];
+        }
+        // Mais de uma sugestão para a mesma aula: "Opção 1 · Ana", "Opção 2 · Bruno" para o cliente escolher.
+        if (sugestoes.length) return sugestoes.map((s, n) => linhaSolicitacao(s.a, s.a.alt.data, s.a.alt.horario,
+          (sugestoes.length > 1 ? `Opção ${n + 1} · ` : '') + (s.p.professorNome || ''), true));
+        if (remarcada) return [linhaSolicitacao(a, remarcada.data, remarcada.horario, 'A definir', true)];
+        return [linhaSolicitacao(a, a.data, a.horario, 'A definir', false)];
+      });
+      await abrirSolicitacao(ps[0], aulas);
+    } catch (err) {
+      console.error('[Propostas] Erro ao gerar a solicitação do grupo:', err);
+      aviso('Não foi possível gerar a solicitação.', 'error');
+    } finally {
+      botao.disabled = false; botao.innerHTML = original;
+    }
   }
 
   function loadNotificacoes() {
