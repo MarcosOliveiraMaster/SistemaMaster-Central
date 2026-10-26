@@ -12,7 +12,7 @@
 // 2) Área "Propostas" (antiga Notificações) — um card por contratação/simulação;
 //    dentro, os cards 4:3 (resumo + calendário) de cada proposta com as
 //    respostas: aceite, recusa com motivo e contraproposta por aula. Aprovar
-//    contraproposta, gerar solicitação, aprovar o professor, enviar para
+//    contraproposta, gerar solicitação, confirmar o professor, reenviar, enviar para
 //    análise e apagar; aceite sem alteração vincula o professor sozinho
 //    (detalhes no bloco "Notificações: grid das propostas").
 // O professor responde pelo portal (SistemMaster-Login/propostas-professor.js).
@@ -764,15 +764,18 @@
   // do grid. Botões do card:
   //   • Gerar solicitação com contraproposta → modal "Solicitação de Aula"
   //     (BancoDeAulasCards) com os horários sugeridos em borda amarela;
-  //   • Aprovar este professor → atribui às aulas aceitas/aprovadas que estão
+  //   • Confirmar Professor → atribui às aulas aceitas/aprovadas que estão
   //     "A definir", grava o endereço completo (local) e encerra as outras
-  //     propostas abertas da mesma contratação/simulação;
+  //     propostas abertas que disputam as mesmas aulas (mesmo lote). Propostas
+  //     de outros lotes da contratação (outra disciplina) seguem abertas;
+  //   • Reenviar proposta → nova proposta 'pendente' com as mesmas aulas para o
+  //     mesmo professor; a antiga sai das duas listas sem aviso;
   //   • Enviar para análise → o card do professor fica com a ampulheta;
   //   • Apagar → status 'cancelada' com o motivo (o professor vê o aviso e a
   //     proposta some da lista dele). As aulas continuam onde estão.
   // Dia amarelo do calendário (ou "Aprovar" na lista) → aprovar contraproposta:
   // a aula muda de data/horário na contratação (BancoDeAulas-Lista) ou na
-  // simulação. O professor só é atribuído em "Aprovar este professor".
+  // simulação. O professor só é atribuído em "Confirmar Professor".
   //
   // A tela principal mostra um card por SIMULAÇÃO/CONTRATAÇÃO (grupo); ao abrir,
   // aparecem as propostas daquele grupo. "Ocultar todas" marca ocultaCentral nas
@@ -781,7 +784,7 @@
   //
   // Aceite sem alteração (status 'aceita', sem contraproposta) vincula o professor
   // automaticamente (processarAceitesAutomaticos) se as aulas estão "A definir";
-  // se já têm outro professor, fica para o botão "Aprovar", que pergunta antes de
+  // se já têm outro professor, fica para o botão "Confirmar Professor", que pergunta antes de
   // substituir.
   let propostas = [];
   let filtro = 'todas';
@@ -862,6 +865,7 @@
       sol: est.some(a => a.alt) && !['aprovado', 'encerrada'].includes(p.status),
       aprovar: ['aceita', 'contraproposta'].includes(p.status) && est.some(a => a.estado === 'aceita' || a.estado === 'aprovada'),
       analise: p.status === 'contraproposta' && !p.emAnalise,
+      reenviar: p.status !== 'aprovado',
       apagar: true
     };
   }
@@ -902,7 +906,7 @@
     .nt2-chg s{color:#9ca3af;text-decoration:none;} .nt2-chg b{color:#111827;}
     .nt2-lista s,.nt2-modal s{color:#9ca3af !important;text-decoration:none;}
     .nt2-msg{font-size:.72rem;color:#4b5563;background:#f3f4f6;border-radius:7px;padding:.35rem .5rem;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;font-style:italic;}
-    .nt2-acoes{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid #e5e7eb;flex:none;}
+    .nt2-acoes{display:grid;grid-template-columns:repeat(5,1fr);border-top:1px solid #e5e7eb;flex:none;}
     .nt2-acoes button{border:0;border-right:1px solid #e5e7eb;background:#fff;min-height:48px;padding:.35rem .3rem;font:700 .68rem 'Comfortaa',sans-serif;color:#4b5563;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.25rem;line-height:1.2;cursor:pointer;}
     .nt2-acoes button:last-child{border-right:0;}
     .nt2-acoes button i{font-size:.95rem;}
@@ -951,7 +955,7 @@
     .nt2-lista .lin{display:flex;justify-content:space-between;gap:.5rem;align-items:center;flex-wrap:wrap;}
     .nt2-lista s{color:#9ca3af;}
     .nt2-mini-btn{border:0;background:#16a34a;color:#fff;border-radius:8px;padding:.3rem .65rem;font:700 .72rem 'Comfortaa',sans-serif;cursor:pointer;display:inline-flex;gap:.3rem;align-items:center;}
-    .nt2-x-acoes{display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;padding:.8rem 1rem;border-top:1px solid #e5e7eb;}
+    .nt2-x-acoes{display:grid;grid-template-columns:repeat(5,1fr);gap:.5rem;padding:.8rem 1rem;border-top:1px solid #e5e7eb;}
     .nt2-x-acoes .pe-btn{justify-content:center;min-height:46px;font-size:.78rem;text-align:center;}
     .nt2-x-acoes .pe-btn.ok{background:#16a34a;border-color:#16a34a;color:#fff;}
     .nt2-x-acoes .pe-btn.del{color:#dc2626;border-color:#fecaca;}
@@ -1063,9 +1067,9 @@
     let h = `<div class="nt2-num"><span>${est.length} aulas · professor recebe</span><strong>${moeda(p.valorTotal)}</strong></div>`;
     if (p.status === 'pendente') h += '<p>Aguardando a resposta do professor.</p>';
     if (p.status === 'recusada') h += `<span class="nt2-mini">Motivo da recusa</span><div class="nt2-msg" style="font-style:normal">${esc(p.motivoRecusa || 'Não informado')}${p.textoRecusa ? ' · ' + esc(p.textoRecusa) : ''}</div>`;
-    if (p.status === 'encerrada') h += `<p>Outro professor foi aprovado para esta ${origemNome(p).toLowerCase()}.</p>`;
+    if (p.status === 'encerrada') h += '<p>Outro professor foi confirmado para estas aulas.</p>';
     if (p.status === 'aceita') h += '<p class="ok">Aceitou todas as aulas.</p>';
-    if (p.status === 'aceita' && p.autoVinculo === 'manual') h += '<p>As aulas já têm outro professor: use "Aprovar" para substituir.</p>';
+    if (p.status === 'aceita' && p.autoVinculo === 'manual') h += '<p>As aulas já têm outro professor: use "Confirmar Professor" para substituir.</p>';
     if (p.status === 'aprovado') h += `<p class="ok">Atribuído a ${(p.aulasAtribuidas || []).length} aula(s).</p>`;
     if (nCt || nAp) {
       h += `<span class="nt2-mini">${est.length - nCt - nAp} aceitas · ${nCt} a aprovar · ${nAp} aprovadas</span>
@@ -1088,7 +1092,8 @@
     const ok = pode(p);
     const B = [
       ['sol', 'fas fa-file-contract', 'Gerar solicitação com contraproposta', 'Solicitação', ok.sol, ''],
-      ['aprovar', 'fas fa-user-check', 'Aprovar este professor para o atendimento', 'Aprovar', ok.aprovar, 'ok'],
+      ['aprovar', 'fas fa-user-check', 'Confirmar Professor', 'Confirmar Professor', ok.aprovar, 'ok'],
+      ['reenviar', 'fas fa-paper-plane', 'Reenviar proposta', 'Reenviar proposta', ok.reenviar, ''],
       ['analise', 'fas fa-hourglass-half', p.emAnalise ? 'Em análise' : 'Enviar para análise', p.emAnalise ? 'Em análise' : 'Análise', ok.analise, ''],
       ['apagar', 'fas fa-trash', 'Apagar proposta', 'Apagar', ok.apagar, 'del']
     ];
@@ -1135,7 +1140,7 @@
           <div class="nt2-sec aulas"><h4><i class="far fa-clock"></i> Aulas (${(p.aulas || []).length})</h4><ul class="nt2-lista">${linhas}</ul></div>
         </div>
         <div class="nt2-x-dir">${calendario(p)}
-          <p class="nt2-dica">Clique num dia amarelo para aprovar a contraproposta. A aula muda na ${origemNome(p).toLowerCase()} ${esc(p.codigo || '')}; o professor só é atribuído em "Aprovar este professor".</p></div>
+          <p class="nt2-dica">Clique num dia amarelo para aprovar a contraproposta. A aula muda na ${origemNome(p).toLowerCase()} ${esc(p.codigo || '')}; o professor só é atribuído em "Confirmar Professor".</p></div>
       </div>
       <div class="nt2-x-acoes">${botoes(p, false)}</div></div>`;
   }
@@ -1418,6 +1423,7 @@
     const acao = alvo.dataset.acao;
     if (acao === 'sol') gerarSolicitacao(p);
     else if (acao === 'aprovar') aprovarProfessor(p);
+    else if (acao === 'reenviar') reenviarProposta(p);
     else if (acao === 'analise') enviarParaAnalise(p);
     else if (acao === 'apagar') apagarProposta(p);
   }
@@ -1528,7 +1534,7 @@
           <dt>Professor sugere</dt><dd>${esc(curta(a.alt.data))} · ${esc(a.alt.horario || '')}</dd>
           ${varias ? `<label class="chk so"><input type="checkbox" class="nt2-so" value="${a.i}" checked style="accent-color:#16a34a"> Aprovar esta</label>` : ''}</dl>`).join('')}
         ${p.contraproposta ? `<p class="fino">"${esc(p.contraproposta)}"</p>` : ''}
-        <p class="fino">Ao aprovar, a aula muda na ${origemNome(p).toLowerCase()} ${esc(p.codigo || '')} para a data e o horário sugeridos. O professor só é atribuído em "Aprovar este professor para o atendimento".</p>`,
+        <p class="fino">Ao aprovar, a aula muda na ${origemNome(p).toLowerCase()} ${esc(p.codigo || '')} para a data e o horário sugeridos. O professor só é atribuído em "Confirmar Professor".</p>`,
       botoes: [{ rotulo: 'Cancelar', valor: null },
         { rotulo: 'Aprovar contraproposta', classe: 'pri', valor: (f) => varias ? [...f.querySelectorAll('.nt2-so:checked')].map(c => Number(c.value)) : [est[0].i] }]
     });
@@ -1590,16 +1596,28 @@
     }
   }
 
+  // Duas propostas concorrem quando têm aula em comum: o envio é por lote (uma
+  // disciplina por vez), então quem recebeu o mesmo lote disputa as mesmas aulas
+  // e lotes de outra disciplina da mesma contratação não se cruzam.
+  // Contratação: id-Aula; simulação: posição na lista; antigas sem os dois: data/horário/matéria.
+  const chaveAula = (a) => a.idAula ? `id|${a.idAula}` : a.indice != null ? `i|${a.indice}` : `d|${a.data}|${a.horario}|${norm(a.materia)}`;
+  function concorrem(a, b) {
+    const ka = new Set((a.aulas || []).map(chaveAula));
+    return (b.aulas || []).some(x => ka.has(chaveAula(x)));
+  }
+
   // Proposta vira 'aprovado' (o professor vê "Nova contratação!" e o endereço) e
-  // as outras propostas abertas do grupo ficam encerradas ("As aulas foram
-  // atribuídas a outro professor"). Devolve quantas foram encerradas.
+  // as outras propostas abertas do grupo que concorrem pelas mesmas aulas ficam
+  // encerradas ("As aulas foram atribuídas a outro professor"). Devolve quantas
+  // foram encerradas.
   async function marcarAprovada(p, indices, extra) {
     const local = await localDoCliente(p);
     await fdb().collection(COLECAO).doc(p.id).update({
       status: 'aprovado', aprovadoEm: ts(), atribuidaEm: ts(), emAnalise: false, avisoVisto: false, lidaCentral: true,
       aulasAtribuidas: indices, local: local || null, ...extra
     });
-    const outras = propostas.filter(x => x.id !== p.id && chaveGrupo(x) === chaveGrupo(p) && ['pendente', 'aceita', 'contraproposta'].includes(x.status));
+    const outras = propostas.filter(x => x.id !== p.id && chaveGrupo(x) === chaveGrupo(p) && concorrem(p, x)
+      && ['pendente', 'aceita', 'contraproposta'].includes(x.status));
     if (outras.length) {
       const lote = fdb().batch();
       outras.forEach(x => lote.update(fdb().collection(COLECAO).doc(x.id), { status: 'encerrada', emAnalise: false, lidaCentral: true }));
@@ -1641,14 +1659,14 @@
       });
     } else {
       ok = await janela({
-        titulo: 'Aprovar este professor para o atendimento',
+        titulo: 'Confirmar Professor',
         corpo: `<p><b>Prof. ${esc(nomeY)}</b> vai ser o professor de ${eleg.length} ${eleg.length === 1 ? 'aula' : 'aulas'} na ${origemNome(p).toLowerCase()} ${esc(p.codigo || '')} (onde está "A definir"):</p>
           ${eleg.length ? `<ul>${eleg.map(m => `<li><b>${esc(curta(m.a.data))}</b> · ${esc(m.a.horario || '')} · ${esc(m.a.materia || '')}</li>`).join('')}</ul>` : ''}
           ${jaDele.length ? `<p class="fino">${jaDele.length} aula(s) já estão com ${esc(nomeY)}.</p>` : ''}
           ${pend.length ? `<div class="aviso">${pend.length} aula(s) com contraproposta ainda não aprovada ficam sem professor.</div>` : ''}
           ${semPar.length ? `<div class="aviso">${semPar.length} aula(s) não foram encontradas na ${origemNome(p).toLowerCase()} (data ou horário mudou?).</div>` : ''}
-          <p class="fino">O professor recebe o aviso "Nova contratação! Novas aulas já agendadas" e passa a ver o endereço completo. As outras propostas abertas desta ${origemNome(p).toLowerCase()} ficam encerradas.</p>`,
-        botoes: [{ rotulo: 'Cancelar', valor: false }, { rotulo: 'Aprovar professor', valor: true, classe: 'pri', desabilitado: !eleg.length && !jaDele.length }]
+          <p class="fino">O professor recebe o aviso "Nova contratação! Novas aulas já agendadas" e passa a ver o endereço completo. As outras propostas abertas para estas mesmas aulas ficam encerradas; as de outras disciplinas continuam abertas.</p>`,
+        botoes: [{ rotulo: 'Cancelar', valor: false }, { rotulo: 'Confirmar Professor', valor: true, classe: 'pri', desabilitado: !eleg.length && !jaDele.length }]
       });
     }
     if (!ok) return;
@@ -1689,8 +1707,8 @@
   // abas abertas não processarem a mesma proposta. Resultado em autoVinculo:
   //   'feito'  → aprovado automaticamente (autoConfirmado);
   //   'manual' → aulas já com outro professor/não encontradas: fica "Aceitou" e a
-  //              Central decide no botão "Aprovar";
-  //   'erro'   → falhou; também fica para o "Aprovar".
+  //              Central decide no botão "Confirmar Professor";
+  //   'erro'   → falhou; também fica para o "Confirmar Professor".
   // Só vale para aceites a partir desta versão — aceites antigos que estavam
   // esperando a Central continuam esperando.
   const AUTO_DESDE = Date.parse('2026-10-21T17:45:00-03:00');
@@ -1743,6 +1761,45 @@
     } catch (err) {
       console.error('[Propostas] Erro no vínculo automático:', err);
       await ref.update({ autoVinculo: 'erro' }).catch(() => {});
+    }
+  }
+
+  // Reenviar: cria uma proposta nova ('pendente') com as mesmas aulas para o
+  // mesmo professor — já com as contrapropostas aprovadas na data nova — e a
+  // antiga vira 'cancelada' sem aviso (avisoVisto). Documento novo porque o
+  // professor só responde proposta 'pendente' e o histórico em
+  // respostasPropostas usa o id da proposta (o professor só cria, não regrava).
+  async function reenviarProposta(p) {
+    const respondida = ['aceita', 'contraproposta', 'recusada'].includes(p.status);
+    const ok = await janela({
+      titulo: 'Reenviar proposta',
+      corpo: `<p>O <b>Prof. ${esc(p.professorNome || '')}</b> recebe de novo a proposta da ${origemNome(p).toLowerCase()} ${esc(p.codigo || '')} · ${esc(p.clienteNome || '')} (${(p.aulas || []).length} aulas · ${moeda(p.valorTotal)}) para responder.</p>
+        ${respondida ? '<div class="aviso">A resposta atual do professor é descartada: a proposta volta para "Aguardando resposta".</div>' : ''}
+        ${p.status === 'encerrada' ? '<div class="aviso">Esta proposta foi encerrada porque outro professor foi confirmado. Se ele aceitar, use "Confirmar Professor" para substituir.</div>' : ''}`,
+      botoes: [{ rotulo: 'Cancelar', valor: false }, { rotulo: 'Reenviar proposta', valor: true, classe: 'pri' }]
+    });
+    if (!ok) return;
+    const alts = new Map((Array.isArray(p.alteracoes) ? p.alteracoes : []).filter(a => a.aprovada).map(a => [Number(a.i), a]));
+    const aulas = (p.aulas || []).map((a, i) => { const alt = alts.get(i); return alt ? { ...a, data: alt.data, horario: alt.horario } : a; });
+    const campos = ['origem', 'idOrigem', 'codigo', 'clienteNome', 'clienteApelido', 'professorId', 'professorEmail', 'professorNome',
+      'professorApelido', 'valorTotal', 'estudantes', 'bairro', 'cidade', 'conteudos'];
+    const nova = Object.fromEntries(campos.filter(c => p[c] !== undefined).map(c => [c, p[c]]));
+    try {
+      const ref = fdb().collection(COLECAO).doc();
+      const lote = fdb().batch();
+      lote.set(ref, {
+        ...nova, aulas, status: 'pendente', contraproposta: '', respondidoEm: null, lidaCentral: false,
+        reenvioDe: p.id, enviadoPor: (window.currentUser && window.currentUser.email) || '', criadoEm: ts()
+      });
+      lote.update(fdb().collection(COLECAO).doc(p.id), {
+        status: 'cancelada', canceladaEm: ts(), motivoCancelamento: [], avisoVisto: true, emAnalise: false, lidaCentral: true, reenviadaComo: ref.id
+      });
+      await lote.commit();
+      if (aberta === p.id) aberta = null;
+      aviso(`Proposta reenviada para o Prof. ${profNome(p)}.`, 'success');
+    } catch (err) {
+      console.error('[Propostas] Erro ao reenviar:', err);
+      aviso('Não foi possível reenviar a proposta.', 'error');
     }
   }
 
