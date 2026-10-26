@@ -9,6 +9,7 @@
 | `login.html` | Tela de login com redefinição de senha |
 | `index.html` | Painel com guard de autenticação e botão Sair |
 | `firestore.rules` | Regras do Firestore — bloqueia acesso não autorizado |
+| `realtime-database.rules.json` | Regras do Realtime Database — colaboração ao vivo da Organização de recursos |
 
 ---
 
@@ -77,6 +78,37 @@ async initializeFirebase() {
   this.firestore   = this.firebaseApp.firestore();
 }
 ```
+
+---
+
+## 1.1 — Colaboração ao vivo (Organização de recursos)
+
+A área **Planejamento → Organização de recursos** mostra presença, edição ao
+vivo e setas entre Marcos (azul) e Esther (rosa). Isso usa o **Realtime
+Database** do Firebase; as simulações continuam salvas no Firestore. Sem os
+passos abaixo a área funciona normalmente, só sem a colaboração ao vivo.
+
+1. **Criar o banco** (se ainda não existir): console do Firebase → *Build →
+   Realtime Database → Criar banco de dados*. Local: **Estados Unidos
+   (us-central1)** — é o endereço já configurado em `firebase-config.js`
+   (`…-default-rtdb.firebaseio.com`) e liberado na política de segurança do
+   site (`_headers`). Começar no **modo bloqueado**.
+2. **Regras**: aba *Regras*. Se estiver vazio ou só com o padrão bloqueado,
+   cole todo o conteúdo de `realtime-database.rules.json` e publique. **Se já
+   houver regras de outro sistema**, não substitua: acrescente apenas o bloco
+   `"orColab": { … }` dentro de `"rules"`.
+3. **Chave de emergência**: para desligar a colaboração sem publicar código,
+   crie na aba *Dados* o nó `orColab/config/ativo` com valor `false` (apague
+   ou ponha `true` para religar).
+4. **Alerta de custo (recomendado)**: Google Cloud Console → *Faturamento →
+   Orçamentos e alertas → Criar orçamento* para o projeto
+   `master-ecossistemaprofessor`, com valor baixo (ex.: US$ 1) e alerta por
+   e-mail. O uso esperado fica dentro da cota sem custo do Realtime Database
+   (10 GB/mês de download; ~15–20 MB por hora de uso simultâneo).
+
+> As regras liberam só os dois e-mails autorizados. Diferente do Firestore, não
+> exigem e-mail verificado: contas criadas pelo console começam como não
+> verificadas, e cada e-mail só pode ter uma conta no Firebase Auth.
 
 ---
 

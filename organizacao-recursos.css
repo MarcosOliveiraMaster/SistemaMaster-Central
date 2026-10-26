@@ -353,6 +353,7 @@ body.or-aberto #barra-inferior, body.or-aberto #menu-toggle { display: none !imp
 .or-app .side-nav { min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 2px 4px 8px; margin-left: -4px; margin-right: -4px; }
 .or-app .sidebar-bottom { padding-top: 14px; }
 .or-app .or-nav-vazio { padding: 4px 14px; color: var(--muted); font-size: 11px; }
+.or-app .side-nav > * { min-width: 0; }   /* título longo termina em reticências em vez de alargar a linha */
 .or-app .profile-chip div:nth-child(2) { min-width: 0; }
 .or-app .profile-chip strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -478,3 +479,57 @@ body.or-aberto #barra-inferior, body.or-aberto #menu-toggle { display: none !imp
 .or-app .money-input input::-webkit-inner-spin-button, .or-app .money-input input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .or-app .money-input input[type="number"] { -moz-appearance: textfield; }
 
+
+/* ── Colaboração ao vivo (organizacao-recursos-colab.js) ─────────────────
+   Azul = Marcos, rosa = Esther. Só aparece no computador. */
+.or-app { --or-marcos: #2f6fed; --or-esther: #e2457f; }
+
+/* Faixa de presença no topo do conteúdo (não ocupa espaço) */
+.or-app .or-colab-barra { position: sticky; top: 0; z-index: 12; height: 0; }
+.or-app .or-colab-chips { position: absolute; top: 12px; right: max(16px, 2.4vw); display: flex; align-items: center; gap: 8px; }
+.or-app .or-chip { display: flex; align-items: center; gap: 8px; max-width: 260px; padding: 5px 11px 5px 5px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255, 253, 250, .92); box-shadow: var(--shadow-small); backdrop-filter: blur(6px); color: var(--ink); text-align: left; }
+.or-app .or-chip-eu { cursor: pointer; }
+.or-app .or-chip-eu:hover { border-color: #f0d6c2; }
+.or-app .or-chip-avatar { flex: 0 0 auto; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; background: var(--or-cor); color: #fff; font: 800 12px 'Manrope', sans-serif; box-shadow: 0 0 0 2px #fff; }
+.or-app .or-chip-texto { min-width: 0; display: flex; flex-direction: column; line-height: 1.15; }
+.or-app .or-chip-texto strong { font-size: 11px; }
+.or-app .or-chip-texto small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 9.5px; }
+.or-app .or-chip-off { opacity: .55; }
+.or-app .or-chip-off .or-chip-avatar { filter: grayscale(.6); }
+.or-app .or-chip-menu { position: absolute; top: calc(100% + 8px); right: 0; width: 250px; display: grid; gap: 3px; padding: 8px; border: 1px solid #eadfd5; border-radius: 14px; background: #fffdfa; box-shadow: 12px 16px 30px rgba(65, 46, 30, .18); }
+.or-app .or-chip-menu-titulo { padding: 4px 6px; color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.or-app .or-chip-menu button { display: flex; align-items: center; gap: 9px; padding: 7px 8px; border-radius: 9px; background: transparent; color: var(--ink); font-size: 12px; text-align: left; }
+.or-app .or-chip-menu button:hover, .or-app .or-chip-menu button[aria-checked="true"] { background: var(--orange-pale); }
+.or-app .or-chip-menu button b { margin-left: auto; color: var(--orange-deep); }
+.or-app .or-chip-menu-uso { margin-top: 4px; padding: 7px 6px 2px; border-top: 1px solid var(--line); color: var(--muted); font-size: 9px; line-height: 1.4; }
+
+/* Borda de presença: azul, rosa ou metade de cada */
+.or-app .or-pres { position: relative; }
+.or-app .or-pres::after { content: ''; position: absolute; inset: -2px; z-index: 1; padding: 2px; border-radius: inherit; background: var(--or-borda); pointer-events: none; -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); transition: opacity .2s ease; }
+.or-app .simulation-nav-row.or-pres::after, .or-app .nav-item.or-pres::after { inset: 0; border-radius: 13px; }   /* por dentro: o menu corta o que passa da borda */
+.or-app .or-pres-marcos { --or-borda: var(--or-marcos); }
+.or-app .or-pres-esther { --or-borda: var(--or-esther); }
+.or-app .or-pres-ambos { --or-borda: linear-gradient(90deg, var(--or-marcos) 0 50%, var(--or-esther) 50% 100%); }
+.or-app .or-pres-ausente::after { opacity: .4; }
+
+/* Seta da outra pessoa */
+.or-app .or-cursores { position: fixed; inset: 0; z-index: 15; overflow: hidden; pointer-events: none; }
+.or-app .or-cursor { position: absolute; top: 0; left: 0; display: flex; align-items: flex-start; color: var(--or-cor); transition: transform 80ms linear, opacity .2s ease; will-change: transform; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .18)); }
+.or-app .or-cursor[hidden] { display: none; }
+.or-app .or-cursor span { margin: 14px 0 0 -2px; padding: 3px 8px; border-radius: 999px; background: var(--or-cor); color: #fff; font: 700 10px 'DM Sans', sans-serif; white-space: nowrap; }
+.or-app .or-cursor-fora { opacity: .45; }
+
+/* Campo que a outra pessoa está editando (sem travar) */
+.or-app .entry-table td.or-editando { position: relative; }
+.or-app .entry-table td.or-editando input, .or-app .entry-table td.or-editando .money-input { box-shadow: 0 0 0 2px var(--or-cor); }
+.or-app .entry-table td.or-editando::after { content: attr(data-editor); position: absolute; z-index: 3; top: -9px; right: 6px; padding: 1px 6px; border-radius: 999px; background: var(--or-cor); color: #fff; font-size: 8px; font-weight: 700; pointer-events: none; }
+
+/* Card ou lançamento novo (meu ou da outra pessoa) entra com animação */
+.or-app .monthly-card.or-chegou { animation: gf-cardMoved .65s cubic-bezier(.2,.8,.2,1) both; }
+.or-app .entry-table tr.or-chegou { animation: gf-orLinhaChegou .6s ease both; }
+@keyframes gf-orLinhaChegou { 0% { opacity: 0; transform: translateY(-6px); } 60% { opacity: 1; } 100% { opacity: 1; transform: none; } }
+
+/* Ações do cabeçalho da lista (Backup + Nova simulação) */
+.or-app .or-heading-acoes { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+@media (max-width: 760px) { .or-app .or-heading-acoes { justify-content: flex-start; margin-top: 22px; } .or-app .page-heading .or-heading-acoes .primary-button { margin-top: 0; } }
+@media (max-width: 1023px), (pointer: coarse) { .or-app .or-colab-barra, .or-app .or-cursores { display: none; } }
