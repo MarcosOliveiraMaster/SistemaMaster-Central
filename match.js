@@ -77,9 +77,14 @@ window.Match = (function () {
       .filter(m => m && normalizarTexto(m) !== 'a definir');
   }
 
+  // Nomes diferentes para a mesma matéria: as aulas usam "Língua Portuguesa" /
+  // "Língua Inglesa" e o cadastro do professor "Português" / "Inglês".
+  const MATERIA_EQUIVALENTE = { 'lingua portuguesa': 'portugues', 'lingua inglesa': 'ingles' };
+  const materiaCanonica = (m) => MATERIA_EQUIVALENTE[m] || m;
+
   function professorLecionaMateria(professor, materiaNormalizada) {
-    const lista = String(professor.disciplinas || '').split(',').map(normalizarTexto).filter(Boolean);
-    return lista.includes(materiaNormalizada);
+    const lista = String(professor.disciplinas || '').split(',').map(d => materiaCanonica(normalizarTexto(d))).filter(Boolean);
+    return lista.includes(materiaCanonica(materiaNormalizada));
   }
 
   // ===== Nível acadêmico =====

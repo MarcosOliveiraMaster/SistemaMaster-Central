@@ -67,12 +67,14 @@
     .pe-aula{display:flex;gap:.75rem;align-items:center;border:1.5px solid #e5e7eb;border-radius:12px;padding:.6rem .8rem;margin-bottom:.5rem;cursor:pointer;}
     .pe-aula:has(input:checked){border-color:var(--pe-acc);background:var(--pe-claro);}
     .pe-aula input{width:18px;height:18px;accent-color:var(--pe-acc);flex-shrink:0;}
-    .pe-aula .pe-a1{flex:1;min-width:0;font-size:.85rem;color:#374151;line-height:1.45;}
+    .pe-aula .pe-a1{flex:1;min-width:0;font-size:.85rem;color:#111827;line-height:1.45;}
+    #pe-disc-aula{flex:0 0 40%;}
     .pe-aula .pe-a1 b{color:#111827;}
     .pe-aula .pe-a2{font-family:'Lexend',sans-serif;font-weight:700;color:#15803d;white-space:nowrap;}
     .pe-aula .pe-status{flex-shrink:0;min-width:84px;text-align:center;border:1.5px solid;border-radius:8px;padding:.15rem .5rem;font-size:.72rem;font-weight:700;white-space:nowrap;}
     .pe-todas{display:flex;gap:.5rem;align-items:center;font-size:.85rem;font-weight:700;margin-bottom:.7rem;cursor:pointer;}
     .pe-todas input{width:18px;height:18px;accent-color:var(--pe-acc);}
+    .pe-aula[hidden],.pe-todas[hidden],.pe-vazio[hidden]{display:none;}
     .pe-filtros{display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:.9rem;align-items:stretch;}
     .pe-filtros input,.pe-filtros select{border:2px solid #e5e7eb;border-radius:10px;padding:.55rem .7rem;font:.9rem 'Comfortaa',sans-serif;min-height:42px;}
     .pe-filtros input{flex:1 1 220px;}
@@ -192,7 +194,7 @@
       .pe-rodape .pe-info{flex-basis:100%;order:-1;font-size:.8rem;}
       .pe-rodape .pe-btn{flex:1;justify-content:center;}
       .pe-prof .pe-foto,.pe-prof .pe-iniciais{width:60px;height:60px;font-size:1.2rem;border-radius:12px;}
-      .pe-multi,.pe-verif{flex:1 1 100%;justify-content:center;}
+      .pe-multi,.pe-verif,#pe-disc-aula{flex:1 1 100%;justify-content:center;}
       .pe-topo h3{font-size:.95rem;}
     }
     /* Notificações */
@@ -231,13 +233,12 @@
   }
 
   // ── Dados ────────────────────────────────────────────────────────────────
-  let professoresCache = null;
+  // Lido a cada abertura do envio (sem cache): professor desligado ou sem acesso
+  // durante a sessão já sai da lista sem recarregar a página.
   async function carregarProfessores() {
-    if (professoresCache) return professoresCache;
     const snap = await fdb().collection('dataBaseProfessores').get();
     const lista = [];
     snap.forEach(d => lista.push({ id: d.id, ...d.data() }));
-    professoresCache = lista;
     return lista;
   }
   const disciplinasDe = (p) => (Array.isArray(p.disciplinas) ? p.disciplinas : String(p.disciplinas || '').split(/[,;/]/))
@@ -413,9 +414,12 @@
 
     // Só professores ativos na equipe (mesmo critério do Match e do BD Professores:
     // sem status = Ativo), com acesso à plataforma e e-mail — os outros não veriam a proposta.
-    const elegiveis = profs.filter(p => (p.status || 'Ativo') === 'Ativo' && p.acessoPlataforma === true && p.email)
+    const elegiveis = profs.filter(p => norm(p.status || 'Ativo') === 'ativo' && p.acessoPlataforma === true && p.email)
       .sort((a, b) => (ehOuro(a) === ehOuro(b)) ? String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR') : (ehOuro(a) ? -1 : 1));
     const disciplinas = [...new Set(elegiveis.flatMap(disciplinasDe))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    // Matérias das aulas para o filtro do passo 1 (uma aula pode ter "Mat1, Mat2 e Mat3").
+    const materiasDe = (a) => String(a.materia || '').split(/,\s+|\s+e\s+/).map(m => m.trim()).filter(Boolean);
+    const materiasAulas = [...new Map(dados.aulas.flatMap(materiasDe).map(m => [norm(m), m])).values()].sort((a, b) => a.localeCompare(b, 'pt-BR'));
     const escolhidos = new Set();
     const titulo = origem === 'simulacao' ? `Simulação ${dados.codigo}` : `Contratação ${dados.codigo}`;
 
@@ -431,11 +435,22 @@
         <div class="pe-trilho"><div class="pe-palco">
           <section class="pe-pag" aria-label="Escolher aulas">
             <div class="pe-corpo">
-              <label class="pe-todas"><input type="checkbox" id="pe-todas" checked> Selecionar todas as aulas</label>
+              <div class="pe-filtros">
+                <input type="search" id="pe-busca-aula" placeholder="Buscar professor" aria-label="Buscar professor já marcado nas aulas">
+                <div class="pe-multi" id="pe-disc-aula">
+                  <button type="button" class="pe-multi-btn" aria-haspopup="true" aria-expanded="false" aria-label="Filtrar Disciplinas"><span>Filtrar Disciplinas</span><i class="fas fa-chevron-down"></i></button>
+                  <div class="pe-multi-painel" hidden>
+                    ${materiasAulas.map(m => `<label><input type="checkbox" value="${esc(norm(m))}" data-rotulo="${esc(m)}"> ${esc(m)}</label>`).join('') || '<p class="pe-vazio" style="padding:.6rem">Nenhuma matéria nas aulas.</p>'}
+                    <button type="button" class="pe-multi-limpar">Limpar seleção</button>
+                  </div>
+                </div>
+              </div>
+              <label class="pe-todas"><input type="checkbox" id="pe-todas" checked> <span id="pe-todas-txt">Selecionar todas as aulas</span></label>
+              <p class="pe-vazio" id="pe-aulas-vazio" hidden>Nenhuma aula para este filtro.</p>
               ${dados.aulas.map(a => `
-                <label class="pe-aula"><input type="checkbox" class="pe-chk" value="${a.i}" checked>
-                  <span class="pe-a1"><b>${esc(a.data || '—')}</b>${a.horario ? ' · ' + esc(a.horario) : ''}${a.duracao ? ' · ' + esc(a.duracao) : ''}<br>
-                  ${esc(a.materia || '—')}${a.estudante ? ' · ' + esc(a.estudante) : ''}${a.professor ? ` · <span style="color:#9ca3af">atual: ${esc(a.professor)}</span>` : ''}</span>
+                <label class="pe-aula" data-i="${a.i}"><input type="checkbox" class="pe-chk" value="${a.i}" checked>
+                  <span class="pe-a1"><b>${esc(a.data || '—')}</b> · <b>Início:</b> ${esc(a.horario || '--')} · <b>Duração:</b> ${esc(a.duracao || '--')}<br>
+                  <b>Disciplina:</b> ${esc(a.materia || '--')} · <b>Prof.:</b> ${esc(a.professor || '--')}${a.estudante ? ` · <b>Aluno:</b> ${esc(a.estudante)}` : ''}</span>
                   <span class="pe-a2">${moeda(a.valor)}</span>${a.status ? `<span class="pe-status" style="${corStatus(a.status)}">${esc(a.status)}</span>` : ''}</label>`).join('')}
             </div>
             <div class="pe-rodape">
@@ -479,7 +494,8 @@
     const teclas = (e) => {
       if (e.key !== 'Escape' || document.querySelector('#gp-detOverlay.gp-open')) return;
       if (fecharPop()) return;
-      if (!$('.pe-multi-painel').hidden) { abrirDisc(false); return; }
+      const painelAberto = fundo.querySelector('.pe-multi-painel:not([hidden])');
+      if (painelAberto) { painelAberto.hidden = true; painelAberto.previousElementSibling.setAttribute('aria-expanded', 'false'); return; }
       fechar();
     };
     document.addEventListener('keydown', teclas);
@@ -487,22 +503,59 @@
     fundo.addEventListener('mousedown', e => { if (e.target === fundo) fechar(); });
 
     const selecionadas = () => [...fundo.querySelectorAll('.pe-chk:checked')].map(c => dados.aulas[+c.value]);
+    // Filtros do passo 1 só escondem aulas da lista: o que vai na proposta continua
+    // sendo o que está marcado (o resumo avisa se há marcadas escondidas).
+    const visiveisAula = () => [...fundo.querySelectorAll('.pe-aula:not([hidden]) .pe-chk')];
     function resumo() {
       const s = selecionadas(); const total = s.reduce((t, a) => t + a.valor, 0);
       const txt = `${s.length} ${s.length === 1 ? 'aula' : 'aulas'} · professor recebe <b>${moeda(total)}</b>`;
-      $('#pe-resumo').innerHTML = txt;
+      const escondidas = fundo.querySelectorAll('.pe-aula[hidden] .pe-chk:checked').length;
+      $('#pe-resumo').innerHTML = txt + (escondidas ? ` · <span style="color:#b45309">${escondidas} ${escondidas === 1 ? 'marcada fora' : 'marcadas fora'} do filtro</span>` : '');
       $('#pe-resumo2').innerHTML = `${txt} · ${escolhidos.size} ${escolhidos.size === 1 ? 'professor' : 'professores'}`;
       $('#pe-avancar').disabled = !s.length;
       $('#pe-enviar').disabled = !s.length || !escolhidos.size;
-      $('#pe-todas').checked = s.length === dados.aulas.length;
+      const vis = visiveisAula();
+      $('#pe-todas').checked = vis.length > 0 && vis.every(c => c.checked);
+    }
+    function filtrarAulas() {
+      const busca = norm($('#pe-busca-aula').value);
+      const discs = [...fundo.querySelectorAll('#pe-disc-aula input:checked')].map(c => c.value);
+      fundo.querySelectorAll('.pe-aula').forEach(el => {
+        const a = dados.aulas[+el.dataset.i];
+        el.hidden = !((!busca || norm(a.professor).includes(busca))
+          && (!discs.length || materiasDe(a).some(m => discs.includes(norm(m)))));
+      });
+      const filtrando = !!(busca || discs.length);
+      $('#pe-todas-txt').textContent = filtrando ? 'Selecionar todas as aulas filtradas' : 'Selecionar todas as aulas';
+      $('#pe-aulas-vazio').hidden = visiveisAula().length > 0;
+      $('.pe-todas').hidden = !visiveisAula().length;
+      resumo();
     }
     // Vista de indicadores (padrão) x vista geral (grade antiga). verif guarda o
     // cálculo das aulas marcadas: Map professorId → { conflitos, fora, materias, media }.
     let modo = 'indicadores';
     let verif = null, calculando = false, erroCalculo = false, calcId = 0, bairroP = null;
     const aulasMudaram = () => { verif = null; erroCalculo = false; resumo(); };
-    $('#pe-todas').onchange = (e) => { fundo.querySelectorAll('.pe-chk').forEach(c => { c.checked = e.target.checked; }); aulasMudaram(); };
+    $('#pe-todas').onchange = (e) => { visiveisAula().forEach(c => { c.checked = e.target.checked; }); aulasMudaram(); };
     fundo.querySelectorAll('.pe-chk').forEach(c => { c.onchange = aulasMudaram; });
+    $('#pe-busca-aula').oninput = filtrarAulas;
+
+    // Dropdown "Filtrar Disciplinas" (passo 1) e "Todas as disciplinas" (passo 2).
+    function ligarMulti(raiz, vazio, aoMudar) {
+      const btn = raiz.querySelector('.pe-multi-btn'), painel = raiz.querySelector('.pe-multi-painel');
+      const marcadas = () => [...painel.querySelectorAll('input:checked')];
+      const abrir = (sim) => { painel.hidden = !sim; btn.setAttribute('aria-expanded', String(sim)); };
+      const rotulo = () => {
+        const m = marcadas().map(c => c.dataset.rotulo);
+        btn.querySelector('span').textContent = !m.length ? vazio : m.length <= 2 ? m.join(' + ') : `${m.length} disciplinas`;
+        btn.title = m.join(', ');
+      };
+      btn.onclick = () => abrir(painel.hidden);
+      painel.querySelectorAll('input').forEach(c => { c.onchange = () => { rotulo(); aoMudar(); }; });
+      painel.querySelector('.pe-multi-limpar').onclick = () => { painel.querySelectorAll('input').forEach(c => { c.checked = false; }); rotulo(); aoMudar(); };
+      fundo.addEventListener('mousedown', e => { if (!painel.hidden && !raiz.contains(e.target)) abrir(false); });
+    }
+    ligarMulti($('#pe-disc-aula'), 'Filtrar Disciplinas', filtrarAulas);
 
     function passo(n) {
       $('.pe-palco').classList.toggle('passo2', n === 2);
@@ -513,7 +566,7 @@
     $('#pe-voltar').onclick = () => passo(1);
 
     // Disciplinas marcadas no dropdown: o professor precisa dar TODAS.
-    const discMarcadas = () => [...fundo.querySelectorAll('.pe-multi-painel input:checked')];
+    const discMarcadas = () => [...fundo.querySelectorAll('#pe-disc .pe-multi-painel input:checked')];
     function desenharGrade() {
       const busca = norm($('#pe-busca').value), discs = discMarcadas().map(c => c.value);
       const lista = elegiveis.filter(p => (!busca || norm(p.nome).includes(busca) || norm(p.apelido).includes(busca))
@@ -637,18 +690,7 @@
     $('#pe-busca').oninput = desenharGrade;
     $('#pe-ordem').onchange = desenharGrade;
 
-    // Dropdown de múltiplas disciplinas
-    const btnDisc = $('.pe-multi-btn'), painelDisc = $('.pe-multi-painel');
-    function abrirDisc(abrir) { painelDisc.hidden = !abrir; btnDisc.setAttribute('aria-expanded', String(abrir)); }
-    function rotuloDisc() {
-      const m = discMarcadas().map(c => c.dataset.rotulo);
-      btnDisc.querySelector('span').textContent = !m.length ? 'Todas as disciplinas' : m.length <= 2 ? m.join(' + ') : `${m.length} disciplinas`;
-      btnDisc.title = m.join(', ');
-    }
-    btnDisc.onclick = () => abrirDisc(painelDisc.hidden);
-    painelDisc.querySelectorAll('input').forEach(c => { c.onchange = () => { rotuloDisc(); desenharGrade(); }; });
-    $('.pe-multi-limpar').onclick = () => { painelDisc.querySelectorAll('input').forEach(c => { c.checked = false; }); rotuloDisc(); desenharGrade(); };
-    fundo.addEventListener('mousedown', e => { if (!painelDisc.hidden && !e.target.closest('.pe-multi')) abrirDisc(false); });
+    ligarMulti($('#pe-disc'), 'Todas as disciplinas', desenharGrade);
 
     // Cálculo da vista de indicadores, para as aulas marcadas no passo 1:
     //  • conflitos: aulas do mesmo dia em outros contratos (BancoDeAulas-Lista);
