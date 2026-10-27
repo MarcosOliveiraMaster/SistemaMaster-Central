@@ -9,7 +9,10 @@
 //   organizacaoRecursos/{id}                — uma simulação por documento
 //     { titulo, descricao (HTML restrito), saldoInicial, dataInicio, dataFim,
 //       tabelas: [ { id, mes: 'AAAA-MM', lancamentos: [ { id, descricao, valor,
-//                    data: 'AAAA-MM-DD', areaId, detalhes } ] } ],
+//                    data: 'AAAA-MM-DD', areaId, detalhes, entrada,
+//                    subitens: [ { id, descricao, valor, data, areaId, entrada } ] } ] } ],
+//     `entrada` soma ao saldo em vez de subtrair. Lançamento com subgastos: só
+//     eles entram nos totais; o valor do lançamento fica apenas informativo.
 //       criadoEm, criadoPor, atualizadoEm, atualizadoPor }
 //   configuracoes/organizacaoRecursosAreas  — áreas de destino (comuns a todas)
 //     { areas: [ { id, nome, icone } ], atualizadoEm, atualizadoPor }
@@ -31,6 +34,8 @@
 
   // Ícones Lucide (mesmos do protótipo), embutidos para não depender de CDN
   const ICONES_SVG = {
+    'list-tree': '<path d="M21 12h-8"/><path d="M21 6H8"/><path d="M21 18h-8"/><path d="M3 6v4c0 1.1.9 2 2 2h3"/><path d="M3 10v6c0 1.1.9 2 2 2h3"/>',
+    'corner-down-right': '<polyline points="15 10 20 15 15 20"/><path d="M4 4v7a4 4 0 0 0 4 4h12"/>',
     'download': '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>',
     'arrow-left': '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
     'arrow-up-right': '<path d="M7 7h10v10"/><path d="M7 17 17 7"/>',
@@ -306,7 +311,9 @@
     const dia = Number(String(l.data || '').slice(-2)) || 10;
     const d = parseMes(mes);
     const ultimo = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-    return { ...l, data: dataNoMes(mes, Math.min(dia, ultimo)) };
+    const novo = { ...l, data: dataNoMes(mes, Math.min(dia, ultimo)) };
+    if (l.subitens) novo.subitens = l.subitens.map((s) => moverLancamentoParaMes(s, mes));
+    return novo;
   }
 
   function fmtData(data) {
@@ -329,9 +336,29 @@
     return doc.body.textContent.replace(/\s+/g, ' ').trim().slice(0, max);
   }
 
-  const somaTabela = (t) => t.lancamentos.reduce((s, l) => s + (Number(l.valor) || 0), 0);
+  // O que entra na conta: com subgastos, só eles (o valor do lançamento fica informativo)
+  const itensContados = (l) => (l.subitens && l.subitens.length ? l.subitens : [l]);
+  function somarItens(itens) {
+    return itens.reduce((acc, i) => {
+      const v = Number(i.valor) || 0;
+      if (i.entrada) acc.entradas += v; else acc.saidas += v;
+      return acc;
+    }, { saidas: 0, entradas: 0 });
+  }
+  const somaTabela = (t) => somarItens(t.lancamentos.flatMap(itensContados));
   function totais(sim) {
-    return sim.tabelas.reduce((acc, t) => ({ gasto: acc.gasto + somaTabela(t), lancamentos: acc.lancamentos + t.lancamentos.length }), { gasto: 0, lancamentos: 0 });
+    return sim.tabelas.reduce((acc, t) => {
+      const s = somaTabela(t);
+      return { gasto: acc.gasto + s.saidas, entradas: acc.entradas + s.entradas, lancamentos: acc.lancamentos + t.lancamentos.length };
+    }, { gasto: 0, entradas: 0, lancamentos: 0 });
+  }
+  const saldoProjetado = (sim, tot = totais(sim)) => sim.saldoInicial - tot.gasto + tot.entradas;
+  function textoSomas({ saidas, entradas }) {
+    return `${moeda(saidas)} em saídas` + (entradas ? ` · ${moeda(entradas)} em entradas` : '');
+  }
+  function textoSaldoDetalhe(tot) {
+    if (!tot.gasto && !tot.entradas) return 'Adicione sua primeira despesa';
+    return [tot.gasto ? `${moeda(tot.gasto)} em despesas acompanhadas` : '', tot.entradas ? `${moeda(tot.entradas)} em entradas` : ''].filter(Boolean).join(' · ');
   }
 
   function novaTabela(mes, lancamentos = []) { return { id: uid('tabela'), mes, lancamentos }; }
@@ -342,8 +369,14 @@
       valor: base.valor ?? 0,
       data: base.data ?? dataNoMes(mes),
       areaId: base.areaId ?? '',          // "A definir" até alguém escolher
-      detalhes: base.detalhes ?? ''
+      detalhes: base.detalhes ?? '',
+      entrada: base.entrada ?? false,
+      subitens: []
     };
+  }
+  // Subgasto novo herda data, área e tipo (entrada/saída) do lançamento
+  function novoSubitem(l) {
+    return { id: uid('sub'), descricao: '', valor: 0, data: l.data, areaId: l.areaId || '', entrada: !!l.entrada };
   }
 
   function situacao(sim) {
@@ -397,7 +430,16 @@
           valor: Number(l.valor) || 0,
           data: DATA_VALIDA.test(l.data) ? l.data : dataNoMes(t.mes),
           areaId: str(l.areaId, 80),
-          detalhes: str(l.detalhes, 20000)
+          detalhes: str(l.detalhes, 20000),
+          entrada: l.entrada === true,
+          subitens: (Array.isArray(l.subitens) ? l.subitens : []).filter((x) => x && typeof x === 'object').map((x) => ({
+            id: str(x.id, 80) || uid('sub'),
+            descricao: str(x.descricao, 200),
+            valor: Number(x.valor) || 0,
+            data: DATA_VALIDA.test(x.data) ? x.data : dataNoMes(t.mes),
+            areaId: str(x.areaId, 80),
+            entrada: x.entrada === true
+          }))
         }))
       }))
     };
@@ -415,7 +457,12 @@
         mes: t.mes,
         lancamentos: t.lancamentos.map((l) => ({
           id: l.id, descricao: l.descricao || '', valor: Number(l.valor) || 0,
-          data: l.data || '', areaId: l.areaId || '', detalhes: l.detalhes || ''
+          data: l.data || '', areaId: l.areaId || '', detalhes: l.detalhes || '',
+          entrada: !!l.entrada,
+          subitens: (l.subitens || []).map((x) => ({
+            id: x.id, descricao: x.descricao || '', valor: Number(x.valor) || 0,
+            data: x.data || '', areaId: x.areaId || '', entrada: !!x.entrada
+          }))
         }))
       }))
     };
@@ -446,7 +493,8 @@
     renomeValor: '',
     menuAberto: false,           // menu lateral no celular
     mesAberto: null,             // { tabelaId, passo: 'mes'|'ano', rascunho: 'AAAA-MM' }
-    areaAberta: null,            // id do lançamento com o seletor de área aberto
+    areaAberta: null,            // id do lançamento (ou subgasto) com o seletor de área aberto
+    subAbertos: new Set(),       // ids dos lançamentos com os subgastos à mostra
     arrastandoId: null,
     movidaId: null,
     modal: null,
@@ -468,6 +516,10 @@
   // Última versão de cada simulação vista no servidor: base da mescla de três
   // vias (o que eu mudei desde a base é aplicado sobre a versão atual do banco)
   const bases = new Map();
+  // Criadas aqui e já gravadas, mas que o listener ainda não trouxe: a
+  // transação não passa pelo cache local, então um snapshot gerado antes do
+  // commit pode chegar depois dele sem a simulação nova
+  const naoVistas = new Set();
   let vistos = { simId: null, ids: new Set() };   // cards/lançamentos já exibidos (animação de chegada)
 
   const selecionada = () => S.simulacoes.find((s) => s.id === S.selecionadaId) || null;
@@ -482,7 +534,8 @@
   // Remoção feita do outro lado vence; tabelas e lançamentos novos dos dois
   // lados são mantidos.
   const CAMPOS_SIM = ['titulo', 'descricao', 'saldoInicial', 'dataInicio', 'dataFim'];
-  const CAMPOS_LANC = ['descricao', 'valor', 'data', 'areaId', 'detalhes'];
+  const CAMPOS_LANC = ['descricao', 'valor', 'data', 'areaId', 'detalhes', 'entrada'];
+  const CAMPOS_SUB = ['descricao', 'valor', 'data', 'areaId', 'entrada'];
 
   function mesclarLista(base, local, servidor, mesclarItem) {
     const b = new Map(base.map((x) => [x.id, x]));
@@ -511,7 +564,11 @@
       ...ts,
       mes: tl.mes !== tb.mes ? tl.mes : ts.mes,
       lancamentos: mesclarLista(tb.lancamentos, tl.lancamentos, ts.lancamentos,
-        (lb, ll, ls) => mesclarCampos(CAMPOS_LANC, lb, ll, ls))
+        (lb, ll, ls) => ({
+          ...mesclarCampos(CAMPOS_LANC, lb, ll, ls),
+          subitens: mesclarLista(lb.subitens || [], ll.subitens || [], ls.subitens || [],
+            (sb, sl, ss) => mesclarCampos(CAMPOS_SUB, sb, sl, ss))
+        }))
     }));
     return r;
   }
@@ -524,6 +581,7 @@
       const noServidor = new Set();
       snap.forEach((doc) => {
         noServidor.add(doc.id);
+        naoVistas.delete(doc.id);
         const local = locais.get(doc.id);
         if (local && doc.metadata.hasPendingWrites) { lista.push(local); return; }
         const servidor = normalizarSimulacao(doc.id, doc.data({ serverTimestamps: 'estimate' }));
@@ -533,11 +591,12 @@
         if (local && pendente(doc.id)) lista.push(base ? { ...mesclar(base, local, servidor), criadoEmMs: servidor.criadoEmMs || local.criadoEmMs } : local);
         else lista.push(servidor);
       });
-      // Criadas aqui e ainda não gravadas (sem base); as que tinham base e
-      // sumiram do servidor foram apagadas por outro administrador
+      // Criadas aqui e ainda não gravadas (sem base, inclusive as que falharam)
+      // ou gravadas e ainda não vistas; as que tinham base e sumiram do
+      // servidor foram apagadas por outro administrador
       S.simulacoes.forEach((s) => {
         if (noServidor.has(s.id)) return;
-        if (pendente(s.id) && !bases.has(s.id)) lista.push(s);
+        if (naoVistas.has(s.id) || (!bases.has(s.id) && (pendente(s.id) || falhas.has(s.id)))) lista.push(s);
         else { bases.delete(s.id); clearTimeout(timers.get(s.id)); timers.delete(s.id); }
       });
       lista.sort((a, b) => (b.criadoEmMs || Infinity) - (a.criadoEmMs || Infinity) || a.titulo.localeCompare(b.titulo));
@@ -620,6 +679,7 @@
       }
       // O que foi digitado durante a transação é reaplicado sobre o resultado
       const atual = S.simulacoes.find((s) => s.id === id);
+      if (!base) naoVistas.add(id);
       bases.set(id, resultado);
       if (atual) {
         const rebase = { ...mesclar(enviada, atual, resultado), criadoEmMs: atual.criadoEmMs };
@@ -631,7 +691,8 @@
       const transitorio = err && ['aborted', 'unavailable', 'deadline-exceeded', 'failed-precondition'].includes(err.code);
       if (transitorio && tentativa < 3) {
         gravando.delete(id);
-        setTimeout(() => gravar(id, extras, tentativa + 1), 700 * (tentativa + 1));
+        // Fica em `timers` para continuar pendente enquanto espera
+        timers.set(id, setTimeout(() => gravar(id, extras, tentativa + 1), 700 * (tentativa + 1)));
         return;
       }
       console.error('[Organização de recursos] Erro ao salvar:', err);
@@ -651,6 +712,7 @@
     clearTimeout(timers.get(id));
     timers.delete(id);
     falhas.delete(id);
+    naoVistas.delete(id);
     try {
       await db.collection(COLECAO).doc(id).delete();
     } catch (err) {
@@ -793,7 +855,7 @@
     const lista = simsFiltradas();
     if (lista.length === 0) return htmlVazio();
     return `<div class="simulation-grid">${lista.map((sim) => {
-      const saldo = sim.saldoInicial - totais(sim).gasto;
+      const saldo = saldoProjetado(sim);
       return `<button type="button" class="simulation-card soft-card" data-acao="abrir-sim" data-id="${esc(sim.id)}" data-sim="${esc(sim.id)}" data-ancora="sim:${esc(sim.id)}">
         <div class="simulation-card-top"><span class="scenario-mark">${ic('circle-dollar-sign', 19)}</span><span class="status-pill"><span></span> ${situacao(sim)}</span>${ic('more-horizontal', 19, 'muted-icon')}</div>
         <div class="simulation-card-body"><h3>${esc(sim.titulo)}</h3><p>${esc(textoDescricao(sim.descricao, 120))}</p><div class="simulation-date">${ic('calendar-days', 14)} ${fmtData(sim.dataInicio)} <span>—</span> ${fmtData(sim.dataFim)}</div></div>
@@ -809,12 +871,12 @@
     const q = S.buscaTabelas.trim().toLocaleLowerCase('pt-BR');
     if (!q) return comLancamentos;
     return comLancamentos.filter((t) => rotuloMes(t.mes).toLocaleLowerCase('pt-BR').includes(q) || t.mes.includes(q)
-      || t.lancamentos.some((l) => (l.descricao || '').toLocaleLowerCase('pt-BR').includes(q)));
+      || t.lancamentos.some((l) => [l, ...l.subitens].some((i) => (i.descricao || '').toLocaleLowerCase('pt-BR').includes(q))));
   }
 
   function htmlPainel(sim) {
     const tot = totais(sim);
-    const saldo = sim.saldoInicial - tot.gasto;
+    const saldo = saldoProjetado(sim, tot);
     return `<div class="page-content dashboard-page">
       <div class="breadcrumb-row" data-ancora="acoes"><button type="button" class="back-button" data-acao="visao-geral">${ic('arrow-left', 16)} Todas as simulações</button><div class="dashboard-actions"><button type="button" class="secondary-button compact" data-acao="analise">${ic('sliders-horizontal', 15)} Análise por área</button><button type="button" class="secondary-button compact" data-acao="editar-sim">${ic('edit3', 15)} Editar simulação</button><button type="button" class="primary-button compact" data-acao="nova-tabela">${ic('plus', 16)} Nova tabela</button></div></div>
       <div class="dashboard-title-row" data-ancora="titulo"><div><span class="eyebrow">Simulação ativa <span class="eyebrow-dot"></span></span><h1>${esc(sim.titulo)}</h1><div class="simulation-subline"><span>${ic('calendar-days', 14)} ${fmtData(sim.dataInicio)} — ${fmtData(sim.dataFim)}</span><span class="description-preview">${esc(textoDescricao(sim.descricao, 170))}</span></div></div></div>
@@ -822,7 +884,7 @@
         ${htmlMetrica('circle-dollar-sign', 'Saldo inicial', moeda(sim.saldoInicial), 'neutral', 'valor recebido', '')}
         ${htmlMetrica('trending-down', 'Investimento', moeda(tot.gasto), 'negative', 'saídas acompanhadas', 'gasto')}
         ${htmlMetrica('receipt-text', 'Lançamentos', String(tot.lancamentos).padStart(2, '0'), 'neutral', 'em todas as tabelas', 'qtd')}
-        <div class="metric-card or-metric-saldo"><div class="metric-topline"><span class="metric-icon">${ic('wallet', 18)}</span><span class="metric-label">Saldo projetado</span></div><strong data-ref="saldo">${moeda(saldo)}</strong><span class="metric-detail" data-ref="saldo-detalhe">${tot.gasto > 0 ? `${moeda(tot.gasto)} em despesas acompanhadas` : 'Adicione sua primeira despesa'}</span></div>
+        <div class="metric-card or-metric-saldo"><div class="metric-topline"><span class="metric-icon">${ic('wallet', 18)}</span><span class="metric-label">Saldo projetado</span></div><strong data-ref="saldo">${moeda(saldo)}</strong><span class="metric-detail" data-ref="saldo-detalhe">${textoSaldoDetalhe(tot)}</span></div>
       </div>
       <section class="chart-card soft-card" data-ancora="grafico"><div class="section-heading"><div><span class="eyebrow">Visão acumulada</span><h2>Evolução do saldo</h2></div><div class="chart-legend"><span><i class="legend-line"></i> Saldo projetado</span><span><i class="legend-dot"></i> Atualizado agora</span></div></div><div class="chart-wrap"><canvas id="or-grafico-saldo" aria-label="Gráfico da evolução do saldo"></canvas></div><div class="chart-caption"><span><span class="caption-arrow">↗</span> Sua projeção parte de ${moeda(sim.saldoInicial)} e considera os lançamentos abaixo.</span><span>Arraste uma tabela pelo título para reorganizar os meses.</span></div></section>
       <section class="tables-section"><div class="tables-heading" data-ancora="meses"><div><span class="eyebrow">Organização por período</span><h2>Meses da simulação</h2><p>Acompanhe apenas os meses cadastrados e filtre por descrição, mês ou ano.</p></div><div class="tables-tools"><label class="table-filter">${ic('search', 15)}<input data-campo="busca-tabelas" value="${esc(S.buscaTabelas)}" placeholder="Descrição, mês ou ano" /></label><button type="button" class="text-button" data-acao="nova-tabela">${ic('plus', 16)} Adicionar tabela</button></div></div><div class="tables-scroller"><div class="monthly-grid" data-ref="grade-tabelas">${htmlGradeTabelas(sim)}</div></div></section>
@@ -845,31 +907,64 @@
   function htmlCartao(sim, t) {
     const qtd = t.lancamentos.length;
     const picker = S.mesAberto && S.mesAberto.tabelaId === t.id ? htmlSeletorMes(sim) : '';
-    const linhas = t.lancamentos.map((l) => `<tr data-lanc="${esc(l.id)}" data-ancora="lanc:${esc(l.id)}">
-      <td><div class="description-field"><input class="description-cell" data-campo="descricao" data-tabela="${esc(t.id)}" data-lanc="${esc(l.id)}" value="${esc(l.descricao)}" maxlength="200" placeholder="Nome da despesa" /><button type="button" class="details-button ${l.detalhes && textoDescricao(l.detalhes, 1) ? 'has-details' : ''}" aria-label="Abrir detalhes" title="Anotações" data-acao="detalhes" data-tabela="${esc(t.id)}" data-lanc="${esc(l.id)}">${ic('notebook-pen', 14)}</button></div></td>
-      <td><div class="money-input"><span>R$</span><input type="number" min="0" step="0.01" data-campo="valor" data-tabela="${esc(t.id)}" data-lanc="${esc(l.id)}" value="${l.valor || ''}" placeholder="0,00" /></div></td>
-      <td><input class="date-cell" type="date" data-campo="data" data-tabela="${esc(t.id)}" data-lanc="${esc(l.id)}" value="${esc(l.data)}" /></td>
-      <td>${htmlSeletorArea(t, l)}</td>
-      <td><button type="button" class="delete-row" aria-label="Excluir lançamento" data-acao="apagar-lanc" data-tabela="${esc(t.id)}" data-lanc="${esc(l.id)}">${ic('trash2', 14)}</button></td>
-    </tr>`).join('');
+    const linhas = t.lancamentos.map((l) => htmlLancamento(t, l)).join('');
     const movida = S.movidaId === t.id ? ' just-moved' : '';
     return `<div class="monthly-card${movida}" data-tabela="${esc(t.id)}" data-ancora="card:${esc(t.id)}">
       <div class="monthly-heading" title="Arraste para mover este mês"><div class="monthly-title">${ic('grip-vertical', 17, 'drag-icon')}<div><h3>${rotuloMes(t.mes)}</h3><span data-ref="qtd-${esc(t.id)}">${qtd} lançamento${qtd === 1 ? '' : 's'}</span></div></div><div class="monthly-actions"><button type="button" class="icon-button subtle" aria-label="Editar mês e ano" data-acao="abrir-mes" data-tabela="${esc(t.id)}">${ic('pencil', 15)}</button><button type="button" class="icon-button subtle monthly-delete-button" aria-label="Apagar card mensal" data-acao="apagar-tabela" data-tabela="${esc(t.id)}">${ic('trash2', 15)}</button>${picker}</div></div>
-      <div class="monthly-summary"><span><i class="dot dot-expense"></i> <span data-ref="soma-${esc(t.id)}">${moeda(somaTabela(t))} em saídas</span></span><span>${qtd} ${qtd === 1 ? 'item' : 'itens'}</span></div>
-      <div class="entry-table-wrap"><table class="entry-table sem-cartao"><thead><tr><th>Descrição</th><th>Investimento</th><th>Data</th><th>Área de destino</th><th></th></tr></thead><tbody>${linhas}</tbody></table></div>
+      <div class="monthly-summary"><span><i class="dot dot-expense"></i> <span data-ref="soma-${esc(t.id)}">${textoSomas(somaTabela(t))}</span></span><span>${qtd} ${qtd === 1 ? 'item' : 'itens'}</span></div>
+      <div class="entry-table-wrap"><table class="entry-table sem-cartao"><thead><tr><th>Descrição</th><th>Investimento</th><th>Data</th><th>Área de destino</th><th class="or-th-entrada">Entrada</th><th></th></tr></thead><tbody>${linhas}</tbody></table></div>
       <button type="button" class="add-entry-button" data-acao="add-lanc" data-tabela="${esc(t.id)}">${ic('plus', 15)} Adicionar lançamento</button>
     </div>`;
   }
 
-  function htmlSeletorArea(t, l) {
-    const area = S.areas.find((a) => a.id === l.areaId);
-    const aberto = S.areaAberta === l.id;
-    const menu = aberto ? `<div class="area-menu"><div class="area-menu-title">Área de destino</div>${S.areas.map((a) => `<button type="button" title="${esc(a.nome)}" data-acao="area-escolher" data-tabela="${esc(t.id)}" data-lanc="${esc(l.id)}" data-area="${esc(a.id)}"><span class="area-icon">${icArea(a.icone, 14)}</span>${esc(a.nome)}</button>`).join('')}<button type="button" class="area-add" data-acao="abrir-areas" data-tabela="${esc(t.id)}">${ic('plus', 13)} Adicionar área</button></div>` : '';
+  function htmlLancamento(t, l) {
+    const ids = `data-tabela="${esc(t.id)}" data-lanc="${esc(l.id)}"`;
+    const subs = l.subitens;
+    const comSubs = subs.length > 0;
+    const aberto = S.subAbertos.has(l.id);
+    const classes = [l.entrada && !comSubs ? 'or-entrada-ativa' : '', comSubs ? 'or-com-subs' : ''].filter(Boolean).join(' ');
+    const principal = `<tr${classes ? ` class="${classes}"` : ''} data-lanc="${esc(l.id)}" data-ancora="lanc:${esc(l.id)}">
+      <td><div class="description-field"><input class="description-cell" data-campo="descricao" ${ids} value="${esc(l.descricao)}" maxlength="200" placeholder="Nome da despesa" /><button type="button" class="details-button ${l.detalhes && textoDescricao(l.detalhes, 1) ? 'has-details' : ''}" aria-label="Abrir detalhes" title="Anotações" data-acao="detalhes" ${ids}>${ic('notebook-pen', 14)}</button></div></td>
+      <td><div class="money-input${comSubs ? ' or-valor-informativo' : ''}"${comSubs ? ' title="Valor informativo: com subgastos, só eles entram no total"' : ''}><span>R$</span><input type="number" min="0" step="0.01" data-campo="valor" ${ids} value="${l.valor || ''}" placeholder="0,00" /></div></td>
+      <td><input class="date-cell" type="date" data-campo="data" ${ids} value="${esc(l.data)}" /></td>
+      <td>${htmlSeletorArea(t, l)}</td>
+      <td>${htmlCheckEntrada('entrada', ids, l.entrada && !comSubs, comSubs)}</td>
+      <td><div class="or-acoes-linha"><button type="button" class="or-sub-botao${aberto ? ' aberto' : ''}${comSubs ? ' tem-subs' : ''}" data-acao="sub-toggle" ${ids} aria-expanded="${aberto}" title="${comSubs ? 'Mostrar ou ocultar os subgastos' : 'Dividir este lançamento em subgastos'}">Subgastos${comSubs ? `<b>${subs.length}</b>` : ''}</button><button type="button" class="delete-row" aria-label="Excluir lançamento" data-acao="apagar-lanc" ${ids}>${ic('trash2', 14)}</button></div></td>
+    </tr>`;
+    if (!aberto) return principal;
+    const linhasSub = subs.map((s) => {
+      const sids = `${ids} data-sub="${esc(s.id)}"`;
+      return `<tr class="or-subitem${s.entrada ? ' or-entrada-ativa' : ''}" data-lanc="${esc(l.id)}" data-sub="${esc(s.id)}" data-ancora="sub:${esc(s.id)}">
+      <td><div class="description-field"><span class="or-sub-marca">${ic('corner-down-right', 13)}</span><input class="description-cell" data-campo="sub-descricao" ${sids} value="${esc(s.descricao)}" maxlength="200" placeholder="Subgasto" /></div></td>
+      <td><div class="money-input"><span>R$</span><input type="number" min="0" step="0.01" data-campo="sub-valor" ${sids} value="${s.valor || ''}" placeholder="0,00" /></div></td>
+      <td><input class="date-cell" type="date" data-campo="sub-data" ${sids} value="${esc(s.data)}" /></td>
+      <td>${htmlSeletorArea(t, l, s)}</td>
+      <td>${htmlCheckEntrada('sub-entrada', sids, s.entrada, false)}</td>
+      <td><div class="or-acoes-linha"><button type="button" class="delete-row" aria-label="Excluir subgasto" data-acao="apagar-sub" ${sids}>${ic('trash2', 14)}</button></div></td>
+    </tr>`;
+    }).join('');
+    const resumo = comSubs ? `<span data-ref="sub-soma-${esc(l.id)}">${textoSomas(somarItens(subs))}</span>` : '<span>Sem subgastos: o valor do lançamento entra no total</span>';
+    return principal + linhasSub
+      + `<tr class="or-subitem-add"><td colspan="6"><div><button type="button" class="or-sub-add" data-acao="add-sub" ${ids}>${ic('plus', 13)} Adicionar subgasto</button>${resumo}</div></td></tr>`;
+  }
+
+  function htmlCheckEntrada(campo, ids, marcado, desativado) {
+    const titulo = desativado ? 'Com subgastos, marque “Entrada” em cada subgasto' : 'Entrada: soma ao saldo em vez de retirar';
+    return `<label class="or-entrada" title="${titulo}"><input type="checkbox" data-campo="${campo}" ${ids}${marcado ? ' checked' : ''}${desativado ? ' disabled' : ''} /><span>Entrada</span></label>`;
+  }
+
+  // `s`: subgasto do lançamento `l` (o seletor age sobre ele)
+  function htmlSeletorArea(t, l, s) {
+    const item = s || l;
+    const ids = `data-tabela="${esc(t.id)}" data-lanc="${esc(l.id)}"${s ? ` data-sub="${esc(s.id)}"` : ''}`;
+    const area = S.areas.find((a) => a.id === item.areaId);
+    const aberto = S.areaAberta === item.id;
+    const menu = aberto ? `<div class="area-menu"><div class="area-menu-title">Área de destino</div>${S.areas.map((a) => `<button type="button" title="${esc(a.nome)}" data-acao="area-escolher" ${ids} data-area="${esc(a.id)}"><span class="area-icon">${icArea(a.icone, 14)}</span>${esc(a.nome)}</button>`).join('')}<button type="button" class="area-add" data-acao="abrir-areas" data-tabela="${esc(t.id)}">${ic('plus', 13)} Adicionar área</button></div>` : '';
     // Sem área escolhida: "A definir"; área que foi removida: "Sem área"
     const [classe, titulo, icone, nome] = area ? ['', area.nome, icArea(area.icone, 13), area.nome]
-      : !l.areaId ? [' or-a-definir', 'Escolha a área de destino', ic('more-horizontal', 13), 'A definir']
+      : !item.areaId ? [' or-a-definir', 'Escolha a área de destino', ic('more-horizontal', 13), 'A definir']
       : [' or-sem-area', 'Área removida — escolha outra', icArea('settings', 13), 'Sem área'];
-    return `<div class="area-picker"><button type="button" class="area-trigger${classe}" data-acao="area-abrir" data-tabela="${esc(t.id)}" data-lanc="${esc(l.id)}" title="${esc(titulo)}"><span class="area-icon">${icone}</span><span>${esc(nome)}</span>${ic('chevron-down', 12)}</button>${menu}</div>`;
+    return `<div class="area-picker"><button type="button" class="area-trigger${classe}" data-acao="area-abrir" ${ids} title="${esc(titulo)}"><span class="area-icon">${icone}</span><span>${esc(nome)}</span>${ic('chevron-down', 12)}</button>${menu}</div>`;
   }
 
   function anosSeletor(sim, ano) {
@@ -955,10 +1050,11 @@
     const semArea = { id: '__sem-area__', nome: 'Sem área', icone: 'settings' };
     const aDefinir = { id: '__a-definir__', nome: 'A definir', icone: 'settings' };
     const linhas = [];
-    sim.tabelas.forEach((t) => t.lancamentos.forEach((l) => {
-      if (!(Number(l.valor) > 0)) return;
-      linhas.push({ ...l, area: porId.get(l.areaId) || (l.areaId ? semArea : aDefinir) });
-    }));
+    sim.tabelas.forEach((t) => t.lancamentos.forEach((l) => itensContados(l).forEach((i) => {
+      if (i.entrada || !(Number(i.valor) > 0)) return;
+      const descricao = i === l ? l.descricao : [l.descricao, i.descricao].filter(Boolean).join(' › ');
+      linhas.push({ ...i, descricao, area: porId.get(i.areaId) || (i.areaId ? semArea : aDefinir) });
+    })));
     const grupos = new Map();
     linhas.forEach((l) => {
       const g = grupos.get(l.area.id) || { ...l.area, valor: 0 };
@@ -1027,12 +1123,13 @@
     const ativo = document.activeElement;
     let alvo = null;
     if (raiz && ativo && raiz.contains(ativo) && ativo.dataset && ativo.dataset.campo && !ativo.closest('.or-modais')) {
-      alvo = { campo: ativo.dataset.campo, lanc: ativo.dataset.lanc, valor: ativo.value, ini: null, fim: null };
+      alvo = { campo: ativo.dataset.campo, lanc: ativo.dataset.lanc, sub: ativo.dataset.sub, valor: ativo.value, ini: null, fim: null };
       try { alvo.ini = ativo.selectionStart; alvo.fim = ativo.selectionEnd; } catch (e) { /* number/date */ }
     }
     fn();
     if (!alvo) return;
-    const seletor = `[data-campo="${CSS.escape(alvo.campo)}"]` + (alvo.lanc ? `[data-lanc="${CSS.escape(alvo.lanc)}"]` : '');
+    const seletor = `[data-campo="${CSS.escape(alvo.campo)}"]` + (alvo.lanc ? `[data-lanc="${CSS.escape(alvo.lanc)}"]` : '')
+      + (alvo.sub ? `[data-sub="${CSS.escape(alvo.sub)}"]` : '');
     const novo = raiz.querySelector(seletor);
     if (!novo || novo === document.activeElement) return;
     if (novo.value !== alvo.valor) novo.value = alvo.valor;
@@ -1075,7 +1172,7 @@
       ids.add(chave);
     });
     raiz.querySelectorAll('.entry-table tr[data-lanc]').forEach((r) => {
-      const chave = 'l:' + r.dataset.lanc;
+      const chave = r.dataset.sub ? 's:' + r.dataset.sub : 'l:' + r.dataset.lanc;
       if (mesma && !ids.has(chave) && !r.closest('.or-chegou')) r.classList.add('or-chegou');
       ids.add(chave);
     });
@@ -1139,11 +1236,14 @@
     const sim = selecionada();
     if (!sim || !raiz) return;
     const tot = totais(sim);
-    definirRef('saldo', moeda(sim.saldoInicial - tot.gasto));
-    definirRef('saldo-detalhe', tot.gasto > 0 ? `${moeda(tot.gasto)} em despesas acompanhadas` : 'Adicione sua primeira despesa');
+    definirRef('saldo', moeda(saldoProjetado(sim, tot)));
+    definirRef('saldo-detalhe', textoSaldoDetalhe(tot));
     definirRef('gasto', moeda(tot.gasto));
     definirRef('qtd', String(tot.lancamentos).padStart(2, '0'));
-    sim.tabelas.forEach((t) => definirRef(`soma-${t.id}`, `${moeda(somaTabela(t))} em saídas`));
+    sim.tabelas.forEach((t) => {
+      definirRef(`soma-${t.id}`, textoSomas(somaTabela(t)));
+      t.lancamentos.forEach((l) => { if (l.subitens.length) definirRef(`sub-soma-${l.id}`, textoSomas(somarItens(l.subitens))); });
+    });
     if (graficoSaldo) {
       const { rotulos, valores } = dadosGrafico(sim);
       graficoSaldo.data.labels = rotulos;
@@ -1171,7 +1271,8 @@
     const rotulos = ['Início'];
     const valores = [acumulado];
     tabelasOrdenadas(sim).forEach((t) => {
-      acumulado -= somaTabela(t);
+      const { saidas, entradas } = somaTabela(t);
+      acumulado += entradas - saidas;
       rotulos.push(rotuloMesCurto(t.mes));
       valores.push(acumulado);
     });
@@ -1356,6 +1457,26 @@
     atualizarTabela(tabelaId, (t) => ({ ...t, lancamentos: t.lancamentos.map((l) => (l.id === lancId ? { ...l, [campo]: valor } : l)) }), imediato);
   }
 
+  function atualizarSubitens(tabelaId, lancId, fn) {
+    return atualizarTabela(tabelaId, (t) => ({ ...t, lancamentos: t.lancamentos.map((l) => (l.id === lancId ? { ...l, subitens: fn(l.subitens, l) } : l)) }), true);
+  }
+
+  function alterarSubitem(tabelaId, lancId, subId, campo, valor, imediato) {
+    atualizarTabela(tabelaId, (t) => ({ ...t, lancamentos: t.lancamentos.map((l) => (l.id === lancId
+      ? { ...l, subitens: l.subitens.map((x) => (x.id === subId ? { ...x, [campo]: valor } : x)) } : l)) }), imediato);
+  }
+
+  // Inclui um subgasto e põe o cursor na descrição dele
+  function adicionarSubitem(tabelaId, lancId) {
+    let novoId = null;
+    atualizarSubitens(tabelaId, lancId, (subs, l) => { const n = novoSubitem(l); novoId = n.id; return [...subs, n]; });
+    S.subAbertos.add(lancId);
+    renderCartao(tabelaId);
+    atualizarDerivados();
+    const campo = novoId && raiz.querySelector(`[data-campo="sub-descricao"][data-sub="${CSS.escape(novoId)}"]`);
+    if (campo) campo.focus();
+  }
+
   function novaTabelaNaSimulacao() {
     const sim = selecionada();
     if (!sim) return;
@@ -1459,7 +1580,7 @@
     if (S.areaAberta && !e.target.closest('.area-picker')) {
       const aberto = S.areaAberta;
       S.areaAberta = null;
-      const btn = raiz.querySelector(`[data-acao="area-abrir"][data-lanc="${CSS.escape(aberto)}"]`);
+      const btn = raiz.querySelector(`[data-acao="area-abrir"][data-lanc="${CSS.escape(aberto)}"], [data-acao="area-abrir"][data-sub="${CSS.escape(aberto)}"]`);
       if (btn) renderCartao(btn.dataset.tabela);
     }
     if (S.mesAberto && !e.target.closest('.month-picker') && !e.target.closest('[data-acao="abrir-mes"]')) {
@@ -1476,7 +1597,7 @@
 
     if (comando) { e.preventDefault(); document.execCommand(comando.dataset.comando, false); sincronizarEditor(); return; }
     if (!alvo) return;
-    const { acao, id, tabela, lanc } = alvo.dataset;
+    const { acao, id, tabela, lanc, sub } = alvo.dataset;
     const sim = selecionada();
     if (/^(mes-|ano-)/.test(acao) && !S.mesAberto) return;
 
@@ -1568,14 +1689,32 @@
       }
       case 'area-abrir': {
         const anterior = S.areaAberta;
-        S.areaAberta = anterior === lanc ? null : lanc;
+        const chave = sub || lanc;
+        S.areaAberta = anterior === chave ? null : chave;
         renderCartao(tabela);
         break;
       }
       case 'area-escolher':
         S.areaAberta = null;
-        alterarLancamento(tabela, lanc, 'areaId', alvo.dataset.area, true);
+        if (sub) alterarSubitem(tabela, lanc, sub, 'areaId', alvo.dataset.area, true);
+        else alterarLancamento(tabela, lanc, 'areaId', alvo.dataset.area, true);
         renderCartao(tabela);
+        break;
+      case 'sub-toggle': {
+        const l = sim && sim.tabelas.find((t) => t.id === tabela)?.lancamentos.find((x) => x.id === lanc);
+        if (!l) break;
+        if (S.subAbertos.has(lanc)) { S.subAbertos.delete(lanc); renderCartao(tabela); break; }
+        // Abrir pela primeira vez já cria o primeiro subgasto
+        if (l.subitens.length === 0) { adicionarSubitem(tabela, lanc); break; }
+        S.subAbertos.add(lanc);
+        renderCartao(tabela);
+        break;
+      }
+      case 'add-sub': adicionarSubitem(tabela, lanc); break;
+      case 'apagar-sub':
+        atualizarSubitens(tabela, lanc, (subs) => subs.filter((x) => x.id !== sub));
+        renderCartao(tabela);
+        atualizarDerivados();
         break;
       case 'apagar-lanc': {
         const novo = atualizarTabela(tabela, (t) => ({ ...t, lancamentos: t.lancamentos.filter((l) => l.id !== lanc) }), true);
@@ -1652,6 +1791,9 @@
       case 'descricao': alterarLancamento(t.dataset.tabela, t.dataset.lanc, 'descricao', t.value.slice(0, 200)); break;
       case 'valor': alterarLancamento(t.dataset.tabela, t.dataset.lanc, 'valor', Math.max(0, Number(t.value) || 0)); atualizarDerivados(); break;
       case 'data': if (t.value) alterarLancamento(t.dataset.tabela, t.dataset.lanc, 'data', t.value, true); break;
+      case 'sub-descricao': alterarSubitem(t.dataset.tabela, t.dataset.lanc, t.dataset.sub, 'descricao', t.value.slice(0, 200)); break;
+      case 'sub-valor': alterarSubitem(t.dataset.tabela, t.dataset.lanc, t.dataset.sub, 'valor', Math.max(0, Number(t.value) || 0)); atualizarDerivados(); break;
+      case 'sub-data': if (t.value) alterarSubitem(t.dataset.tabela, t.dataset.lanc, t.dataset.sub, 'data', t.value, true); break;
       case 'editor': sincronizarEditor(); break;
       case 'form-titulo': S.modal.form.titulo = t.value; break;
       case 'form-saldo': S.modal.form.saldoInicial = t.value; break;
@@ -1669,7 +1811,15 @@
   }
 
   function aoMudar(e) {
-    if (e.target.dataset && e.target.dataset.campo === 'analise-ordem') { S.modal.ordem = e.target.value; renderModal(); }
+    const t = e.target;
+    const campo = t.dataset && t.dataset.campo;
+    if (campo === 'analise-ordem') { S.modal.ordem = t.value; renderModal(); return; }
+    if (campo === 'entrada' || campo === 'sub-entrada') {
+      if (campo === 'entrada') alterarLancamento(t.dataset.tabela, t.dataset.lanc, 'entrada', t.checked, true);
+      else alterarSubitem(t.dataset.tabela, t.dataset.lanc, t.dataset.sub, 'entrada', t.checked, true);
+      t.closest('tr').classList.toggle('or-entrada-ativa', t.checked);
+      atualizarDerivados();
+    }
   }
 
   function aoEnviar(e) {
