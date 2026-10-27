@@ -31,6 +31,7 @@
 
   // Ícones Lucide (mesmos do protótipo), embutidos para não depender de CDN
   const ICONES_SVG = {
+    'download': '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>',
     'arrow-left': '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
     'arrow-up-right': '<path d="M7 7h10v10"/><path d="M7 17 17 7"/>',
     'calendar-days': '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/>',
@@ -464,28 +465,85 @@
   const timers = new Map();     // id da simulação → gravação agendada
   const gravando = new Set();   // ids com escrita em andamento
   const falhas = new Set();     // ids cuja última gravação falhou
+  // Última versão de cada simulação vista no servidor: base da mescla de três
+  // vias (o que eu mudei desde a base é aplicado sobre a versão atual do banco)
+  const bases = new Map();
+  let vistos = { simId: null, ids: new Set() };   // cards/lançamentos já exibidos (animação de chegada)
 
   const selecionada = () => S.simulacoes.find((s) => s.id === S.selecionadaId) || null;
   const usuario = () => (window.currentUser && window.currentUser.email) || ((firebase.auth().currentUser || {}).email) || '';
   const carimbo = () => firebase.firestore.FieldValue.serverTimestamp();
   const pendente = (id) => timers.has(id) || gravando.has(id);
 
+  // ── Mescla de três vias ──────────────────────────────────────────────────
+  // Dois administradores editando a mesma simulação: em vez de "vence quem
+  // salvar por último" (documento inteiro), aplica só o que eu mudei desde a
+  // base sobre a versão do servidor, campo a campo, por tabela e lançamento.
+  // Remoção feita do outro lado vence; tabelas e lançamentos novos dos dois
+  // lados são mantidos.
+  const CAMPOS_SIM = ['titulo', 'descricao', 'saldoInicial', 'dataInicio', 'dataFim'];
+  const CAMPOS_LANC = ['descricao', 'valor', 'data', 'areaId', 'detalhes'];
+
+  function mesclarLista(base, local, servidor, mesclarItem) {
+    const b = new Map(base.map((x) => [x.id, x]));
+    const l = new Map(local.map((x) => [x.id, x]));
+    const sIds = new Set(servidor.map((x) => x.id));
+    const saida = [];
+    servidor.forEach((s) => {
+      const vb = b.get(s.id);
+      const vl = l.get(s.id);
+      if (vb && !vl) return;                 // removido aqui
+      saida.push(vb && vl ? mesclarItem(vb, vl, s) : s);
+    });
+    local.forEach((x) => { if (!b.has(x.id) && !sIds.has(x.id)) saida.push(x); });   // novo aqui
+    return saida;
+  }
+
+  function mesclarCampos(campos, base, local, servidor) {
+    const r = { ...servidor };
+    campos.forEach((c) => { if (local[c] !== base[c]) r[c] = local[c]; });
+    return r;
+  }
+
+  function mesclar(base, local, servidor) {
+    const r = mesclarCampos(CAMPOS_SIM, base, local, servidor);
+    r.tabelas = mesclarLista(base.tabelas, local.tabelas, servidor.tabelas, (tb, tl, ts) => ({
+      ...ts,
+      mes: tl.mes !== tb.mes ? tl.mes : ts.mes,
+      lancamentos: mesclarLista(tb.lancamentos, tl.lancamentos, ts.lancamentos,
+        (lb, ll, ls) => mesclarCampos(CAMPOS_LANC, lb, ll, ls))
+    }));
+    return r;
+  }
+
   // ── Firestore ────────────────────────────────────────────────────────────
   function assinar() {
     pararSims = db.collection(COLECAO).onSnapshot((snap) => {
       const locais = new Map(S.simulacoes.map((s) => [s.id, s]));
       const lista = [];
+      const noServidor = new Set();
       snap.forEach((doc) => {
+        noServidor.add(doc.id);
         const local = locais.get(doc.id);
-        if (local && (pendente(doc.id) || doc.metadata.hasPendingWrites)) { lista.push(local); return; }
-        const sim = normalizarSimulacao(doc.id, doc.data({ serverTimestamps: 'estimate' }));
-        lista.push(sim);
+        if (local && doc.metadata.hasPendingWrites) { lista.push(local); return; }
+        const servidor = normalizarSimulacao(doc.id, doc.data({ serverTimestamps: 'estimate' }));
+        const base = bases.get(doc.id);
+        bases.set(doc.id, servidor);
+        // Com alteração minha pendente, o que veio do outro lado entra por baixo dela
+        if (local && pendente(doc.id)) lista.push(base ? { ...mesclar(base, local, servidor), criadoEmMs: servidor.criadoEmMs || local.criadoEmMs } : local);
+        else lista.push(servidor);
       });
-      // Criadas aqui e ainda não refletidas no snapshot
-      S.simulacoes.forEach((s) => { if (pendente(s.id) && !lista.some((x) => x.id === s.id)) lista.push(s); });
+      // Criadas aqui e ainda não gravadas (sem base); as que tinham base e
+      // sumiram do servidor foram apagadas por outro administrador
+      S.simulacoes.forEach((s) => {
+        if (noServidor.has(s.id)) return;
+        if (pendente(s.id) && !bases.has(s.id)) lista.push(s);
+        else { bases.delete(s.id); clearTimeout(timers.get(s.id)); timers.delete(s.id); }
+      });
       lista.sort((a, b) => (b.criadoEmMs || Infinity) - (a.criadoEmMs || Infinity) || a.titulo.localeCompare(b.titulo));
 
       const mudou = !S.carregado || assinatura(lista) !== assinatura(S.simulacoes);
+      const primeira = !S.carregado;
       S.simulacoes = lista;
       S.carregado = true;
       S.erro = null;
@@ -493,8 +551,11 @@
         S.tela = 'simulacoes';
         S.selecionadaId = null;
         avisar('A simulação aberta foi apagada por outro administrador.');
+        render();
+        return;
       }
-      if (mudou) renderSeguro();
+      if (primeira) render();
+      else if (mudou) renderRemoto();
     }, (err) => {
       console.error('[Organização de recursos] Erro ao ler simulações:', err);
       S.erro = err && err.code ? err.code : 'desconhecido';
@@ -507,35 +568,72 @@
       const areas = normalizarAreas(doc.exists ? doc.data().areas : null);
       if (JSON.stringify(areas) === JSON.stringify(S.areas)) return;
       S.areas = areas;
-      renderSeguro();
+      renderRemoto();
       if (S.modal && S.modal.tipo === 'areas') renderModal();
     }, (err) => console.warn('[Organização de recursos] Usando áreas padrão:', err && (err.code || err.message)));
   }
 
   const assinatura = (lista) => JSON.stringify(lista.map((s) => [s.id, serializarSimulacao(s)]));
 
-  function agendarGravacao(id) {
+  function agendarGravacao(id, atraso = ATRASO_GRAVACAO) {
     clearTimeout(timers.get(id));
-    timers.set(id, setTimeout(() => gravar(id), ATRASO_GRAVACAO));
+    timers.set(id, setTimeout(() => gravar(id), atraso));
     definirSync('salvando');
   }
 
-  async function gravar(id, extras) {
+  // Grava numa transação: lê a versão atual do banco, aplica por cima o que
+  // mudou aqui desde a base e escreve o resultado. Uma por simulação por vez.
+  async function gravar(id, extras, tentativa = 0) {
     clearTimeout(timers.get(id));
     timers.delete(id);
-    const sim = S.simulacoes.find((s) => s.id === id);
-    if (!sim) return;
+    const enviada = S.simulacoes.find((s) => s.id === id);
+    if (!enviada) return;
+    if (gravando.has(id)) { agendarGravacao(id, 150); return; }
     gravando.add(id);
     definirSync('salvando');
+    const base = bases.get(id);
+    const ref = db.collection(COLECAO).doc(id);
+    let resultado = null;
+    let apagada = false;
     try {
-      await db.collection(COLECAO).doc(id).set({
-        ...serializarSimulacao(sim),
-        ...(extras || {}),
-        atualizadoEm: carimbo(),
-        atualizadoPor: usuario()
-      }, { merge: true });
+      await db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        const servidor = snap.exists ? normalizarSimulacao(id, snap.data()) : null;
+        apagada = !servidor && !!base;
+        if (apagada) return;
+        resultado = servidor && base ? mesclar(base, enviada, servidor) : enviada;
+        tx.set(ref, {
+          ...serializarSimulacao(resultado),
+          ...(extras || {}),
+          atualizadoEm: carimbo(),
+          atualizadoPor: usuario()
+        }, { merge: true });
+      });
       falhas.delete(id);
+      if (apagada) {
+        bases.delete(id);
+        S.simulacoes = S.simulacoes.filter((s) => s.id !== id);
+        if (S.selecionadaId === id) { S.tela = 'simulacoes'; S.selecionadaId = null; }
+        avisar('Esta simulação foi apagada por outro administrador.');
+        render();
+        return;
+      }
+      // O que foi digitado durante a transação é reaplicado sobre o resultado
+      const atual = S.simulacoes.find((s) => s.id === id);
+      bases.set(id, resultado);
+      if (atual) {
+        const rebase = { ...mesclar(enviada, atual, resultado), criadoEmMs: atual.criadoEmMs };
+        const mudou = assinatura([rebase]) !== assinatura([atual]);
+        S.simulacoes = S.simulacoes.map((s) => (s.id === id ? rebase : s));
+        if (mudou) renderRemoto();
+      }
     } catch (err) {
+      const transitorio = err && ['aborted', 'unavailable', 'deadline-exceeded', 'failed-precondition'].includes(err.code);
+      if (transitorio && tentativa < 3) {
+        gravando.delete(id);
+        setTimeout(() => gravar(id, extras, tentativa + 1), 700 * (tentativa + 1));
+        return;
+      }
       console.error('[Organização de recursos] Erro ao salvar:', err);
       falhas.add(id);
       avisar(mensagemErro(err, 'Não foi possível salvar a simulação.'));
@@ -577,7 +675,7 @@
     const codigo = err && err.code;
     if (codigo === 'permission-denied') return 'Sem permissão no Firestore para esta coleção. Verifique as regras de segurança.';
     if (codigo === 'resource-exhausted') return 'Cota do Firestore esgotada — tente mais tarde.';
-    if (codigo === 'unavailable') return 'Sem conexão — a alteração será enviada quando a internet voltar.';
+    if (codigo === 'unavailable') return 'Sem conexão — a alteração será enviada assim que a internet voltar.';
     return padrao;
   }
 
@@ -591,9 +689,12 @@
     Array.from(timers.keys()).forEach((id) => gravar(id));
   }
 
-  function alterarSimulacao(sim) {
+  // `imediato`: mudanças de estrutura (tabela/lançamento novo ou removido,
+  // mês, área, anotações, título) vão ao banco na hora, para a outra pessoa
+  // ver sem esperar; digitação espera uma pausa curta.
+  function alterarSimulacao(sim, imediato) {
     S.simulacoes = S.simulacoes.map((s) => (s.id === sim.id ? sim : s));
-    agendarGravacao(sim.id);
+    agendarGravacao(sim.id, imediato ? 0 : ATRASO_GRAVACAO);
   }
 
   // ── Templates ────────────────────────────────────────────────────────────
@@ -618,7 +719,7 @@
     const conteudo = S.renomeandoId === item.id
       ? `<div class="nav-item simulation-nav"><input class="or-renomear" data-campo="renomear" maxlength="120" value="${esc(S.renomeValor)}" aria-label="Novo nome da simulação" /></div>`
       : `<button type="button" class="nav-item simulation-nav" data-acao="abrir-sim" data-id="${esc(item.id)}" title="${esc(item.titulo)} — clique duplo para renomear">${ic('clipboard-list', 15)}<span>${esc(item.titulo)}</span></button>`;
-    return `<div class="simulation-nav-row${ativo}">${conteudo}<button type="button" class="simulation-delete" aria-label="Apagar ${esc(item.titulo)}" data-acao="pedir-apagar-sim" data-id="${esc(item.id)}">${ic('trash2', 14)}</button></div>`;
+    return `<div class="simulation-nav-row${ativo}" data-sim="${esc(item.id)}" data-ancora="nav:${esc(item.id)}">${conteudo}<button type="button" class="simulation-delete" aria-label="Apagar ${esc(item.titulo)}" data-acao="pedir-apagar-sim" data-id="${esc(item.id)}">${ic('trash2', 14)}</button></div>`;
   }
 
   function htmlSidebar() {
@@ -626,12 +727,12 @@
     const iniciais = (email.split('@')[0] || 'ME').replace(/[^a-zA-Z]/g, '').slice(0, 2).toUpperCase() || 'ME';
     const linhas = S.simulacoes.map(htmlLinhaSimulacao).join('');
 
-    return `<aside class="sidebar">
+    return `<aside class="sidebar" data-ancora="menu">
       ${htmlMarca(false)}
       <button type="button" class="or-voltar" data-acao="voltar-central" title="Voltar ao Painel Administrativo">${ic('arrow-left', 16)} Voltar à Central</button>
       <nav class="side-nav">
         <span class="nav-section-label">Workspace</span>
-        <button type="button" class="nav-item ${S.tela === 'simulacoes' ? 'active' : ''}" data-acao="visao-geral">${ic('layout-dashboard', 18)} Visão geral</button>
+        <button type="button" class="nav-item ${S.tela === 'simulacoes' ? 'active' : ''}" data-acao="visao-geral" data-sim="__lista__" data-ancora="nav:lista">${ic('layout-dashboard', 18)} Visão geral</button>
         <button type="button" class="nav-item area-nav" data-acao="abrir-areas">${ic('plus-circle', 18)} Adicionar Área</button>
         <span class="nav-section-label simulation-nav-label">Simulações</span>
         ${linhas || '<span class="or-nav-vazio">Nenhuma simulação ainda</span>'}
@@ -676,9 +777,9 @@
   function htmlLista() {
     const lancamentos = S.simulacoes.reduce((s, item) => s + totais(item).lancamentos, 0);
     return `<div class="page-content">
-      <div class="page-heading"><div><span class="eyebrow">Planejamento · Master Educação</span><h1>Simulações</h1><p>Organize cenários, acompanhe o caixa e decida com mais clareza.</p></div><button type="button" class="primary-button" data-acao="nova-sim">${ic('plus', 17)} Nova simulação</button></div>
-      <div class="overview-strip"><div><span class="overview-number">${S.simulacoes.length}</span><span class="overview-label">cenários ativos</span></div><div class="overview-accent-line"></div><div><span class="overview-number">${lancamentos}</span><span class="overview-label">lançamentos registrados</span></div><div class="overview-note">${ic('sparkles', 17)} <span>Pequenas decisões, grandes respiros.</span></div></div>
-      <div class="list-toolbar"><div><h2>Todos os cenários</h2><span data-ref="qtd-sims"></span></div><label class="search-box">${ic('search', 16)}<input data-campo="busca-sim" value="${esc(S.busca)}" placeholder="Buscar simulação" /></label></div>
+      <div class="page-heading" data-ancora="topo"><div><span class="eyebrow">Planejamento · Master Educação</span><h1>Simulações</h1><p>Organize cenários, acompanhe o caixa e decida com mais clareza.</p></div><div class="or-heading-acoes"><button type="button" class="secondary-button" data-acao="exportar-backup" title="Baixar uma cópia de todas as simulações e áreas (JSON)">${ic('download', 16)} Backup</button><button type="button" class="primary-button" data-acao="nova-sim">${ic('plus', 17)} Nova simulação</button></div></div>
+      <div class="overview-strip" data-ancora="resumo"><div><span class="overview-number">${S.simulacoes.length}</span><span class="overview-label">cenários ativos</span></div><div class="overview-accent-line"></div><div><span class="overview-number">${lancamentos}</span><span class="overview-label">lançamentos registrados</span></div><div class="overview-note">${ic('sparkles', 17)} <span>Pequenas decisões, grandes respiros.</span></div></div>
+      <div class="list-toolbar" data-ancora="filtro"><div><h2>Todos os cenários</h2><span data-ref="qtd-sims"></span></div><label class="search-box">${ic('search', 16)}<input data-campo="busca-sim" value="${esc(S.busca)}" placeholder="Buscar simulação" /></label></div>
       <div data-ref="grade-sims">${htmlGradeSims()}</div>
     </div>`;
   }
@@ -693,7 +794,7 @@
     if (lista.length === 0) return htmlVazio();
     return `<div class="simulation-grid">${lista.map((sim) => {
       const saldo = sim.saldoInicial - totais(sim).gasto;
-      return `<button type="button" class="simulation-card soft-card" data-acao="abrir-sim" data-id="${esc(sim.id)}">
+      return `<button type="button" class="simulation-card soft-card" data-acao="abrir-sim" data-id="${esc(sim.id)}" data-sim="${esc(sim.id)}" data-ancora="sim:${esc(sim.id)}">
         <div class="simulation-card-top"><span class="scenario-mark">${ic('circle-dollar-sign', 19)}</span><span class="status-pill"><span></span> ${situacao(sim)}</span>${ic('more-horizontal', 19, 'muted-icon')}</div>
         <div class="simulation-card-body"><h3>${esc(sim.titulo)}</h3><p>${esc(textoDescricao(sim.descricao, 120))}</p><div class="simulation-date">${ic('calendar-days', 14)} ${fmtData(sim.dataInicio)} <span>—</span> ${fmtData(sim.dataFim)}</div></div>
         <div class="simulation-card-bottom"><div><span>Saldo projetado</span><strong>${moeda(saldo)}</strong></div>${ic('arrow-up-right', 18)}</div>
@@ -715,16 +816,16 @@
     const tot = totais(sim);
     const saldo = sim.saldoInicial - tot.gasto;
     return `<div class="page-content dashboard-page">
-      <div class="breadcrumb-row"><button type="button" class="back-button" data-acao="visao-geral">${ic('arrow-left', 16)} Todas as simulações</button><div class="dashboard-actions"><button type="button" class="secondary-button compact" data-acao="analise">${ic('sliders-horizontal', 15)} Análise por área</button><button type="button" class="secondary-button compact" data-acao="editar-sim">${ic('edit3', 15)} Editar simulação</button><button type="button" class="primary-button compact" data-acao="nova-tabela">${ic('plus', 16)} Nova tabela</button></div></div>
-      <div class="dashboard-title-row"><div><span class="eyebrow">Simulação ativa <span class="eyebrow-dot"></span></span><h1>${esc(sim.titulo)}</h1><div class="simulation-subline"><span>${ic('calendar-days', 14)} ${fmtData(sim.dataInicio)} — ${fmtData(sim.dataFim)}</span><span class="description-preview">${esc(textoDescricao(sim.descricao, 170))}</span></div></div></div>
-      <div class="metrics-grid">
+      <div class="breadcrumb-row" data-ancora="acoes"><button type="button" class="back-button" data-acao="visao-geral">${ic('arrow-left', 16)} Todas as simulações</button><div class="dashboard-actions"><button type="button" class="secondary-button compact" data-acao="analise">${ic('sliders-horizontal', 15)} Análise por área</button><button type="button" class="secondary-button compact" data-acao="editar-sim">${ic('edit3', 15)} Editar simulação</button><button type="button" class="primary-button compact" data-acao="nova-tabela">${ic('plus', 16)} Nova tabela</button></div></div>
+      <div class="dashboard-title-row" data-ancora="titulo"><div><span class="eyebrow">Simulação ativa <span class="eyebrow-dot"></span></span><h1>${esc(sim.titulo)}</h1><div class="simulation-subline"><span>${ic('calendar-days', 14)} ${fmtData(sim.dataInicio)} — ${fmtData(sim.dataFim)}</span><span class="description-preview">${esc(textoDescricao(sim.descricao, 170))}</span></div></div></div>
+      <div class="metrics-grid" data-ancora="metricas">
         ${htmlMetrica('circle-dollar-sign', 'Saldo inicial', moeda(sim.saldoInicial), 'neutral', 'valor recebido', '')}
         ${htmlMetrica('trending-down', 'Investimento', moeda(tot.gasto), 'negative', 'saídas acompanhadas', 'gasto')}
         ${htmlMetrica('receipt-text', 'Lançamentos', String(tot.lancamentos).padStart(2, '0'), 'neutral', 'em todas as tabelas', 'qtd')}
         <div class="metric-card or-metric-saldo"><div class="metric-topline"><span class="metric-icon">${ic('wallet', 18)}</span><span class="metric-label">Saldo projetado</span></div><strong data-ref="saldo">${moeda(saldo)}</strong><span class="metric-detail" data-ref="saldo-detalhe">${tot.gasto > 0 ? `${moeda(tot.gasto)} em despesas acompanhadas` : 'Adicione sua primeira despesa'}</span></div>
       </div>
-      <section class="chart-card soft-card"><div class="section-heading"><div><span class="eyebrow">Visão acumulada</span><h2>Evolução do saldo</h2></div><div class="chart-legend"><span><i class="legend-line"></i> Saldo projetado</span><span><i class="legend-dot"></i> Atualizado agora</span></div></div><div class="chart-wrap"><canvas id="or-grafico-saldo" aria-label="Gráfico da evolução do saldo"></canvas></div><div class="chart-caption"><span><span class="caption-arrow">↗</span> Sua projeção parte de ${moeda(sim.saldoInicial)} e considera os lançamentos abaixo.</span><span>Arraste uma tabela pelo título para reorganizar os meses.</span></div></section>
-      <section class="tables-section"><div class="tables-heading"><div><span class="eyebrow">Organização por período</span><h2>Meses da simulação</h2><p>Acompanhe apenas os meses cadastrados e filtre por descrição, mês ou ano.</p></div><div class="tables-tools"><label class="table-filter">${ic('search', 15)}<input data-campo="busca-tabelas" value="${esc(S.buscaTabelas)}" placeholder="Descrição, mês ou ano" /></label><button type="button" class="text-button" data-acao="nova-tabela">${ic('plus', 16)} Adicionar tabela</button></div></div><div class="tables-scroller"><div class="monthly-grid" data-ref="grade-tabelas">${htmlGradeTabelas(sim)}</div></div></section>
+      <section class="chart-card soft-card" data-ancora="grafico"><div class="section-heading"><div><span class="eyebrow">Visão acumulada</span><h2>Evolução do saldo</h2></div><div class="chart-legend"><span><i class="legend-line"></i> Saldo projetado</span><span><i class="legend-dot"></i> Atualizado agora</span></div></div><div class="chart-wrap"><canvas id="or-grafico-saldo" aria-label="Gráfico da evolução do saldo"></canvas></div><div class="chart-caption"><span><span class="caption-arrow">↗</span> Sua projeção parte de ${moeda(sim.saldoInicial)} e considera os lançamentos abaixo.</span><span>Arraste uma tabela pelo título para reorganizar os meses.</span></div></section>
+      <section class="tables-section"><div class="tables-heading" data-ancora="meses"><div><span class="eyebrow">Organização por período</span><h2>Meses da simulação</h2><p>Acompanhe apenas os meses cadastrados e filtre por descrição, mês ou ano.</p></div><div class="tables-tools"><label class="table-filter">${ic('search', 15)}<input data-campo="busca-tabelas" value="${esc(S.buscaTabelas)}" placeholder="Descrição, mês ou ano" /></label><button type="button" class="text-button" data-acao="nova-tabela">${ic('plus', 16)} Adicionar tabela</button></div></div><div class="tables-scroller"><div class="monthly-grid" data-ref="grade-tabelas">${htmlGradeTabelas(sim)}</div></div></section>
     </div>`;
   }
 
@@ -744,7 +845,7 @@
   function htmlCartao(sim, t) {
     const qtd = t.lancamentos.length;
     const picker = S.mesAberto && S.mesAberto.tabelaId === t.id ? htmlSeletorMes(sim) : '';
-    const linhas = t.lancamentos.map((l) => `<tr>
+    const linhas = t.lancamentos.map((l) => `<tr data-lanc="${esc(l.id)}" data-ancora="lanc:${esc(l.id)}">
       <td><div class="description-field"><input class="description-cell" data-campo="descricao" data-tabela="${esc(t.id)}" data-lanc="${esc(l.id)}" value="${esc(l.descricao)}" maxlength="200" placeholder="Nome da despesa" /><button type="button" class="details-button ${l.detalhes && textoDescricao(l.detalhes, 1) ? 'has-details' : ''}" aria-label="Abrir detalhes" title="Anotações" data-acao="detalhes" data-tabela="${esc(t.id)}" data-lanc="${esc(l.id)}">${ic('notebook-pen', 14)}</button></div></td>
       <td><div class="money-input"><span>R$</span><input type="number" min="0" step="0.01" data-campo="valor" data-tabela="${esc(t.id)}" data-lanc="${esc(l.id)}" value="${l.valor || ''}" placeholder="0,00" /></div></td>
       <td><input class="date-cell" type="date" data-campo="data" data-tabela="${esc(t.id)}" data-lanc="${esc(l.id)}" value="${esc(l.data)}" /></td>
@@ -752,7 +853,7 @@
       <td><button type="button" class="delete-row" aria-label="Excluir lançamento" data-acao="apagar-lanc" data-tabela="${esc(t.id)}" data-lanc="${esc(l.id)}">${ic('trash2', 14)}</button></td>
     </tr>`).join('');
     const movida = S.movidaId === t.id ? ' just-moved' : '';
-    return `<div class="monthly-card${movida}" data-tabela="${esc(t.id)}">
+    return `<div class="monthly-card${movida}" data-tabela="${esc(t.id)}" data-ancora="card:${esc(t.id)}">
       <div class="monthly-heading" title="Arraste para mover este mês"><div class="monthly-title">${ic('grip-vertical', 17, 'drag-icon')}<div><h3>${rotuloMes(t.mes)}</h3><span data-ref="qtd-${esc(t.id)}">${qtd} lançamento${qtd === 1 ? '' : 's'}</span></div></div><div class="monthly-actions"><button type="button" class="icon-button subtle" aria-label="Editar mês e ano" data-acao="abrir-mes" data-tabela="${esc(t.id)}">${ic('pencil', 15)}</button><button type="button" class="icon-button subtle monthly-delete-button" aria-label="Apagar card mensal" data-acao="apagar-tabela" data-tabela="${esc(t.id)}">${ic('trash2', 15)}</button>${picker}</div></div>
       <div class="monthly-summary"><span><i class="dot dot-expense"></i> <span data-ref="soma-${esc(t.id)}">${moeda(somaTabela(t))} em saídas</span></span><span>${qtd} ${qtd === 1 ? 'item' : 'itens'}</span></div>
       <div class="entry-table-wrap"><table class="entry-table sem-cartao"><thead><tr><th>Descrição</th><th>Investimento</th><th>Data</th><th>Área de destino</th><th></th></tr></thead><tbody>${linhas}</tbody></table></div>
@@ -901,24 +1002,84 @@
     renderPendente = false;
     const topo = raiz.scrollTop;
     destruirGrafico('saldo');
-    raiz.querySelector('.or-shell').innerHTML = `<div class="app-shell${S.menuAberto ? ' or-menu-aberto' : ''}">${htmlSidebar()}<div class="or-sidebar-fundo" data-acao="fechar-menu"></div><main class="main-area">${htmlCabecalhoCelular()}${htmlConteudo()}</main></div>`;
+    raiz.querySelector('.or-shell').innerHTML = `<div class="app-shell${S.menuAberto ? ' or-menu-aberto' : ''}">${htmlSidebar()}<div class="or-sidebar-fundo" data-acao="fechar-menu"></div><main class="main-area" data-ancora="main"><div class="or-colab-barra" data-ref="colab"></div>${htmlCabecalhoCelular()}${htmlConteudo()}</main></div>`;
     raiz.scrollTop = topo;
     atualizarContagemSims();
     const sim = selecionada();
+    S.cabecalhoRenderizado = sim ? assinaturaCabecalho(sim) : null;
     if (S.tela === 'painel' && sim) criarGraficoSaldo(sim);
+    marcarNovos();
     const renomear = raiz.querySelector('.or-renomear');
-    if (renomear) { renomear.focus(); renomear.select(); }
+    if (renomear && document.activeElement !== renomear) { renomear.focus(); renomear.select(); }
+    colab('aposRender');
   }
 
-  // Mudança vinda do banco: não re-renderiza por baixo de quem está digitando
-  function renderSeguro() {
-    if (S.arrastandoId) { renderPendente = true; return; }
+  const assinaturaCabecalho = (sim) => JSON.stringify(CAMPOS_SIM.map((c) => sim[c]));
+
+  // Redesenha mantendo o campo em edição focado, com o cursor de texto no lugar
+  function preservarFoco(fn) {
     const ativo = document.activeElement;
-    if (raiz && ativo && raiz.contains(ativo) && (ativo.matches('input, select, textarea') || ativo.isContentEditable)) {
-      renderPendente = true;
+    let alvo = null;
+    if (raiz && ativo && raiz.contains(ativo) && ativo.dataset && ativo.dataset.campo && !ativo.closest('.or-modais')) {
+      alvo = { campo: ativo.dataset.campo, lanc: ativo.dataset.lanc, valor: ativo.value, ini: null, fim: null };
+      try { alvo.ini = ativo.selectionStart; alvo.fim = ativo.selectionEnd; } catch (e) { /* number/date */ }
+    }
+    fn();
+    if (!alvo) return;
+    const seletor = `[data-campo="${CSS.escape(alvo.campo)}"]` + (alvo.lanc ? `[data-lanc="${CSS.escape(alvo.lanc)}"]` : '');
+    const novo = raiz.querySelector(seletor);
+    if (!novo || novo === document.activeElement) return;
+    if (novo.value !== alvo.valor) novo.value = alvo.valor;
+    novo.focus({ preventScroll: true });
+    try { if (alvo.ini !== null) novo.setSelectionRange(alvo.ini, alvo.fim); } catch (e) { /* number/date */ }
+  }
+
+  // Mudança vinda do banco (outro administrador): redesenha só o necessário e
+  // sem tirar o foco de quem está digitando
+  function renderRemoto() {
+    if (!raiz) return;
+    if (S.arrastandoId) { renderPendente = true; return; }
+    renderPendente = false;
+    const sim = selecionada();
+    const grade = raiz.querySelector('[data-ref="grade-tabelas"]');
+    if (S.tela === 'painel' && sim && grade && S.cabecalhoRenderizado === assinaturaCabecalho(sim)) {
+      preservarFoco(() => {
+        const menu = raiz.querySelector('aside.sidebar');
+        if (menu && !S.renomeandoId) menu.outerHTML = htmlSidebar();
+        grade.innerHTML = htmlGradeTabelas(sim);
+      });
+      atualizarDerivados();
+      marcarNovos();
+      colab('aposRender');
       return;
     }
-    render();
+    preservarFoco(render);
+  }
+
+  // Cards e lançamentos que aparecem pela primeira vez (meus ou do outro)
+  // entram com animação
+  function marcarNovos() {
+    const sim = S.tela === 'painel' ? selecionada() : null;
+    if (!sim || !raiz) { vistos = { simId: null, ids: new Set() }; return; }
+    const mesma = vistos.simId === sim.id;
+    const ids = mesma ? vistos.ids : new Set();
+    raiz.querySelectorAll('.monthly-card[data-tabela]').forEach((c) => {
+      const chave = 't:' + c.dataset.tabela;
+      if (mesma && !ids.has(chave)) c.classList.add('or-chegou');
+      ids.add(chave);
+    });
+    raiz.querySelectorAll('.entry-table tr[data-lanc]').forEach((r) => {
+      const chave = 'l:' + r.dataset.lanc;
+      if (mesma && !ids.has(chave) && !r.closest('.or-chegou')) r.classList.add('or-chegou');
+      ids.add(chave);
+    });
+    vistos = { simId: sim.id, ids };
+  }
+
+  function colab(metodo, ...args) {
+    const c = window.OrganizacaoRecursosColab;
+    if (!c || typeof c[metodo] !== 'function') return;
+    try { c[metodo](...args); } catch (err) { console.warn('[Organização de recursos] Colaboração:', err); }
   }
 
   function renderModal() {
@@ -928,6 +1089,7 @@
     destruirGrafico('analise');
     const host = raiz.querySelector('.or-modais');
     host.innerHTML = htmlModal();
+    colab('aposModal');
     if (!S.modal) return;
     if (S.modal.tipo === 'analise') { const sim = selecionada(); if (sim) criarGraficoAnalise(sim); }
     const foco = host.querySelector('[data-foco]') || (S.modal.tipo === 'detalhes' ? host.querySelector('.editor-content') : null);
@@ -941,12 +1103,17 @@
     if (!atual) return;
     if (!tabela || tabela.lancamentos.length === 0 || !tabelasVisiveis(sim).includes(tabela)) { renderGradeTabelas(); return; }
     atual.outerHTML = htmlCartao(sim, tabela);
+    marcarNovos();
+    colab('aposRender');
   }
 
   function renderGradeTabelas() {
     const sim = selecionada();
     const grade = raiz && raiz.querySelector('[data-ref="grade-tabelas"]');
-    if (sim && grade) grade.innerHTML = htmlGradeTabelas(sim);
+    if (!sim || !grade) return;
+    grade.innerHTML = htmlGradeTabelas(sim);
+    marcarNovos();
+    colab('aposRender');
   }
 
   function atualizarContagemSims() {
@@ -1164,23 +1331,23 @@
     const porMes = new Map(sim.tabelas.map((t) => [t.mes, t]));
     const tabelas = permitidos.map((mes) => porMes.get(mes) || novaTabela(mes));
     const fora = sim.tabelas.filter((t) => !permitidos.includes(t.mes) && t.lancamentos.length > 0);
-    alterarSimulacao({ ...sim, ...valores, tabelas: [...tabelas, ...fora] });
+    alterarSimulacao({ ...sim, ...valores, tabelas: [...tabelas, ...fora] }, true);
     S.modal = null;
     renderModal();
     render();
     if (fora.length) avisar(`${fora.length} ${fora.length === 1 ? 'mês com lançamentos ficou' : 'meses com lançamentos ficaram'} fora do novo período e ${fora.length === 1 ? 'foi mantido' : 'foram mantidos'}.`);
   }
 
-  function atualizarTabela(tabelaId, fn) {
+  function atualizarTabela(tabelaId, fn, imediato) {
     const sim = selecionada();
     if (!sim) return null;
     const novo = { ...sim, tabelas: sim.tabelas.map((t) => (t.id === tabelaId ? fn(t) : t)) };
-    alterarSimulacao(novo);
+    alterarSimulacao(novo, imediato);
     return novo;
   }
 
-  function alterarLancamento(tabelaId, lancId, campo, valor) {
-    atualizarTabela(tabelaId, (t) => ({ ...t, lancamentos: t.lancamentos.map((l) => (l.id === lancId ? { ...l, [campo]: valor } : l)) }));
+  function alterarLancamento(tabelaId, lancId, campo, valor, imediato) {
+    atualizarTabela(tabelaId, (t) => ({ ...t, lancamentos: t.lancamentos.map((l) => (l.id === lancId ? { ...l, [campo]: valor } : l)) }), imediato);
   }
 
   function novaTabelaNaSimulacao() {
@@ -1191,7 +1358,7 @@
     const tabelas = existente
       ? sim.tabelas.map((t) => (t.id === existente.id ? { ...t, lancamentos: [novoLancamento(mes)] } : t))
       : [...sim.tabelas, novaTabela(mes, [novoLancamento(mes)])];
-    alterarSimulacao({ ...sim, tabelas });
+    alterarSimulacao({ ...sim, tabelas }, true);
     S.buscaTabelas = '';
     render();
     avisar(`Tabela de ${rotuloMes(mes)} adicionada com um lançamento pronto para editar.`);
@@ -1207,7 +1374,7 @@
       avisar(`${rotuloMes(mes)} já possui um card cadastrado.`);
       return false;
     }
-    alterarSimulacao({ ...sim, tabelas: tabelasComMes(sim, tabelaId, mes) });
+    alterarSimulacao({ ...sim, tabelas: tabelasComMes(sim, tabelaId, mes) }, true);
     avisar(`Card atualizado para ${rotuloMes(mes)}.`);
     return true;
   }
@@ -1217,7 +1384,7 @@
     const origem = sim && sim.tabelas.find((t) => t.id === tabelaId);
     if (!origem) return;
     const destino = mesLivre(sim, tabelaId);
-    alterarSimulacao({ ...sim, tabelas: tabelasComMes(sim, tabelaId, destino) });
+    alterarSimulacao({ ...sim, tabelas: tabelasComMes(sim, tabelaId, destino) }, true);
     S.movidaId = tabelaId;
     renderGradeTabelas();
     atualizarDerivados();
@@ -1230,7 +1397,7 @@
     const nome = S.renomeValor.trim().slice(0, 120);
     S.renomeandoId = null;
     const sim = S.simulacoes.find((s) => s.id === id);
-    if (sim && nome && nome !== sim.titulo) alterarSimulacao({ ...sim, titulo: nome });
+    if (sim && nome && nome !== sim.titulo) alterarSimulacao({ ...sim, titulo: nome }, true);
     // Redesenha só a linha do menu e o título: um redesenho completo aqui
     // engoliria o clique que tirou o foco do campo
     const campo = raiz && raiz.querySelector('.or-renomear');
@@ -1240,6 +1407,28 @@
     linha.outerHTML = htmlLinhaSimulacao(atual);
     const titulo = S.tela === 'painel' && S.selecionadaId === id && raiz.querySelector('.dashboard-title-row h1');
     if (titulo) titulo.textContent = atual.titulo;
+    if (S.cabecalhoRenderizado && S.selecionadaId === id) S.cabecalhoRenderizado = assinaturaCabecalho(atual);
+    colab('aposRender');
+  }
+
+  // Cópia de segurança de todas as simulações e áreas, em JSON
+  function exportarBackup() {
+    const dados = {
+      geradoEm: new Date().toISOString(),
+      geradoPor: usuario(),
+      colecao: COLECAO,
+      areas: S.areas,
+      simulacoes: S.simulacoes.map((sim) => ({ id: sim.id, ...serializarSimulacao(sim) }))
+    };
+    const blob = new Blob([JSON.stringify(dados, null, 2)], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `organizacao-recursos-backup-${hojeISO()}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    avisar(`Backup com ${dados.simulacoes.length} simulação(ões) baixado.`);
   }
 
   function salvarArea(m) {
@@ -1306,6 +1495,7 @@
         break;
       case 'pedir-apagar-sim': e.stopPropagation(); S.modal = { tipo: 'apagar-sim', id }; renderModal(); break;
       case 'nova-sim': abrirModalSimulacao('criar'); break;
+      case 'exportar-backup': exportarBackup(); break;
       case 'editar-sim': abrirModalSimulacao('editar'); break;
       case 'analise': S.modal = { tipo: 'analise', modo: 'radar', ordem: 'valor' }; renderModal(); break;
       case 'nova-tabela': novaTabelaNaSimulacao(); break;
@@ -1340,7 +1530,7 @@
       case 'apagar-tabela': S.modal = { tipo: 'apagar-tabela', tabelaId: tabela }; renderModal(); break;
       case 'confirmar-apagar-tabela': {
         const tabelaId = S.modal.tabelaId;
-        if (sim) alterarSimulacao({ ...sim, tabelas: sim.tabelas.filter((t) => t.id !== tabelaId) });
+        if (sim) alterarSimulacao({ ...sim, tabelas: sim.tabelas.filter((t) => t.id !== tabelaId) }, true);
         S.modal = null;
         renderModal();
         render();
@@ -1364,7 +1554,7 @@
       }
       case 'salvar-detalhes': {
         const m = S.modal;
-        alterarLancamento(m.tabelaId, m.lancId, 'detalhes', sanitizarDescricao(m.valor));
+        alterarLancamento(m.tabelaId, m.lancId, 'detalhes', sanitizarDescricao(m.valor), true);
         S.modal = null;
         renderModal();
         renderCartao(m.tabelaId);
@@ -1378,11 +1568,11 @@
       }
       case 'area-escolher':
         S.areaAberta = null;
-        alterarLancamento(tabela, lanc, 'areaId', alvo.dataset.area);
+        alterarLancamento(tabela, lanc, 'areaId', alvo.dataset.area, true);
         renderCartao(tabela);
         break;
       case 'apagar-lanc': {
-        const novo = atualizarTabela(tabela, (t) => ({ ...t, lancamentos: t.lancamentos.filter((l) => l.id !== lanc) }));
+        const novo = atualizarTabela(tabela, (t) => ({ ...t, lancamentos: t.lancamentos.filter((l) => l.id !== lanc) }), true);
         const t = novo && novo.tabelas.find((x) => x.id === tabela);
         renderCartao(tabela);
         atualizarDerivados();
@@ -1390,7 +1580,7 @@
         break;
       }
       case 'add-lanc': {
-        const novo = atualizarTabela(tabela, (t) => ({ ...t, lancamentos: [...t.lancamentos, novoLancamento(t.mes)] }));
+        const novo = atualizarTabela(tabela, (t) => ({ ...t, lancamentos: [...t.lancamentos, novoLancamento(t.mes)] }), true);
         renderCartao(tabela);
         atualizarDerivados();
         const t = novo && novo.tabelas.find((x) => x.id === tabela);
@@ -1455,7 +1645,7 @@
       case 'renomear': S.renomeValor = t.value; break;
       case 'descricao': alterarLancamento(t.dataset.tabela, t.dataset.lanc, 'descricao', t.value.slice(0, 200)); break;
       case 'valor': alterarLancamento(t.dataset.tabela, t.dataset.lanc, 'valor', Math.max(0, Number(t.value) || 0)); atualizarDerivados(); break;
-      case 'data': if (t.value) alterarLancamento(t.dataset.tabela, t.dataset.lanc, 'data', t.value); break;
+      case 'data': if (t.value) alterarLancamento(t.dataset.tabela, t.dataset.lanc, 'data', t.value, true); break;
       case 'editor': sincronizarEditor(); break;
       case 'form-titulo': S.modal.form.titulo = t.value; break;
       case 'form-saldo': S.modal.form.saldoInicial = t.value; break;
@@ -1481,18 +1671,19 @@
     if (!form) return;
     e.preventDefault();
     if (form.dataset.form === 'simulacao') { sincronizarEditor(); salvarModalSimulacao(); }
-    if (form.dataset.form === 'area') {
-      // Enter na busca escolhe o primeiro ícone encontrado em vez de salvar
-      if (document.activeElement && document.activeElement.dataset.campo === 'busca-icone') {
-        const primeiro = raiz.querySelector('.or-icones-grade [data-icone]');
-        if (primeiro) { S.modal.icone = primeiro.dataset.icone; S.modal.iconesAbertos = false; renderModal(); }
-        return;
-      }
-      salvarArea(S.modal);
-    }
+    if (form.dataset.form === 'area') salvarArea(S.modal);
   }
 
   function aoTeclar(e) {
+    // Enter na busca de ícones escolhe o primeiro resultado. Tratado aqui:
+    // pelo envio do formulário, o clique sintético no botão fechava o popover
+    // e redesenhava o formulário antes do envio.
+    if (e.key === 'Enter' && e.target.dataset && e.target.dataset.campo === 'busca-icone') {
+      e.preventDefault();
+      const primeiro = raiz.querySelector('.or-icones-grade [data-icone]');
+      if (primeiro) { S.modal.icone = primeiro.dataset.icone; S.modal.iconesAbertos = false; renderModal(); }
+      return;
+    }
     if (e.target.classList && e.target.classList.contains('or-renomear')) {
       if (e.key === 'Enter') { e.preventDefault(); confirmarRenomear(); }
       if (e.key === 'Escape') { S.renomeValor = ''; confirmarRenomear(); }
@@ -1508,8 +1699,8 @@
 
   function aoSairDoFoco(e) {
     if (e.target.classList && e.target.classList.contains('or-renomear') && S.renomeandoId) { confirmarRenomear(); return; }
-    // Uma atualização do banco chegou enquanto o usuário digitava
-    if (renderPendente) setTimeout(() => { if (renderPendente) renderSeguro(); }, 0);
+    // Saiu de um campo de lançamento: grava já, sem esperar a pausa
+    if (e.target.dataset && e.target.dataset.lanc && S.selecionadaId && timers.has(S.selecionadaId)) gravar(S.selecionadaId);
   }
 
   // Fundo do modal fecha ao pressionar (como no protótipo), não ao soltar
@@ -1586,11 +1777,14 @@
   function limparArraste() {
     S.arrastandoId = null;
     if (!raiz) return;
-    if (renderPendente) setTimeout(renderSeguro, 0);
+    if (renderPendente) setTimeout(renderRemoto, 0);
     raiz.querySelectorAll('.is-dragging, .is-drag-target').forEach((n) => n.classList.remove('is-dragging', 'is-drag-target'));
     raiz.querySelectorAll('.is-dragging-grid').forEach((n) => n.classList.remove('is-dragging-grid'));
     raiz.querySelectorAll('.monthly-card[draggable="true"]').forEach((c) => { c.draggable = false; });
   }
+
+  // A internet voltou: reenvia o que falhou (transações não ficam na fila offline)
+  function aoVoltarConexao() { Array.from(falhas).forEach((id) => gravar(id)); }
 
   function antesDeSair(e) {
     if (!timers.size && !gravando.size) return;
@@ -1630,14 +1824,30 @@
     EVENTOS.forEach(([tipo, fn]) => raiz.addEventListener(tipo, fn));
     raiz.addEventListener('wheel', aoRolar, { passive: true });
     window.addEventListener('beforeunload', antesDeSair);
+    window.addEventListener('online', aoVoltarConexao);
     // No document: depois de um redesenho o foco pode ficar no <body>
     document.addEventListener('keydown', aoTeclar);
     render();
     assinar();
+    colab('iniciar', raiz, {
+      ambiente: () => (S.tela === 'painel' && S.selecionadaId ? 'sim_' + S.selecionadaId : 'lista'),
+      simulacaoAberta: () => (S.tela === 'painel' ? S.selecionadaId : null),
+      tituloSimulacao: (id) => { const sim = S.simulacoes.find((x) => x.id === id); return sim ? sim.titulo : ''; },
+      modalAberto: () => (S.modal ? S.modal.tipo : null),
+      // Valor salvo de um campo de lançamento, como aparece no input
+      valorCampo: (lancId, campo) => {
+        const sim = selecionada();
+        const l = sim && sim.tabelas.flatMap((t) => t.lancamentos).find((x) => x.id === lancId);
+        if (!l) return undefined;
+        return campo === 'valor' ? String(l.valor || '') : String(l[campo] ?? '');
+      },
+      email: usuario
+    });
   }
 
   function fechar() {
     if (!raiz) return;
+    colab('parar');
     gravarPendencias();
     if (pararSims) { pararSims(); pararSims = null; }
     if (pararAreas) { pararAreas(); pararAreas = null; }
@@ -1645,6 +1855,7 @@
     destruirGrafico('analise');
     clearTimeout(timerAviso);
     window.removeEventListener('beforeunload', antesDeSair);
+    window.removeEventListener('online', aoVoltarConexao);
     document.removeEventListener('keydown', aoTeclar);
     raiz.remove();
     raiz = null;

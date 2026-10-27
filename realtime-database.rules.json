@@ -1,0 +1,34 @@
+{
+  "rules": {
+    "orColab": {
+      ".read": "auth != null && (auth.token.email == 'marcos.lucas.ti@gmail.com' || auth.token.email == 'mastereducacaoadm@gmail.com')",
+      "config": {
+        ".write": false
+      },
+      "presenca": {
+        "$pessoa": {
+          ".write": "auth != null && (auth.token.email == 'marcos.lucas.ti@gmail.com' || auth.token.email == 'mastereducacaoadm@gmail.com') && ($pessoa == 'marcos' || $pessoa == 'esther')",
+          "$sessao": {
+            ".validate": "newData.hasChildren(['ambiente', 'estado']) && newData.child('ambiente').isString() && newData.child('ambiente').val().length <= 80"
+          }
+        }
+      },
+      "cursores": {
+        "$ambiente": {
+          "$pessoa": {
+            ".write": "auth != null && (auth.token.email == 'marcos.lucas.ti@gmail.com' || auth.token.email == 'mastereducacaoadm@gmail.com') && ($pessoa == 'marcos' || $pessoa == 'esther')",
+            ".validate": "newData.hasChildren(['a']) && newData.child('a').isString() && newData.child('a').val().length <= 120"
+          }
+        }
+      },
+      "rascunhos": {
+        "$simulacao": {
+          "$pessoa": {
+            ".write": "auth != null && (auth.token.email == 'marcos.lucas.ti@gmail.com' || auth.token.email == 'mastereducacaoadm@gmail.com') && ($pessoa == 'marcos' || $pessoa == 'esther')",
+            ".validate": "newData.hasChildren(['lanc', 'campo', 'valor']) && newData.child('valor').isString() && newData.child('valor').val().length <= 200"
+          }
+        }
+      }
+    }
+  }
+}
