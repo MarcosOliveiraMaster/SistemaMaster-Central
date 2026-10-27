@@ -3,7 +3,7 @@
 // Só nesta área e só no computador (tela ≥ 1024px com mouse):
 //   - Presença: quem está online/ausente e onde (Visão geral ou qual simulação).
 //     A simulação em que cada pessoa está ganha a borda na cor dela (azul =
-//     Marcos, rosa = Esther; as duas cores quando os dois estão nela).
+//     Marcos, rosa = Ester; as duas cores quando os dois estão nela).
 //   - Edição ao vivo: o que a outra pessoa digita num lançamento aparece
 //     enquanto ela digita, com o campo contornado na cor dela (sem travar).
 //   - Setas: com os dois no mesmo ambiente, cada um vê a seta do outro. A
@@ -28,7 +28,8 @@
   const RAIZ = 'orColab';
   const PESSOAS = {
     marcos: { nome: 'Marcos', cor: '#2f6fed', email: 'marcos.lucas.ti@gmail.com' },
-    esther: { nome: 'Esther', cor: '#e2457f', email: 'mastereducacaoadm@gmail.com' }
+    // A chave 'esther' fica como está: é o nome do nó no banco e nas regras
+    esther: { nome: 'Ester', cor: '#e2457f', email: 'mastereducacaoadm@gmail.com' }
   };
   const CHAVE_PESSOA = 'orColabPessoa';
   const SDK_DATABASE = 'https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js';
@@ -119,7 +120,7 @@
     raiz = r;
     api = a;
     eu = pessoaInicial();
-    if (!eu) return;                                   // só Marcos e Esther colaboram
+    if (!eu) return;                                   // só Marcos e Ester colaboram
     if (!(await carregarSdk()) || !raiz) return;
     try { rdb = firebase.database(); } catch (err) { console.warn('[Colaboração] Realtime Database indisponível:', err); return; }
     sessao = Math.random().toString(36).slice(2, 10);

@@ -482,7 +482,7 @@ body.or-aberto #barra-inferior, body.or-aberto #menu-toggle { display: none !imp
 
 
 /* ── Colaboração ao vivo (organizacao-recursos-colab.js) ─────────────────
-   Azul = Marcos, rosa = Esther. Só aparece no computador. */
+   Azul = Marcos, rosa = Ester. Só aparece no computador. */
 .or-app { --or-marcos: #2f6fed; --or-esther: #e2457f; }
 
 /* Faixa de presença no topo do conteúdo (não ocupa espaço) */

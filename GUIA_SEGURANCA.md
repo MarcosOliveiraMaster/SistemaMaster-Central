@@ -84,7 +84,7 @@ async initializeFirebase() {
 ## 1.1 — Colaboração ao vivo (Organização de recursos)
 
 A área **Planejamento → Organização de recursos** mostra presença, edição ao
-vivo e setas entre Marcos (azul) e Esther (rosa). Isso usa o **Realtime
+vivo e setas entre Marcos (azul) e Ester (rosa). Isso usa o **Realtime
 Database** do Firebase; as simulações continuam salvas no Firestore. Sem os
 passos abaixo a área funciona normalmente, só sem a colaboração ao vivo.
 
