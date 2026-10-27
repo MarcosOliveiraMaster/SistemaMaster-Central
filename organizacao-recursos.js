@@ -468,6 +468,10 @@
   // Última versão de cada simulação vista no servidor: base da mescla de três
   // vias (o que eu mudei desde a base é aplicado sobre a versão atual do banco)
   const bases = new Map();
+  // Criadas aqui e já gravadas, mas que o listener ainda não trouxe: a
+  // transação não passa pelo cache local, então um snapshot gerado antes do
+  // commit pode chegar depois dele sem a simulação nova
+  const naoVistas = new Set();
   let vistos = { simId: null, ids: new Set() };   // cards/lançamentos já exibidos (animação de chegada)
 
   const selecionada = () => S.simulacoes.find((s) => s.id === S.selecionadaId) || null;
@@ -524,6 +528,7 @@
       const noServidor = new Set();
       snap.forEach((doc) => {
         noServidor.add(doc.id);
+        naoVistas.delete(doc.id);
         const local = locais.get(doc.id);
         if (local && doc.metadata.hasPendingWrites) { lista.push(local); return; }
         const servidor = normalizarSimulacao(doc.id, doc.data({ serverTimestamps: 'estimate' }));
@@ -533,11 +538,12 @@
         if (local && pendente(doc.id)) lista.push(base ? { ...mesclar(base, local, servidor), criadoEmMs: servidor.criadoEmMs || local.criadoEmMs } : local);
         else lista.push(servidor);
       });
-      // Criadas aqui e ainda não gravadas (sem base); as que tinham base e
-      // sumiram do servidor foram apagadas por outro administrador
+      // Criadas aqui e ainda não gravadas (sem base, inclusive as que falharam)
+      // ou gravadas e ainda não vistas; as que tinham base e sumiram do
+      // servidor foram apagadas por outro administrador
       S.simulacoes.forEach((s) => {
         if (noServidor.has(s.id)) return;
-        if (pendente(s.id) && !bases.has(s.id)) lista.push(s);
+        if (naoVistas.has(s.id) || (!bases.has(s.id) && (pendente(s.id) || falhas.has(s.id)))) lista.push(s);
         else { bases.delete(s.id); clearTimeout(timers.get(s.id)); timers.delete(s.id); }
       });
       lista.sort((a, b) => (b.criadoEmMs || Infinity) - (a.criadoEmMs || Infinity) || a.titulo.localeCompare(b.titulo));
@@ -620,6 +626,7 @@
       }
       // O que foi digitado durante a transação é reaplicado sobre o resultado
       const atual = S.simulacoes.find((s) => s.id === id);
+      if (!base) naoVistas.add(id);
       bases.set(id, resultado);
       if (atual) {
         const rebase = { ...mesclar(enviada, atual, resultado), criadoEmMs: atual.criadoEmMs };
@@ -631,7 +638,8 @@
       const transitorio = err && ['aborted', 'unavailable', 'deadline-exceeded', 'failed-precondition'].includes(err.code);
       if (transitorio && tentativa < 3) {
         gravando.delete(id);
-        setTimeout(() => gravar(id, extras, tentativa + 1), 700 * (tentativa + 1));
+        // Fica em `timers` para continuar pendente enquanto espera
+        timers.set(id, setTimeout(() => gravar(id, extras, tentativa + 1), 700 * (tentativa + 1)));
         return;
       }
       console.error('[Organização de recursos] Erro ao salvar:', err);
@@ -651,6 +659,7 @@
     clearTimeout(timers.get(id));
     timers.delete(id);
     falhas.delete(id);
+    naoVistas.delete(id);
     try {
       await db.collection(COLECAO).doc(id).delete();
     } catch (err) {
