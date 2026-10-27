@@ -536,3 +536,43 @@ body.or-aberto #barra-inferior, body.or-aberto #menu-toggle { display: none !imp
 .or-app .or-heading-acoes { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 @media (max-width: 760px) { .or-app .or-heading-acoes { justify-content: flex-start; margin-top: 22px; } .or-app .page-heading .or-heading-acoes .primary-button { margin-top: 0; } }
 @media (max-width: 1023px), (pointer: coarse) { .or-app .or-colab-barra, .or-app .or-cursores { display: none; } }
+
+/* Entrada (checkbox) e subgastos nos cards mensais */
+.or-app .entry-table th:first-child { width: 22%; }
+.or-app .entry-table th:nth-child(2) { width: 15%; }
+.or-app .entry-table th:nth-child(3) { width: 18%; }
+.or-app .entry-table th:nth-child(4) { width: 15%; }
+.or-app .entry-table th:nth-child(5) { width: 8%; text-align: center; }
+.or-app .entry-table th:last-child { width: 22%; }
+.or-app .or-entrada { display: flex; align-items: center; justify-content: center; gap: 5px; height: 29px; cursor: pointer; }
+.or-app .or-entrada > span { display: none; color: var(--muted-deep); font-size: 11px; font-weight: 600; }
+.or-app .entry-table .or-entrada input { width: 15px; height: 15px; padding: 0; accent-color: #2f9e62; cursor: pointer; background: none; }
+.or-app .entry-table .or-entrada input:disabled { cursor: not-allowed; opacity: .4; }
+.or-app .or-entrada-ativa .money-input { background: #e6f5ec; box-shadow: inset 0 0 0 1px #bfe5cd; }
+.or-app .or-entrada-ativa .money-input span, .or-app .or-entrada-ativa .money-input input { color: #237a4b; }
+.or-app .or-valor-informativo { opacity: .5; background: transparent; box-shadow: inset 0 0 0 1px dashed #e2d8ce; outline: 1px dashed #e2d8ce; outline-offset: -1px; }
+.or-app .or-acoes-linha { display: flex; align-items: center; justify-content: flex-end; gap: 3px; }
+.or-app .or-sub-botao { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 6px; color: var(--muted-deep); border-radius: 7px; background: #f3f0ec; font-size: 9px; font-weight: 700; white-space: nowrap; }
+.or-app .or-sub-botao:hover, .or-app .or-sub-botao.aberto { color: var(--orange-deep); background: var(--orange-soft); }
+.or-app .or-sub-botao b { min-width: 15px; height: 15px; padding: 0 4px; display: inline-grid; place-items: center; color: #fff; border-radius: 999px; background: var(--orange); font-size: 8px; }
+.or-app .or-subitem td:first-child { padding-left: 14px; }
+.or-app .or-sub-marca { display: grid; place-items: center; flex: 0 0 auto; color: #c9b8a9; }
+.or-app .or-subitem input, .or-app .or-subitem .money-input, .or-app .or-subitem .area-trigger { background: #faf7f3; }
+.or-app .or-subitem.or-entrada-ativa .money-input { background: #e6f5ec; }
+.or-app .or-subitem-add td > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 4px 4px 32px; color: var(--muted); font-size: 9px; }
+.or-app .or-sub-add { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; color: var(--orange-deep); border-radius: 7px; background: transparent; font-size: 9px; font-weight: 700; }
+.or-app .or-sub-add:hover { background: var(--orange-pale); }
+@media (max-width: 480px) {
+  .or-app .entry-table tr { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 30px 34px; grid-template-areas: "desc desc desc acoes" "valor data area area" "ent ent ent ent"; }
+  .or-app .entry-table td:nth-child(5) { grid-area: ent; align-self: center; }
+  .or-app .entry-table td:nth-child(6) { grid-area: acoes; align-self: center; }
+  .or-app .entry-table tr:not(.or-subitem) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 30px 112px; }
+  .or-app .or-entrada { justify-content: flex-start; height: 26px; }
+  .or-app .or-entrada > span { display: inline; }
+  .or-app .or-sub-botao { height: 34px; font-size: 11px; }
+  .or-app .or-subitem { margin-left: 18px; }
+  .or-app .or-subitem td:first-child { padding-left: 0; }
+  .or-app .entry-table tr.or-subitem-add { display: block; padding: 0 0 4px; border: 0; background: none; }
+  .or-app .or-subitem-add td > div { flex-wrap: wrap; padding-left: 18px; font-size: 11px; }
+  .or-app .or-sub-add { font-size: 11px; }
+}
