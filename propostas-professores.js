@@ -806,6 +806,8 @@
   // do grid. Botões do card:
   //   • Gerar solicitação com contraproposta → modal "Solicitação de Aula"
   //     (BancoDeAulasCards) com os horários sugeridos em borda amarela;
+  //   • Aceitar contraproposta → aprova de uma vez as datas/horários sugeridos
+  //     pelo professor (mesma janela do dia amarelo, com caixas por aula);
   //   • Confirmar Professor → atribui às aulas aceitas/aprovadas que estão
   //     "A definir", grava o endereço completo (local) e encerra as outras
   //     propostas abertas que disputam as mesmas aulas (mesmo lote). Propostas
@@ -905,6 +907,7 @@
     const est = aulasComEstado(p);
     return {
       sol: est.some(a => a.alt) && !['aprovado', 'encerrada'].includes(p.status),
+      contra: ['aceita', 'contraproposta'].includes(p.status) && est.some(a => a.estado === 'contra'),
       aprovar: ['aceita', 'contraproposta'].includes(p.status) && est.some(a => a.estado === 'aceita' || a.estado === 'aprovada'),
       analise: p.status === 'contraproposta' && !p.emAnalise,
       reenviar: p.status !== 'aprovado',
@@ -918,7 +921,8 @@
     estiloGrid = true;
     const s = document.createElement('style');
     s.textContent = `
-    .nt2-grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,480px),1fr));gap:1rem;}
+    .nt2-grade{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem;}
+    @media (max-width:1280px){.nt2-grade{grid-template-columns:repeat(2,minmax(0,1fr));}}
     .nt2-card{aspect-ratio:4/3;background:#fff;border:1.5px solid #e5e7eb;border-radius:14px;display:flex;flex-direction:column;overflow:hidden;min-width:0;box-shadow:0 2px 8px rgba(0,0,0,.04);transition:border-color .15s,box-shadow .15s;}
     .nt2-card:hover{border-color:#fdba74;box-shadow:0 8px 22px rgba(0,0,0,.08);}
     .nt2-card.nova{border-color:#f28705;}
@@ -948,7 +952,7 @@
     .nt2-chg s{color:#9ca3af;text-decoration:none;} .nt2-chg b{color:#111827;}
     .nt2-lista s,.nt2-modal s{color:#9ca3af !important;text-decoration:none;}
     .nt2-msg{font-size:.72rem;color:#4b5563;background:#f3f4f6;border-radius:7px;padding:.35rem .5rem;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;font-style:italic;}
-    .nt2-acoes{display:grid;grid-template-columns:repeat(5,1fr);border-top:1px solid #e5e7eb;flex:none;}
+    .nt2-acoes{display:grid;grid-template-columns:repeat(6,1fr);border-top:1px solid #e5e7eb;flex:none;}
     .nt2-acoes button{border:0;border-right:1px solid #e5e7eb;background:#fff;min-height:48px;padding:.35rem .3rem;font:700 .68rem 'Comfortaa',sans-serif;color:#4b5563;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.25rem;line-height:1.2;cursor:pointer;}
     .nt2-acoes button:last-child{border-right:0;}
     .nt2-acoes button i{font-size:.95rem;}
@@ -997,7 +1001,7 @@
     .nt2-lista .lin{display:flex;justify-content:space-between;gap:.5rem;align-items:center;flex-wrap:wrap;}
     .nt2-lista s{color:#9ca3af;}
     .nt2-mini-btn{border:0;background:#16a34a;color:#fff;border-radius:8px;padding:.3rem .65rem;font:700 .72rem 'Comfortaa',sans-serif;cursor:pointer;display:inline-flex;gap:.3rem;align-items:center;}
-    .nt2-x-acoes{display:grid;grid-template-columns:repeat(5,1fr);gap:.5rem;padding:.8rem 1rem;border-top:1px solid #e5e7eb;}
+    .nt2-x-acoes{display:grid;grid-template-columns:repeat(6,1fr);gap:.5rem;padding:.8rem 1rem;border-top:1px solid #e5e7eb;}
     .nt2-x-acoes .pe-btn{justify-content:center;min-height:46px;font-size:.78rem;text-align:center;}
     .nt2-x-acoes .pe-btn.ok{background:#16a34a;border-color:#16a34a;color:#fff;}
     .nt2-x-acoes .pe-btn.del{color:#dc2626;border-color:#fecaca;}
@@ -1057,7 +1061,27 @@
     .nt2-g-info{display:grid;grid-template-columns:auto 1fr;gap:.2rem .6rem;font-size:.78rem;margin:0;}
     .nt2-g-info dt{color:#9ca3af;} .nt2-g-info dd{margin:0;color:#111827;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
     .nt2-g-chips{display:flex;flex-wrap:wrap;gap:.3rem;}
-    .nt2-g-conf{display:flex;gap:.45rem;align-items:center;background:#f0fdf4;border-radius:9px;padding:.4rem .6rem;color:#15803d;font-size:.78rem;font-weight:700;}
+    .nt2-prog{display:flex;flex-direction:column;gap:.35rem;}
+    .nt2-prog-h{display:flex;justify-content:space-between;align-items:baseline;gap:.5rem;font-size:.74rem;color:#9ca3af;}
+    .nt2-prog-h b{font:700 .8rem 'Lexend',sans-serif;color:#15803d;font-variant-numeric:tabular-nums;}
+    .nt2-prog-barra{display:flex;gap:3px;height:10px;}
+    .nt2-prog-barra i{flex:1;min-width:0;border-radius:999px;background:#e5e7eb;overflow:hidden;display:block;}
+    .nt2-prog-barra i b{display:block;height:100%;background:#16a34a;border-radius:999px;transition:width .3s;}
+    .nt2-tip{position:fixed;z-index:100000;width:min(360px,92vw);max-height:70vh;overflow-y:auto;background:#fff;color:var(--gray-dark,#374151);border:1px solid var(--orange,#f28705);border-radius:var(--radius-sm,10px);box-shadow:var(--shadow,0 14px 40px rgba(0,0,0,.16));padding:.7rem .8rem;font:.75rem 'Comfortaa',sans-serif;pointer-events:none;display:flex;flex-direction:column;gap:.7rem;}
+    .nt2-tip-mat{display:flex;flex-direction:column;gap:.45rem;}
+    .nt2-tip-mat+.nt2-tip-mat{border-top:1px dashed #e5e7eb;padding-top:.6rem;}
+    .nt2-tip-h{display:flex;align-items:center;gap:.45rem;}
+    .nt2-tip-h>i{color:#f28705;width:16px;text-align:center;}
+    .nt2-tip-h>b{flex:1;min-width:0;font:700 .8rem 'Lexend',sans-serif;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .nt2-tip-grade{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.45rem;}
+    .nt2-tip-p{position:relative;display:flex;flex-direction:column;align-items:center;gap:.2rem;min-width:0;}
+    .nt2-tip-p img,.nt2-tip-p .ini{width:52px;height:52px;border-radius:12px;object-fit:cover;object-position:center 22%;display:grid;place-items:center;background:#ffedd5;color:#d97804;font:700 .9rem 'Lexend',sans-serif;filter:grayscale(1);opacity:.45;}
+    .nt2-tip-p small{max-width:100%;font-size:.64rem;color:#9ca3af;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .nt2-tip-p.on img,.nt2-tip-p.on .ini{filter:none;opacity:1;box-shadow:0 0 0 2px #16a34a;}
+    .nt2-tip-p.on small{color:#15803d;font-weight:700;}
+    .nt2-tip-p.on::after{content:"\\2713";position:absolute;top:-4px;right:calc(50% - 32px);width:16px;height:16px;border-radius:50%;background:#16a34a;color:#fff;font:700 .6rem/16px 'Lexend',sans-serif;text-align:center;}
+    .nt2-tip-p .ini{font-size:.9rem;}
+    body.theme-blue .nt2-tip{background:var(--glass-header-bg,#fff);backdrop-filter:blur(var(--glass-header-blur,0));-webkit-backdrop-filter:blur(var(--glass-header-blur,0));}
     .nt2-g-pe{display:flex;justify-content:space-between;align-items:center;gap:.5rem;border-top:1px solid #f1f2f4;padding-top:.55rem;font-size:.72rem;color:#9ca3af;}
     .nt2-g-pe span:last-child{color:#d97804;font-weight:700;}
     .nt2-gv-topo{display:flex;flex-wrap:wrap;gap:.8rem;align-items:center;margin-bottom:1rem;padding:.8rem 1rem;background:#fff;border:1.5px solid #fdba74;border-radius:14px;}
@@ -1066,6 +1090,7 @@
     .nt2-gerar-sol:hover:not(:disabled){background:#f28705;border-color:#f28705;color:#fff;}
     .nt2-f-datas{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;}
     @media (max-width:760px){
+      .nt2-grade{grid-template-columns:1fr;}
       .nt2-card{aspect-ratio:auto;} .nt2-split,.nt2-x-split{grid-template-columns:1fr;}
       .nt2-esq,.nt2-x-esq{border-right:0;border-bottom:1px solid #f1f2f4;}
       .nt2-x{height:auto;} .nt2-lista{max-height:420px;} .nt2-x-acoes{grid-template-columns:1fr 1fr;}
@@ -1136,6 +1161,7 @@
     const ok = pode(p);
     const B = [
       ['sol', 'fas fa-file-contract', 'Gerar solicitação com contraproposta', 'Solicitação', ok.sol, ''],
+      ['contra', 'fas fa-calendar-check', 'Aceitar contraproposta', 'Aceitar datas', ok.contra, ''],
       ['aprovar', 'fas fa-user-check', 'Confirmar Professor', 'Confirmar Professor', ok.aprovar, 'ok'],
       ['reenviar', 'fas fa-paper-plane', 'Reenviar proposta', 'Reenviar proposta', ok.reenviar, ''],
       ['analise', 'fas fa-hourglass-half', p.emAnalise ? 'Em análise' : 'Enviar para análise', p.emAnalise ? 'Em análise' : 'Análise', ok.analise, ''],
@@ -1151,7 +1177,7 @@
       <div class="nt2-hit" role="button" tabindex="0" data-abrir="${esc(p.id)}" aria-label="Abrir detalhes da proposta de ${esc(p.professorNome || '')}">
         <div class="nt2-topo">${topo(p)}</div>
         <div class="nt2-split"><div class="nt2-esq">${resumo(p)}</div><div class="nt2-dir">${calendario(p)}</div></div>
-        ${autoConfirmada(p) ? `<div class="nt2-auto"><i class="fas fa-circle-check"></i>${TEXTO_AUTO}<small>Clique para ver os detalhes</small></div>` : ''}
+        ${autoConfirmada(p) ? `<div class="nt2-auto"><i class="fas fa-circle-check"></i>${textoAuto(p)}<small>Clique para ver os detalhes</small></div>` : ''}
       </div>
       <div class="nt2-acoes">${botoes(p, true)}</div></article>`;
   }
@@ -1170,7 +1196,7 @@
     return `<div class="nt2-x">
       <div class="nt2-x-topo"><button type="button" class="nt2-voltar" data-fechar><i class="fas fa-arrow-left"></i> Voltar às propostas</button>
         <div class="nt2-topo" style="padding:0;border:0;flex:1;min-width:0">${topo(p)}</div>
-        ${autoConfirmada(p) ? `<div class="nt2-auto-faixa" style="flex-basis:100%"><i class="fas fa-circle-check"></i>${TEXTO_AUTO}</div>` : ''}</div>
+        ${autoConfirmada(p) ? `<div class="nt2-auto-faixa" style="flex-basis:100%"><i class="fas fa-circle-check"></i>${textoAuto(p)}</div>` : ''}</div>
       <div class="nt2-x-split">
         <div class="nt2-x-esq">
           <dl class="nt2-kv"><dt>Cliente</dt><dd>${esc(p.clienteNome || '—')}</dd>
@@ -1194,6 +1220,7 @@
     if (!sec) return;
     injetarEstiloGrid();
     const cont = sec.querySelector('.nt-conteudo');
+    fecharTooltip();
     sec.querySelectorAll('.nt-chip').forEach(c => c.classList.toggle('on', c.dataset.f === filtro));
     if (filtro === 'clientes') {
       if (window.SolicitacoesClientes) window.SolicitacoesClientes.desenhar(cont);
@@ -1240,7 +1267,7 @@
   const ocultaP = (p) => p.ocultaCentral === true && (!p.ocultaEm || atividade(p) <= ms(p.ocultaEm));
   const novaP = (p) => p.status !== 'pendente' && !p.lidaCentral;
   const autoConfirmada = (p) => p.status === 'aprovado' && p.autoConfirmado === true;
-  const TEXTO_AUTO = 'Professor aceitou a aula, ele foi confirmado para o atendimento';
+  const textoAuto = (p) => `Professor ${esc(profNome(p))} Aceitou`;
 
   function grupos(lista) {
     const mapa = new Map();
@@ -1281,7 +1308,8 @@
     const nAulas = Math.max(0, ...g.propostas.map(p => (p.aulas || []).length));
     const alunos = [...new Set(g.propostas.flatMap(p => (Array.isArray(p.estudantes) ? p.estudantes : []).map(e => e.nome)).filter(Boolean))];
     const bairro = (g.propostas.find(p => p.bairro) || {}).bairro || '';
-    const conf = g.propostas.filter(p => p.status === 'aprovado');
+    const mats = materiasDoGrupo(g);
+    const nConf = mats.filter(m => m.conf === m.total).length;
     const chips = [['pendente', 'Aguardando'], ['aceita', 'Aceitaram'], ['contraproposta', 'Contraproposta'], ['recusada', 'Recusaram'], ['encerrada', 'Encerradas']]
       .map(([st, rot]) => [st, rot, n(st)]).filter(x => x[2])
       .map(([st, rot, k]) => `<span class="nt2-st ${(ST[st] || ST.pendente)[1]}">${rot} · ${k}</span>`).join('');
@@ -1293,10 +1321,83 @@
         ${bairro ? `<dt>Bairro</dt><dd>${esc(bairro)}</dd>` : ''}
         <dt>Propostas</dt><dd>${g.propostas.length} ${g.propostas.length === 1 ? 'professor' : 'professores'}</dd>
       </dl>
-      ${conf.length ? conf.map(p => `<div class="nt2-g-conf"><i class="fas fa-user-check"></i> Prof. ${esc(p.professorNome || profNome(p))} confirmado${p.autoConfirmado ? ' (aceitou a proposta)' : ''}</div>`).join('') : ''}
+      ${mats.length ? `<div class="nt2-prog" data-prog="${esc(g.chave)}">
+        <div class="nt2-prog-h"><span>Professores confirmados</span><b>${nConf}/${mats.length} ${mats.length === 1 ? 'matéria' : 'matérias'}</b></div>
+        <div class="nt2-prog-barra">${mats.map(m => `<i><b style="width:${Math.round(m.conf / m.total * 100)}%"></b></i>`).join('')}</div></div>` : ''}
       ${chips ? `<div class="nt2-g-chips">${chips}</div>` : ''}
       <div class="nt2-g-pe"><span>${g.ultima ? `Atualizado em ${g.ultima.toLocaleDateString('pt-BR')} ${g.ultima.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : ''}</span><span>Ver propostas <i class="fas fa-arrow-right"></i></span></div>
     </button>`;
+  }
+
+  // Por matéria do grupo: aulas (cada uma uma vez, chaveAula), quantas já têm
+  // professor confirmado (proposta 'aprovado' com a aula atribuída) e os
+  // professores que receberam a proposta — confirmados primeiro.
+  function materiasDoGrupo(g) {
+    const mapa = new Map();
+    g.propostas.forEach(p => {
+      const atrib = new Set(p.status === 'aprovado' ? (p.aulasAtribuidas || []).map(Number) : []);
+      const quem = String(p.professorId || p.professorEmail || p.id);
+      (p.aulas || []).forEach((a, i) => {
+        const nome = String(a.materia || '').trim() || 'Sem matéria';
+        if (!mapa.has(norm(nome))) mapa.set(norm(nome), { nome, aulas: new Set(), conf: new Set(), profs: new Map() });
+        const m = mapa.get(norm(nome));
+        const ka = chaveAula(a);
+        m.aulas.add(ka);
+        const prof = m.profs.get(quem) || { p, confirmado: false };
+        if (atrib.has(i)) { m.conf.add(ka); prof.confirmado = true; prof.p = p; }
+        m.profs.set(quem, prof);
+      });
+    });
+    return [...mapa.values()]
+      .map(m => ({ nome: m.nome, total: m.aulas.size, conf: m.conf.size, profs: [...m.profs.values()].sort((a, b) => b.confirmado - a.confirmado) }))
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  }
+
+  // Fotos dos professores para o tooltip da barra (dataBaseProfessores, lido uma vez).
+  let professoresPorId = null;
+  async function carregarFotosProfessores() {
+    if (professoresPorId) return;
+    professoresPorId = new Map();
+    try { (await carregarProfessores()).forEach(p => professoresPorId.set(String(p.id), p)); }
+    catch (err) { console.warn('[Propostas] Fotos dos professores indisponíveis:', err && err.code); }
+  }
+
+  // Tooltip da barra: matéria + situação e a grade (4 colunas) dos professores
+  // que receberam a proposta; o confirmado aparece colorido, os outros em cinza.
+  function tooltipHtml(g) {
+    return materiasDoGrupo(g).map(m => {
+      const ok = m.conf === m.total;
+      const st = ok ? '<span class="nt2-st g">Prof. confirmado</span>'
+        : `<span class="nt2-st n">Aguardando professor${m.conf ? ` · ${m.conf}/${m.total} aulas` : ''}</span>`;
+      const profs = m.profs.map(({ p, confirmado }) => {
+        const cad = (professoresPorId && professoresPorId.get(String(p.professorId))) || {};
+        const foto = fotoDe(cad);
+        const nome = cad.apelido || profNome(p);
+        return `<span class="nt2-tip-p${confirmado ? ' on' : ''}">${foto ? `<img src="${esc(foto)}" alt="" loading="lazy">` : `<span class="ini">${esc(iniciais(cad.nome || p.professorNome))}</span>`}<small>${esc(nome)}</small></span>`;
+      }).join('');
+      return `<div class="nt2-tip-mat"><div class="nt2-tip-h"><i class="${esc(iconeMateria(m.nome))}"></i><b>${esc(m.nome)}</b>${st}</div>
+        <div class="nt2-tip-grade">${profs}</div></div>`;
+    }).join('');
+  }
+
+  let tip = null, tipAlvo = null;
+  function fecharTooltip() { if (tip) tip.remove(); tip = null; tipAlvo = null; }
+  function abrirTooltip(alvo) {
+    if (alvo === tipAlvo && tip) return;
+    fecharTooltip();
+    const g = grupos(visiveis()).find(x => x.chave === alvo.dataset.prog);
+    if (!g) return;
+    tipAlvo = alvo;
+    tip = document.createElement('div');
+    tip.className = 'nt2-tip';
+    tip.setAttribute('role', 'tooltip');
+    tip.innerHTML = tooltipHtml(g);
+    document.body.appendChild(tip);
+    const r = alvo.getBoundingClientRect(), t = tip.getBoundingClientRect();
+    const left = Math.min(Math.max(8, r.left + r.width / 2 - t.width / 2), window.innerWidth - t.width - 8);
+    const top = r.bottom + 8 + t.height <= window.innerHeight ? r.bottom + 8 : Math.max(8, r.top - t.height - 8);
+    tip.style.left = `${left}px`;
+    tip.style.top = `${top}px`;
   }
 
   // ── Classificação por mês e semana ───────────────────────────────────────
@@ -1470,6 +1571,7 @@
     if (alvo.dataset.abrir) { abrirProposta(p.id); return; }
     const acao = alvo.dataset.acao;
     if (acao === 'sol') gerarSolicitacao(p);
+    else if (acao === 'contra') aprovarContra(p, aulasComEstado(p).filter(a => a.estado === 'contra').map(a => a.i));
     else if (acao === 'aprovar') aprovarProfessor(p);
     else if (acao === 'reenviar') reenviarProposta(p);
     else if (acao === 'analise') enviarParaAnalise(p);
@@ -1992,7 +2094,14 @@
     sec.querySelector('#nt2-ocultar-todas').onclick = ocultarTodas;
     sec.querySelector('#nt2-exibir-todas').onclick = exibirTodas;
     const cont = sec.querySelector('.nt-conteudo');
-    cont.addEventListener('click', aoClicarGrid);
+    cont.addEventListener('click', (e) => { fecharTooltip(); aoClicarGrid(e); });
+    cont.addEventListener('mouseover', (e) => { const b = e.target.closest('[data-prog]'); if (b) abrirTooltip(b); else fecharTooltip(); });
+    cont.addEventListener('mouseleave', fecharTooltip);
+    cont.addEventListener('focusin', (e) => { const b = e.target.matches('[data-grupo]') && e.target.querySelector('[data-prog]'); if (b) abrirTooltip(b); else fecharTooltip(); });
+    cont.addEventListener('focusout', fecharTooltip);
+    if (!loadNotificacoes.rolagem) { loadNotificacoes.rolagem = true; window.addEventListener('scroll', fecharTooltip, true); }
+    carregarFotosProfessores();
+    carregarIconesMaterias();
     cont.addEventListener('keydown', (e) => {
       if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-abrir]')) { e.preventDefault(); abrirProposta(e.target.dataset.abrir); }
     });
