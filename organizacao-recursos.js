@@ -341,7 +341,7 @@
       descricao: base.descricao ?? '',
       valor: base.valor ?? 0,
       data: base.data ?? dataNoMes(mes),
-      areaId: base.areaId ?? (S.areas[0] ? S.areas[0].id : ''),
+      areaId: base.areaId ?? '',          // "A definir" até alguém escolher
       detalhes: base.detalhes ?? ''
     };
   }
@@ -865,7 +865,11 @@
     const area = S.areas.find((a) => a.id === l.areaId);
     const aberto = S.areaAberta === l.id;
     const menu = aberto ? `<div class="area-menu"><div class="area-menu-title">Área de destino</div>${S.areas.map((a) => `<button type="button" title="${esc(a.nome)}" data-acao="area-escolher" data-tabela="${esc(t.id)}" data-lanc="${esc(l.id)}" data-area="${esc(a.id)}"><span class="area-icon">${icArea(a.icone, 14)}</span>${esc(a.nome)}</button>`).join('')}<button type="button" class="area-add" data-acao="abrir-areas" data-tabela="${esc(t.id)}">${ic('plus', 13)} Adicionar área</button></div>` : '';
-    return `<div class="area-picker"><button type="button" class="area-trigger${area ? '' : ' or-sem-area'}" data-acao="area-abrir" data-tabela="${esc(t.id)}" data-lanc="${esc(l.id)}" title="${esc(area ? area.nome : 'Área removida — escolha outra')}"><span class="area-icon">${icArea(area ? area.icone : 'settings', 13)}</span><span>${esc(area ? area.nome : 'Sem área')}</span>${ic('chevron-down', 12)}</button>${menu}</div>`;
+    // Sem área escolhida: "A definir"; área que foi removida: "Sem área"
+    const [classe, titulo, icone, nome] = area ? ['', area.nome, icArea(area.icone, 13), area.nome]
+      : !l.areaId ? [' or-a-definir', 'Escolha a área de destino', ic('more-horizontal', 13), 'A definir']
+      : [' or-sem-area', 'Área removida — escolha outra', icArea('settings', 13), 'Sem área'];
+    return `<div class="area-picker"><button type="button" class="area-trigger${classe}" data-acao="area-abrir" data-tabela="${esc(t.id)}" data-lanc="${esc(l.id)}" title="${esc(titulo)}"><span class="area-icon">${icone}</span><span>${esc(nome)}</span>${ic('chevron-down', 12)}</button>${menu}</div>`;
   }
 
   function anosSeletor(sim, ano) {
@@ -944,14 +948,16 @@
   }
 
   // Linhas da análise: uma por lançamento com valor, agrupadas pela área
-  // (lançamentos de área removida entram em "Sem área" em vez de sumir).
+  // (sem área escolhida entram em "A definir"; de área removida, em "Sem
+  // área" — em vez de sumirem).
   function dadosAnalise(sim) {
     const porId = new Map(S.areas.map((a) => [a.id, a]));
     const semArea = { id: '__sem-area__', nome: 'Sem área', icone: 'settings' };
+    const aDefinir = { id: '__a-definir__', nome: 'A definir', icone: 'settings' };
     const linhas = [];
     sim.tabelas.forEach((t) => t.lancamentos.forEach((l) => {
       if (!(Number(l.valor) > 0)) return;
-      linhas.push({ ...l, area: porId.get(l.areaId) || semArea });
+      linhas.push({ ...l, area: porId.get(l.areaId) || (l.areaId ? semArea : aDefinir) });
     }));
     const grupos = new Map();
     linhas.forEach((l) => {
