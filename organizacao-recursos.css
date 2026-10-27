@@ -375,6 +375,7 @@ body.or-aberto #barra-inferior, body.or-aberto #menu-toggle { display: none !imp
 .or-app .monthly-grid.is-dragging-grid .or-mes-livre { display: grid; }
 .or-app .or-mes-livre.is-drag-target { border-color: var(--orange); background: var(--orange-soft); }
 .or-app .area-trigger.or-sem-area { color: var(--rose); }
+.or-app .area-trigger.or-a-definir { color: var(--muted); font-style: italic; }
 
 /* Celular: menu próprio vira gaveta; cabeçalho com Voltar e Menu */
 .or-app .or-sidebar-fundo { display: none; }
@@ -522,6 +523,8 @@ body.or-aberto #barra-inferior, body.or-aberto #menu-toggle { display: none !imp
 /* Campo que a outra pessoa está editando (sem travar) */
 .or-app .entry-table td.or-editando { position: relative; }
 .or-app .entry-table td.or-editando input, .or-app .entry-table td.or-editando .money-input { box-shadow: 0 0 0 2px var(--or-cor); }
+/* No valor o contorno fica só em volta do campo inteiro (com o "R$") */
+.or-app .entry-table td.or-editando .money-input input { box-shadow: none; }
 .or-app .entry-table td.or-editando::after { content: attr(data-editor); position: absolute; z-index: 3; top: -9px; right: 6px; padding: 1px 6px; border-radius: 999px; background: var(--or-cor); color: #fff; font-size: 8px; font-weight: 700; pointer-events: none; }
 
 /* Card ou lançamento novo (meu ou da outra pessoa) entra com animação */
