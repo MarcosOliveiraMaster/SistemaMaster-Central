@@ -1229,7 +1229,9 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
       console.error('❌ Erro ao carregar tarefas do dia:', erro);
       ctx.erroCarregamento = true;
     }
-    ctx.itens = itensDoDia.map(i => ({ ...i, _persisted: true, _textoSalvo: i.texto, _dia: ctx }));
+    // _textoSalvo já aparado: é com o texto aparado que persistirTexto compara
+    // (sem isso, clicar e sair de uma tarefa com espaço no fim regravava ela).
+    ctx.itens = itensDoDia.map(i => ({ ...i, _persisted: true, _textoSalvo: (i.texto || '').trim(), _dia: ctx }));
     dia = ctx;
     recolhidos.clear();
     ctx.itens.forEach(i => { if (i.parentId) recolhidos.add(i.parentId); });
@@ -1422,7 +1424,7 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
       if (ctxDestino && ctxDestino === dia) {
         novos.forEach(n => dia.itens.push({
           ...n, status: 'pendente', ultimaEdicao: new Date(),
-          _persisted: true, _textoSalvo: n.texto, _dia: dia
+          _persisted: true, _textoSalvo: (n.texto || '').trim(), _dia: dia
         }));
         render();
       }
@@ -1875,6 +1877,10 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
   // criação terminar em vez de se perder. Se falhar, desfaz e re-renderiza.
   const persistirCampoSimples = (item, campo, valor) => {
     const valorAnterior = item[campo];
+    // Nada mudou (ex.: clicou no comentário e saiu sem digitar): não grava.
+    // Antes regravava e trocava o "editado por" de quem só clicou.
+    const mesmoValor = (a, b) => JSON.stringify(a ?? '') === JSON.stringify(b ?? '');
+    if (item._persisted && mesmoValor(valorAnterior, valor)) return Promise.resolve();
     item[campo] = valor;
     item.ultimaEdicao = new Date();
     item.ultimaEdicaoPor = editorAtual;
