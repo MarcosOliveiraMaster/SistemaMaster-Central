@@ -50,6 +50,8 @@
     'avaliacoes-equipe':       { secao: 'avaliacoes-equipe', nome: 'Avaliações da equipe', icone: 'fas fa-star' },
     'analise-recusas':         { secao: 'analise-recusas', nome: 'Análise de recusas de aulas', icone: 'fas fa-chart-bar' },
     'gerenciamento-midias':    { secao: 'gerenciamento-midias', nome: 'Gerenciamento de mídias', icone: 'fas fa-photo-film' },
+    'cadastro-atendentes':     { secao: 'cadastro-atendentes', nome: 'Cadastro de Atendentes', icone: 'fas fa-headset' },
+    'logs-atendimento':        { secao: 'logs-atendimento', nome: 'Logs', icone: 'fas fa-clipboard-list' },
     'organizar-menu':          { secao: 'organizar-menu', nome: 'Organizar Menu', icone: 'fas fa-sitemap' },
     'detalhes-banco-de-aulas': { secao: 'detalhes-banco-de-aulas', nome: 'Detalhes Banco de Aulas', icone: 'fas fa-table-cells' }
   };
@@ -86,6 +88,7 @@
         ] },
         f('avaliacoes-equipe'), f('analise-recusas')
       ] },
+      { id: 's-atendimento', nome: 'Atendimento', itens: [f('cadastro-atendentes'), f('logs-atendimento')] },
       { id: 's-ferramentas', nome: 'Ferramentas e Administrativo', itens: [
         f('exportar-dados'), f('gerenciamento-midias'), f('organizar-menu'),
         { tipo: 'gaveta', id: 'g-area-dev', nome: 'Área Dev', icone: 'fas fa-code', itens: [f('detalhes-banco-de-aulas')] }
@@ -165,7 +168,11 @@
     const SECAO_EXISTENTE = { 'analise-recusas': 's-pessoas', 'gerenciamento-midias': 's-ferramentas' };
     // Funções novas com seção própria: a seção é criada (depois de `depois`)
     // quando o menu salvo ainda não a tem.
-    const SECAO_NOVAS = { 'organizacao-recursos': { id: 's-planejamento', nome: 'Planejamento', depois: 's-financeiro' } };
+    const SECAO_NOVAS = {
+      'organizacao-recursos': { id: 's-planejamento', nome: 'Planejamento', depois: 's-financeiro' },
+      'cadastro-atendentes':  { id: 's-atendimento', nome: 'Atendimento', depois: 's-pessoas' },
+      'logs-atendimento':     { id: 's-atendimento', nome: 'Atendimento', depois: 's-pessoas' }
+    };
     const acharGaveta = (itens, id) => {
       for (const n of itens) {
         if (n.tipo !== 'gaveta') continue;
