@@ -10,7 +10,7 @@ const CONFIG = {
     'area-pagamento', 'cofres-pagamento', 'exportar-dados', 'previsao-financeira',
     'detalhes-banco-de-aulas', 'quadros-aula', 'notificacoes', 'avaliacoes-equipe', 'orientacoes-alunos',
     'lista-materias', 'organizar-menu', 'organizacao-recursos', 'analise-recusas',
-    'gerenciamento-midias'
+    'gerenciamento-midias', 'cadastro-atendentes', 'logs-atendimento'
   ]
 };
 
@@ -233,6 +233,12 @@ function loadSectionContent(sectionId) {
       break;
     case 'gerenciamento-midias':
       if (typeof loadGerenciamentoMidias === 'function') loadGerenciamentoMidias();
+      break;
+    case 'cadastro-atendentes':
+      if (window.CadastroAtendentes) CadastroAtendentes.abrir();
+      break;
+    case 'logs-atendimento':
+      if (window.LogsAtendimento) LogsAtendimento.abrir();
       break;
     case 'lista-materias':
       if (typeof loadListaMaterias === 'function') loadListaMaterias();

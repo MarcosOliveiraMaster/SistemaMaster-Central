@@ -1,6 +1,48 @@
 console.log('✅ functions-simulacoes.js carregado');
 
 // Objeto global para expor as funções
+// ── Código da contratação (sequencial, sem colisão) ─────────────────────────
+// contadores/codigoContratacao = { ultimo: <número> }. Na primeira vez, o
+// contador nasce a partir do maior codigoContratacao que já existe.
+async function _ultimoCodigoContratacaoExistente() {
+  const snap = await db.collection('BancoDeAulas')
+    .orderBy('codigoContratacao', 'desc')
+    .limit(1)
+    .get();
+  if (snap.empty) return 0;
+  const n = parseInt(snap.docs[0].data().codigoContratacao, 10);
+  return Number.isFinite(n) ? n : 0;
+}
+
+async function reservarCodigoESalvarContrato(montarContrato) {
+  const refContador = db.collection('contadores').doc('codigoContratacao');
+  const quem = (window.currentUser && window.currentUser.email) || '';
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(refContador);
+    let ultimo = snap.exists ? parseInt(snap.data().ultimo, 10) : NaN;
+    if (!Number.isFinite(ultimo)) ultimo = await _ultimoCodigoContratacaoExistente();
+
+    // Pula códigos já ocupados (todas as leituras antes das gravações).
+    let codigo = String(ultimo + 1).padStart(4, '0');
+    for (let tentativas = 0; tentativas < 50; tentativas++) {
+      const existente = await tx.get(db.collection('BancoDeAulas').doc(codigo));
+      if (!existente.exists) break;
+      ultimo += 1;
+      codigo = String(ultimo + 1).padStart(4, '0');
+      if (tentativas === 49) throw new Error('Não foi possível reservar um código de contratação livre.');
+    }
+
+    const { aulasComIds, contratoData } = montarContrato(codigo);
+    tx.set(refContador, {
+      ultimo: ultimo + 1,
+      atualizadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+      atualizadoPor: quem
+    }, { merge: true });
+    tx.set(db.collection('BancoDeAulas').doc(codigo), contratoData);
+    return { codigo, aulasComIds };
+  });
+}
+
 const Simulacoes = (function() {
   // Variáveis privadas
   let simulacoesData = [];
@@ -4040,23 +4082,6 @@ const Simulacoes = (function() {
     btnAprovar.innerHTML = '<div class="loading-spinner mr-2"></div> Aprovando...';
     
     try {
-      // 1. Buscar último código de contratação
-      const lastCodeSnapshot = await db. collection('BancoDeAulas')
-        .orderBy('codigoContratacao', 'desc')
-        .limit(1)
-        .get();
-      
-      let novoCodigoContratacao = '0001';
-      
-      if (! lastCodeSnapshot.empty) {
-        const ultimoCodigo = lastCodeSnapshot.docs[0].data().codigoContratacao;
-        const numeroAtual = parseInt(ultimoCodigo);
-        const proximoNumero = numeroAtual + 1;
-        novoCodigoContratacao = proximoNumero.toString().padStart(4, '0');
-      }
-      
-      console.log('✅ Novo código de contratação:', novoCodigoContratacao);
-      
       // 2. Coletar dados do formulário
       const selectCliente = document.getElementById('select-cliente');
       let nomeCliente = '';
@@ -4126,6 +4151,9 @@ const Simulacoes = (function() {
         return prof ? String(prof.email || '').trim().toLowerCase() : '';
       };
 
+      // 4 e 5. Monta as aulas e o contrato para um código. Chamado dentro da
+      // transação que reserva o código (passo 7).
+      const montarContrato = (novoCodigoContratacao) => {
       // 4. Gerar IDs de aula e fixar ValorAula com os valores atualmente exibidos
       const aulasComIds = (editingSimulacao.aulas || []).map((aula, index) => {
         const idAula = novoCodigoContratacao + gerarSufixoAula(index);
@@ -4186,11 +4214,21 @@ const Simulacoes = (function() {
         ObservacaoContratacao: '',
         timestamp: firebase.firestore.FieldValue.serverTimestamp()
       };
-      
-      // 7. Salvar em BancoDeAulas
-      await db.collection('BancoDeAulas').doc(novoCodigoContratacao).set(contratoData);
+        return { aulasComIds, contratoData };
+      };
+
+      // 7. Reserva o código e salva em BancoDeAulas numa transação só.
+      // Antes: lia o maior código e somava 1, sem trava — duas aprovações ao
+      // mesmo tempo (admin + atendente) geravam o mesmo código e o segundo
+      // set() apagava o contrato do primeiro. Agora o contador
+      // contadores/codigoContratacao é lido e gravado junto com o contrato;
+      // se duas pessoas aprovarem juntas, o Firestore refaz a segunda
+      // transação, que pega o código seguinte. Códigos já existentes (ex.:
+      // criados por uma aba antiga sem o contador) são pulados, nunca
+      // sobrescritos.
+      const { codigo: novoCodigoContratacao, aulasComIds } = await reservarCodigoESalvarContrato(montarContrato);
       console.log('✅ Salvo em BancoDeAulas:', novoCodigoContratacao);
-      
+
       // 8. Salvar cada aula em BancoDeAulas-Lista
       for (const aula of aulasComIds) {
         // professorUid já vem definido da seleção do professor na simulação;
@@ -4434,4 +4472,5 @@ const Simulacoes = (function() {
 if (typeof window !== 'undefined') {
   window.Simulacoes = Simulacoes;
   console.log('✅ Simulacoes exportado para escopo global');
+
 }
