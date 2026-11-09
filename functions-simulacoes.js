@@ -9,12 +9,18 @@ async function _ultimoCodigoContratacaoExistente() {
   // Antes pegava o maior valor de qualquer formato: um código com letras
   // ("APP-…", "C0158"…) fica acima dos números na ordenação, virava NaN → 0, e a
   // reserva tentava 0001…0050, todos ocupados — nenhuma simulação era aprovada.
-  const snap = await db.collection('BancoDeAulas')
-    .where('codigoContratacao', '>=', '0')
-    .where('codigoContratacao', '<', ':')
-    .orderBy('codigoContratacao', 'desc')
-    .limit(50)
-    .get();
+  let snap;
+  try {
+    snap = await db.collection('BancoDeAulas')
+      .where('codigoContratacao', '>=', '0')
+      .where('codigoContratacao', '<', ':')
+      .orderBy('codigoContratacao', 'desc')
+      .limit(50)
+      .get();
+  } catch (e) {
+    console.warn('⚠️ Consulta por faixa de código falhou; lendo todos os contratos.', e);
+    snap = await db.collection('BancoDeAulas').get();
+  }
   let maior = 0;
   snap.forEach(doc => {
     const cod = String(doc.data().codigoContratacao || '');
@@ -54,19 +60,34 @@ async function reservarCodigoESalvarContrato(montarContrato) {
       tx.set(db.collection('BancoDeAulas').doc(livre.codigo), contratoData);
       return { codigo: livre.codigo, aulasComIds };
     });
-  } catch (erroContador) {
-    // Sem o contador (regra do Firestore, contador inválido, rede…), a
-    // aprovação não pode travar: reserva o código só pelo BancoDeAulas, como
-    // antes de 02/11, mas ainda dentro de uma transação — se outra pessoa
-    // gravar o mesmo código ao mesmo tempo, o Firestore refaz e pega o próximo.
-    console.warn('⚠️ Contador de código indisponível; usando o maior código existente.', erroContador);
-    const ultimoExistente = await _ultimoCodigoContratacaoExistente();
-    return db.runTransaction(async (tx) => {
-      const livre = await _primeiroCodigoLivre(tx, ultimoExistente);
-      const { aulasComIds, contratoData } = montarContrato(livre.codigo);
-      tx.set(db.collection('BancoDeAulas').doc(livre.codigo), contratoData);
-      return { codigo: livre.codigo, aulasComIds };
-    });
+  } catch (erroTransacao) {
+    // A transação falhou (na produção já veio como "unknown"). A aprovação não
+    // pode travar: reserva o código sem transação, como antes de 02/11 — lê o
+    // maior código numérico, confere que o próximo está livre e grava. O
+    // contador é atualizado depois, se der; se não der, não impede a aprovação.
+    console.warn('⚠️ Transação do código da contratação falhou; gravando sem transação.', erroTransacao);
+    try {
+      let ultimo = await _ultimoCodigoContratacaoExistente();
+      for (let tentativas = 0; tentativas < 50; tentativas++) {
+        const codigo = String(ultimo + 1).padStart(4, '0');
+        const ref = db.collection('BancoDeAulas').doc(codigo);
+        if ((await ref.get()).exists) { ultimo += 1; continue; }
+        const { aulasComIds, contratoData } = montarContrato(codigo);
+        await ref.set(contratoData);
+        refContador.set({
+          ultimo: ultimo + 1,
+          atualizadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+          atualizadoPor: quem
+        }, { merge: true }).catch(e => console.warn('⚠️ Contador não atualizado:', e));
+        return { codigo, aulasComIds };
+      }
+      throw new Error('Não foi possível reservar um código de contratação livre.');
+    } catch (erroSemTransacao) {
+      const txt = (e) => [e && e.code, e && e.message].filter(Boolean).join(' — ') || String(e);
+      const erro = new Error(`com transação: ${txt(erroTransacao)} | sem transação: ${txt(erroSemTransacao)}`);
+      erro.code = (erroSemTransacao && erroSemTransacao.code) || (erroTransacao && erroTransacao.code) || '';
+      throw erro;
+    }
   }
 }
 
@@ -4103,6 +4124,7 @@ const Simulacoes = (function() {
     }
 
     // Mostrar loading
+    let etapa = 'preparar os dados';
     const btnAprovar = document.getElementById('btn-aprovar-simulacao');
     const originalHtml = btnAprovar.innerHTML;
     btnAprovar. disabled = true;
@@ -4253,10 +4275,12 @@ const Simulacoes = (function() {
       // transação, que pega o código seguinte. Códigos já existentes (ex.:
       // criados por uma aba antiga sem o contador) são pulados, nunca
       // sobrescritos.
+      etapa = 'reservar o código e salvar o contrato';
       const { codigo: novoCodigoContratacao, aulasComIds } = await reservarCodigoESalvarContrato(montarContrato);
       console.log('✅ Salvo em BancoDeAulas:', novoCodigoContratacao);
 
       // 8. Salvar cada aula em BancoDeAulas-Lista
+      etapa = `salvar as aulas do contrato ${novoCodigoContratacao}`;
       for (const aula of aulasComIds) {
         // professorUid já vem definido da seleção do professor na simulação;
         // fallback por CPF cobre simulações antigas salvas antes dessa mudança
@@ -4302,6 +4326,7 @@ const Simulacoes = (function() {
       console.log('✅ Aulas salvas em BancoDeAulas-Lista:', aulasComIds.length);
       
       // 9. Atualizar título da simulação
+      etapa = `marcar a simulação como aprovada (contrato ${novoCodigoContratacao} já salvo)`;
       const novoTitulo = 'SIMULAÇÃO APROVADA - ' + titulo;
       await db.collection('simulacoes').doc(editingSimulacao.idSimulacao).update({
         tituloSimulacao: novoTitulo,
@@ -4318,8 +4343,8 @@ const Simulacoes = (function() {
       
     } catch (error) {
       console.error('❌ Erro ao aprovar simulação:', error);
-      const motivo = (error && (error.code || error.message)) || String(error);
-      showToast(`❌ Erro ao aprovar simulação: ${escapeHtml(motivo)}`, 'error', 10000);
+      const motivo = [error && error.code, error && error.message].filter(Boolean).join(' — ') || String(error);
+      showToast(`❌ Erro ao aprovar simulação (etapa: ${escapeHtml(etapa)}): ${escapeHtml(motivo)}`, 'error', 30000);
       
       btnAprovar.disabled = false;
       btnAprovar.innerHTML = originalHtml;
