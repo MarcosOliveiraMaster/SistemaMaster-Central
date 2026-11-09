@@ -5,42 +5,69 @@ console.log('✅ functions-simulacoes.js carregado');
 // contadores/codigoContratacao = { ultimo: <número> }. Na primeira vez, o
 // contador nasce a partir do maior codigoContratacao que já existe.
 async function _ultimoCodigoContratacaoExistente() {
+  // Só códigos que começam com dígito ('0' a '9'; ':' vem logo depois do '9').
+  // Antes pegava o maior valor de qualquer formato: um código com letras
+  // ("APP-…", "C0158"…) fica acima dos números na ordenação, virava NaN → 0, e a
+  // reserva tentava 0001…0050, todos ocupados — nenhuma simulação era aprovada.
   const snap = await db.collection('BancoDeAulas')
+    .where('codigoContratacao', '>=', '0')
+    .where('codigoContratacao', '<', ':')
     .orderBy('codigoContratacao', 'desc')
-    .limit(1)
+    .limit(50)
     .get();
-  if (snap.empty) return 0;
-  const n = parseInt(snap.docs[0].data().codigoContratacao, 10);
-  return Number.isFinite(n) ? n : 0;
+  let maior = 0;
+  snap.forEach(doc => {
+    const cod = String(doc.data().codigoContratacao || '');
+    if (/^\d+$/.test(cod)) maior = Math.max(maior, parseInt(cod, 10));
+  });
+  return maior;
+}
+
+// Procura, dentro da transação, o primeiro código livre a partir de `ultimo + 1`
+// (todas as leituras antes das gravações).
+async function _primeiroCodigoLivre(tx, ultimo) {
+  for (let tentativas = 0; tentativas < 50; tentativas++) {
+    const codigo = String(ultimo + 1).padStart(4, '0');
+    const existente = await tx.get(db.collection('BancoDeAulas').doc(codigo));
+    if (!existente.exists) return { codigo, ultimo };
+    ultimo += 1;
+  }
+  throw new Error('Não foi possível reservar um código de contratação livre.');
 }
 
 async function reservarCodigoESalvarContrato(montarContrato) {
   const refContador = db.collection('contadores').doc('codigoContratacao');
   const quem = (window.currentUser && window.currentUser.email) || '';
-  return db.runTransaction(async (tx) => {
-    const snap = await tx.get(refContador);
-    let ultimo = snap.exists ? parseInt(snap.data().ultimo, 10) : NaN;
-    if (!Number.isFinite(ultimo)) ultimo = await _ultimoCodigoContratacaoExistente();
+  try {
+    return await db.runTransaction(async (tx) => {
+      const snap = await tx.get(refContador);
+      let ultimo = snap.exists ? parseInt(snap.data().ultimo, 10) : NaN;
+      if (!Number.isFinite(ultimo)) ultimo = await _ultimoCodigoContratacaoExistente();
+      const livre = await _primeiroCodigoLivre(tx, ultimo);
 
-    // Pula códigos já ocupados (todas as leituras antes das gravações).
-    let codigo = String(ultimo + 1).padStart(4, '0');
-    for (let tentativas = 0; tentativas < 50; tentativas++) {
-      const existente = await tx.get(db.collection('BancoDeAulas').doc(codigo));
-      if (!existente.exists) break;
-      ultimo += 1;
-      codigo = String(ultimo + 1).padStart(4, '0');
-      if (tentativas === 49) throw new Error('Não foi possível reservar um código de contratação livre.');
-    }
-
-    const { aulasComIds, contratoData } = montarContrato(codigo);
-    tx.set(refContador, {
-      ultimo: ultimo + 1,
-      atualizadoEm: firebase.firestore.FieldValue.serverTimestamp(),
-      atualizadoPor: quem
-    }, { merge: true });
-    tx.set(db.collection('BancoDeAulas').doc(codigo), contratoData);
-    return { codigo, aulasComIds };
-  });
+      const { aulasComIds, contratoData } = montarContrato(livre.codigo);
+      tx.set(refContador, {
+        ultimo: livre.ultimo + 1,
+        atualizadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+        atualizadoPor: quem
+      }, { merge: true });
+      tx.set(db.collection('BancoDeAulas').doc(livre.codigo), contratoData);
+      return { codigo: livre.codigo, aulasComIds };
+    });
+  } catch (erroContador) {
+    // Sem o contador (regra do Firestore, contador inválido, rede…), a
+    // aprovação não pode travar: reserva o código só pelo BancoDeAulas, como
+    // antes de 02/11, mas ainda dentro de uma transação — se outra pessoa
+    // gravar o mesmo código ao mesmo tempo, o Firestore refaz e pega o próximo.
+    console.warn('⚠️ Contador de código indisponível; usando o maior código existente.', erroContador);
+    const ultimoExistente = await _ultimoCodigoContratacaoExistente();
+    return db.runTransaction(async (tx) => {
+      const livre = await _primeiroCodigoLivre(tx, ultimoExistente);
+      const { aulasComIds, contratoData } = montarContrato(livre.codigo);
+      tx.set(db.collection('BancoDeAulas').doc(livre.codigo), contratoData);
+      return { codigo: livre.codigo, aulasComIds };
+    });
+  }
 }
 
 const Simulacoes = (function() {
@@ -4291,7 +4318,8 @@ const Simulacoes = (function() {
       
     } catch (error) {
       console.error('❌ Erro ao aprovar simulação:', error);
-      showToast('❌ Erro ao aprovar simulação', 'error');
+      const motivo = (error && (error.code || error.message)) || String(error);
+      showToast(`❌ Erro ao aprovar simulação: ${escapeHtml(motivo)}`, 'error', 10000);
       
       btnAprovar.disabled = false;
       btnAprovar.innerHTML = originalHtml;
