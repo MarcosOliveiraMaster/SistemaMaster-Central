@@ -5,13 +5,22 @@ console.log('✅ functions-simulacoes.js carregado');
 // contadores/codigoContratacao = { ultimo: <número> }. Na primeira vez, o
 // contador nasce a partir do maior codigoContratacao que já existe.
 async function _ultimoCodigoContratacaoExistente() {
+  // Só códigos que começam com dígito ('0' a '9'; ':' vem logo depois do '9').
+  // Antes pegava o maior valor de qualquer formato: um código com letras
+  // ("APP-…", "C0158"…) fica acima dos números na ordenação, virava NaN → 0, e a
+  // reserva tentava 0001…0050, todos ocupados — nenhuma simulação era aprovada.
   const snap = await db.collection('BancoDeAulas')
+    .where('codigoContratacao', '>=', '0')
+    .where('codigoContratacao', '<', ':')
     .orderBy('codigoContratacao', 'desc')
-    .limit(1)
+    .limit(50)
     .get();
-  if (snap.empty) return 0;
-  const n = parseInt(snap.docs[0].data().codigoContratacao, 10);
-  return Number.isFinite(n) ? n : 0;
+  let maior = 0;
+  snap.forEach(doc => {
+    const cod = String(doc.data().codigoContratacao || '');
+    if (/^\d+$/.test(cod)) maior = Math.max(maior, parseInt(cod, 10));
+  });
+  return maior;
 }
 
 // Procura, dentro da transação, o primeiro código livre a partir de `ultimo + 1`
