@@ -10,7 +10,8 @@ const CONFIG = {
     'area-pagamento', 'cofres-pagamento', 'exportar-dados', 'previsao-financeira',
     'detalhes-banco-de-aulas', 'quadros-aula', 'notificacoes', 'avaliacoes-equipe', 'orientacoes-alunos',
     'lista-materias', 'organizar-menu', 'organizacao-recursos', 'analise-recusas',
-    'gerenciamento-midias', 'cadastro-atendentes', 'logs-atendimento'
+    'gerenciamento-midias', 'cadastro-atendentes', 'logs-atendimento',
+    'dev-colecoes', 'backup-download', 'backup-envio'
   ]
 };
 
@@ -99,6 +100,10 @@ function setupMenuNavigation() {
     if (sectionId === APP_STATE.currentSection && !tabId) return;
     if (APP_STATE.currentSection === 'organizar-menu' && window.MenuLateral && MenuLateral.temAlteracoes()
         && !window.confirm('Há alterações não salvas no menu. Sair mesmo assim?')) return;
+    if (APP_STATE.currentSection === 'dev-colecoes' && window.DevColecoes && DevColecoes.temAlteracoes()
+        && !window.confirm('Há alterações não salvas no Editor de Coleções. Sair mesmo assim?')) return;
+    if (window.BackupMaster && BackupMaster.emAndamento()
+        && !window.confirm('Há um backup em andamento. Sair desta tela não o interrompe, mas você deixa de ver o progresso. Sair mesmo assim?')) return;
 
     nav.querySelectorAll('button.active').forEach(i => i.classList.remove('active'));
     btn.classList.add('active');
@@ -218,6 +223,15 @@ function loadSectionContent(sectionId) {
       break;
     case 'detalhes-banco-de-aulas':
       if (typeof DetalhesBancoDeAulas !== 'undefined' && DetalhesBancoDeAulas.init) DetalhesBancoDeAulas.init();
+      break;
+    case 'dev-colecoes':
+      if (window.DevColecoes) DevColecoes.init();
+      break;
+    case 'backup-download':
+      if (window.BackupMaster) BackupMaster.abrirDownload();
+      break;
+    case 'backup-envio':
+      if (window.BackupMaster) BackupMaster.abrirEnvio();
       break;
     case 'notificacoes':
       if (typeof loadNotificacoes === 'function') loadNotificacoes();

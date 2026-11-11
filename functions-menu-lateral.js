@@ -53,7 +53,10 @@
     'cadastro-atendentes':     { secao: 'cadastro-atendentes', nome: 'Cadastro de Atendentes', icone: 'fas fa-headset' },
     'logs-atendimento':        { secao: 'logs-atendimento', nome: 'Logs', icone: 'fas fa-clipboard-list' },
     'organizar-menu':          { secao: 'organizar-menu', nome: 'Organizar Menu', icone: 'fas fa-sitemap' },
-    'detalhes-banco-de-aulas': { secao: 'detalhes-banco-de-aulas', nome: 'Detalhes Banco de Aulas', icone: 'fas fa-table-cells' }
+    'dev-colecoes':            { secao: 'dev-colecoes', nome: 'Editor de Coleções', icone: 'fas fa-database' },
+    'detalhes-banco-de-aulas': { secao: 'detalhes-banco-de-aulas', nome: 'Detalhes Banco de Aulas', icone: 'fas fa-table-cells' },
+    'backup-download':         { secao: 'backup-download', nome: 'Download Backup', icone: 'fas fa-download' },
+    'backup-envio':            { secao: 'backup-envio', nome: 'Envio de Backup', icone: 'fas fa-upload' }
   };
 
   // Badges de contagem pendurados em certos itens (atualizados por outros scripts pelo id)
@@ -91,7 +94,8 @@
       { id: 's-atendimento', nome: 'Atendimento', itens: [f('cadastro-atendentes'), f('logs-atendimento')] },
       { id: 's-ferramentas', nome: 'Ferramentas e Administrativo', itens: [
         f('exportar-dados'), f('gerenciamento-midias'), f('organizar-menu'),
-        { tipo: 'gaveta', id: 'g-area-dev', nome: 'Área Dev', icone: 'fas fa-code', itens: [f('detalhes-banco-de-aulas')] }
+        { tipo: 'gaveta', id: 'g-area-dev', nome: 'Área Dev', icone: 'fas fa-code', itens: [f('dev-colecoes'), f('detalhes-banco-de-aulas')] },
+        f('backup-download'), f('backup-envio')
       ] }
     ]
   };
@@ -108,7 +112,7 @@
     'fas fa-envelope', 'fas fa-comments', 'fas fa-phone', 'fas fa-money-bill-wave', 'fas fa-coins',
     'fas fa-receipt', 'fas fa-briefcase', 'fas fa-building', 'fas fa-star', 'fas fa-flag',
     'fas fa-lightbulb', 'fas fa-shield-halved', 'fas fa-magnifying-glass', 'fas fa-diagram-project',
-    'fas fa-piggy-bank', 'fas fa-scale-balanced', 'fas fa-bullseye'
+    'fas fa-piggy-bank', 'fas fa-scale-balanced', 'fas fa-bullseye', 'fas fa-download', 'fas fa-upload'
   ];
   const ICONE_VALIDO = /^(fas|far|fab|fa-solid|fa-regular|fa-brands)( fa-[a-z0-9-]+)+$/;
   const ICONE_GAVETA = 'fas fa-folder';
@@ -163,9 +167,12 @@
 
     // Funções novas entram no lugar previsto quando ele existe no menu salvo
     // (ex.: "Orientações para alunos" na gaveta Clientes); senão, no fim.
-    const LUGAR_NOVAS = { 'orientacoes-alunos': 'g-clientes', 'lista-materias': 'g-professores' };
+    const LUGAR_NOVAS = { 'orientacoes-alunos': 'g-clientes', 'lista-materias': 'g-professores', 'dev-colecoes': 'g-area-dev' };
     // Funções novas que entram direto numa seção existente (no fim dela).
-    const SECAO_EXISTENTE = { 'analise-recusas': 's-pessoas', 'gerenciamento-midias': 's-ferramentas' };
+    const SECAO_EXISTENTE = {
+      'analise-recusas': 's-pessoas', 'gerenciamento-midias': 's-ferramentas',
+      'backup-download': 's-ferramentas', 'backup-envio': 's-ferramentas'
+    };
     // Funções novas com seção própria: a seção é criada (depois de `depois`)
     // quando o menu salvo ainda não a tem.
     const SECAO_NOVAS = {
