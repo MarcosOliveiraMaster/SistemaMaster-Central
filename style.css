@@ -4836,6 +4836,11 @@ h2, h3, h4, h5, h6 {
   color: white;
 }
 
+.cm-editor-btn[data-pessoa="Aras"].ativo {
+  background: #F97316;
+  color: white;
+}
+
 /* Botão de olho — mostra/oculta "Editado em ..." de todas as tarefas listadas */
 .cm-eye-btn {
   border: none;
@@ -4887,6 +4892,11 @@ h2, h3, h4, h5, h6 {
 .cm-filtro-pessoa-btn.ativo-ester {
   background: #fdf2f8;
   color: #be185d;
+}
+
+.cm-filtro-pessoa-btn.ativo-aras {
+  background: #fff7ed;
+  color: #c2410c;
 }
 
 .cm-tarefa-item {
@@ -5310,6 +5320,22 @@ h2, h3, h4, h5, h6 {
 
 .cm-tarefa-pessoa-ester {
   background: #EC4899;
+}
+
+.cm-tarefa-pessoa-aras {
+  background: #F97316;
+}
+
+/* Laranja no laranja: a borda de hover do Aras fica mais escura pra aparecer */
+.cm-tarefa-pessoa.cm-tarefa-pessoa-aras:hover,
+.cm-tarefa-pessoa.cm-tarefa-pessoa-aras:focus-visible {
+  border-color: #9a3412;
+}
+
+/* Boneco fixo (barra fechada): impede seleção de texto no duplo clique */
+.cm-tarefa-pessoa-fixo {
+  flex-shrink: 0;
+  user-select: none;
 }
 
 .cm-tarefa-pessoa.ativo {

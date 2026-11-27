@@ -11,7 +11,7 @@
 //   listasTarefas/{listaId}            { data, totalItens, itensConcluidos, timestamp }
 //   listasTarefas/{listaId}/itens/{id} { texto, status('pendente'|'andamento'|'concluido'|'cancelado'),
 //                                        nivel(1-3), parentId,
-//                                        responsavel('Marcos'|'Ester'|''), prazo('HH:MM'|''),
+//                                        responsavel('Marcos'|'Ester'|'Aras'|''), prazo('HH:MM'|''),
 //                                        comentario, tags(string[], só nível 1), ordem,
 //                                        ultimaEdicao, ultimaEdicaoPor, criadoEm }
 // "totalItens"/"itensConcluidos" contam só os itens de nível 1 (são o que vira
@@ -28,7 +28,9 @@ function _cmProximoStatusTarefa(status) {
   return CM_TAREFAS_STATUS_CICLO[(idx + 1) % CM_TAREFAS_STATUS_CICLO.length];
 }
 
-const CM_TAREFAS_PESSOAS = ['Marcos', 'Ester'];
+const CM_TAREFAS_PESSOAS = ['Marcos', 'Ester', 'Aras'];
+// Duplo clique no boneco fixo (barra de ações fechada) remove o responsável
+const CM_TAREFAS_DUPLO_CLIQUE_MS = 400;
 const CM_TAREFAS_MAX_FATIAS = 20;
 const CM_TAREFAS_FATIAS_POR_LINHA = 10;
 const CM_TAREFAS_URGENCIA_MS = 2 * 60 * 60 * 1000; // 2h antes do prazo já fica "vermelho"
@@ -855,6 +857,7 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
   // filhos já começa recolhido
   const recolhidos = new Set();
   const comentariosAbertos = new Set();  // ids com o campo de comentário expandido
+  let ultimoCliquePessoaFixo = { id: null, em: 0 }; // detecção do duplo clique no boneco fixo
   let tagPopoverAbertoId = null;         // id do item com o popover de tags aberto (só 1 por vez)
   let funcoesAbertoId = null;            // id do item com a barra de ícones (tag/hora/comentário/etc.) aberta (só 1 por vez)
   let copiarPopoverAbertoId = null;      // id do item nível 1 com o popover "copiar para um dia" aberto (só 1 por vez)
@@ -918,6 +921,9 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
                 <button type="button" class="cm-filtro-pessoa-btn" id="cmFiltroEster" data-pessoa="Ester">
                   <i class="fas fa-user"></i> Ester
                 </button>
+                <button type="button" class="cm-filtro-pessoa-btn" id="cmFiltroAras" data-pessoa="Aras">
+                  <i class="fas fa-user"></i> Aras
+                </button>
               </div>
 
               <div class="cm-toolbar-secao cm-toolbar-secao-tags">
@@ -937,6 +943,7 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
               <span class="cm-toolbar-secao-label">Editando como</span>
               <button type="button" class="cm-editor-btn" data-pessoa="Marcos">Marcos</button>
               <button type="button" class="cm-editor-btn" data-pessoa="Ester">Ester</button>
+              <button type="button" class="cm-editor-btn" data-pessoa="Aras">Aras</button>
             </div>
 
             <div class="cm-toolbar-secao cm-toolbar-secao-olho">
@@ -974,8 +981,7 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
   const btnFechar = modal.querySelector('#cmTarefasBtnFechar');
   const btnSalvarTudo = modal.querySelector('#cmTarefasBtnSalvarTudo');
   const btnExcluirLista = modal.querySelector('#cmTarefasBtnExcluirLista');
-  const btnFiltroMarcos = modal.querySelector('#cmFiltroMarcos');
-  const btnFiltroEster = modal.querySelector('#cmFiltroEster');
+  const botoesFiltroPessoa = modal.querySelectorAll('.cm-filtro-pessoa-btn');
   const botoesEditor = modal.querySelectorAll('.cm-editor-btn');
   const barraCarregando = modal.querySelector('#cmTarefasCarregando');
 
@@ -1094,19 +1100,17 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
 
   // ---- Filtro por responsável ----
   const atualizarBotoesFiltro = () => {
-    btnFiltroMarcos.classList.toggle('ativo-marcos', filtroPessoas.has('Marcos'));
-    btnFiltroEster.classList.toggle('ativo-ester', filtroPessoas.has('Ester'));
+    botoesFiltroPessoa.forEach(btn => {
+      const pessoa = btn.dataset.pessoa;
+      btn.classList.toggle(`ativo-${pessoa.toLowerCase()}`, filtroPessoas.has(pessoa));
+    });
   };
-  btnFiltroMarcos.addEventListener('click', () => {
-    filtroPessoas.has('Marcos') ? filtroPessoas.delete('Marcos') : filtroPessoas.add('Marcos');
+  botoesFiltroPessoa.forEach(btn => btn.addEventListener('click', () => {
+    const pessoa = btn.dataset.pessoa;
+    filtroPessoas.has(pessoa) ? filtroPessoas.delete(pessoa) : filtroPessoas.add(pessoa);
     atualizarBotoesFiltro();
     render();
-  });
-  btnFiltroEster.addEventListener('click', () => {
-    filtroPessoas.has('Ester') ? filtroPessoas.delete('Ester') : filtroPessoas.add('Ester');
-    atualizarBotoesFiltro();
-    render();
-  });
+  }));
 
   // ---- Buscar Tags (filtro do topo) ----
   const buscarTagsWrap = modal.querySelector('#cmBuscarTagsWrap');
@@ -1474,8 +1478,7 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
         <i class="fas fa-comment-alt"></i>
       </button>`,
       `<span class="cm-tarefa-pessoas">
-        <button type="button" class="cm-tarefa-pessoa cm-tarefa-pessoa-marcos${responsavelAtual === 'Marcos' ? ' ativo' : ''}" data-item-id="${item.id}" data-pessoa="Marcos" title="Marcos"><i class="fas fa-user"></i></button>
-        <button type="button" class="cm-tarefa-pessoa cm-tarefa-pessoa-ester${responsavelAtual === 'Ester' ? ' ativo' : ''}" data-item-id="${item.id}" data-pessoa="Ester" title="Ester"><i class="fas fa-user"></i></button>
+        ${CM_TAREFAS_PESSOAS.map(pessoa => `<button type="button" class="cm-tarefa-pessoa cm-tarefa-pessoa-${pessoa.toLowerCase()}${responsavelAtual === pessoa ? ' ativo' : ''}" data-item-id="${item.id}" data-pessoa="${pessoa}" title="${pessoa}"><i class="fas fa-user"></i></button>`).join('')}
       </span>`,
       ...(podeVirarSubtarefa ? [`<button type="button" class="cm-tarefa-btn-subtarefa" data-item-id="${item.id}" title="Adicionar subtarefa"><i class="fas fa-code-branch"></i></button>`] : []),
       ...(item.nivel === 1 ? [
@@ -1500,7 +1503,7 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
       `<button type="button" class="cm-tarefa-btn-excluir" data-item-id="${item.id}" title="Excluir"><i class="fas fa-trash"></i></button>`
     ].join('<span class="cm-tarefa-divisor"></span>');
 
-    // Com a barra de ações fechada, horário e comentário continuam visíveis (sozinhos,
+    // Com a barra de ações fechada, horário, comentário e responsável continuam visíveis (sozinhos,
     // na mesma ordem em que apareceriam dentro da barra) se o item tiver algum valor
     // definido — lembra o usuário que existe prazo/comentário sem precisar abrir a
     // barra inteira. Mesmos botões/classes dos de dentro da barra, então o clique já
@@ -1511,7 +1514,11 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
       <button type="button" class="cm-tarefa-btn-comentario cm-tarefa-btn-comentario-ativo" data-item-id="${item.id}" title="Comentário">
         <i class="fas fa-comment-alt"></i>
       </button>` : '';
-    const fixosHtml = [horaFixoHtml, comentarioFixoHtml].filter(Boolean).join('<span class="cm-tarefa-divisor"></span>');
+    // Boneco do responsável fixo: aqui o clique simples não faz nada (evita tirar o
+    // responsável sem querer); dois cliques seguidos removem o responsável.
+    const responsavelFixoHtml = (!funcoesAberto && CM_TAREFAS_PESSOAS.includes(responsavelAtual)) ? `
+      <button type="button" class="cm-tarefa-pessoa cm-tarefa-pessoa-fixo cm-tarefa-pessoa-${responsavelAtual.toLowerCase()} ativo" data-item-id="${item.id}" data-pessoa="${responsavelAtual}" title="${responsavelAtual} (2 cliques para remover)"><i class="fas fa-user"></i></button>` : '';
+    const fixosHtml = [horaFixoHtml, comentarioFixoHtml, responsavelFixoHtml].filter(Boolean).join('<span class="cm-tarefa-divisor"></span>');
 
     const statusIconHtml = {
       andamento: '<i class="fas fa-hourglass-half"></i>',
@@ -2208,6 +2215,16 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
     if (handlePessoa) {
       const item = itemDoCampo(handlePessoa);
       if (!item) return;
+      if (handlePessoa.classList.contains('cm-tarefa-pessoa-fixo')) {
+        const agora = Date.now();
+        const ehDuplo = ultimoCliquePessoaFixo.id === item.id && (agora - ultimoCliquePessoaFixo.em) < CM_TAREFAS_DUPLO_CLIQUE_MS;
+        ultimoCliquePessoaFixo = ehDuplo ? { id: null, em: 0 } : { id: item.id, em: agora };
+        if (ehDuplo) {
+          persistirCampoSimples(item, 'responsavel', '');
+          render();
+        }
+        return;
+      }
       const pessoa = handlePessoa.dataset.pessoa;
       const novoValor = item.responsavel === pessoa ? '' : pessoa;
       persistirCampoSimples(item, 'responsavel', novoValor);
