@@ -943,7 +943,6 @@ async function abrirListaTarefas(listaIdExistente, dataPresetBR) {
               <span class="cm-toolbar-secao-label">Editando como</span>
               <button type="button" class="cm-editor-btn" data-pessoa="Marcos">Marcos</button>
               <button type="button" class="cm-editor-btn" data-pessoa="Ester">Ester</button>
-              <button type="button" class="cm-editor-btn" data-pessoa="Aras">Aras</button>
             </div>
 
             <div class="cm-toolbar-secao cm-toolbar-secao-olho">
